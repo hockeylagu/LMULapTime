@@ -6,7 +6,8 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { descriptorTexturePath, normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
-import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
+import { carMaterialKey, createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
+import { batchCarParts } from '../car/carBatches.js';
 import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp } from '../car/carLamps.js';
 import { createLampStates, flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
@@ -172,12 +173,12 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const model = template.clone(true), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
-    // One material per lamp.
+    // One material per lamp, and one per distinct material content: a car file repeats a material under many names.
     const lampMaterials = new Map<CarLamp, Material>(), materials = new Map<string, Material>();
     const replace = (material: Material) => {
-      const recipe = recipeOf(material);
-      let created = materials.get(recipe.id);
-      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading); materials.set(recipe.id, created); }
+      const recipe = recipeOf(material), key = carMaterialKey(recipe, appearance);
+      let created = materials.get(key);
+      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading); materials.set(key, created); }
       return created;
     };
     for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, [...drawn, ...surfaces], rainFlashes, (lamp, current) => {
@@ -205,16 +206,18 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const [primaryModel, baselineModel] = await Promise.all([loadModel(assets.primary), assets.baseline ? loadModel(assets.baseline) : null]);
     const primary = makeCar(MAP_COLORS.carBody, false, primaryModel);
     primaryModel.add(createContactShadow(primaryModel));
+    // The ghost stays part by part: its see-through parts are drawn in a fixed order.
+    const primaryBatches = batchCarParts(primaryModel);
     const ghost = baselineModel ? makeCar(TELEMETRY_COLORS.baseline, true, baselineModel) : null;
     ghost?.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
-    return {primary, ghost};
+    return {primary, ghost, primaryBatches};
   };
   /** The cars `preload` built for the next load of the same `assets`: a load takes them, so no two layers share a car. */
   const preloaded = new WeakMap<LapCars, ReturnType<typeof buildCars>>();
   const load = async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, colorBy: MapColorMode) => {
     const built = preloaded.get(assets) ?? buildCars(assets);
     preloaded.delete(assets);
-    const cars = await built, primary = cars.primary, ghost = baseline && cars.ghost ? cars.ghost : new Group();
+    const cars = await built, primary = cars.primary, primaryBatches = cars.primaryBatches, ghost = baseline && cars.ghost ? cars.ghost : new Group();
     const primaryWheels = createWheelAnimation(primary, trajectory, surfaceHeight);
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
     const lights = (car: Group, points: ReplayTrajectoryData['points']) => [createLampStates(car, points)].filter(light => light !== null);
@@ -243,13 +246,15 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         primaryLine.material.opacity = primaryOpacity; primaryLine.visible = primaryOpacity > 0;
         if (baselineLine) { baselineLine.material.opacity = baselineOpacity; baselineLine.visible = baselineOpacity > 0; }
       },
+      /** The primary car's batched parts follow its wheels, steering and shown parts: call before each frame is drawn. */
+      syncParts() { primaryBatches.sync(); },
       /** Scenery streams in after the lines were draped: re-drape them on the road that is resident now. */
       refreshHeights() {
         primaryWheels.refreshHeights(); ghostWheels?.refreshHeights();
         refreshRacingLine(primaryLine, trajectory, origin, colors.primary, surfaceHeight);
         if (baselineLine && baseline) refreshRacingLine(baselineLine, baseline, origin, colors.baseline, surfaceHeight, BASELINE_LINE.widthM, BASELINE_LINE.liftM);
       },
-      dispose() { root.removeFromParent(); disposeObjects(root); },
+      dispose() { root.removeFromParent(); primaryBatches.dispose(); disposeObjects(root); },
     };
   };
   /**

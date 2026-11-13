@@ -51,6 +51,14 @@ export function materialTexturePaths(recipe: CarMaterialRecipe, appearance: CarA
   return [...(albedo ? [albedo] : []), ...(paint ? PAINT_MAPS.flatMap(key => paint.maps[key]?.texture ?? []) : [])];
 }
 
+/**
+ * What `createCarMaterial` builds from, for an appearance: two recipes with the same key make the same material, so a car draws
+ * them with one. Car files often repeat a material under several names (one per part).
+ */
+export function carMaterialKey(recipe: CarMaterialRecipe, appearance: CarAppearance): string {
+  return JSON.stringify([recipe.paint, recipe.paint ? appearance.paint : recipe.surface ?? null, albedoPath(recipe, appearance) ?? null]);
+}
+
 /** The map's own copy of a shared texture: repeat-wrapped (car UVs keep their native range) and decoded by the map's colour role. */
 function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Texture {
   const copy = texture(map.texture);

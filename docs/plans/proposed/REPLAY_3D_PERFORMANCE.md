@@ -236,6 +236,26 @@ of the prefiltered environment is a program define, and an unset environment is 
 - Method for this kind of stall: wrap `linkProgram` and `getProgramInfoLog` in an init script, record the shader name, the
   time and the calling phase; two programs with the same body and different `#define` lines are one material compiled twice.
 
+### The followed car: one multi-draw per material (2026-11-12)
+
+The first step towards a full race grid ([RACE_REPLAY.md](RACE_REPLAY.md)). Each car file already holds one primitive per
+native material, but many materials repeat the same content under other names (a median car: 94 drawn parts, 33 distinct
+contents). The car now builds one material per content (`carMaterialKey`) and draws its opaque parts that share one as a
+`BatchedMesh` (`car/carBatches.ts`); glass, decals, displays and lamps keep their own draws. The parts stay in the model as
+stand-ins in no camera layer, so wheel animation and cockpit/distance switching move them; `sync` copies them to the batch
+once a frame. The ghost is not batched (its see-through parts draw in a fixed order).
+
+Fuji ADESS lap, production builds, 30 s of playback, two interleaved runs each (ms):
+
+| Build | Main draws | Offscreen draws | Frame p50 | p95 | p99 | Callback p50 |
+|---|---|---|---|---|---|---|
+| Parts drawn one by one | 129 | 237 | 6.4–6.6 | 10.7–12.1 | 23.3–25.0 | 5.9–6.2 |
+| Batched by material | 89–90 | 93 | 6.3–6.4 | 10.7 | 23.4–24.8 | 5.8–5.9 |
+
+(The probe counts `drawElements`-style calls, not the multi-draw extension's, so the counts show what the batches removed.)
+The calls fell by about 180 a frame, but frame time did not move beyond run-to-run spread: one car is not what bounds this
+lap. The gain is for many cars, where the same batches can take every car of a model as instances.
+
 ## The scene (from the package index)
 
 | | Typical | Worst |

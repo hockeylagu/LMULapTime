@@ -230,6 +230,7 @@ export async function createReplayScene(
       camera.lookAt(rig.focus);
     }
     try {
+      layer.syncParts();
       // Cached shadow cascades still due ask for the next frame.
       if (environment.update()) invalidate();
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.

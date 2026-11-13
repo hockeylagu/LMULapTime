@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { NoColorSpace, SRGBColorSpace, Texture, Vector2, type IUniform } from 'three';
-import { createCarMaterial, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
+import { carMaterialKey, createCarMaterial, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
@@ -67,4 +67,14 @@ it('draws a standard material with its metal/roughness, AO/specular and normal m
 it('rejects a standard material without its surface description', () => {
   const bare: CarMaterialRecipe = { ...standard, surface: { ...standardSurface, flags: undefined } };
   expect(() => createCarMaterial(bare, appearance, () => new Texture(), testShading())).toThrow('has no surface description');
+});
+
+it('gives repeated materials of a car file one key, and tells apart a livery-textured or paint one', () => {
+  const twin: CarMaterialRecipe = { ...standard, id: 's2', name: 'CARBON_REAR' };
+  expect(carMaterialKey(twin, appearance)).toBe(carMaterialKey(standard, appearance));
+  const livery = { ...appearance, materialTextures: { CARBON_REAR: 'textures/livery' } } as unknown as CarAppearance;
+  expect(carMaterialKey(twin, livery)).not.toBe(carMaterialKey(standard, livery));
+  const paint: CarMaterialRecipe = { id: 'p', name: 'BODY', paint: true };
+  const otherPaint: CarAppearance = { ...appearance, albedo: 'other' };
+  expect(carMaterialKey(paint, appearance)).not.toBe(carMaterialKey(paint, otherPaint));
 });
