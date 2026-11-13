@@ -45,24 +45,54 @@ export function indexRaceStandings(overview: RaceReplayOverview, progress: RaceR
   const lapsBySlot = new Map<number, RaceReplayLap[]>();
   for (const lap of overview.laps) lapsBySlot.set(lap.slot, [...lapsBySlot.get(lap.slot) ?? [], lap]);
   for (const laps of lapsBySlot.values()) laps.sort((a, b) => a.endSec - b.endSec);
-  const outAtSec = new Map(overview.cars.flatMap(car => car.retired ? [[car.slot, outSecOf(overview, car, lapsBySlot)] as const] : []));
+  const progressTrack: RaceProgressTrack | null = progress && {
+    fromSec: progress.fromSec, hz: progress.hz, trackLengthM: progress.trackLengthM,
+    bySlot: new Map(progress.cars.map(car => [car.slot, car.distances])),
+  };
+  const outAtSec = new Map(overview.cars.flatMap(car => car.retired ? [[car.slot, outSecOf(overview, car, lapsBySlot, progressTrack)] as const] : []));
   return {
     outAtSec,
     isRace: !isNonRaceSession(overview.sessionType), cars: overview.cars, lapsBySlot, runningOrder: overview.runningOrder,
-    progress: progress && { fromSec: progress.fromSec, hz: progress.hz, trackLengthM: progress.trackLengthM,
-      bySlot: new Map(progress.cars.map(car => [car.slot, car.distances])) },
+    progress: progressTrack,
   };
 }
 
+const MOVE_EPSILON_M = 0.5;
+
+/** Last time `slot` moved along the track in `progress`; null when unavailable or it never moved. */
+function lastMovedSecOf(progress: RaceProgressTrack | null, slot: number): number | null {
+  const distances = progress?.bySlot.get(slot);
+  if (!progress || !distances) return null;
+  let lastMovedIdx = -1;
+  let prev: number | null = null;
+  for (let i = 0; i < distances.length; i++) {
+    const d = distances[i];
+    if (d === null) continue;
+    if (prev !== null && Math.abs(d - prev) > MOVE_EPSILON_M) lastMovedIdx = i;
+    prev = d;
+  }
+  return lastMovedIdx >= 0 ? progress.fromSec + lastMovedIdx / progress.hz : null;
+}
+
 /**
- * When a car that did not finish was out: the end of its last lap in the results (the replay may hold one more, unfinished,
- * up to the session end), the session start with none; without its results, the end of its last replay lap.
+ * When a car that did not finish was out: the later of its last completed result lap and the last moment
+ * it moved along the track (so a car that retires mid-lap isn't marked DNF while still driving).
  */
-function outSecOf(overview: RaceReplayOverview, car: RaceReplayCar, lapsBySlot: Map<number, RaceReplayLap[]>): number {
+function outSecOf(
+  overview: RaceReplayOverview,
+  car: RaceReplayCar,
+  lapsBySlot: Map<number, RaceReplayLap[]>,
+  progress: RaceProgressTrack | null,
+): number {
   const laps = lapsBySlot.get(car.slot) ?? [];
-  if (!car.sessionLapOrdinals) return laps.at(-1)?.endSec ?? overview.startSec;
+  const lastMoved = lastMovedSecOf(progress, car.slot);
+  if (!car.sessionLapOrdinals) {
+    const lapEnd = laps.at(-1)?.endSec ?? overview.startSec;
+    return lastMoved !== null ? Math.max(lapEnd, lastMoved) : lapEnd;
+  }
   const counted = Math.max(0, ...Object.keys(car.sessionLapOrdinals).map(Number).filter(Number.isFinite));
-  return laps.find(lap => lap.lapNumber === counted)?.endSec ?? overview.startSec;
+  const lapEnd = laps.find(lap => lap.lapNumber === counted)?.endSec ?? overview.startSec;
+  return lastMoved !== null ? Math.max(lapEnd, lastMoved) : lapEnd;
 }
 
 /** Out of the race (did not finish, past its last lap) at `timeSec`. */

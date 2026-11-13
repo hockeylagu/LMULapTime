@@ -11,7 +11,8 @@ import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js
 import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../../src/components/replay/inspector/replayPlaybackCursor.js';
 
 const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
-vi.mock('../../../../../src/components/replay/view3d/laps/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
+vi.mock('../../../../../src/components/replay/view3d/laps/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene), lapFirstStation: () => 0}));
+vi.mock('../../../../../src/components/replay/view3d/scene/sceneShell.js', () => ({createSceneShell: () => ({started: false, broken: false, detach() {}, dispose() {}})}));
 const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
 vi.mock('../../../../../src/api/sceneryApi.js', () => ({fetchSceneryLayout: vi.fn(async () => layout)}));
 vi.mock('../../../../../src/api/vehicles/bodyApi.js', () => ({fetchBody: vi.fn(async (vehicleId: string) => ({vehicleId}))}));
@@ -179,7 +180,7 @@ it('removes shortcut listeners and fullscreen isolation on leaving 3D', async ()
 
 it('passes the fetched scenery layout to the scene and draws no focus outline on the 3D map', async () => {
   const {map} = await setup();
-  expect(vi.mocked(createReplayScene).mock.calls[0][1]).toBe(layout);
+  expect(vi.mocked(createReplayScene).mock.calls[0][2]).toBe(layout);
   expect(map.className).not.toContain('focus-visible:outline-2');
 });
 

@@ -6,6 +6,7 @@ import { GhostSyncContext, type GhostSyncState } from './inspector/ghostSyncCont
 import { parseGhostSyncMode } from './map/ghostSync.js';
 import { RaceReplayView } from './race/RaceReplayView.js';
 import { RaceModeContext } from './race/raceModeContext.js';
+import { SceneShellsContext, useSharedSceneShells } from './view3d/scene/sceneShells.js';
 
 /** A finite number from a URL value, or null. */
 const numberParam = (value: string | null): number | null => {
@@ -21,6 +22,8 @@ export const ReplayInspectorPage: React.FC = () => {
   const fullscreen = searchParams.get('fullscreen') ?? searchParams.get('fullScreen');
   const viewParam = searchParams.get('view');
   const view: '2d' | '3d' = viewParam === '3d' ? '3d' : '2d';
+  // The race and lap views share one 3D scene per circuit: switching keeps its renderer, scenery and car models.
+  const sceneShells = useSharedSceneShells();
   // Marker A is kept as a distance, so it survives a lap or resolution reload.
   const [markerDistM, setMarkerDistM] = useState<number | null>(null);
   // From A needs marker A (a reload keeps the URL mode but not the marker): without it, Distance.
@@ -92,6 +95,7 @@ export const ReplayInspectorPage: React.FC = () => {
 
   if (isRace) {
     return (
+      <SceneShellsContext.Provider value={sceneShells}>
       <RaceReplayView
         sessionId={sessionId}
         initialTimeSec={numberParam(searchParams.get('t'))}
@@ -109,6 +113,7 @@ export const ReplayInspectorPage: React.FC = () => {
           t: String(timeSec), car: slot === null ? null : String(slot), lap: null,
         })}
       />
+      </SceneShellsContext.Provider>
     );
   }
 
@@ -120,6 +125,7 @@ export const ReplayInspectorPage: React.FC = () => {
   const corner = searchParams.get('corner');
 
   return (
+    <SceneShellsContext.Provider value={sceneShells}>
     <RaceModeContext.Provider value={openRace}>
     <GhostSyncContext.Provider value={ghostSync}>
       <ReplayInspectorContent
@@ -145,5 +151,6 @@ export const ReplayInspectorPage: React.FC = () => {
       />
     </GhostSyncContext.Provider>
     </RaceModeContext.Provider>
+    </SceneShellsContext.Provider>
   );
 };

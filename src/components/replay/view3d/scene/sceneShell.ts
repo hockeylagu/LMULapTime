@@ -3,27 +3,29 @@ import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
 import type { RenderPose } from './replayPose.js';
-import type { CarTextures } from '../laps/lapLayer.js';
+import type { CarTextures } from '../cars/carModels.js';
+import { createCarTemplates, type CarTemplates } from '../cars/carTemplates.js';
 import { disposeObjects } from './disposeObjects.js';
 import { exposureType, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
 import { createCameraRig, type CameraRig } from '../camera/cameraRig.js';
-import { addSceneEnvironment, sceneSun, VENUE_PROBE_PX } from '../sceneEnvironment.js';
-import { linkPrefilters } from '../prefilterLink.js';
+import { addSceneEnvironment, sceneSun } from '../sceneEnvironment.js';
+import { assertHazed } from '../atmosphere/haze.js';
 import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
-import { CAR_REFLECTION_PX, CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
+import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
 import { createSceneryBatches } from '../scenery/sceneryBatches.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
-import type { WheelAnimation } from '../cars/wheelAnimation.js';
 import { createSceneryStream } from '../scenery/sceneryStream.js';
 import { createSceneWarmup } from '../scenery/sceneWarmup.js';
-import { startStreaming } from '../scenery/materials/mipStreaming.js';
+import { releaseOnUpload, startStreaming } from '../scenery/materials/mipStreaming.js';
 import { isDriverCamera } from '../camera/driverCameras.js';
 import { isFreeCameraMode, viewMoved } from '../scenery/streamView.js';
+import { placeCarFrame } from '../cars/carParts.js';
+import type { CarMotion } from '../cars/carMotion.js';
 
 /** What a scene shows on the circuit: the lap view's cars and lines, or the race replay's cars. */
 export interface SceneContent {
@@ -40,15 +42,20 @@ export interface SceneContent {
 
 export interface SceneShellOptions {
   daylightClock?: ReplayDaylightClock;
-  onFailure: (message: string) => void;
-  onProgress: (progress: SceneLoadProgress) => void;
   /** The view whose chunks stream first, before any content exists. */
   firstView: StreamView;
 }
 
+/** What the view showing the scene is told: a failure (the shell is then `broken`) and the load's progress. */
+export interface SceneShellListener {
+  onFailure: (message: string) => void;
+  onProgress: (progress: SceneLoadProgress) => void;
+}
+
 /**
  * The 3D view without its content: the renderer, the circuit's scenery streaming around the view, the sky and its light, auto
- * exposure, the car reflection, the cameras and the draw loop. The lap view and the race replay each add their content (`start`).
+ * exposure, the car reflection, the cameras and the draw loop. The lap view and the race replay each add their content (`start`,
+ * then `show`): one shell serves both on a circuit, its canvas in the element of the view shown (`attach`).
  */
 export interface SceneShell {
   readonly renderer: WebGLRenderer;
@@ -59,6 +66,8 @@ export interface SceneShell {
   readonly surfaceHeight: SurfaceHeight;
   /** Car textures: from start files, sharpened (the interior's only once a driver camera is used). */
   readonly carTextures: CarTextures;
+  /** The scene's parsed bodies, shared by every car loader of the scene. */
+  readonly carTemplates: CarTemplates;
   /** Resolves once the environment and the car reflection exist: content programs compile against them. */
   readonly lit: Promise<void>;
   /** Resolves once the chunks under the first view are resident: content draped on the road waits for it. */
@@ -75,33 +84,46 @@ export interface SceneShell {
   exposureDisplay(): DisplayTransform;
   /** The lap distance the scenery streams around (with what is near the camera); undefined streams around the camera only. */
   station: number | undefined;
+  /** Whether `start` has run: later content shows with `show`. */
+  readonly started: boolean;
+  /** Whether the shell failed (a scenery chunk, the graphics context): the next view makes a new one. */
+  readonly broken: boolean;
+  /** Puts the canvas (once started) in `host` and reports to `listener`, until `detach`. */
+  attach(host: HTMLDivElement, listener: SceneShellListener): void;
+  /** Whether `host`'s view holds the shell: a view that left while it loaded shows nothing. */
+  isAttached(host: HTMLDivElement): boolean;
+  /**
+   * `host`'s view leaves (nothing happens if another view holds the shell by now): the canvas leaves its element and the content
+   * leaves the scene (the view disposes it). Nothing draws until the next view attaches and shows its own.
+   */
+  detach(host: HTMLDivElement): void;
   /** Shows the first content behind the loading screen, compiles it and starts drawing. */
   start(content: SceneContent): Promise<void>;
-  /** Replaces the content (the caller disposes the old one first). */
+  /** Replaces the content, its root taking the old one's place (the caller disposes the old one first). */
   show(content: SceneContent): void;
   /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker; wheels and lights follow it. */
-  placeCar(car: Object3D, pose: RenderPose, wheels: WheelAnimation | null, lights: Array<{update(pose: RenderPose): void}>): void;
+  placeCar(car: Object3D, pose: RenderPose, motion: CarMotion | null): void;
   /** Switches the camera mode with its environment, shadows and exposure; false when it is the current one. */
   setMode(next: CameraMode): boolean;
   beforeFrame(hook: ((frameTime: number) => void) | null): void;
   invalidate(): void;
-  /** Frees everything when the creation failed before `start` resolved. */
-  abort(): void;
   dispose(): void;
 }
 
-export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutResource, {daylightClock, onFailure, onProgress, firstView}: SceneShellOptions): SceneShell {
+/** Each car's body and pose marker, which `placeCar` switches by whether the pose has a heading. */
+const poseShapes = new WeakMap<Object3D, {body: Object3D; marker: Object3D}>();
+
+export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, firstView}: SceneShellOptions): SceneShell {
+  /** The view's element the canvas is in, and what it is told; none between views. */
+  let host: HTMLDivElement | null = null, listener: SceneShellListener | null = null, broken = false, started = false;
+  const onFailure = (message: string) => { broken = true; listener?.onFailure(message); };
+  const onProgress = (progress: SceneLoadProgress) => listener?.onProgress(progress);
   let renderer: WebGLRenderer;
   // No canvas multisampling: the scene renders into the auto-exposure target, which multisamples; the canvas gets one full-screen quad.
   try { renderer = new WebGLRenderer({antialias: false, alpha: false, reversedDepthBuffer: true}); }
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   // Reading a program's error log waits for its link to finish: about 10 ms a program at the first frame. Production builds skip it.
   renderer.debug.checkShaderErrors = import.meta.env.DEV;
-  // Texture units are numbered across both shader stages, but three checks them against the fragment stage's own limit (16 here)
-  // and warns once a draw per frame for a batched terrain whose two vertex-stage batch textures take it to 17. The link already
-  // holds each stage to its limit; the top unit stays three's upload slot.
-  const gl = renderer.getContext();
-  renderer.capabilities.maxTextures = (gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS) as number) - 1;
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, TextureStartFile>(), startOf = (url: string) => carStarts.get(url);
   // Car textures load at the package's size (it stores outside-only parts small and the liveries larger). The interior's own
@@ -110,15 +132,15 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
   const sun = sceneSun(layout, origin.y, daylightClock);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);
-  // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
-  const ground = createSceneryGround();
+  // Wheel and line contact heights read the package's road height grid; off it, and for the camera checks, one ray tree per resident chunk.
+  const ground = createSceneryGround(layout.roadHeightAt);
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
   const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
   /** A chunk's box in the scene: native coordinates less the origin, z mirrored as the world group draws them. */
   const worldBox = ({min, max}: SceneryBounds) => new Box3(new Vector3(min[0], min[1], -max[2]), new Vector3(max[0], max[1], -min[2]))
     .translate(new Vector3(-origin.x, -origin.y, origin.z));
   // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
-  const batches = createSceneryBatches(sceneryRoot, layout.materials);
+  const batches = createSceneryBatches(sceneryRoot, layout.materials, renderer.capabilities.maxTextures);
   let content: SceneContent | null = null;
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
   /** Resolves once the scene has its environment and the car's reflection: programs compiled before that would compile again. */
@@ -131,6 +153,8 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
   };
   // The scene and its cameras exist from the start, so the first view's chunks warm up as each arrives, while the others still load.
   const scene = new Scene(), rig = createCameraRig(renderer.domElement, origin, () => invalidate());
+  // Each `render` call (main, shadow layers, probe, environment) would walk the whole graph: `draw` updates it once per frame.
+  scene.matrixWorldAutoUpdate = false;
   const warmup = createSceneWarmup(renderer, scene, rig.perspective,
     () => { renderer.setRenderTarget(exposure.target); environment.applyHaze(); }, () => invalidate());
   // The loading screen's progress (the layout and cars were fetched before this ran), then the scenery still streaming in.
@@ -186,24 +210,22 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
       return (interior ? interiorTextures : carTextureLoader).loadAsync(url);
     },
     copied(copy, original, interior) {
-      const detail = (interior ? interiorTextures : carTextureLoader).detail(original);
-      if (!detail) return;
-      startStreaming(copy, renderer, detail);
+      const loader = interior ? interiorTextures : carTextureLoader, detail = loader.detail(original);
+      if (!detail) { const file = loader.file(original); if (file) releaseOnUpload(copy, file); return; }
+      startStreaming(copy, detail);
       if (interior && !driverCameraUsed) warmup.hold(copy); else warmup.sharpen(copy);
     },
   };
-  // The first view's chunks are requested first: the sky's environment and the car's reflection link their programs on the main
-  // thread, which the downloads then overlap.
+  // The first view's chunks are requested first, so their downloads overlap the lighting set up below: the sky's environment and
+  // the car's reflection, built on the main thread, and the convolution program, linked off it.
   let streamView: StreamView | null = firstView; stream.update(firstView); report();
   // Both exist once `lit` resolves; nothing below reads them before.
   let environment!: ReturnType<typeof addSceneEnvironment>, reflection!: ReturnType<typeof createCarReflection>;
-  // The environment and the car's reflection prefilter on creation: their programs link first, off the main thread.
-  const prefilters = linkPrefilters(renderer, rig.perspective, [VENUE_PROBE_PX, CAR_REFLECTION_PX]);
   const convolution = linkConvolution(renderer, layout.shading.convolution.kernels);
-  lit = prefilters.ready.then(() => {
+  lit = Promise.resolve().then(() => {
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), sun);
     reflection = createCarReflection(renderer, scene, layout.shading);
-  }).finally(() => { prefilters.dispose(); });
+  });
   lit.then(() => report({lighting: 1}), () => {}); // Awaited by the content.
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
@@ -237,6 +259,7 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
     }
     try {
       content.beforeDraw(camera);
+      scene.updateMatrixWorld();
       // Cached shadow cascades still due ask for the next frame.
       if (environment.update()) invalidate();
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
@@ -257,11 +280,11 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
     }
   };
   /** Kept loaded behind the 2D map. */
-  const hidden = () => host.closest('[hidden]') !== null;
+  const hidden = () => !host || host.closest('[hidden]') !== null;
   let viewportWidth = 0, viewportHeight = 0;
   const resize = () => {
     if (disposed || hidden()) return; // Keep the size it had.
-    const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
+    const width = Math.max(1, host!.clientWidth), height = Math.max(1, host!.clientHeight);
     if (width === viewportWidth && height === viewportHeight) { invalidate(); return; } // Shown again at the same size.
     viewportWidth = width; viewportHeight = height;
     renderer.setSize(width, height, false); rig.resize(width / height);
@@ -272,10 +295,33 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
   const contextLost = (event: Event) => { event.preventDefault(); onFailure('The 3D graphics context was lost. Retry or return to 2D.'); };
   const observer = new ResizeObserver(resize);
   const show = (next: SceneContent) => {
+    if (content && content.root !== next.root) world.remove(content.root);
     content = next; world.add(next.root); environment.setDynamic([next.root]); reflection.setCar(next.reflected, next.root);
+    assertHazed(scene);
+  };
+  /** Puts the canvas in the attached view's element. */
+  const mount = () => {
+    if (!host || renderer.domElement.parentElement === host) return;
+    host.append(renderer.domElement);
+    observer.observe(host);
+    viewportWidth = 0; viewportHeight = 0; resize();
   };
   const shell: SceneShell = {
-    renderer, scene, rig, origin, surfaceHeight: ground.surfaceHeight, carTextures,
+    renderer, scene, rig, origin, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(),
+    get started() { return started; },
+    get broken() { return broken; },
+    attach(next, nextListener) {
+      if (host) shell.detach(host);
+      host = next; listener = nextListener;
+      if (started) mount();
+    },
+    isAttached: view => host === view,
+    detach(view) {
+      if (host !== view) return;
+      observer.disconnect(); renderer.domElement.remove();
+      host = null; listener = null; frameHook = null;
+      if (content) { world.remove(content.root); content = null; }
+    },
     lit,
     underView: () => stream.whenUnderView(),
     warm: object => (loading ? warmup.queue(object, new AbortController().signal) : warmup.warm(object, new AbortController().signal)),
@@ -304,6 +350,7 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
       // The scenery around the first view is resident and compiled: capture the venue's light for the scene's environment.
       environment.captureVenue();
       warmup.shown();
+      assertHazed(scene);
       invalidate = () => {
         // Nor while kept hidden behind the 2D map: showing it again resizes, which draws.
         if (disposed || frame || document.hidden || hidden()) return;
@@ -311,17 +358,18 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
       };
       renderer.domElement.addEventListener('webglcontextlost', contextLost);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.domElement.className = 'h-full w-full';
-      host.append(renderer.domElement);
-      observer.observe(host);
-      document.addEventListener('visibilitychange', invalidate); resize();
+      document.addEventListener('visibilitychange', invalidate);
+      started = true; mount();
     },
     show,
-    placeCar(car, pose, wheels, lights) {
+    placeCar(car, pose, motion) {
       car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
       if (pose.orientation) car.quaternion.copy(pose.orientation); else car.quaternion.identity();
-      wheels?.update(pose); for (const light of lights) light.update(pose);
-      car.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
-      car.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
+      placeCarFrame(car);
+      motion?.update(pose);
+      let shown = poseShapes.get(car);
+      if (!shown) { shown = {body: car.getObjectByName('body-envelope')!, marker: car.getObjectByName('pose-marker')!}; poseShapes.set(car, shown); }
+      shown.body.visible = pose.yaw !== undefined; shown.marker.visible = pose.yaw === undefined;
     },
     setMode(next) {
       if (!rig.setMode(next)) return false;
@@ -332,7 +380,6 @@ export function createSceneShell(host: HTMLDivElement, layout: SceneryLayoutReso
     },
     beforeFrame(hook) { frameHook = hook; },
     invalidate: () => invalidate(),
-    abort: cleanup,
     dispose() {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost); document.removeEventListener('visibilitychange', invalidate);

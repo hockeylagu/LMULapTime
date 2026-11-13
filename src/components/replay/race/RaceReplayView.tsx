@@ -115,18 +115,25 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
   const [trackRequest, setTrackRequest] = useState(0);
   const [view, setView] = useState<'2d' | '3d'>('2d');
   useRaceUrlSync(clock, followSlot, onStateChange);
+  // Once opened, the 3D view stays loaded while the page shows the 2D map: hidden, its keys and drawing stop.
+  const [kept3d, setKept3d] = useState(false), is3d = view === '3d';
+  if (is3d && !kept3d) setKept3d(true);
+  const view3d = (is3d || kept3d) && (
+    <div className="contents" hidden={!is3d}>
+      <Suspense fallback={<div className="relative min-w-0 flex-1 bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
+        <Race3DView className="min-w-0 flex-1" overview={overview} clock={clock} poses={poses} followSlot={followSlot} progress={progress}
+          active={is3d} onToggleView={() => setView('2d')} />
+      </Suspense>
+    </div>
+  );
 
   return (
     <>
       <RaceReplayHeader onClose={onClose} metadata={metadata} overview={overview} clock={clock} followSlot={followSlot}
         onFollow={setFollowSlot} onOpenLap={onOpenLap} />
       <div className="flex min-h-0 flex-1">
-        {view === '3d' ? (
-          <Suspense fallback={<div className="relative min-w-0 flex-1 bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
-            <Race3DView className="min-w-0 flex-1" overview={overview} clock={clock} poses={poses} followSlot={followSlot} progress={progress}
-              onToggleView={() => setView('2d')} />
-          </Suspense>
-        ) : (
+        {view3d}
+        {view === '2d' && (
           <RaceMapScene className="min-w-0 flex-1" overview={overview} index={index} clock={clock} poses={poses}
             followSlot={followSlot} hoverSlot={hoverSlot} trackRequest={trackRequest} onFollow={setFollowSlot} onHover={setHoverSlot}
             onToggleView={() => setView('3d')} />

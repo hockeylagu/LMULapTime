@@ -17,6 +17,8 @@ export interface LoadedBody {
    * named by their content, so every call returns the same bytes.
    */
   files(): Promise<BodyFiles>;
+  /** Reads the body's far model GLB (the exterior from `resource.far.fromM` metres on, merged by role), for the parse only. */
+  farFile(): Promise<ArrayBuffer>;
   descriptor: BodyDescriptor;
   /** The body's cabin volumes by their descriptor path (`volumes/<sha256>.bin`), for the cockpit reflection occlusion. */
   volumes: Map<string, ArrayBuffer>;
@@ -35,6 +37,11 @@ export async function fetchBody(vehicleId: string, packageRevision: string | und
     if (bytes.byteLength !== resource.byteLength || (interior && interiorBytes?.byteLength !== interior.byteLength)) throw Error('Incomplete 3D body');
     return { bytes, interiorBytes };
   };
+  const farFile = async () => {
+    const bytes = await file(`${resource.far.sha256}.glb`);
+    if (bytes.byteLength !== resource.far.byteLength) throw Error('Incomplete 3D body');
+    return bytes;
+  };
   const [descriptor, volumes] = await Promise.all([
     fetchJson<BodyDescriptor>(`${VEHICLE_FILES}bodies/${resource.folder}.json`, { signal }),
     Promise.all(resource.volumes.map(async row => {
@@ -43,5 +50,5 @@ export async function fetchBody(vehicleId: string, packageRevision: string | und
       return [`volumes/${row.sha256}.bin`, volume] as const;
     })),
   ]);
-  return { resource, files, descriptor, volumes: new Map(volumes), vehicleId };
+  return { resource, files, farFile, descriptor, volumes: new Map(volumes), vehicleId };
 }

@@ -1,13 +1,16 @@
-import { useEffect, useEffectEvent, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, type RefObject } from 'react';
 import type { RaceReplayOverview, RaceReplayProgress } from '../../../../../shared/types/replay.js';
 import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import { fetchSceneryLayout } from '../../../../api/sceneryApi.js';
-import { fetchBody, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import { createBodyStore, type BodyStore } from '../../../../api/vehicles/bodyStore.js';
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import type { RaceClock } from '../../race/raceClock.js';
 import type { RacePoseCache } from '../../race/racePoseCache.js';
 import type { CameraMode } from '../camera/cameraModes.js';
-import { NO_LOAD_PROGRESS, type SceneLoadProgress } from '../scene/loadProgress.js';
+import { NO_LOAD_PROGRESS } from '../scene/loadProgress.js';
+import { useSceneHost, type SceneCreateContext } from '../scene/useSceneHost.js';
+import { useSceneShells } from '../scene/sceneShells.js';
 import { createRaceScene, type RaceSceneHandle } from './raceScene.js';
 
 interface Options {
@@ -21,12 +24,16 @@ interface Options {
   mode: CameraMode;
   retry: number;
 }
-interface SceneState {key: string; error?: string; ready?: boolean; progress?: SceneLoadProgress}
-
-/** Where a car is at `timeSec` (native x and z), or else the first car the window has on the track. */
-function firstPlace(window: RacePoseWindow, slot: number | null, timeSec: number): {x: number; z: number} | null {
-  const pose = new Float32Array(RACE_POSE_CHANNEL_COUNT), order = [window.slots.indexOf(slot ?? -1), ...window.slots.keys()];
-  for (const car of order) if (car >= 0 && sampleRacePose(window, car, timeSec, pose)) return {x: pose[0], z: pose[2]};
+/**
+ * Where a car is at `timeSec` (native x and z): on the track, else where it next appears (waiting in its garage), else where the
+ * first car the window has on the track is.
+ */
+async function firstPlace(window: RacePoseWindow, poses: RacePoseCache, slot: number | null, timeSec: number): Promise<{x: number; z: number} | null> {
+  const pose = new Float32Array(RACE_POSE_CHANNEL_COUNT), own = window.slots.indexOf(slot ?? -1);
+  if (own >= 0 && sampleRacePose(window, own, timeSec, pose)) return {x: pose[0], z: pose[2]};
+  const next = slot === null ? null : await poses.nextPose(slot, timeSec);
+  if (next && sampleRacePose(next.window, next.carIndex, next.timeSec, pose)) return {x: pose[0], z: pose[2]};
+  for (const car of window.slots.keys()) if (sampleRacePose(window, car, timeSec, pose)) return {x: pose[0], z: pose[2]};
   return null;
 }
 
@@ -40,67 +47,58 @@ export function trackStation(progress: RaceReplayProgress | null, slot: number |
   return ((distance % length) + length) % length;
 }
 
+/** Draws the session clock's moment: every car's pose, and the track station the scenery streams towards. */
+function drawScene(handle: RaceSceneHandle, clock: RaceClock, poses: RacePoseCache, progress: RaceReplayProgress | null, followSlot: number | null) {
+  const {timeSec} = clock.getState();
+  handle.time(timeSec, poses.windowAt(timeSec), trackStation(progress, followSlot, timeSec));
+}
+
 /** The race replay's 3D scene for a layout: every car on the session clock, the followed one as its full model. */
 export function useRaceScene({host, overview, clock, poses, followSlot, progress, mode, retry}: Options) {
-  const scene = useRef<RaceSceneHandle | null>(null);
-  const [state, setState] = useState<SceneState | null>(null);
-  const key = `${overview.layoutKey ?? ''}:${retry}`;
+  const key = `${overview.replayName}:${overview.layoutKey ?? ''}:${retry}`;
+  const shells = useSceneShells();
   const window = poses.windowAt(clock.getState().timeSec);
   // Bodies outlive the scene's loads (a load cancelled by a re-render leaves its body to the next): they stop only on unmount.
-  const bodies = useRef({cache: new Map<string, Promise<LoadedBody>>(), signal: AbortSignal.abort()});
+  // Made on mount (a remount gets a new one: a disposed store's fetches stay aborted).
+  const bodies = useRef<BodyStore | null>(null);
   useEffect(() => {
-    const controller = new AbortController(), owner = bodies.current;
-    owner.signal = controller.signal;
-    return () => { controller.abort(); owner.cache.clear(); };
+    const store = createBodyStore();
+    bodies.current = store;
+    return () => { store.dispose(); if (bodies.current === store) bodies.current = null; };
   }, []);
+  /** The scene's package revision once its layout is in: every body after it is checked against it. */
+  const revision = useRef<string | undefined>(undefined);
   /** A car's body, once per livery (the scene parses each body once for all its liveries); null for a car the replay does not name. */
-  const bodyOf = useEffectEvent((slot: number | null): Promise<LoadedBody | null> => {
+  const bodyOf = useCallback((slot: number | null): Promise<LoadedBody | null> => {
     const vehicleId = overview.cars.find(car => car.slot === slot)?.vehicleId;
     if (!vehicleId) return Promise.resolve(null);
-    const {cache, signal} = bodies.current;
-    let pending = cache.get(vehicleId);
-    if (!pending) {
-      pending = fetchBody(vehicleId, undefined, signal);
-      cache.set(vehicleId, pending);
-      pending.catch(() => { if (cache.get(vehicleId) === pending) cache.delete(vehicleId); });
-    }
-    return pending;
-  });
-  const latest = useEffectEvent(() => ({followSlot, mode, window}));
-  const drawAt = useEffectEvent(() => {
-    const {timeSec} = clock.getState();
-    scene.current?.time(timeSec, poses.windowAt(timeSec), trackStation(progress, followSlot, timeSec));
-  });
+    if (!bodies.current) return Promise.reject(new DOMException('The race view is unmounted', 'AbortError'));
+    return bodies.current.body(vehicleId, revision.current);
+  }, [overview.cars]);
+  const create = async ({container, signal, showProgress, fail}: SceneCreateContext): Promise<RaceSceneHandle> => {
+    const layoutKey = overview.layoutKey;
+    if (!layoutKey) throw Error('This replay has no resolved circuit layout. Use the 2D map.');
+    const place = window && await firstPlace(window, poses, followSlot, clock.getState().timeSec);
+    signal.throwIfAborted();
+    if (!place) throw Error('No car is on the track here. Use the 2D map.');
+    showProgress(NO_LOAD_PROGRESS);
+    const [layout, body] = await Promise.all([fetchSceneryLayout(layoutKey, signal), bodyOf(followSlot)]);
+    signal.throwIfAborted();
+    revision.current = layout.packageRevision;
+    if (body && body.resource.packageRevision !== layout.packageRevision) throw Error('Body package revision differs from the 3D scene');
+    const shell = shells.acquire(layout, {firstView: {kind: 'free', x: place.x, z: place.z}});
+    try {
+      return await createRaceScene(shell, container, layout, overview.cars, {slot: followSlot, body}, slot => bodyOf(slot),
+        (slot, timeSec) => poses.nextPose(slot, timeSec), fail, showProgress);
+    } catch (error) { shell.detach(container); shells.discardUnstarted(shell); throw error; }
+  };
   // The scene waits for the first pose window: its scenery streams first around the followed car.
-  const hasWindow = window !== null;
-  useEffect(() => {
-    const container = host.current, layoutKey = overview.layoutKey;
-    if (!container || !hasWindow) return;
-    const abort = new AbortController();
-    let active = true, created: RaceSceneHandle | null = null;
-    const fail = (message: string) => { if (active) setState({key, error: message}); };
-    const initialize = async () => {
-      if (!layoutKey) throw Error('This replay has no resolved circuit layout. Use the 2D map.');
-      const selected = latest();
-      const place = selected.window && firstPlace(selected.window, selected.followSlot, clock.getState().timeSec);
-      if (!place) throw Error('No car is on the track here. Use the 2D map.');
-      setState({key, progress: NO_LOAD_PROGRESS});
-      const showProgress = (progress: SceneLoadProgress) => { if (active) setState(current => current?.error ? current : {...(current?.key === key ? current : {key}), progress}); };
-      const [layout, body] = await Promise.all([fetchSceneryLayout(layoutKey, abort.signal), bodyOf(selected.followSlot)]);
-      abort.signal.throwIfAborted();
-      const handle = await createRaceScene(container, layout, overview.cars, {slot: selected.followSlot, body, ...place}, slot => bodyOf(slot), fail, showProgress);
-      if (!active) { handle.dispose(); return; }
-      created = handle; scene.current = handle; handle.mode(latest().mode); drawAt();
+  const {scene, state, setState} = useSceneHost<RaceSceneHandle>({host, key, enabled: window !== null, errorMessage: 'Unable to load the 3D race scene', create,
+    onCreated: handle => {
+      handle.mode(mode); drawScene(handle, clock, poses, progress, followSlot);
       setState(current => ({key, ready: true, progress: current?.key === key ? current.progress : undefined}));
-    };
-    initialize().catch((error: unknown) => {
-      if (active && !isAbortError(error)) fail(apiErrorMessage(error, 'Unable to load the 3D race scene'));
-    });
-    return () => {
-      active = false; abort.abort(); created?.dispose();
-      if (scene.current === created) scene.current = null;
-    };
-  }, [key, host, overview, clock, hasWindow]);
+    }});
+  const drawAt = useEffectEvent(() => { if (scene.current) drawScene(scene.current, clock, poses, progress, followSlot); });
   // A newly followed car loads its body; the scene shows its box until then.
   useEffect(() => {
     const handle = scene.current;
@@ -110,9 +108,9 @@ export function useRaceScene({host, overview, clock, poses, followSlot, progress
       if (!abort.signal.aborted && !isAbortError(error)) setState({key, error: apiErrorMessage(error, 'Unable to load the followed car')});
     });
     return () => abort.abort();
-  }, [followSlot, key, state?.ready]);
+  }, [followSlot, key, state?.ready, scene, setState, bodyOf]);
   useEffect(() => clock.subscribe(() => drawAt()), [clock]);
   useEffect(() => { drawAt(); }, [window, state?.ready, progress]);
-  useEffect(() => { scene.current?.mode(mode); drawAt(); }, [mode]);
-  return {scene, state: state?.key === key ? state : null};
+  useEffect(() => { scene.current?.mode(mode); drawAt(); }, [mode, scene]);
+  return {scene, state};
 }

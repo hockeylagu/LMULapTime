@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { RaceReplayOverview, RaceReplayProgress } from '../../../../shared/types/index.js';
-import { indexRaceStandings, raceStandingsAt, runningOrderAt } from '../../../../src/components/replay/race/raceStandings.js';
+import { indexRaceStandings, isOutAt, raceStandingsAt, runningOrderAt } from '../../../../src/components/replay/race/raceStandings.js';
 import { formatRaceGap } from '../../../../src/components/replay/race/RaceStandingsTower.js';
 
 /** Car 1 laps in 100 s, car 2 in 105 s, car 3 (another class) in 130 s; car 1 laps car 3 on lap 4. */
@@ -126,6 +126,37 @@ describe('raceStandingsAt', () => {
     const rows = raceStandingsAt(indexRaceStandings(race, progress), 5);
     expect(rows.find(row => row.car.slot === 1)!.gap).toEqual({ kind: 'leader' });
     expect(rows.find(row => row.car.slot === 2)!.gap).toEqual({ kind: 'time', sec: 1 });
+  });
+
+  it('keeps a 0-lap DNF car racing until it actually stops moving on track', () => {
+    const progress = {
+      trackLengthM: 1000,
+      fromSec: 0,
+      hz: 1,
+      cars: [
+        { slot: 1, distances: [0, 50, 100, 150, 200, 250] },
+        { slot: 2, distances: [0, 40, 80, 120, 120, 120] },
+      ],
+    };
+    const race = {
+      ...overview(),
+      cars: [
+        { ...overview().cars[0], carClass: 'Hyper' },
+        { ...overview().cars[1], carClass: 'Hyper', retired: 'DNF', sessionLapOrdinals: {} },
+      ],
+      laps: [
+        { slot: 1, lapNumber: 1, startSec: 0, endSec: 20, lapTimeSec: 20, isValid: true },
+        { slot: 2, lapNumber: 1, startSec: 0, endSec: 100, lapTimeSec: null, isValid: false },
+      ],
+      runningOrder: [{ timeSec: 0, order: [1, 2] }],
+    };
+    const index = indexRaceStandings(race, progress);
+    expect(isOutAt(index, 2, 2)).toBe(false);
+    const liveRow = raceStandingsAt(index, 2).find(row => row.car.slot === 2)!;
+    expect(liveRow.gap?.kind).toBe('time');
+    expect((liveRow.gap as { kind: 'time'; sec: number }).sec).toBeCloseTo(0.4, 5);
+    expect(isOutAt(index, 2, 3)).toBe(true);
+    expect(raceStandingsAt(index, 3).find(row => row.car.slot === 2)!.gap).toEqual({ kind: 'out', status: 'DNF' });
   });
 
   it('compares best laps in practice and qualifying, valid laps only', () => {

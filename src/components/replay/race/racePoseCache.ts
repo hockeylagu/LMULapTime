@@ -1,9 +1,14 @@
-import type { RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
+import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
 
 type FetchWindow = (index: number, signal: AbortSignal) => Promise<RacePoseWindow>;
 
 /** Windows kept around the clock: the current one, the next (fetched ahead) and a few behind. */
 const KEEP_WINDOWS = 6;
+/** Windows a car's next pose is looked for in, from the clock's: a car out of the replay longer than this has none. */
+const NEXT_POSE_WINDOWS = 30;
+
+/** A car's next sample with a pose: the window holding it, the car's index in it and the sample's time. */
+export interface NextPose { window: RacePoseWindow; carIndex: number; timeSec: number }
 
 /**
  * The race replay's pose windows on the client: loads the window under the clock, fetches the
@@ -35,7 +40,35 @@ export function createRacePoseCache(windowSec: number, fetchWindow: FetchWindow,
     }
   };
 
+  /** Each car's next pose by slot and window index, found once. */
+  const nextPoses = new Map<string, Promise<NextPose | null>>();
+  /** One window after another (the first with a pose ends the search), from `index`. */
+  const findNextPose = async (slot: number, timeSec: number, index: number, last: number): Promise<NextPose | null> => {
+    if (index > last) return null;
+    // A window past the replay's end does not load: the car has no pose ahead.
+    const window = windows.get(index) ?? await fetchWindow(index, new AbortController().signal).catch(() => null);
+    if (!window) return null;
+    const carIndex = window.slots.indexOf(slot);
+    if (carIndex >= 0) {
+      const from = Math.max(0, Math.ceil((timeSec - window.fromSec) * window.hz));
+      for (let sample = from; sample < window.count; sample++) {
+        if (Number.isFinite(window.data[(carIndex * window.count + sample) * RACE_POSE_CHANNEL_COUNT])) return {window, carIndex, timeSec: window.fromSec + sample / window.hz};
+      }
+    }
+    return findNextPose(slot, timeSec, index + 1, last);
+  };
+
   return {
+    /**
+     * The car's first pose at or after `timeSec`, looked for in the windows ahead (not kept), or null if it has none in the next
+     * `NEXT_POSE_WINDOWS`: where a car out of the replay (in its garage) appears.
+     */
+    nextPose(slot: number, timeSec: number): Promise<NextPose | null> {
+      const index = Math.max(0, Math.floor(timeSec / windowSec)), key = `${slot}:${index}`;
+      let found = nextPoses.get(key);
+      if (!found) { found = findNextPose(slot, timeSec, index, index + NEXT_POSE_WINDOWS - 1); nextPoses.set(key, found); }
+      return found;
+    },
     /** The window holding `timeSec`, or null while it loads; starts the loads it needs. */
     windowAt(timeSec: number): RacePoseWindow | null {
       const index = Math.max(0, Math.floor(timeSec / windowSec));

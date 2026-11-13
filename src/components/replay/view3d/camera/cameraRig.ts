@@ -6,7 +6,7 @@ import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
-import { setCockpitView } from '../cars/sceneObjects.js';
+import { setCockpitView } from '../cars/carParts.js';
 import { createTracksideCameras } from './tracksideCameras.js';
 
 const DEFAULT_CHASE_DISTANCE_M = 7.8;
@@ -49,6 +49,8 @@ export interface CameraRig {
   readonly focus: Vector3;
   /** Whether the first pose has placed the camera. */
   readonly placed: boolean;
+  /** The next pose places the camera again, as the first did: new content (lap or race) takes over the scene. */
+  unplace(): void;
   /** Free views (not on a car) keep the eye above the ground and out of walls; car-mounted and overhead views do not. */
   readonly checksGround: boolean;
   /** The lap's cars: trackside spots along its line, and the game cameras and cockpit mesh of its primary car. */
@@ -119,6 +121,7 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
     get mode() { return mode; },
     focus: controls.target,
     get placed() { return placed; },
+    unplace() { placed = false; },
     get checksGround() { return camera === perspective && !isDriverCamera(mode); },
     setLayer(next) {
       layer = next;

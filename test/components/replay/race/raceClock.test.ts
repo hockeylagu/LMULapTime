@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRaceClock } from '../../../../src/components/replay/race/raceClock.js';
 import { createRacePoseCache } from '../../../../src/components/replay/race/racePoseCache.js';
-import type { RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
+import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
 
 describe('createRaceClock', () => {
   let frames: Array<(time: number) => void>;
@@ -64,6 +64,24 @@ describe('createRacePoseCache', () => {
     await vi.waitFor(() => expect(cache.windowAt(9 * 60)).not.toBeNull());
     expect(cache.windowAt(9 * 60 + 1)).not.toBeNull();
     cache.dispose();
+  });
+
+  it('finds where a car out of the replay next appears, in the windows ahead, once', async () => {
+    // One car (slot 7): no pose before 143.8 s, then poses.
+    const posed = (index: number) => {
+      const data = new Float32Array(601 * RACE_POSE_CHANNEL_COUNT).fill(Number.NaN);
+      const from = index === 2 ? 238 : index > 2 ? 0 : 601;
+      for (let sample = from; sample < 601; sample++) data[sample * RACE_POSE_CHANNEL_COUNT] = 1;
+      return { fromSec: index * 60, hz: 10, count: 601, slots: [7], data } as RacePoseWindow;
+    };
+    const fetchWindow = vi.fn((index: number) => (index > 3 ? Promise.reject(new Error('past the end')) : Promise.resolve(posed(index))));
+    const cache = createRacePoseCache(60, fetchWindow, vi.fn());
+    const next = await cache.nextPose(7, 0);
+    expect(next?.timeSec).toBeCloseTo(143.8);
+    expect(next?.window.fromSec).toBe(120);
+    await cache.nextPose(7, 30);
+    expect(fetchWindow).toHaveBeenCalledTimes(3);
+    expect(await cache.nextPose(8, 0)).toBeNull();
   });
 
   it('remembers a failed window until retried', async () => {

@@ -6,6 +6,7 @@ import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../.
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import { inverseToneCurve, type DisplayTransform } from '../autoExposure.js';
+import { hazeProgram } from '../atmosphere/haze.js';
 
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
 export const RACING_LINE_WIDTH_M = 0.6;
@@ -70,7 +71,9 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
   fillHeights(heights, lap, surfaceHeight);
   const geometry = racingLineGeometry(lap, origin, heights, widthM, liftM);
   // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
-  const line = new Mesh(geometry, new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
+  const material = new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
+  hazeProgram(material);
+  const line = new Mesh(geometry, material);
   line.name = 'racing-line';
   line.renderOrder = liftM > LIFT_M ? 3 : 2;
   // Data, not lit scenery: its vertex colours are what the display transform shows as the 2D map's colours (colorRacingLine), and

@@ -2,7 +2,8 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { descriptorTexturePath } from '../../../../../shared/packageContract/index.js';
 import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene, type ShaderMaterial } from 'three';
-import { createReplayScene } from '../../../../../src/components/replay/view3d/laps/replayScene.js';
+import { createReplayScene, lapFirstStation } from '../../../../../src/components/replay/view3d/laps/replayScene.js';
+import { createSceneShell, type SceneShell } from '../../../../../src/components/replay/view3d/scene/sceneShell.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/scene/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import { isStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
@@ -17,6 +18,7 @@ const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveC
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
 /** Car texture reads, as `car` or `interior` by the loader that made them and the start file each was read from, and the textures read from one. */
 const carTextureLoads = vi.hoisted(() => ({paths: [] as string[], started: new WeakSet<object>()}));
+import { hazeProgram } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
 vi.mock('three-mesh-bvh/worker', async () => {
   const {MeshBVH} = await import('three-mesh-bvh');
   return {GenerateMeshBVHWorker: class {async generate(geometry: BufferGeometry) { return new MeshBVH(geometry, {indirect: true}); } dispose() {}}};
@@ -49,6 +51,9 @@ vi.mock('three', async importOriginal => {
     getActiveMipmapLevel() { return 0; }
     xr = {enabled: false};
     setRenderTarget() {}
+    setScissorTest() {}
+    getScissorTest() { return false; }
+    copyTextureToTexture() {}
     getDrawingBufferSize(size: {set(x: number, y: number): unknown}) { return size.set(1, 1); }
     readRenderTargetPixelsAsync() { return Promise.resolve(); }
     autoClear = true;
@@ -66,15 +71,16 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
     async parseAsync(bytes: ArrayBuffer) {
       // The interior file (one byte in this double): a dashboard under its chassis node.
       if (bytes.byteLength === 1) {
-        const scene = new Group(), parts = new Group(), dash = new Group();
+        const scene = new Group(), parts = new Group(), dash = new Mesh(new BoxGeometry(), new MeshBasicMaterial());
+        (dash.material.userData as {nativeMaterialId?: string}).nativeMaterialId = 'm1';
         parts.name = 'chassis'; dash.name = 'dash-in'; dash.userData.cockpitView = 'in';
         parts.add(dash); scene.add(parts);
         return {scene};
       }
-      const root = rigModel(), cockpit = new Group(), chassis = new Group();
+      const root = rigModel(), cockpit = new Mesh(new BoxGeometry(), new MeshBasicMaterial()), chassis = new Group();
       chassis.name = 'chassis'; root.add(chassis);
-      root.traverse(object => { if (object instanceof Mesh) { const material = object.material as Material; material.userData.nativeMaterialId = 'm1'; material.name = 'body'; } });
       cockpit.name = 'cockpit-in'; cockpit.userData.cockpitView = 'in'; root.add(cockpit);
+      root.traverse(object => { if (object instanceof Mesh) { const material = object.material as Material; material.userData.nativeMaterialId = 'm1'; material.name = 'body'; } });
       // An interior part (the package marks its node) with its own material, and the same material's texture kept for the outside by a second, unmarked one.
       const interior = new Group(); interior.userData.interior = true; root.add(interior);
       for (const [name, id, parent] of [['seat', 'seat', interior], ['dash', 'trim', interior], ['sill', 'trim', root]] as const) {
@@ -96,7 +102,8 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
 });
 /** One shared material per package material key, as the loader shares them. */
 const keyed = new Map<string, MeshBasicMaterial>();
-const materialOf = (key: string) => { let made = keyed.get(key); if (!made) { made = new MeshBasicMaterial(); made.userData = {lmuMaterial: key, surfaceConfigured: true}; keyed.set(key, made); } return made; };
+// Configured as the chunk loader configures its surfaces, haze included.
+const materialOf = (key: string) => { let made = keyed.get(key); if (!made) { made = new MeshBasicMaterial(); made.userData = {lmuMaterial: key, surfaceConfigured: true, surfaceTextureUnits: 1}; hazeProgram(made); keyed.set(key, made); } return made; };
 vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', () => ({createChunkLoader: () => ({
   async load(chunk: SceneryChunk, _signal: AbortSignal, onParsed?: (root: Object3D) => void) {
     chunks.loads.push(chunk.id);
@@ -129,6 +136,7 @@ vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js
     return texture;
   }
   detail(texture: Texture) { return carTextureLoads.started.has(texture) ? {missing: 2, load: async () => []} : undefined; }
+  file() { return undefined; }
   release() {}
   dispose() {}
 }}));
@@ -144,7 +152,7 @@ const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`
 const layout = {
   layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
-  camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]},
+  camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]}, roadHeightAt: () => null,
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
   // A box has 24 vertices and 36 indices: the horizon's ground, and a road and an obstacle in each sector (up to eight).
@@ -194,7 +202,16 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length; });
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
-afterEach(() => vi.unstubAllGlobals());
+const shells: SceneShell[] = [];
+afterEach(() => { for (const shell of shells.splice(0)) shell.dispose(); vi.unstubAllGlobals(); });
+
+/** A lap scene in `host` on a new shell of `sceneLayout` (disposed after the test), or on `shell`. */
+function openScene(host: HTMLDivElement, sceneLayout: SceneryLayoutResource, trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null,
+  onFailure: (message: string) => void, cars: Parameters<typeof createReplayScene>[6], shell?: SceneShell) {
+  const used = shell ?? createSceneShell(sceneLayout, {daylightClock: trajectory.daylightClock, firstView: {kind: 'lap', lapDistanceM: lapFirstStation(trajectory, sceneLayout)}});
+  if (!shell) shells.push(used);
+  return createReplayScene(used, host, sceneLayout, trajectory, baseline, onFailure, cars);
+}
 
 it.each([
   ['overpass__OPAQUE', 22.3],
@@ -203,7 +220,7 @@ it.each([
   chunks.obstacleName = name;
   const renderedHeights: number[] = [];
   gpu.render.mockImplementation((_scene, camera) => { if (!isFrame(_scene, camera)) return; renderedHeights.push(camera.position.y); });
-  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   expect(renderedHeights.at(-1)).toBeCloseTo(expectedHeight);
   handle.cursor(3, 0); draw();
@@ -215,7 +232,7 @@ it('serializes GPU warm-ups when several new sectors load together', async () =>
   const sectors = Array.from({length: 8}, (_, index) => ({...sector(index), prev: `s${(index + 7) % 8}`, next: `s${(index + 1) % 8}`}));
   const extended = {...layout, routeLengthM: 8000, sectors};
   const moving = {...lap, points: lap.points.map((point, index) => ({...point, stationM: index * 1000}))};
-  const handle = await createReplayScene(document.createElement('div'), extended, moving, null, vi.fn(), assets);
+  const handle = await openScene(document.createElement('div'), extended, moving, null, vi.fn(), assets);
   const releases: (() => void)[] = [];
   gpu.upload.mockClear().mockImplementation(() => new Promise<void>(resolve => { releases.push(resolve); }));
   try {
@@ -230,7 +247,7 @@ it('serializes GPU warm-ups when several new sectors load together', async () =>
 });
 
 it('caches static scenery matrices after the scene reflection without freezing the moving car', async () => {
-  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   try {
     // Chunks still loading behind the window join (and freeze) later.
     for (const root of [...chunks.roots.values()].filter(root => root.parent)) {
@@ -252,7 +269,7 @@ it('repaints a resized embedded canvas before paint, skipping notifications with
   const host = document.createElement('div');
   let height = 540;
   Object.defineProperties(host, {clientWidth: {get: () => 460}, clientHeight: {get: () => height}});
-  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   const camera = lastSceneRender()[1], eye = camera.position.clone();
   gpu.render.mockClear(); gpu.setSize.mockClear();
@@ -267,7 +284,7 @@ it('repaints a resized embedded canvas before paint, skipping notifications with
 
 it('retains scenery, canvas and camera settings, releases old laps, and draws the new primary and ghost', async () => {
   const host = document.createElement('div');
-  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(2, 0); handle.mode('orbit'); handle.zoom(1); draw();
   const [scene, camera] = lastSceneRender();
   const lightingEnvironment = scene.environment;
@@ -293,8 +310,9 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   handle.cursor(2, 0); draw();
   expect(host.firstChild).toBe(canvas); expect(gpu.constructed).toHaveBeenCalledOnce(); expect(gpu.dispose).not.toHaveBeenCalled();
   expect(scene.getObjectByName('road__OPAQUE')).toBe(road); expect(scene.environment).toBe(lightingEnvironment);
-  // The car geometry is shared with the cached template; only the lap's materials are released.
-  expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).not.toHaveBeenCalled(); expect(materialDispose).toHaveBeenCalled();
+  // The car's body draws from its batch: its own stand-in (bounds, no vertices) goes with it, and the lap's materials are released.
+  expect(oldBody.geometry.attributes.position).toBeUndefined();
+  expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).toHaveBeenCalled(); expect(materialDispose).toHaveBeenCalled();
   expect(oldLayer.parent).toBeNull();
   expect(lastSceneRender()[1]).toBe(camera); expect(camera.position).toEqual(eye); expect(camera.zoom).toBe(zoom);
   const layer = world.children.at(-1)!;
@@ -303,12 +321,15 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   expect(await handle.updateLaps(next, null, assets)).toBe(true); handle.cursor(2, 0);
   expect(world.children.at(-1)!.children).toHaveLength(3);
   expect(world.children.at(-1)!.children[1].visible).toBe(false);
-  handle.dispose(); expect(scene.environment).toBeNull();
+  // The view leaving keeps the shell for the next one; the shell going frees it all.
+  handle.dispose(); expect(host.childNodes).toHaveLength(0); expect(gpu.dispose).not.toHaveBeenCalled();
+  for (const shell of shells.splice(0)) shell.dispose();
+  expect(scene.environment).toBeNull();
   expect(roadDispose).toHaveBeenCalledOnce(); expect(gpu.dispose).toHaveBeenCalledOnce(); expect(host.childNodes).toHaveLength(0);
 });
 
 it('places the ghost at the same distance, the same lap time, or the same time since marker A', async () => {
-  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   try {
     // The baseline drives the same line at half speed.
     const slower = {...lap, points: lap.points.map(point => ({...point, timeSec: (point.timeSec ?? 0) * 2}))};
@@ -325,7 +346,7 @@ it('places the ghost at the same distance, the same lap time, or the same time s
 
 it('rejects layout, geometry and package mismatches, and discards cancelled or superseded lap builds', async () => {
   const host = document.createElement('div');
-  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   const scene = lastSceneRender()[0], road = scene.getObjectByName('road__OPAQUE')!;
   const world = road.parent!.parent!.parent!, original = world.children.at(-1);
@@ -343,7 +364,7 @@ it('rejects layout, geometry and package mismatches, and discards cancelled or s
 
 it('puts the cockpit, hood and roof views on the game cameras of the car with their cockpit mesh, and zooms via projection matrix', async () => {
   const host = document.createElement('div');
-  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   const [scene, camera] = lastSceneRender();
   const cockpit = scene.getObjectByName('cockpit-in')!, headlight = scene.getObjectByName('lampGlow')!;
@@ -395,7 +416,7 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
 
 it('joins the interior file to the body under its chassis node, drawn in the driver cameras', async () => {
   const withInterior = {...assets, primary: {...assets.primary, resource: {...assets.primary.resource, interior: {sha256: 'interior', byteLength: 1, triangles: 0, vertices: 0}}, files: async () => ({bytes: new ArrayBuffer(0), interiorBytes: new ArrayBuffer(1)})}};
-  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), withInterior);
+  const handle = await openScene(document.createElement('div'), layout, lap, null, vi.fn(), withInterior);
   handle.cursor(0, 0); draw();
   const [scene] = lastSceneRender(), dash = scene.getObjectByName('dash-in')!;
   expect([dash.parent?.name, dash.visible]).toEqual(['chassis', false]);
@@ -405,14 +426,14 @@ it('joins the interior file to the body under its chassis node, drawn in the dri
 });
 
 it('reads car textures from their start files, the ones only the interior uses through the interior loader', async () => {
-  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  const handle = await openScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   // The seat is interior only; the trim is also on an outside part, so it loads like the body. The paint has no start file.
   expect(carTextureLoads.paths.filter(path => path.startsWith('interior'))).toEqual([`interior ${hashOf('seat')}.ktx2.zst from ${hashOf('seat-start')}.ktx2.zst`]);
   expect(carTextureLoads.paths).toEqual(expect.arrayContaining([`car ${hashOf('trim')}.ktx2.zst from ${hashOf('trim-start')}.ktx2.zst`, 'car a.ktx2']));
   const [scene] = lastSceneRender(), map = (name: string) => (scene.getObjectByName(name) as Mesh<BufferGeometry, MeshBasicMaterial>).material.map!;
-  // Each map's own copy allocates the full texture (two levels above the 512 it holds) and waits to sharpen.
-  expect([isStreaming(map('seat')), map('seat').mipmaps.map(level => level.width), isStreaming(map('dash'))]).toEqual([true, [2048, 1024, 512], true]);
+  // Each map's own copy draws from the 512 start file and waits to sharpen.
+  expect([isStreaming(map('seat')), map('seat').mipmaps.map(level => level.width), isStreaming(map('dash'))]).toEqual([true, [512], true]);
   handle.mode('cockpit'); draw();
   expect(isStreaming(map('seat'))).toBe(true); // Not on the GPU in this double: nothing to copy yet.
   handle.dispose();
@@ -422,7 +443,7 @@ it('loads the whole circuit, shows the window around the car, hides what left it
   const host = document.createElement('div'), far = {...lap, points: [...lap.points.slice(0, 6), {...lap.points[6], stationM: 3000}]};
   // s1 lies 5 km from the car's path, so only its lap range can bring it in (the other sectors are also near in a straight line).
   const away = {min: [5000, 0, -100], max: [5200, 0, 100]}, spread = {...layout, sectors: layout.sectors.map(chunk => chunk.id === 's1' ? {...chunk, bounds: away} : chunk)} as SceneryLayoutResource;
-  const handle = await createReplayScene(host, spread, far, null, vi.fn(), assets);
+  const handle = await openScene(host, spread, far, null, vi.fn(), assets);
   const shown = () => [...chunks.roots].filter(([, root]) => root.parent && root.visible).map(([id]) => id).sort();
   // Everything loads; at station 0 the window [-300, 1500] covers s0, s1 and the end of s3, never s2.
   await vi.waitFor(() => expect([...chunks.roots.values()].every(root => root.parent)).toBe(true));
@@ -435,5 +456,23 @@ it('loads the whole circuit, shows the window around the car, hides what left it
   // An orbit camera is planned around its own position, not the lap distance.
   handle.mode('orbit'); draw();
   handle.dispose();
+  expect(chunks.roots.get('horizon')!.parent).not.toBeNull();
+  for (const shell of shells.splice(0)) shell.dispose();
   expect(chunks.roots.get('horizon')!.parent).toBeNull();
+});
+
+it('hands its shell to the next view: one renderer, the canvas moving to its element', async () => {
+  const first = document.createElement('div'), second = document.createElement('div');
+  const shell = createSceneShell(layout, {daylightClock: lap.daylightClock, firstView: {kind: 'lap', lapDistanceM: lapFirstStation(lap, layout)}});
+  shells.push(shell);
+  const before = await openScene(first, layout, lap, null, vi.fn(), assets, shell);
+  const canvas = shell.renderer.domElement;
+  expect(canvas.parentElement).toBe(first);
+  before.dispose();
+  expect(canvas.parentElement).toBeNull();
+  const after = await openScene(second, layout, lap, null, vi.fn(), assets, shell);
+  expect(shell.renderer.domElement).toBe(canvas);
+  expect(canvas.parentElement).toBe(second);
+  expect(shell.scene.getObjectsByProperty('name', 'body-envelope').length).toBeGreaterThan(0);
+  after.dispose();
 });

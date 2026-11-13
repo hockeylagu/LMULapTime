@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import type { TrackBoundaryGeometry } from '../../../../../shared/types/trackGeometry.js';
 import { MapFullscreenButton } from '../../map/display/MapFullscreenButton.js';
-import { MapViewSwitchButton } from '../../map/display/MapViewSwitchButton.js';
-import { MapControlsOverlay } from '../../map/MapControlsOverlay.js';
 import { GpsCircuitMinimap } from '../../map/GpsCircuitMinimap.js';
 import { ReplayTelemetryHud } from '../../inspector/ReplayTelemetryHud.js';
 import { GpsMapTelemetryHud } from '../../map/display/GpsMapTelemetryHud.js';
@@ -20,8 +18,8 @@ import {
   type MapColorMode,
 } from '../../map/replayMapUtils.js';
 import { useReplayScene } from './useReplayScene.js';
-import { Replay3DLoading, Replay3DStreaming } from '../scene/Replay3DLoading.js';
-import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
+import { Scene3DFrame } from '../scene/Scene3DFrame.js';
+import { carLockedCamera, followsCar, type CameraMode } from '../camera/cameraModes.js';
 import { useGpsMapShortcuts } from '../../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
 import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../../inspector/ghostSyncContext.js';
@@ -92,7 +90,6 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
     return buildContinuousSvgPath(svgPoints);
   }, [trackGeometry, trajectory.bounds, svgPoints]);
 
-  useCameraModeShortcuts(map, setMode);
   useGpsMapShortcuts({isExpanded, containerRef: map, points: trajectory.points, currentIndex, onSelectIndex,
     onZoomIn: () => scene.current?.zoom(1), onZoomOut: () => scene.current?.zoom(-1), onResetZoom: () => scene.current?.reset(),
     onPan: (horizontal, vertical) => { if (carLockedCamera(mode)) setMode('orbit'); scene.current?.pan(horizontal, vertical); },
@@ -101,37 +98,24 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
     onCycleGhostSync: baseline ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode, ghostSync.markerDistM !== null)) : undefined,
     onToggleMarker: () => toggleGhostMarker(ghostSync, primaryDists[activeIndex] ?? 0),
     onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded(), onToggleView: onReturnTo2D});
-  useEffect(() => { if (active) map.current?.focus({preventScroll: true}); }, [active]);
   // What drives the car and wheels, for the curious: hover the toolbar rather than read it under every frame.
   const sources = state?.ready ? [state.cars, state.wheelMotion, baseline ? {distance: 'Same-station ghost', time: 'Same-time ghost', anchored: 'Ghost on time from marker A'}[ghostSync.mode] : ''].filter(Boolean).join(' · ') : undefined;
 
   return (
-    <div ref={map} data-replay-surface="map" data-replay-view="3d" data-map-expanded={isExpanded ? '' : undefined} tabIndex={0}
-      className="relative flex flex-col w-full h-full min-h-[360px] bg-lmu-deep overflow-hidden [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen outline-none">
-      {!isExpanded && (
+    <Scene3DFrame surface={map} host={host} scene={scene} state={state} mode={mode} onModeChange={setMode} followMode="follow"
+      onRetry={() => setRetry(value => value + 1)} onToggleView={onReturnTo2D} active={active} expanded={isExpanded}
+      isPlaying={isPlaying} onTogglePlay={onTogglePlay} streamingClassName={isExpanded && effectiveShowFriction ? 'bottom-48' : 'bottom-2'}
+      className="w-full h-full min-h-[360px] [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen"
+      controlsBefore={<ReplayShortcutHelp view="3d" />} controlsAfter={<MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded} />}
+      top={!isExpanded && (
         <div data-testid="replay-3d-toolbar" title={sources} className="flex items-start justify-between px-2 py-1 gap-2 shrink-0 text-xs border-b border-lmu-border bg-lmu-deep">
-
           <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy} hasBaseline={Boolean(baseline)}
             isCompareMode={Boolean(baseline)} fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
             showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction}
             showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />
         </div>
       )}
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        <div ref={host} tabIndex={0} onPointerDown={event => event.currentTarget.focus({preventScroll: true})}
-          aria-label="3D track. Drag to orbit, scroll to zoom. Left/Right: step replay. WASD: pan camera." className="relative w-full h-full outline-none" />
-        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_24px_rgba(6,9,16,0.35)]" />
-        <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
-          className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
-        <MapControlsOverlay onZoomIn={() => scene.current?.zoom(1)} onZoomOut={() => scene.current?.zoom(-1)} onReset={() => scene.current?.reset()}
-          followCar={followsCar(mode)} onToggleFollowCar={() => setMode(value => (followsCar(value) ? 'orbit' : 'follow'))}
-          onCenterCar={() => scene.current?.center()} isPlaying={isPlaying} onTogglePlay={onTogglePlay}
-          orientation={isExpanded ? 'horizontal' : 'vertical'} className="top-2 right-3 bottom-auto">
-          <CameraModeControl mode={mode} onChange={setMode} />
-          <ReplayShortcutHelp view="3d" />
-          <MapViewSwitchButton view="3d" onToggleView={onReturnTo2D} />
-          <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded} />
-        </MapControlsOverlay>
+      overlays={<>
         <HeatmapLegendBar colorBy={colorBy} />
         {isExpanded && <GpsMapExpandedOverlays points={trajectory.points} currentIndex={activeIndex}
           primaryLapSummary={primaryLapSummary} baselineLapSummary={baselineLapSummary} comparisons={comparisons}
@@ -141,10 +125,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
           showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction}
           showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />}
-        {state?.ready && <Replay3DStreaming progress={state.progress} className={isExpanded && effectiveShowFriction ? 'bottom-48' : 'bottom-2'} />}
-        {!state?.ready && <Replay3DLoading progress={state?.progress} error={state?.error} onRetry={() => setRetry(value => value + 1)} />}
-      </div>
-      {isExpanded && onSelectIndex ? (
+      </>}
+      bottom={isExpanded && onSelectIndex ? (
         <GpsMapTelemetryDock points={trajectory.points} baselinePoints={baseline?.points} comparisons={comparisons} currentIndex={currentIndex}
           onSelectIndex={onSelectIndex} trackLengthM={trajectory.trackLengthM} source={trajectory.source} sectors={trajectory.sectors}
           isPlaying={isPlaying} onTogglePlay={onTogglePlay} traceHidden={isTraceHidden} onToggleTrace={toggleTrace}
@@ -156,7 +138,10 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
             onClose={handleToggleFriction} />}
           <ReplayTelemetryHud currentPoint={activePrimaryPoint} />
         </div>
-      )}
-    </div>
+      )}>
+      <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_24px_rgba(6,9,16,0.35)]" />
+      <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
+        className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
+    </Scene3DFrame>
   );
 }

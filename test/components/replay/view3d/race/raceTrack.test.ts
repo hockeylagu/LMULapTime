@@ -1,8 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
-import { createRaceCarMotion, windowPoints } from '../../../../../src/components/replay/view3d/race/raceCarMotion.js';
-import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
-import { rigModel } from '../../../../helpers/scenes/rigModel.js';
+import { windowPoints } from '../../../../../src/components/replay/view3d/race/raceTrack.js';
 
 const channel = (name: typeof RACE_POSE_CHANNELS[number]) => RACE_POSE_CHANNELS.indexOf(name);
 
@@ -28,23 +26,5 @@ describe('windowPoints', () => {
     expect(second.timeSec).toBeCloseTo(100.1);
     expect(second.x).toBeNaN();
     expect(second).toMatchObject({steerYaw: undefined, suspensionDeflections: undefined, headlights: false});
-  });
-});
-
-describe('createRaceCarMotion', () => {
-  it('builds the wheels and fits them to the road only once the car is drawn (read), not for every window or road change', () => {
-    const ground = vi.fn(() => 0), motion = createRaceCarMotion(makeCar('#38bdf8', false, rigModel()), undefined, ground);
-    const first = window(), second = window();
-    motion.update(first, 1); motion.update(second, 1); motion.refreshHeights();
-    expect(ground).not.toHaveBeenCalled();
-    expect(motion.wheels).not.toBeNull();
-    const built = ground.mock.calls.length;
-    expect(built).toBeGreaterThan(0);
-    void motion.lights; // Reading again builds nothing more.
-    expect(ground).toHaveBeenCalledTimes(built);
-    motion.refreshHeights(); motion.refreshHeights();
-    expect(ground).toHaveBeenCalledTimes(built);
-    void motion.wheels;
-    expect(ground.mock.calls.length).toBeGreaterThan(built);
   });
 });

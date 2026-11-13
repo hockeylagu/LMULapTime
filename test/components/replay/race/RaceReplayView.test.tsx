@@ -189,6 +189,11 @@ describe('RaceReplayView', () => {
     expect(screen.queryByTestId('race-map-scene')).toBeNull();
     fireEvent.click(scene);
     await waitFor(() => expect(screen.getByTestId('race-map-scene')).toBeTruthy());
+    // Kept loaded behind the 2D map, hidden: opening it again does not rebuild it.
+    expect(document.querySelector('[data-testid="race-3d"]')?.closest('[hidden]')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to 3D view' }));
+    expect(screen.getByTestId('race-3d').closest('[hidden]')).toBeNull();
+    expect(screen.queryByTestId('race-map-scene')).toBeNull();
   });
 
   it('renders the app loading indicator while the session replay overview is loading', () => {
