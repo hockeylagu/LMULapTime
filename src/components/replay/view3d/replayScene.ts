@@ -1,5 +1,5 @@
-import { Group, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
-import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
+import { Box3, Group, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
+import type { SceneryBounds, SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../api/vehicles/bodyApi.js';
 import type { MapColorMode } from '../map/replayMapUtils.js';
@@ -81,6 +81,9 @@ export async function createReplayScene(
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
   const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
+  /** A chunk's box in the scene: native coordinates less the origin, z mirrored as the world group draws them. */
+  const worldBox = ({min, max}: SceneryBounds) => new Box3(new Vector3(min[0], min[1], -max[2]), new Vector3(max[0], max[1], -min[2]))
+    .translate(new Vector3(-origin.x, -origin.y, origin.z));
   // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
   const batches = createSceneryBatches(sceneryRoot, layout.materials);
   let layer: LapLayer, layerReady = false;
@@ -125,7 +128,7 @@ export async function createReplayScene(
         });
         const created = batches.add(root);
         await lit; // A chunk's programs depend on the scene's environment.
-        await Promise.all([warmup.queue([root, ...created], signal), built.grounded]); signal.throwIfAborted(); return root;
+        await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), built.grounded]); signal.throwIfAborted(); return root;
       } catch (error) {
         // The loader releases a chunk whose own load failed; one that failed after it is released here.
         if (built.parsed) ground.remove(chunk.id, built.parsed);

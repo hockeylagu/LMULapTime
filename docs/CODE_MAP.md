@@ -321,7 +321,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   across chunks: one `BatchedMesh` per package material key (`lmuMaterial`) and shadow flags, sized once from the layout's
   material totals; a chunk's instances show while the chunk does.
   `replayScene.ts` wires the scene: `cameraRig.ts` owns the cameras, OrbitControls and how each mode follows the car, and
-  `scenery/sceneWarmup.ts` compiles and uploads each chunk (with the batches it created) before it joins, then sharpens reduced scenery textures.
+  `scenery/sceneWarmup.ts` compiles and uploads each chunk (with the batches it created) before it joins, then sharpens reduced textures: the car's first, then the chunk nearest the camera, the largest first within it.
   `laps/useReplayScene.ts` retains the scene for a layout/geometry/package revision; selecting
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
