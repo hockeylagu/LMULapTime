@@ -172,6 +172,13 @@ describe('RaceReplayView', () => {
     expect(screen.getByRole('tooltip').textContent).toContain('#7Ann (You)');
   });
 
+  it('renders the app loading indicator while the session replay overview is loading', () => {
+    vi.mocked(fetchRaceOverview).mockReturnValueOnce(new Promise(() => {}));
+    view();
+    expect(screen.getByTestId('race-replay-loading')).toBeInTheDocument();
+    expect(screen.getByText('Loading Session Replay')).toBeInTheDocument();
+  });
+
   it('offers a retry when the race replay cannot load', async () => {
     vi.mocked(fetchRaceOverview).mockRejectedValueOnce(new Error('No replay'));
     view();

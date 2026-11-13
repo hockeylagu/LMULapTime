@@ -5,6 +5,7 @@ import { racePitSlots } from '../../../../shared/domain/raceReplay/poseWindow.js
 import { isNonRaceSession } from '../../../../shared/domain/raceTraffic.js';
 import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { LoadingState } from '../../common/LoadingState.js';
 import { createRaceClock } from './raceClock.js';
 import { createRacePoseCache } from './racePoseCache.js';
 import { indexRaceStandings } from './raceStandings.js';
@@ -67,7 +68,14 @@ export const RaceReplayView: React.FC<RaceReplayViewProps> = (props) => {
                 <span>{current.error}</span>
                 <button type="button" onClick={() => setAttempt(n => n + 1)} className={`underline underline-offset-4 text-lmu-text-soft ${FOCUS_RING}`}>Retry</button>
               </div>
-            ) : <span role="status">Loading the race replay…</span>}
+            ) : (
+              <LoadingState
+                card={false}
+                title="Loading Session Replay"
+                subtitle="Preparing session overview and car standings..."
+                dataTestId="race-replay-loading"
+              />
+            )}
           </div>
         </>
       )}
