@@ -58,6 +58,9 @@ export interface VehicleBodyTexture {
  */
 export interface VehicleBodyVolume {sha256: string; byteLength: number; width: number; height: number; depth: number}
 
+/** The far model of a body: its GLB and the camera distance in metres from which it equals the exterior GLB's parts. */
+export interface VehicleFarModel extends VehicleBodyModel {fromM: number}
+
 /** One 3D body of the catalog. */
 export interface VehicleBody extends VehicleBodyModel {
   /** The installed vehicle folder, or `<folder>.<hash>` for a further geometry of that folder. Unique. */
@@ -68,6 +71,8 @@ export interface VehicleBody extends VehicleBodyModel {
   descriptorSha256: string;
   /** The driver-camera-only GLB; null when the body has no such part. */
   interior: VehicleBodyModel | null;
+  /** The far model GLB: the exterior parts drawn from `fromM` metres on, merged by role (docs/PACKAGE_FORMAT.md, Vehicles). */
+  far: VehicleFarModel;
   /** Every texture the body uses, sorted by `sha256`. */
   textures: VehicleBodyTexture[];
   /** Every cockpit volume the body's materials use, sorted by `sha256`; empty when none does. */
@@ -81,7 +86,7 @@ export interface VehicleBuildCatalog {vehicles: VehicleRecord[]; bodies?: Vehicl
 
 export const VEHICLE_CATALOG_KEYS = ['vehicles', 'bodies'] as const;
 const RECORD_KEYS = ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'deploymentKw', 'outlineXZ', 'replayOriginOffsetXZ'];
-const BODY_KEYS = ['folder', 'vehicleIds', 'descriptorSha256', 'sha256', 'byteLength', 'triangles', 'vertices', 'interior', 'textures', 'volumes'];
+const BODY_KEYS = ['folder', 'vehicleIds', 'descriptorSha256', 'sha256', 'byteLength', 'triangles', 'vertices', 'interior', 'far', 'textures', 'volumes'];
 const MAX_RECORDS = 2000, MAX_BODIES = 256, MAX_IDS = 5000, MAX_TEXTURES = 4096, MAX_VOLUMES = 64, MAX_VOLUME_SIDE = 512;
 
 /** A VEH id as the records and the game write it: any case, with or without `.veh`; the canonical form is upper case without it. */
@@ -104,6 +109,9 @@ function parseBody(value: unknown, what: string): VehicleBody {
   sha256(body.descriptorSha256, `${what}.descriptorSha256`);
   parseModel(body, what, BODY_KEYS);
   if (body.interior !== null) parseModel(body.interior, `${what}.interior`, ['sha256', 'byteLength', 'triangles', 'vertices']);
+  parseModel(body.far, `${what}.far`, ['sha256', 'byteLength', 'triangles', 'vertices', 'fromM']);
+  const fromM = (body.far as Obj).fromM;
+  if (typeof fromM !== 'number' || !Number.isFinite(fromM) || fromM < 0 || fromM > 10000) throw Error(`${what}.far.fromM: expected a distance in metres`);
   const textures = array(body.textures, `${what}.textures`, MAX_TEXTURES).map((item, i) => {
     const at = `${what}.textures[${i}]`, texture = record(item, at);
     knownKeys(texture, ['sha256', 'byteLength'], ['width', 'height', 'levels', 'format', 'interiorOnly', 'start'], at);

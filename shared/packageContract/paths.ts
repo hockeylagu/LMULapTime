@@ -5,7 +5,7 @@
  */
 
 /** The only package schema the tools and the app read. */
-export const PACKAGE_SCHEMA = 12;
+export const PACKAGE_SCHEMA = 13;
 
 /** The catalog files of every package, release or debug. These paths are constants of the schema: the manifest names none. */
 export const PACKAGE_FILES = {tracks: 'tracks/index.json', vehicles: 'vehicles/index.json', logos: 'vehicles/logos.json', scenery: 'scenery/index.json', rendering: 'rendering/index.json'} as const;
@@ -18,7 +18,7 @@ export const trackLayoutPath = (layoutKey: string): string => `tracks/${layoutKe
 export const sceneryChunkPath = (sha256: string): string => `scenery/${sha256}.glb`;
 export const sceneryTexturePath = (sha256: string): string => `scenery/textures/${sha256}.ktx2.zst`;
 
-/** Vehicle body GLB (exterior or interior), texture (or start) file and descriptor. */
+/** Vehicle body GLB (exterior, interior or far), texture (or start) file and descriptor. */
 export const bodyGlbPath = (sha256: string): string => `vehicles/${sha256}.glb`;
 export const bodyTexturePath = (sha256: string): string => `vehicles/textures/${sha256}.ktx2.zst`;
 export const bodyDescriptorPath = (folder: string): string => `vehicles/bodies/${folder}.json`;
