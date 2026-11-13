@@ -28,10 +28,14 @@ interface Props {
   hasTurns?: boolean;
   pedalPoints?: PedalPointsControl;
   onToggleView?: () => void;
+  /** Which shortcuts the help lists: the lap view's, or the race replay's. */
+  shortcuts?: 'telemetry' | 'race';
+  /** False where the map already fills the page (the race replay). */
+  fullscreen?: boolean;
 }
 
 export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geometry,
-  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause, hasSectors, hasTurns, pedalPoints, onToggleView }) => {
+  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause, hasSectors, hasTurns, pedalPoints, onToggleView, shortcuts = 'telemetry', fullscreen = true }) => {
   const surfaces = geometry?.surfaces;
   const fit = (points: Point[]) => { const rectangle = projectedPointBounds(points); if (rectangle) camera.fitBounds(rectangle); };
   const active = left.length && right.length ? [...left, ...right] : trajectory;
@@ -52,8 +56,8 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
       onFitTrack={() => fit(active)} onFitVisible={() => fit([...active,
         ...projectBoundaryPoints(visibleSurfacePoints(surfaces,
           { ...layers, road: Boolean(surfaces) && layers.road, kerb: Boolean(surfaces) && layers.kerb }), bounds, 800, 60)])} />
-    <ReplayShortcutHelp />
+    <ReplayShortcutHelp view={shortcuts} />
     {onToggleView && <MapViewSwitchButton view="2d" onToggleView={onToggleView} />}
-    <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={onToggleExpanded} />
+    {fullscreen && <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={onToggleExpanded} />}
   </MapControlsOverlay>;
 };

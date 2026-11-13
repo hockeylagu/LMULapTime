@@ -1,4 +1,4 @@
-import type { RaceReplayOverview, ReplayMetadata, ReplayTrafficResponse, ReplayTrajectoryData } from '../../shared/types/index.js';
+import type { RaceReplayOverview, RaceReplayProgress, ReplayMetadata, ReplayTrafficResponse, ReplayTrajectoryData } from '../../shared/types/index.js';
 import { apiErrorMessage, fetchBinary, fetchJson, isAbortError } from './apiClient.js';
 import { decodeRacePoseWindow, type RacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
 import { fetchLiveLapEvidence } from './liveEvidenceApi.js';
@@ -25,8 +25,23 @@ export function sessionTelemetryPath(sessionId: string, request: SessionTelemetr
   return `/api/session/${encodeURIComponent(sessionId)}/telemetry?${params.toString()}`;
 }
 
-export function fetchSessionTelemetryMetadata(sessionId: string, init?: RequestInit): Promise<ReplayMetadata> {
-  return fetchJson<ReplayMetadata>(`/api/session/${encodeURIComponent(sessionId)}/telemetry/metadata`, init);
+// The race replay opens with the lap view's header already filled.
+let lastMetadata: { sessionId: string; value: ReplayMetadata } | null = null;
+
+export async function fetchSessionTelemetryMetadata(sessionId: string, init?: RequestInit): Promise<ReplayMetadata> {
+  const value = await fetchJson<ReplayMetadata>(`/api/session/${encodeURIComponent(sessionId)}/telemetry/metadata`, init);
+  lastMetadata = { sessionId, value };
+  return value;
+}
+
+/** The metadata last fetched for this session, if any. */
+export function lastSessionTelemetryMetadata(sessionId: string): ReplayMetadata | null {
+  return lastMetadata?.sessionId === sessionId ? lastMetadata.value : null;
+}
+
+/** Every car's distance along the track once a second (race sessions with a track centreline), for live gaps. */
+export function fetchRaceProgress(sessionId: string, init?: RequestInit): Promise<RaceReplayProgress> {
+  return fetchJson<RaceReplayProgress>(`/api/session/${encodeURIComponent(sessionId)}/race/progress`, init);
 }
 
 /** Every car of the session replay on the replay clock: cars, laps and running order (poses come in windows). */

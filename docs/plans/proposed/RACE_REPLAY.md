@@ -1,10 +1,10 @@
 # Race replay: every car on the map and in 3D
 
-Status: proposed 2026-11-08; decisions below are the user's. Order steps 1 and 2 implemented 2026-11-12
-(uncommitted): pose windows, session clock, Race mode in the inspector, 2D map with every car, standings
+Status: proposed 2026-11-08; decisions below are the user's. Order steps 1 and 2 implemented 2026-11-12:
+pose windows, session clock, Race mode in the inspector, 2D map with every car, standings
 tower; the followed car's incidents (pit stops, contacts, penalties) in a dropdown as in the game, a
 hover tooltip for a car on the map or in the standings (no always-on labels: too crowded), gaps of a
-minute or more as m:ss.s. Measured on Le Mans R1 (63 cars): a window is ~1 MB, 0.2–1.6 s the first time (worker
+minute or more as m:ss.s, live between line crossings; the lap map's toolbar and keys. Measured on Le Mans R1 (63 cars): a window is ~1 MB, 0.2–1.6 s the first time (worker
 start + about 70 laps decoded), ~2 ms once its laps are cached. Next: step 3 (3D). Its first part is done: the followed car draws as one multi-draw per material content (94 → 33 draws for a median car; see REPLAY_3D_PERFORMANCE.md); the grid reuses those batches with an instance per car (about 5,700 → 200 draws for Le Mans R1, counted from the package).
 
 ## Goal
@@ -76,7 +76,8 @@ view on one session clock, with seek, playback speed and a followed car. Any ses
 
 ### 5. Overlays
 
-- Standings tower from `replay_running_order` (class order, gaps), clickable.
+- Standings tower from `replay_running_order` (class order, gaps), clickable. Race gaps are live: the time since the class
+  leader passed the car's place on the track on the same lap, from the traffic index of every car's track distance.
 - Incidents of the followed car from `replay_driver_events` in a dropdown (what, who, when); a pick seeks 3 s before.
 - A car's timing line as a tooltip when it is hovered on the map or in the standings.
 

@@ -1,24 +1,32 @@
-import React, { useMemo, useSyncExternalStore } from 'react';
-import { LocateFixed, Minus, Plus } from 'lucide-react';
+import React, { useEffect, useEffectEvent, useMemo, useSyncExternalStore } from 'react';
 import type { RaceReplayCar, RaceReplayOverview } from '../../../../shared/types/index.js';
-import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
+import { RACE_POSE_CHANNEL_COUNT, racePitSlots, sampleRacePose, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
 import { useTrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';
 import { useGpsMapPanZoom } from '../map/useGpsMapPanZoom.js';
 import { activeTrackBounds } from '../map/display/mapLayers.js';
 import { useMapLayers } from '../map/display/useMapLayers.js';
 import { GpsMapBackground } from '../map/display/GpsMapBackground.js';
-import { projectBoundaryPoints } from '../map/replayMapUtils.js';
+import { GpsMapControls } from '../map/display/GpsMapControls.js';
+import { projectBoundaryPoints, projectStartFinishGate } from '../map/replayMapUtils.js';
+import { GpsBrakeMarkers } from '../map/display/GpsBrakeMarkers.js';
+import { projectSectorMarkers, useTrackMarkerPlacement } from '../map/display/useTrackMarkerPlacement.js';
+import { buildRibbonIndex } from '../map/scene/cornerRibbonClearance.js';
+import { GpsSectorMarkers } from '../map/scene/GpsSectorMarkers.js';
+import { GpsStartFinishLine } from '../map/scene/GpsStartFinishLine.js';
 import { FOCUS_RING, SURFACE_FOCUS_RING } from '../../common/buttonStyles.js';
 import { RaceCarMarkers, type RaceCarPosition } from './RaceCarMarkers.js';
 import { RaceCarTooltip } from './RaceCarTooltip.js';
-import type { RaceStandingsIndex } from './raceStandings.js';
+import { isOutAt, type RaceStandingsIndex } from './raceStandings.js';
 import type { RaceClock } from './raceClock.js';
 import type { RacePoseCache } from './racePoseCache.js';
+import { useRaceMapKeys } from './useRaceReplayControls.js';
 
 const VIEWBOX_SIZE = 800;
 const PADDING = 60;
 /** Opens on the whole circuit (the camera zooms 1.5x at zoom 1). */
 const OVERVIEW_ZOOM = 0.7;
+const NO_POINTS: Array<{ sx: number; sy: number }> = [];
+const EMPTY_BOUNDS: Bounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0, spanX: 0, spanZ: 0 };
 
 type Bounds = { minX: number; minZ: number; maxX: number; maxZ: number; spanX: number; spanZ: number };
 
@@ -57,6 +65,8 @@ interface Props {
   clock: RaceClock;
   poses: RacePoseCache;
   followSlot: number | null;
+  /** Counts the requests to put the map on the followed car (a double click in the standings). */
+  trackRequest?: number;
   /** The car highlighted here or in the standings, shown with its tooltip. */
   hoverSlot: number | null;
   onFollow: (slot: number) => void;
@@ -65,27 +75,43 @@ interface Props {
 }
 
 /** The race map: the circuit and every car on the session clock, following the selected car. */
-export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, followSlot, hoverSlot, onFollow, onHover, className = '' }) => {
+export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, followSlot, trackRequest = 0, hoverSlot, onFollow, onHover, className = '' }) => {
   const { timeSec } = useSyncExternalStore(clock.subscribe, clock.getState);
   const { trackGeometry } = useTrackBoundaryGeometry({ layoutKey: overview.layoutKey, trackVenue: overview.trackVenue, trackCourse: overview.trackCourse });
-  const { layers } = useMapLayers();
+  const { layers, changeLayers } = useMapLayers();
   const window = poses.windowAt(timeSec);
   const poseError = window ? null : poses.errorAt(timeSec);
   const trackBounds = useMemo(() => activeTrackBounds(trackGeometry), [trackGeometry]);
   const carBounds = useMemo(() => (trackBounds ? null : windowBounds(window)), [trackBounds, window]);
   const bounds = trackBounds ?? carBounds;
   const cars = useMemo(() => new Map<number, RaceReplayCar>(overview.cars.map(car => [car.slot, car])), [overview.cars]);
-  const positions = racePositionsAt(window, timeSec, bounds);
+  const pitted = racePitSlots(window, timeSec);
+  // Only the race's cars: the windows also carry the pace car.
+  const positions = racePositionsAt(window, timeSec, bounds).filter(position => cars.has(position.slot)).map(position =>
+    pitted.has(position.slot) || isOutAt(index, position.slot, timeSec) ? { ...position, dimmed: true } : position);
   const followed = positions.find(position => position.slot === followSlot);
 
   const camera = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos: followed, initialZoom: OVERVIEW_ZOOM, initialFollowCar: false });
-  const { containerRef, viewportRef, currentViewBox, markerScale, handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } = camera;
+  useRaceMapKeys(camera);
+  const { containerRef, viewportRef, currentViewBox, markerScale, zoomLevel, handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } = camera;
   const svg = useMemo(() => bounds && trackGeometry ? {
     left: trackGeometry.leftBoundary ? projectBoundaryPoints(trackGeometry.leftBoundary, bounds, VIEWBOX_SIZE, PADDING) : [],
     right: trackGeometry.rightBoundary ? projectBoundaryPoints(trackGeometry.rightBoundary, bounds, VIEWBOX_SIZE, PADDING) : [],
     center: trackGeometry.centerline ? projectBoundaryPoints(trackGeometry.centerline, bounds, VIEWBOX_SIZE, PADDING) : [],
   } : { left: [], right: [], center: [] }, [bounds, trackGeometry]);
+  // The lap map's track furniture: brake boards, the start/finish line and the sector lines, placed clear of each other.
+  const ribbon = useMemo(() => buildRibbonIndex(svg.left, svg.right), [svg]);
+  const gates = useMemo(() => bounds ? projectStartFinishGate(trackGeometry, bounds, VIEWBOX_SIZE, PADDING) : null, [trackGeometry, bounds]);
+  const sectorMarkers = useMemo(() => bounds ? projectSectorMarkers(trackGeometry, bounds, VIEWBOX_SIZE, PADDING) : [], [trackGeometry, bounds]);
+  const furniture = useTrackMarkerPlacement({ layers, brakeMarkers: trackGeometry?.brakeMarkers, bounds: bounds ?? EMPTY_BOUNDS,
+    viewBoxSize: VIEWBOX_SIZE, padding: PADDING, markerScale, zoomLevel, ribbon, svgPoints: NO_POINTS,
+    gateLeftSvg: gates?.gateLeftSvg, gateRightSvg: gates?.gateRightSvg, sectorMarkers });
   const unitsPerMeter = bounds ? (VIEWBOX_SIZE - 2 * PADDING) / Math.max(bounds.spanX, bounds.spanZ, 1) : 0;
+  // Only a new request moves the map (the camera's setter changes every render).
+  const trackFollowed = useEffectEvent(() => camera.setFollowCar(true));
+  useEffect(() => {
+    if (trackRequest) trackFollowed();
+  }, [trackRequest]);
   const follow = (slot: number) => {
     onFollow(slot);
     camera.setFollowCar(true);
@@ -101,6 +127,11 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
             <svg viewBox={currentViewBox} className="w-full h-full" data-testid="race-map-scene">
               <GpsMapBackground geometry={trackGeometry} bounds={bounds} layers={layers}
                 left={svg.left} right={svg.right} center={svg.center} pathD="" />
+              {furniture.placedBrakes.length ? <GpsBrakeMarkers placement={furniture.placedBrakes} markerScale={markerScale}
+                startFinishGate={furniture.placedStart?.gate} timingGates={furniture.sectorGates} obstacles={furniture.markerObstacles} /> : null}
+              {layers.sectors && <GpsSectorMarkers markers={furniture.placedSectors} markerScale={markerScale} obstacles={furniture.markerObstacles} />}
+              {layers.startFinish && <GpsStartFinishLine placement={furniture.placedStart} svgPoints={NO_POINTS} zoomLevel={zoomLevel}
+                markerScale={markerScale} gateLeftSvg={gates?.gateLeftSvg} gateRightSvg={gates?.gateRightSvg} />}
             </svg>
             <RaceCarMarkers viewBox={currentViewBox} positions={positions} cars={cars} followSlot={followSlot}
               unitsPerMeter={unitsPerMeter} markerScale={markerScale} hoverSlot={hoverSlot} onHover={onHover} onFollow={follow}
@@ -115,24 +146,13 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
               <button type="button" onClick={poses.retry} className={`underline underline-offset-4 ${FOCUS_RING}`}>Retry</button></> : 'Loading the cars…'}
           </div>
         )}
-        <div data-map-control className="absolute right-3 top-3 flex flex-col gap-1">
-          <MapButton label="Zoom in" onClick={camera.zoomIn}><Plus aria-hidden="true" className="w-4 h-4" /></MapButton>
-          <MapButton label="Zoom out" onClick={camera.zoomOut}><Minus aria-hidden="true" className="w-4 h-4" /></MapButton>
-          <MapButton label={camera.followCar ? 'Stop following the car (F)' : 'Follow the selected car (F)'} pressed={camera.followCar}
-            disabled={followSlot === null} onClick={() => camera.setFollowCar(value => !value)}>
-            <LocateFixed aria-hidden="true" className="w-4 h-4" />
-          </MapButton>
-        </div>
+        {bounds && (
+          <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={trackGeometry} bounds={bounds}
+            left={svg.left} right={svg.right} center={svg.center} trajectory={[]} orientation="horizontal"
+            hasSectors={sectorMarkers.length > 0} showPlayPause={false} shortcuts="race" fullscreen={false} />
+        )}
       </div>
     </div>
   );
 };
 
-const MapButton: React.FC<{ label: string; onClick: () => void; pressed?: boolean; disabled?: boolean; children: React.ReactNode }> = ({
-  label, onClick, pressed, disabled, children,
-}) => (
-  <button type="button" aria-label={label} title={label} aria-pressed={pressed} disabled={disabled} onClick={onClick}
-    className={`grid h-8 w-8 place-items-center rounded-md border border-lmu-border bg-lmu-card text-lmu-text-soft hover:bg-lmu-cardHover disabled:opacity-40 aria-pressed:text-lmu-info ${FOCUS_RING}`}>
-    {children}
-  </button>
-);

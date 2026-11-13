@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { RaceReplayOverview } from '../../../../shared/types/index.js';
+import type { RaceReplayOverview, RaceReplayProgress } from '../../../../shared/types/index.js';
 import { indexRaceStandings, raceStandingsAt, runningOrderAt } from '../../../../src/components/replay/race/raceStandings.js';
 import { formatRaceGap } from '../../../../src/components/replay/race/RaceStandingsTower.js';
 
@@ -42,6 +42,22 @@ describe('raceStandingsAt', () => {
     expect(rows[0]).toMatchObject({ lapsDone: 2, lastLapSec: 100, bestLapSec: 100 });
   });
 
+  it('runs a car that did not finish until its last lap ends, then lists it last as out', () => {
+    const retired = { ...overview(), cars: overview().cars.map(car => car.slot === 1 ? { ...car, retired: 'DNF' } : car),
+      laps: overview().laps.filter(lap => lap.slot !== 1 || lap.lapNumber <= 2) };
+    expect(raceStandingsAt(indexRaceStandings(retired), 150)[0]).toMatchObject({ car: { slot: 1 }, gap: { kind: 'leader' } });
+
+    const rows = raceStandingsAt(indexRaceStandings(retired), 250);
+    expect(rows.map(row => row.car.slot)).toEqual([2, 3, 4, 1]);
+    expect(rows[0].gap).toEqual({ kind: 'leader' });
+    expect(rows[3]).toMatchObject({ position: 4, lapsDone: 2, gap: { kind: 'out', status: 'DNF' } });
+    expect(formatRaceGap(rows[3].gap, true)).toBe('DNF');
+    // The results count no lap: out from the start, although the replay holds one lap up to the session end.
+    const neverStarted = { ...overview(), cars: overview().cars.map(car => car.slot === 4 ? { ...car, retired: 'DNF', sessionLapOrdinals: {} } : car),
+      laps: [...overview().laps, { slot: 4, lapNumber: 1, startSec: 0, endSec: 600, lapTimeSec: 600, isValid: false }] };
+    expect(raceStandingsAt(indexRaceStandings(neverStarted), 10).at(-1)).toMatchObject({ car: { slot: 4 }, gap: { kind: 'out' } });
+  });
+
   it('gives race gaps to the class leader on the road, in time or in laps', () => {
     const rows = raceStandingsAt(indexRaceStandings(overview()), 299);
     expect(rows[0].gap).toEqual({ kind: 'leader' });
@@ -53,6 +69,31 @@ describe('raceStandingsAt', () => {
     expect(leader.gap).toEqual({ kind: 'leader' });
     // GT3 leads its class whatever the overall order.
     expect(later.find(row => row.car.slot === 3)!.gap).toEqual({ kind: 'leader' });
+  });
+
+  it('gives the interval to the car ahead in the class beside the gap to the leader', () => {
+    const threeHypers = { ...overview(), cars: overview().cars.map(car => car.slot === 3 ? { ...car, carClass: 'Hyper' } : car) };
+    const rows = raceStandingsAt(indexRaceStandings(threeHypers), 299);
+    expect(rows.slice(0, 3).map(row => [row.car.slot, row.gap, row.interval])).toEqual([
+      [1, { kind: 'leader' }, { kind: 'leader' }],
+      [2, { kind: 'time', sec: 10 }, { kind: 'time', sec: 10 }],
+      [3, { kind: 'time', sec: 60 }, { kind: 'time', sec: 50 }],
+    ]);
+  });
+
+  it('gives live gaps between line crossings from where the cars are on the track', () => {
+    // A 1000 m lap at the overview's lap times, once a second; car 2's distance has its own zero (two laps on).
+    const grid = (slot: number, lapTime: number, zero = 0) => ({
+      slot, distances: Array.from({ length: 601 }, (_, k) => (k >= 275 && k < 285 && slot === 2 ? null : zero + 1000 * k / lapTime)),
+    });
+    const progress: RaceReplayProgress = { fromSec: 0, hz: 1, trackLengthM: 1000, cars: [grid(1, 100), grid(2, 105, 2000), grid(3, 130)] };
+    const at = (timeSec: number) => raceStandingsAt(indexRaceStandings(overview(), progress), timeSec);
+    // At 250 s car 2 is 380.95 m into lap 3, where car 1 was at 238.1 s; the line gives 10 s (crossings at 200 and 210).
+    expect(at(250)[1].gap).toMatchObject({ kind: 'time' });
+    expect((at(250)[1].gap as { sec: number }).sec).toBeCloseTo(11.905, 2);
+    expect(raceStandingsAt(indexRaceStandings(overview()), 250)[1].gap).toEqual({ kind: 'time', sec: 10 });
+    // Car 2 off the track (pits): the gap of its last crossing.
+    expect(at(280)[1].gap).toEqual({ kind: 'time', sec: 10 });
   });
 
   it('shows a car laps down once the leader has crossed the line more often', () => {

@@ -1,11 +1,14 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RaceReplayView, initialRaceTime, lapAt } from '../../../../src/components/replay/race/RaceReplayView.js';
+import { RaceReplayView } from '../../../../src/components/replay/race/RaceReplayView.js';
+import { initialRaceTime, lapAt } from '../../../../src/components/replay/race/raceLaps.js';
 import { fetchRaceOverview, fetchRacePoseWindow } from '../../../../src/api/replayApi.js';
 import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
 import type { RaceReplayOverview } from '../../../../shared/types/index.js';
 
-vi.mock('../../../../src/api/replayApi.js', () => ({ fetchRaceOverview: vi.fn(), fetchRacePoseWindow: vi.fn() }));
+vi.mock('../../../../src/api/replayApi.js', () => ({ fetchRaceOverview: vi.fn(), fetchRacePoseWindow: vi.fn(), fetchRaceProgress: vi.fn(() => Promise.reject(Error('No centreline'))),
+  fetchSessionTelemetryMetadata: vi.fn(() => Promise.reject(Error('No metadata'))),
+  lastSessionTelemetryMetadata: vi.fn(() => null) }));
 vi.mock('../../../../src/api/trackGeometryApi.js', () => ({ loadTrackBoundaryGeometry: vi.fn(() => Promise.resolve(null)) }));
 
 const overview: RaceReplayOverview = {
@@ -29,7 +32,9 @@ function poseWindow(index: number): RacePoseWindow {
   const data = new Float32Array(2 * count * RACE_POSE_CHANNEL_COUNT);
   for (let car = 0; car < 2; car++) for (let i = 0; i < count; i++) {
     const t = index * 60 + i / 10;
-    data.set([10 * t - car * 100, 0, car * 50, 0, Math.PI / 2, 0, 36], (car * count + i) * RACE_POSE_CHANNEL_COUNT);
+    // Ann is in the pit lane from 30 to 60 s.
+    const inPit = car === 0 && t >= 30 && t < 60 ? 1 : 0;
+    data.set([10 * t - car * 100, 0, car * 50, 0, Math.PI / 2, 0, 36, inPit], (car * count + i) * RACE_POSE_CHANNEL_COUNT);
   }
   return { fromSec: index * 60, hz: 10, count, slots: [1, 2], data };
 }
@@ -53,7 +58,44 @@ describe('RaceReplayView', () => {
     const rows = screen.getAllByRole('button', { pressed: true });
     expect(rows.some(row => row.textContent?.includes('Ann'))).toBe(true);
     expect(screen.getByTestId('race-standings').textContent).toContain('Leader');
-    expect(screen.getByText('Race replay')).toBeTruthy();
+    expect(within(screen.getByTestId('race-standings')).getByText('You')).toBeTruthy();
+    // The followed car's laps on the timeline; following Bea shows her one lap.
+    expect(screen.getByTestId('race-lap-ticks').textContent).toBe('12');
+    fireEvent.click(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Bea/ }));
+    expect(screen.getByTestId('race-lap-ticks').textContent).toBe('1');
+    // The gap column switches between the class leader and the car ahead.
+    const gapMode = screen.getByRole('button', { name: 'Gap' });
+    fireEvent.click(gapMode);
+    expect(screen.getByRole('button', { name: 'Interval' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('fades a car in the pits on the map and in the standings', async () => {
+    view({ initialTimeSec: 40 });
+    await waitFor(() => expect(document.querySelectorAll('[data-race-car]')).toHaveLength(2));
+    expect(document.querySelector('[data-race-car="1"]')!.getAttribute('opacity')).toBeNull();
+    fireEvent.click(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Bea/ }));
+    expect(document.querySelector('[data-race-car="1"]')!.getAttribute('opacity')).toBe('0.4');
+    expect(document.querySelector('[data-race-car="2"]')!.getAttribute('opacity')).toBeNull();
+    expect(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Ann/ }).className).toContain('opacity-50');
+  });
+
+  it('follows a car on the map after a double click in the standings', async () => {
+    view();
+    await waitFor(() => expect(document.querySelectorAll('[data-race-car]')).toHaveLength(2));
+    const toolbar = screen.getByTestId('map-controls-overlay');
+    const followButton = () => within(toolbar).getAllByRole('button').find(button => /follow/i.test(button.getAttribute('aria-label') ?? button.title))!;
+    expect(followButton().getAttribute('aria-pressed')).not.toBe('true');
+    fireEvent.doubleClick(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Bea/ }));
+    expect(screen.getAllByRole('button', { pressed: true }).some(row => row.textContent?.includes('Bea'))).toBe(true);
+    expect(followButton().getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('goes back through the page, not the browser history', async () => {
+    const onClose = vi.fn();
+    view({ onClose });
+    await waitFor(() => expect(document.querySelectorAll('[data-race-car]')).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it('follows the car picked in the standings and opens its lap in the lap view', async () => {
@@ -71,7 +113,7 @@ describe('RaceReplayView', () => {
 
   it('seeks with the timeline and the arrow keys, and plays with Space', async () => {
     view();
-    await waitFor(() => expect(screen.getByTestId('race-playback')).toBeTruthy());
+    await waitFor(() => expect(document.querySelectorAll('[data-race-car]')).toHaveLength(2));
     const slider = screen.getAllByLabelText('Session time').find(element => element.tagName === 'INPUT')!;
     fireEvent.change(slider, { target: { value: '95' } });
     expect((slider as HTMLInputElement).value).toBe('95');
@@ -82,6 +124,27 @@ describe('RaceReplayView', () => {
     fireEvent.click(screen.getByRole('button', { name: '4x' }));
     expect(screen.getByRole('button', { name: '4x' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'Pause (Space)' }));
+  });
+
+  it('takes the lap map toolbar and its keys from anywhere on the page', async () => {
+    view();
+    const toolbar = await screen.findByTestId('map-controls-overlay');
+    expect(within(toolbar).queryByRole('button', { name: 'Full screen map' })).toBeNull();
+    const zoom = () => toolbar.textContent;
+    const before = zoom();
+    act(() => { fireEvent.keyDown(window, { key: '+' }); });
+    expect(zoom()).not.toBe(before);
+    act(() => { fireEvent.keyDown(window, { key: 'r' }); });
+    expect(zoom()).toBe(before);
+    const slider = screen.getAllByLabelText('Session time').find(element => element.tagName === 'INPUT') as HTMLInputElement;
+    act(() => { fireEvent.keyDown(window, { key: 'End' }); });
+    expect(slider.value).toBe('200');
+    act(() => { fireEvent.keyDown(window, { key: 'Home' }); });
+    expect(slider.value).toBe('0');
+    act(() => { fireEvent.keyDown(window, { key: '.' }); });
+    expect(screen.getByRole('button', { name: '2x' }).getAttribute('aria-pressed')).toBe('true');
+    act(() => { fireEvent.keyDown(window, { key: '?' }); });
+    expect(screen.getByRole('dialog', { name: 'Race replay shortcuts' })).toBeTruthy();
   });
 
   it('lists the followed car incidents and jumps to just before one', async () => {

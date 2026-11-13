@@ -1,12 +1,12 @@
 import { useEffect, useEffectEvent } from 'react';
 import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
-import type { RaceClock } from './raceClock.js';
+import { RACE_SPEEDS, type RaceClock } from './raceClock.js';
 
 /** Seconds an arrow key moves the clock; Shift moves it further. */
 const SEEK_SEC = 5;
 const SEEK_FAR_SEC = 30;
 
-/** Space plays or pauses the race replay; Left and Right step the clock back and forward. */
+/** Space plays or pauses the race replay; Left and Right step the clock, Home and End jump to its ends, comma and period change the speed. */
 export function useRaceReplayKeys(clock: RaceClock): void {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -18,11 +18,55 @@ export function useRaceReplayKeys(clock: RaceClock): void {
         event.preventDefault();
         const step = (event.shiftKey ? SEEK_FAR_SEC : SEEK_SEC) * (event.key === 'ArrowLeft' ? -1 : 1);
         clock.seek(clock.getState().timeSec + step);
+      } else if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        clock.seek(event.key === 'Home' ? clock.startSec : clock.endSec);
+      } else if (event.key === ',' || event.key === '.') {
+        event.preventDefault();
+        const at = RACE_SPEEDS.indexOf(clock.getState().speed as typeof RACE_SPEEDS[number]);
+        const next = RACE_SPEEDS[Math.max(0, Math.min(RACE_SPEEDS.length - 1, at + (event.key === ',' ? -1 : 1)))];
+        clock.setSpeed(next);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [clock]);
+}
+
+/** The race map's camera, as useGpsMapPanZoom gives it. */
+export interface RaceMapCamera {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetPanZoom: () => void;
+  centerOnCar: () => void;
+  setFollowCar: (value: boolean | ((current: boolean) => boolean)) => void;
+  panBy: (horizontal: number, vertical: number) => void;
+}
+
+const PAN_KEYS: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] };
+
+/**
+ * The lap map's keys on the race map, from anywhere on the race replay: + and − zoom, 0 or R shows the circuit, C centres and
+ * F follows the followed car, W/A/S/D pan. The camera's own C and F (map focused) and these act once: the first prevents the other.
+ */
+export function useRaceMapKeys(camera: RaceMapCamera): void {
+  const onKey = useEffectEvent((event: KeyboardEvent) => {
+    if (replayShortcutBlocked(event)) return;
+    const key = event.key.toLowerCase(), pan = PAN_KEYS[key];
+    if (pan) camera.panBy(...pan);
+    else if (key === '+' || key === '=') camera.zoomIn();
+    else if (key === '-') camera.zoomOut();
+    else if (key === '0' || key === 'r') camera.resetPanZoom();
+    else if (key === 'c' && !event.repeat) camera.centerOnCar();
+    else if (key === 'f' && !event.repeat) camera.setFollowCar(value => !value);
+    else return;
+    event.preventDefault();
+  });
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => onKey(event);
+    window.addEventListener('keydown', handle);
+    return () => window.removeEventListener('keydown', handle);
+  }, []);
 }
 
 /** Wait after the last move before writing the URL, so scrubbing does not rewrite history on every step. */

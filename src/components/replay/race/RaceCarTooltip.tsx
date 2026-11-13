@@ -14,8 +14,9 @@ interface Props {
 
 /** A hovered car's line of the timing screen: who, place overall and in class, laps, gap and laps times. */
 export const RaceCarTooltip: React.FC<Props> = ({ index, clock, slot }) => {
-  const second = useSyncExternalStore(clock.subscribe, () => Math.floor(clock.getState().timeSec));
-  const row = useMemo(() => raceStandingsAt(index, second).find(entry => entry.car.slot === slot), [index, second, slot]);
+  // As often as the standings tower.
+  const tenth = useSyncExternalStore(clock.subscribe, () => Math.floor(clock.getState().timeSec * 10));
+  const row = useMemo(() => raceStandingsAt(index, tenth / 10).find(entry => entry.car.slot === slot), [index, tenth, slot]);
   if (!row) return null;
   const { car } = row;
   const gap = index.isRace ? formatRaceGap(row.gap, true) : '';
