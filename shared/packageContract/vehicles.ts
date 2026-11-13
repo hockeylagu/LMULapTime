@@ -147,7 +147,9 @@ export function vehicleBodyProblems(catalog: VehicleBuildCatalog, {partial = fal
     if (folders.has(body.folder)) problems.push(`body ${body.folder} is listed twice`);
     folders.add(body.folder);
     if (index > 0 && !(bodies[index - 1].folder < body.folder)) problems.push(`bodies are not sorted by folder at ${body.folder}`);
-    if (JSON.stringify(body.vehicleIds) !== JSON.stringify([...new Set(body.vehicleIds.map(id => id.toUpperCase()))].sort())) problems.push(`body ${body.folder}: vehicleIds are not sorted, unique and upper-case`);
+    if (body.vehicleIds.some((id, i) => id !== id.toUpperCase() || (i > 0 && !(body.vehicleIds[i - 1] < id)))) {
+      problems.push(`body ${body.folder}: vehicleIds are not sorted, unique and upper-case`);
+    }
     for (const id of body.vehicleIds) {
       if (!recordOf.has(id)) problems.push(`body ${body.folder} names ${id}, which belongs to no record`);
       if (owner.has(id)) problems.push(`${id} is in bodies ${owner.get(id)} and ${body.folder}`);
@@ -204,8 +206,14 @@ function parseRecord(item: unknown, at: string, ids: Set<string>, aliases: Set<s
     const outline = row.outlineXZ.map((p, i) => pair(p, `${at}.outlineXZ[${i}]`));
     if (outline.length > 3 && outline[0].every((n, i) => n === outline[outline.length - 1][i])) outline.pop();
     const xs = outline.map(p => p[0]), zs = outline.map(p => p[1]);
-    if (Math.abs(Math.max(...xs) - Math.min(...xs) - dimensions.widthM) > 0.02 || Math.abs(Math.max(...zs) - Math.min(...zs) - dimensions.lengthM) > 0.02
-      || new Set(outline.map(p => p.join(','))).size !== outline.length) throw Error(`${at}.outlineXZ: Outline dimensions disagree`);
+    if (Math.abs(Math.max(...xs) - Math.min(...xs) - dimensions.widthM) > 0.02 || Math.abs(Math.max(...zs) - Math.min(...zs) - dimensions.lengthM) > 0.02) {
+      throw Error(`${at}.outlineXZ: Outline dimensions disagree`);
+    }
+    for (let i = 0; i < outline.length; i++) {
+      for (let j = i + 1; j < outline.length; j++) {
+        if (outline[i][0] === outline[j][0] && outline[i][1] === outline[j][1]) throw Error(`${at}.outlineXZ: Outline dimensions disagree`);
+      }
+    }
     // A convex collision envelope: every point on one side of every edge.
     let sign = 0;
     for (let i = 0; i < outline.length; i++) {

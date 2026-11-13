@@ -139,6 +139,7 @@ export const TRACK_LAYOUT_KEYS = ['layoutKey', 'circuitId', 'layoutId', 'trackVe
   'nominalWidthM', 'startFinish', 'timingGates', 'pitLane', 'pitStalls', 'gridSlots', 'surfaceProfile', 'projectionRevision', 'surfaces', 'brakeMarkers', 'geometryRevision'] as const;
 const REQUIRED_LAYOUT_KEYS = ['layoutKey', 'circuitId', 'layoutId', 'trackVenue', 'trackCourse', 'lengthM', 'bounds', 'leftBoundary', 'rightBoundary', 'centerline',
   'projectionRevision', 'surfaces', 'brakeMarkers', 'geometryRevision'];
+const OPTIONAL_LAYOUT_KEYS = TRACK_LAYOUT_KEYS.filter(key => !REQUIRED_LAYOUT_KEYS.includes(key));
 /** The keys `geometryRevision` hashes (with `projectionRevision` after them). */
 export const TRACK_GEOMETRY_KEYS: readonly string[] = TRACK_LAYOUT_KEYS.slice(0, TRACK_LAYOUT_KEYS.indexOf('surfaceProfile') + 1);
 
@@ -187,9 +188,13 @@ function bounded(value: unknown, path: string, min = -MAX_COORDINATE_M, max = MA
  */
 export function parseTrackLayout(value: unknown, expectedLayoutKey?: string): TrackBoundaryGeometry {
   const geometry = record(value, 'track layout');
-  knownKeys(geometry, REQUIRED_LAYOUT_KEYS, TRACK_LAYOUT_KEYS, 'track layout');
-  const present = TRACK_LAYOUT_KEYS.filter(key => geometry[key] !== undefined);
-  if (JSON.stringify(Object.keys(geometry)) !== JSON.stringify(present)) throw Error('track layout: fields are not in the published order');
+  knownKeys(geometry, REQUIRED_LAYOUT_KEYS, OPTIONAL_LAYOUT_KEYS, 'track layout');
+  let order = 0;
+  for (const key of Object.keys(geometry)) {
+    while (order < TRACK_LAYOUT_KEYS.length && TRACK_LAYOUT_KEYS[order] !== key) order++;
+    if (order >= TRACK_LAYOUT_KEYS.length) throw Error('track layout: fields are not in the published order');
+    order++;
+  }
   for (const key of ['layoutKey', 'circuitId', 'layoutId']) if (typeof geometry[key] !== 'string' || !(geometry[key] as string).trim() || (geometry[key] as string).length > 512) invalid(key);
   for (const key of ['trackVenue', 'trackCourse']) if (typeof geometry[key] !== 'string' || (geometry[key] as string).length > 512) invalid(key);
   if (!LAYOUT_KEY.test(geometry.layoutKey as string)) invalid('layoutKey');
@@ -316,7 +321,14 @@ export function parseTrackLayout(value: unknown, expectedLayoutKey?: string): Tr
     }
   }
   // A real closed route of the stated length: allows centimetre publication rounding without accepting a different station frame.
-  if (new Set(centerline.map(p => p.join(','))).size < 3) throw Error('Degenerate route');
+  let first = centerline[0], second: [number, number] | null = null, distinct = 1;
+  for (let i = 1; i < centerline.length && distinct < 3; i++) {
+    const p = centerline[i];
+    if (p[0] === first[0] && p[1] === first[1]) continue;
+    if (!second) { second = p; distinct = 2; }
+    else if (p[0] !== second[0] || p[1] !== second[1]) distinct = 3;
+  }
+  if (distinct < 3) throw Error('Degenerate route');
   let measuredLength = 0;
   for (let i = 0; i < centerline.length; i++) {
     const a = centerline[i], b = centerline[(i + 1) % centerline.length], length = Math.hypot(b[0] - a[0], b[1] - a[1]);

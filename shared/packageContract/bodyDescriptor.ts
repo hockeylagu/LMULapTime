@@ -209,7 +209,11 @@ function optionNodes(value: unknown, at: string): string[] {
   return names;
 }
 
-const sameList = (a: readonly string[], b: readonly string[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  const left = [...a].sort(), right = [...b].sort();
+  return left.every((value, i) => value === right[i]);
+}
 
 /**
  * The descriptor of the body `row` (its catalog row): exact keys in order, option nodes, appearances covering exactly the body's vehicle ids and carrying no
@@ -275,8 +279,9 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
     return text(camera.name, `${at}.name`, 64);
   });
   if (!sameList(names, ['cockpit', 'hood', 'roof'])) throw Error(`${what}.cameras.list: expected exactly the cockpit, hood and roof cameras`);
-  for (const path of JSON.stringify(descriptor).match(ANY_TEXTURE_PATH) ?? []) if (!declared.has(path)) throw Error(`${row.folder}: descriptor uses undeclared texture vehicles/${path}`);
-  for (const path of JSON.stringify(descriptor).match(ANY_VOLUME_PATH) ?? []) if (!declaredVolumes.has(path)) throw Error(`${row.folder}: descriptor uses undeclared volume vehicles/${path}`);
+  const raw = JSON.stringify(descriptor);
+  for (const path of raw.match(ANY_TEXTURE_PATH) ?? []) if (!declared.has(path)) throw Error(`${row.folder}: descriptor uses undeclared texture vehicles/${path}`);
+  for (const path of raw.match(ANY_VOLUME_PATH) ?? []) if (!declaredVolumes.has(path)) throw Error(`${row.folder}: descriptor uses undeclared volume vehicles/${path}`);
   for (const path of declaredVolumes) if (!usedVolumes.has(path)) throw Error(`${row.folder}: volume vehicles/${path} is declared but no material uses it`);
   return value as BodyDescriptor;
 }
