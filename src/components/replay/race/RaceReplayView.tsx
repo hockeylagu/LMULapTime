@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { RaceReplayOverview, RaceReplayProgress, ReplayMetadata } from '../../../../shared/types/index.js';
 import { fetchRaceOverview, fetchRacePoseWindow, fetchRaceProgress, fetchSessionTelemetryMetadata, lastSessionTelemetryMetadata } from '../../../api/replayApi.js';
 import { racePitSlots } from '../../../../shared/domain/raceReplay/poseWindow.js';
@@ -15,6 +15,9 @@ import { RacePlaybackBar } from './RacePlaybackBar.js';
 import { useRaceReplayKeys, useRaceUrlSync } from './useRaceReplayControls.js';
 import { RaceReplayHeader } from './RaceReplayHeader.js';
 import { initialRaceTime } from './raceLaps.js';
+import { Replay3DLoading } from '../view3d/laps/Replay3DLoading.js';
+
+const Race3DView = lazy(() => import('./Race3DView.js'));
 
 export interface RaceReplayViewProps {
   sessionId: string;
@@ -110,6 +113,7 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
   useRaceReplayKeys(clock);
   // Each double click in the standings puts the map on the followed car.
   const [trackRequest, setTrackRequest] = useState(0);
+  const [view, setView] = useState<'2d' | '3d'>('2d');
   useRaceUrlSync(clock, followSlot, onStateChange);
 
   return (
@@ -117,8 +121,16 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
       <RaceReplayHeader onClose={onClose} metadata={metadata} overview={overview} clock={clock} followSlot={followSlot}
         onFollow={setFollowSlot} onOpenLap={onOpenLap} />
       <div className="flex min-h-0 flex-1">
-        <RaceMapScene className="min-w-0 flex-1" overview={overview} index={index} clock={clock} poses={poses}
-          followSlot={followSlot} hoverSlot={hoverSlot} trackRequest={trackRequest} onFollow={setFollowSlot} onHover={setHoverSlot} />
+        {view === '3d' ? (
+          <Suspense fallback={<div className="relative min-w-0 flex-1 bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
+            <Race3DView className="min-w-0 flex-1" overview={overview} clock={clock} poses={poses} followSlot={followSlot} progress={progress}
+              onToggleView={() => setView('2d')} />
+          </Suspense>
+        ) : (
+          <RaceMapScene className="min-w-0 flex-1" overview={overview} index={index} clock={clock} poses={poses}
+            followSlot={followSlot} hoverSlot={hoverSlot} trackRequest={trackRequest} onFollow={setFollowSlot} onHover={setHoverSlot}
+            onToggleView={() => setView('3d')} />
+        )}
         <RaceStandingsTower className="w-[360px] shrink-0" index={index} clock={clock} followSlot={followSlot}
           onFollow={setFollowSlot} pittedAt={timeSec => racePitSlots(poses.windowAt(timeSec), timeSec)} onTrack={slot => { setFollowSlot(slot); setTrackRequest(n => n + 1); }} onHover={setHoverSlot} />
       </div>

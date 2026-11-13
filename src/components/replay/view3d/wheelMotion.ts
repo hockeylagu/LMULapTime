@@ -34,8 +34,11 @@ export function createWheelTravel(points: ReplayTrajectoryPoint[]): (index: numb
   };
 }
 
+/** What the wheel animation reads of a lap: its samples and the car's steering calibration. */
+export type WheelLap = Pick<ReplayTrajectoryData, 'points' | 'handlingCalibration'>;
+
 /** Steering-wheel rotation in radians (ISO positive-left, counter-clockwise from the driver's seat) from the recorded steering. */
-export function createSteeringWheelAngle(lap: ReplayTrajectoryData): (index: number, fraction: number) => number {
+export function createSteeringWheelAngle(lap: WheelLap): (index: number, fraction: number) => number {
   const calibration = lap.handlingCalibration, points = lap.points;
   if (!calibration) return () => 0;
   // steerYaw keeps the chart's ±270° scale; see computeUnderOversteer for the same conversion.
@@ -49,7 +52,7 @@ export function createSteeringWheelAngle(lap: ReplayTrajectoryData): (index: num
 }
 
 /** Front road-wheel angle in radians (ISO positive-left): the steering-wheel rotation over the plugin ratio. */
-export function createSteerAngle(lap: ReplayTrajectoryData): (index: number, fraction: number) => number {
+export function createSteerAngle(lap: WheelLap): (index: number, fraction: number) => number {
   const wheel = createSteeringWheelAngle(lap), ratio = lap.handlingCalibration?.steeringRatio ?? 1;
   return (index, fraction) => wheel(index, fraction) / ratio;
 }

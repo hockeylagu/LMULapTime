@@ -13,6 +13,16 @@ describe('GpsCircuitMinimap', () => {
     expect(containerEmpty.querySelector('[data-testid="gps-circuit-minimap"]')).toBeNull();
   });
 
+  it('draws other cars as dots in their colours under the current car, faded when dimmed', () => {
+    const { container } = render(<GpsCircuitMinimap trackBoundaryPathD={mockBoundaryPathD} currentPos={{ sx: 150, sy: 150 }}
+      cars={[{ key: 2, sx: 120, sy: 100, color: '#C084FC' }, { key: 5, sx: 180, sy: 200, color: '#34D399', dimmed: true }]} />);
+    const dots = [...container.querySelectorAll('[data-minimap-car]')];
+    expect(dots.map(dot => [dot.getAttribute('data-minimap-car'), dot.getAttribute('fill'), dot.getAttribute('fill-opacity')]))
+      .toEqual([['2', '#C084FC', '1'], ['5', '#34D399', '0.35']]);
+    // The current car draws last, on top of the others.
+    expect(container.querySelector('svg')!.lastElementChild!.getAttribute('fill')).toBe('#38BDF8');
+  });
+
   it('renders track boundary path and car position marker', () => {
     const { container } = render(
       <GpsCircuitMinimap

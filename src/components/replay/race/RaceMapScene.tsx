@@ -73,11 +73,13 @@ interface Props {
   hoverSlot: number | null;
   onFollow: (slot: number) => void;
   onHover: (slot: number | null) => void;
+  /** Switches to the 3D view. */
+  onToggleView?: () => void;
   className?: string;
 }
 
 /** The race map: the circuit and every car on the session clock, following the selected car. */
-export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, followSlot, trackRequest = 0, hoverSlot, onFollow, onHover, className = '' }) => {
+export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, followSlot, trackRequest = 0, hoverSlot, onFollow, onHover, onToggleView, className = '' }) => {
   const { timeSec } = useSyncExternalStore(clock.subscribe, clock.getState);
   const { trackGeometry } = useTrackBoundaryGeometry({ layoutKey: overview.layoutKey, trackVenue: overview.trackVenue, trackCourse: overview.trackCourse });
   const { layers, changeLayers } = useMapLayers();
@@ -154,7 +156,7 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
         {bounds && (
           <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={trackGeometry} bounds={bounds}
             left={svg.left} right={svg.right} center={svg.center} trajectory={[]} orientation="horizontal"
-            hasSectors={sectorMarkers.length > 0} showPlayPause={false} shortcuts="race" fullscreen={false} />
+            hasSectors={sectorMarkers.length > 0} showPlayPause={false} shortcuts="race" fullscreen={false} onToggleView={onToggleView} />
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { Quaternion, Vector3, type Group, type Object3D } from 'three';
-import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
+import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
 import { attachWheelRigs, type WheelRig } from './wheelGeometry.js';
-import { createSteerAngle, createSteeringWheelAngle, createWheelTravel } from './wheelMotion.js';
+import { createSteerAngle, createSteeringWheelAngle, createWheelTravel, type WheelLap } from './wheelMotion.js';
 import { isContinuousPose, sampleRenderPose, type RenderPose } from './replayPose.js';
 import type { SurfaceHeight } from './scenery/sceneryGround.js';
 
@@ -50,7 +50,7 @@ function restValue(points: ReplayTrajectoryPoint[], corner: number, channel: Sus
   return median(samples.slice(0, Math.max(1, Math.ceil(samples.length / 10))).map(sample => sample.value));
 }
 
-export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surfaceHeight: SurfaceHeight): WheelAnimation {
+export function createWheelAnimation(car: Group, lap: WheelLap, surfaceHeight: SurfaceHeight): WheelAnimation {
   const envelope = car.getObjectByName('body-envelope');
   if (!envelope || !('isGroup' in envelope)) throw Error('Car has no body envelope');
   const rigs = attachWheelRigs(envelope as Group);

@@ -6,6 +6,8 @@ export interface GpsCircuitMinimapProps {
   trackBoundaryPathD?: string;
   currentPos?: { sx: number; sy: number };
   baselineGhostPos?: { sx: number; sy: number } | null;
+  /** Other cars as small dots under the current one (the race replay), each in its own colour. */
+  cars?: ReadonlyArray<{ key: number; sx: number; sy: number; color: string; dimmed?: boolean }>;
   currentViewBox?: string;
   onPanTo?: (targetX: number, targetY: number) => void;
   isExpanded?: boolean;
@@ -17,6 +19,7 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
   trackBoundaryPathD,
   currentPos,
   baselineGhostPos,
+  cars,
   currentViewBox,
   onPanTo,
   isExpanded = false,
@@ -117,6 +120,11 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
             rx="14"
           />
         )}
+
+        {cars?.map(car => (
+          <circle key={car.key} data-minimap-car={car.key} cx={car.sx} cy={car.sy} r="10" fill={car.color}
+            fillOpacity={car.dimmed ? 0.35 : 1} stroke={MAP_COLORS.minimapBorder} strokeWidth="2" />
+        ))}
 
         {baselineGhostPos && (
           <circle

@@ -9,6 +9,11 @@ import type { RaceReplayOverview } from '../../../../shared/types/index.js';
 vi.mock('../../../../src/api/replayApi.js', () => ({ fetchRaceOverview: vi.fn(), fetchRacePoseWindow: vi.fn(), fetchRaceProgress: vi.fn(() => Promise.reject(Error('No centreline'))),
   fetchSessionTelemetryMetadata: vi.fn(() => Promise.reject(Error('No metadata'))),
   lastSessionTelemetryMetadata: vi.fn(() => null) }));
+// The 3D view needs WebGL: a stand-in shows which car it follows and switches back.
+vi.mock('../../../../src/components/replay/race/Race3DView.js', () => ({
+  default: ({ followSlot, onToggleView }: { followSlot: number | null; onToggleView: () => void }) => (
+    <button type="button" data-testid="race-3d" onClick={onToggleView}>3D following {followSlot}</button>),
+}));
 vi.mock('../../../../src/api/trackGeometryApi.js', () => ({ loadTrackBoundaryGeometry: vi.fn(() => Promise.resolve(null)) }));
 
 const overview: RaceReplayOverview = {
@@ -174,6 +179,16 @@ describe('RaceReplayView', () => {
     expect(screen.queryByRole('tooltip')).toBeNull();
     fireEvent.pointerEnter(document.querySelector('[data-race-car="1"]')!);
     expect(screen.getByRole('tooltip').textContent).toContain('#7Ann (You)');
+  });
+
+  it('switches the race between the 2D map and the 3D view, keeping the followed car', async () => {
+    view();
+    fireEvent.click(await screen.findByRole('button', { name: 'Switch to 3D view' }));
+    const scene = await screen.findByTestId('race-3d');
+    expect(scene.textContent).toBe('3D following 1');
+    expect(screen.queryByTestId('race-map-scene')).toBeNull();
+    fireEvent.click(scene);
+    await waitFor(() => expect(screen.getByTestId('race-map-scene')).toBeTruthy());
   });
 
   it('renders the app loading indicator while the session replay overview is loading', () => {
