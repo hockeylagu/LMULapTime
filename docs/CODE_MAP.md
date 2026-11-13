@@ -227,6 +227,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
    - `GET /api/session/:id/traffic`: reads race position index (`racePositions.ts`, `racePositionsWorkerClient.ts`, `dbRacePositionStore.ts`) to produce traffic spells (`trafficSpells.ts`).
 6. **Replay Inspector UI** (`src/components/replay/ReplayInspectorPage.tsx`, route `/telemetry`):
    - **Data & cursor**: `useReplayInspectorData.ts` (remaps scrub index across reloads using `getDistancesInReferenceFrame`), `replayPlaybackCursor.ts` (rAF frame interpolation without full rerenders), `useReplayPersonalBest.ts`.
+   - **Map panel width**: `inspector/PanelResizeHandle.tsx` is the divider on the right-hand panel's edge (drag, arrow keys, double-click reset); the breakpoint widths in `ReplayInspectorSidebar.tsx` stay the minimum, the charts keep 560 px, and the width is remembered per layout (map only, map beside analysis).
    - **Inspector title**: `ReplayInspectorTitle.tsx` (weather, rain intensity, air/track temps; lap conditions take precedence over replay metadata).
    - **GPS Map** (`map/`):
      - Heatmap modes: Delta (cumulative gap) and Gain / Loss (local change in s/s over ±0.3s window, 0.015 s/s deadband, 0.16 s/s saturation via `computeGainLossByIdx` in `replayMapUtils.ts`).
@@ -412,7 +413,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 ### File Size Limits Watchlist
 - **Source files near 1,000 lines**: `shared/domain/circuitDefinitions.ts` (~774 lines), `server/telemetry/duckdbReader.ts` (~773 lines).
 - **Directories near 20 files**: `shared/domain/` (19), `src/components/settings/` (19), `test/domain/` (19), `src/components/common/` (18), `src/utils/` (18).
-- **Components near 300 lines**: `ReplayInspectorContent.tsx` (291), `ReplayInspectorModalBody.tsx` (289), `Dashboard.tsx` (279), `TelemetryPresetModal.tsx` (273), `ReplayInspectorSidebar.tsx` (270).
+- **Components near 300 lines**: `ReplayInspectorContent.tsx` (291), `ReplayInspectorModalBody.tsx` (289), `Dashboard.tsx` (279), `TelemetryPresetModal.tsx` (273), `ReplayInspectorSidebar.tsx` (286).
 
 ### Known Data Limits
 - VCR/XML logs do not prove in-session repairs. Live capture records vehicle condition and REST repair estimates, but inferred completed repairs retain uncertainty.

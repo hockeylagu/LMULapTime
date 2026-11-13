@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { Activity, BrainCircuit, Timer } from 'lucide-react';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
@@ -6,6 +6,7 @@ import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/co
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { ReplayInspectorSidebarTabs } from './ReplayInspectorSidebarTabs.js';
+import { PanelResizeHandle, usePanelWidth } from './PanelResizeHandle.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayMapContainer } from '../map/ReplayMapContainer.js';
 import { AIReportTab } from '../analysis/AIReportTab.js';
@@ -121,6 +122,8 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   }, [handleSelectCorner, setActiveTab]);
 
   const isDoublePanel = activeTab !== 'map';
+  const panel = useRef<HTMLDivElement>(null), [dragging, setDragging] = useState(false);
+  const [panelWidth, setPanelWidth] = usePanelWidth(isDoublePanel ? 'double' : 'single');
 
   const mapContainer = (
     <ReplayMapContainer
@@ -151,13 +154,15 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   );
 
   return (
-    <div
-      className={`shrink-0 bg-lmu-bg flex flex-col min-h-0 overflow-hidden transition-all duration-200 ${
+    <div ref={panel} style={{'--panel-w': `${panelWidth ?? 0}px`} as React.CSSProperties}
+      className={`relative shrink-0 bg-lmu-bg flex flex-col min-h-0 overflow-hidden w-full md:w-[var(--panel-w)] ${dragging ? '' : 'transition-all duration-200'} ${
         isDoublePanel
-          ? 'w-full md:w-[700px] lg:w-[800px] xl:w-[880px] 2xl:w-[980px]'
-          : 'w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[500px]'
+          ? 'md:min-w-[700px] lg:min-w-[800px] xl:min-w-[880px] 2xl:min-w-[980px]'
+          : 'md:min-w-[380px] lg:min-w-[420px] xl:min-w-[460px] 2xl:min-w-[500px]'
       }`}
     >
+      {/* The breakpoint widths are the minimum: the divider only widens the panel over the charts. */}
+      <PanelResizeHandle panel={panel} onResize={setPanelWidth} onDragging={setDragging} />
       <ReplayInspectorSidebarTabs
         activeTab={activeTab}
         setActiveTab={setActiveTab}
