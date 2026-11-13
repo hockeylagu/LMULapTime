@@ -83,9 +83,9 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
       onClose={onClose} metadata={metadata} trajectory={trajectory}
       titleActions={openRace && (
         <button type="button" onClick={() => openRace(selectedDriverSlot, trajectory?.currentLap ?? null)} disabled={isLoading}
-          title="Race replay: every car of the session on one clock, from this lap"
+          title="Session replay: every car of the session on one clock, from this lap"
           className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-lmu-border bg-lmu-bg px-2.5 text-xs text-lmu-text-soft hover:bg-lmu-card disabled:opacity-40 ${FOCUS_RING}`}>
-          <ListOrdered aria-hidden="true" className="h-3.5 w-3.5 text-lmu-accent-text" />Race
+          <ListOrdered aria-hidden="true" className="h-3.5 w-3.5 text-lmu-accent-text" />Session
         </button>
       )}
       drivers={drivers} selectedDriverSlot={selectedDriverSlot} onSelectDriver={onSelectDriver}
