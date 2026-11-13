@@ -99,3 +99,17 @@ export function deleteReplayDriverLaps(db: DatabaseType, filename: string, drive
   db.prepare('DELETE FROM replay_trajectory_defaults WHERE filename = ? AND driver_slot = ?').run(filename, driverSlot);
   deleteReplayDriverLapFacts(db, filename, driverSlot);
 }
+
+/**
+ * Identifies the stored decode of a replay cheaply (no trajectory blob is read): its drivers'
+ * stored ingests, or for replays cached before ingests were recorded, its lap facts. Null when
+ * nothing of it is stored.
+ */
+export function getReplayStoredSignature(db: DatabaseType, filename: string): string | null {
+  const ingest = db.prepare(
+    "SELECT COUNT(*) AS n, MAX(attempted_at) AS at FROM replay_ingest_drivers WHERE filename = ? AND status = 'stored'"
+  ).get(filename) as { n: number; at: number | null };
+  if (ingest.n > 0) return `${ingest.n}:${ingest.at}`;
+  const laps = db.prepare('SELECT COUNT(*) AS n FROM replay_laps WHERE filename = ?').get(filename) as { n: number };
+  return laps.n > 0 ? `laps:${laps.n}` : null;
+}

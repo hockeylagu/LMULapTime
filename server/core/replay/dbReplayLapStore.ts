@@ -116,6 +116,14 @@ export function getReplayConditions(db: DatabaseType, filename: string): ReplayC
   }));
 }
 
+/** The game's running order snapshots of a replay, in time order. */
+export function getReplayRunningOrder(db: DatabaseType, filename: string): Array<{ timeSec: number; order: number[] }> {
+  const rows = db.prepare('SELECT time_sec, order_json FROM replay_running_order WHERE filename = ? ORDER BY time_sec').all(filename) as Array<{
+    time_sec: number; order_json: string;
+  }>;
+  return rows.map(r => ({ timeSec: r.time_sec, order: JSON.parse(r.order_json) as number[] }));
+}
+
 /** A replay's driver events, optionally one driver's and within [fromSec, toSec], in time order. */
 export function getDriverEvents(db: DatabaseType, filename: string, options: { driverSlot?: number; fromSec?: number; toSec?: number } = {}): ReplayDriverEventFact[] {
   const rows = db.prepare(`

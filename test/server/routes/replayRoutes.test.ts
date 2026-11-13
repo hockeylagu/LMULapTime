@@ -13,7 +13,8 @@ import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 import { session as sessionFixture, driver, lap } from '../core/sessionRows/builders.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
 import { RaceTrafficService } from '../../../server/traffic/raceTrafficService.js';
-import type { ReplayTrajectoryData } from '../../../shared/types/index.js';
+import { RaceReplayService } from '../../../server/traffic/raceReplayService.js';
+import type { RaceReplayOverview, ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { setLiveCaptureMatch, upsertLiveCapture } from '../../../server/core/live/dbLiveCaptureStore.js';
 import type { LiveCaptureManifest } from '../../../shared/types/liveCapture.js';
 
@@ -123,6 +124,29 @@ describe('session telemetry routes', () => {
     expect(response.status).toBe(200);
     expect(traffic.mock.calls[0][0].session?.drivers[0]).toMatchObject({ name: 'Route Driver', carClass: 'GT3', laps: [] });
     expect(getSessionById).not.toHaveBeenCalled();
+  });
+
+  it('serves the race replay overview with the session drivers, and its pose windows as binary', async () => {
+    const overview = await request(app).get('/api/session/session-1/race');
+    expect(overview.status).toBe(200);
+    expect(overview.body).toMatchObject({ replayName: 'Route_Test_P1.Vcr', poseHz: 10, windowSec: 60, laps: [], runningOrder: [] });
+    expect((overview.body as RaceReplayOverview).cars[0]).toMatchObject({ name: 'Route Driver', carNumber: '21', sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0 } });
+
+    const getPoseWindow = vi.spyOn(RaceReplayService.prototype, 'getPoseWindow').mockResolvedValue(new Uint8Array(36).fill(7));
+    const poses = await request(app).get('/api/session/session-1/race/poses?window=3').buffer(true).parse((res, done) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => done(null, Buffer.concat(chunks)));
+    });
+    expect(poses.status).toBe(200);
+    expect(poses.headers['content-type']).toContain('application/octet-stream');
+    expect([...(poses.body as Buffer)]).toEqual(new Array<number>(36).fill(7));
+    expect(getPoseWindow).toHaveBeenCalledWith('Route_Test_P1.Vcr', 3);
+
+    expect((await request(app).get('/api/session/session-1/race/poses')).status).toBe(400);
+    expect((await request(app).get('/api/session/session-1/race/poses?window=-1')).status).toBe(400);
+    expect((await request(app).get('/api/session/missing/race')).status).toBe(404);
+    expect((await request(app).get('/api/session/missing/race/poses?window=0')).status).toBe(404);
   });
 
   it('does not expose replay-name telemetry routes', async () => {

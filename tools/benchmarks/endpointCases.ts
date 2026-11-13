@@ -111,5 +111,8 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     add(`telemetry-${source}`, '/api/session/:sessionId/telemetry', locator ? `${base}/telemetry?driverOrdinal=${locator.driverOrdinal}&lapOrdinal=${locator.lapOrdinal}&pointSpacingM=2${source === 'vcr' ? '&source=vcr' : ''}` : undefined);
   }
   add('traffic', '/api/session/:sessionId/traffic', locator ? `${base}/traffic?driverName=${encodeURIComponent(locator.driverName)}` : undefined);
+  add('race-overview', '/api/session/:sessionId/race', base ? `${base}/race` : undefined);
+  // The first window: the server resamples its laps on a worker the first time, then serves it from memory.
+  add('race-poses', '/api/session/:sessionId/race/poses', base ? `${base}/race/poses?window=0` : undefined);
   return cases;
 }

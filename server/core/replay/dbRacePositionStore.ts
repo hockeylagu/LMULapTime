@@ -28,6 +28,15 @@ export function listReplayLapRows(db: DatabaseType, filename: string): ReplayLap
   return rows.map((row) => ({ slot: row.driver_slot, lapNumber: row.lap_key, blob: row.trajectory_br }));
 }
 
+/** The stored blobs of the given laps of a replay; laps without a stored row are left out. */
+export function getReplayLapBlobs(db: DatabaseType, filename: string, laps: ReadonlyArray<{ slot: number; lapNumber: number }>): ReplayLapRow[] {
+  const statement = db.prepare('SELECT trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?');
+  return laps.flatMap((lap) => {
+    const row = statement.get(filename, lap.slot, lap.lapNumber) as { trajectory_br: Buffer } | undefined;
+    return row ? [{ slot: lap.slot, lapNumber: lap.lapNumber, blob: row.trajectory_br }] : [];
+  });
+}
+
 export function getRacePositions<T>(db: DatabaseType, filename: string, signature: string): T | null {
   const row = db.prepare(
     'SELECT positions_br FROM replay_race_positions WHERE filename = ? AND signature = ?'

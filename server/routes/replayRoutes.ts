@@ -7,6 +7,10 @@ import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { RaceTrafficService } from '../traffic/raceTrafficService.js';
+import { RaceReplayService } from '../traffic/raceReplayService.js';
+import { getReplayLapBlobs } from '../core/replay/dbRacePositionStore.js';
+import { getReplayStoredSignature } from '../core/replay/dbReplayIngestStore.js';
+import { getDriverEvents, getReplayLaps, getReplayRunningOrder } from '../core/replay/dbReplayLapStore.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
 import { readReplaySessionContext } from '../core/sessionRows/replayContext.js';
 import { hasVerifiedLiveCapture } from '../core/live/dbLiveCaptureStore.js';
@@ -24,6 +28,14 @@ export function createReplayRouter(context: ServerContext): Router {
     telemetryService
   );
   const trafficService = new RaceTrafficService(context.sessionDb);
+  const db = () => context.sessionDb.getDb();
+  const raceService = new RaceReplayService({
+    getReplaySignature: filename => getReplayStoredSignature(db(), filename),
+    getReplayLaps: filename => getReplayLaps(db(), filename),
+    getReplayLapBlobs: (filename, laps) => getReplayLapBlobs(db(), filename, laps),
+    getReplayRunningOrder: filename => getReplayRunningOrder(db(), filename),
+    getReplayDriverEvents: filename => getDriverEvents(db(), filename),
+  });
 
   router.get('/replays/cache', (_req, res) => {
     try {
@@ -34,39 +46,46 @@ export function createReplayRouter(context: ServerContext): Router {
     }
   });
 
+  /** The session replay's metadata, its drivers matched to the session's drivers by name; null without a replay. */
+  const sessionReplayMetadata = (sessionId: string) => {
+    const session = readReplaySessionContext(context.sessionDb.getDb(), sessionId, 'all');
+    const replayName = session?.matchingReplayFile?.name;
+    if (!session || !replayName) return null;
+    const filePath = path.join(context.replaysDir, replayName);
+    const metadata = context.replayRecordings.getMetadata(filePath, replayName, context.currentParser.configuredPlayerName);
+    const composed = composeReplayMetadata({
+      metadata,
+      replayName,
+      matchedSession: session,
+      duckdbFilename: TelemetryLinks.load(context.sessionDb, session.id).forSession(session),
+    });
+    const replayNameCounts = new Map<string, number>();
+    for (const driver of composed.drivers) {
+      const key = driver.name.trim().toLowerCase();
+      if (key) replayNameCounts.set(key, (replayNameCounts.get(key) ?? 0) + 1);
+    }
+    for (const driver of composed.drivers) {
+      const key = driver.name.trim().toLowerCase();
+      const matches = key && replayNameCounts.get(key) === 1
+        ? session.drivers.flatMap((item, ordinal) => item.name.trim().toLowerCase() === key ? [ordinal] : [])
+        : [];
+      if (matches.length !== 1) continue;
+      const ordinal = matches[0];
+      driver.sessionDriverOrdinal = session.drivers[ordinal].driverOrdinal ?? ordinal;
+      const sessionLapOrdinals: Record<string, number> = {};
+      session.drivers[ordinal].laps.forEach((lap, lapOrdinal) => {
+        sessionLapOrdinals[String(lap.lapNumber)] = lap.lapOrdinal ?? lapOrdinal;
+      });
+      driver.sessionLapOrdinals = sessionLapOrdinals;
+    }
+    return { replayName, metadata, composed };
+  };
+
   router.get('/session/:sessionId/telemetry/metadata', (req, res) => {
     try {
-      const session = readReplaySessionContext(context.sessionDb.getDb(), req.params.sessionId, 'all');
-      const replayName = session?.matchingReplayFile?.name;
-      if (!session || !replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
-      const filePath = path.join(context.replaysDir, replayName);
-      const metadata = context.replayRecordings.getMetadata(filePath, replayName, context.currentParser.configuredPlayerName);
-      const composed = composeReplayMetadata({
-        metadata,
-        replayName,
-        matchedSession: session,
-        duckdbFilename: TelemetryLinks.load(context.sessionDb, session.id).forSession(session),
-      });
-      const replayNameCounts = new Map<string, number>();
-      for (const driver of composed.drivers) {
-        const key = driver.name.trim().toLowerCase();
-        if (key) replayNameCounts.set(key, (replayNameCounts.get(key) ?? 0) + 1);
-      }
-      for (const driver of composed.drivers) {
-        const key = driver.name.trim().toLowerCase();
-        const matches = key && replayNameCounts.get(key) === 1
-          ? session.drivers.flatMap((item, ordinal) => item.name.trim().toLowerCase() === key ? [ordinal] : [])
-          : [];
-        if (matches.length !== 1) continue;
-        const ordinal = matches[0];
-        driver.sessionDriverOrdinal = session.drivers[ordinal].driverOrdinal ?? ordinal;
-        const sessionLapOrdinals: Record<string, number> = {};
-        session.drivers[ordinal].laps.forEach((lap, lapOrdinal) => {
-          sessionLapOrdinals[String(lap.lapNumber)] = lap.lapOrdinal ?? lapOrdinal;
-        });
-        driver.sessionLapOrdinals = sessionLapOrdinals;
-      }
-      res.json(composed);
+      const replay = sessionReplayMetadata(req.params.sessionId);
+      if (!replay) return res.status(404).json({ error: 'Session replay is unavailable' });
+      res.json(replay.composed);
     } catch (error: unknown) {
       res.status(404).json({ error: error instanceof Error ? error.message : 'Session telemetry metadata unavailable' });
     }
@@ -134,6 +153,48 @@ export function createReplayRouter(context: ServerContext): Router {
     } catch (error: unknown) {
       if (error instanceof ReplayDriverNotFoundError) return res.status(404).json({ error: error.message });
       res.status(404).json({ error: error instanceof Error ? error.message : 'Session telemetry unavailable' });
+    }
+  });
+
+  router.get('/session/:sessionId/race', (req, res) => {
+    try {
+      const replay = sessionReplayMetadata(req.params.sessionId);
+      if (!replay) return res.status(404).json({ error: 'Session replay is unavailable' });
+      const { composed, metadata, replayName } = replay;
+      res.json(raceService.getOverview({
+        replayName,
+        sessionType: composed.sessionType ?? metadata.sessionType,
+        trackVenue: metadata.trackName,
+        trackCourse: metadata.trackCourse,
+        sceneDesc: metadata.sceneDesc,
+        cars: composed.drivers.flatMap(driver => typeof driver.slot === 'number' ? [{
+          slot: driver.slot, name: driver.name, carClass: driver.carClass, carNumber: driver.carNumber, team: driver.team,
+          vehicleId: driver.vehicleId, isPlayer: driver.isPlayer,
+          sessionDriverOrdinal: driver.sessionDriverOrdinal, sessionLapOrdinals: driver.sessionLapOrdinals,
+        }] : []),
+      }));
+    } catch (error: unknown) {
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Session race replay unavailable' });
+    }
+  });
+
+  router.get('/session/:sessionId/race/poses', async (req, res) => {
+    let index: number;
+    try {
+      const parsed = parseBoundedInteger(req.query.window, 'window', 0, 100000);
+      if (parsed === undefined) return res.status(400).json({ error: 'window is required' });
+      index = parsed;
+    } catch (error: unknown) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid window' });
+    }
+    try {
+      const session = readReplaySessionContext(context.sessionDb.getDb(), req.params.sessionId, 'none');
+      const replayName = session?.matchingReplayFile?.name;
+      if (!replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
+      const body = await raceService.getPoseWindow(replayName, index);
+      res.type('application/octet-stream').send(Buffer.from(body.buffer, body.byteOffset, body.byteLength));
+    } catch (error: unknown) {
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Race poses unavailable' });
     }
   });
 

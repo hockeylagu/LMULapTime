@@ -399,3 +399,74 @@ export interface ReplayTrajectoryData {
   // finalized ReplayTrajectoryData per detected lap of this driver, from a single file scan.
   allLapsData?: ReplayTrajectoryData[];
 }
+
+/** A car of a session replay as the race replay shows it (replay slot, entry and session driver). */
+export interface RaceReplayCar {
+  slot: number;
+  name: string;
+  carClass?: string;
+  carNumber?: string;
+  team?: string;
+  vehicleId?: string;
+  isPlayer?: boolean;
+  /** The session driver this car is, when the name matches one; opens its laps in the lap view. */
+  sessionDriverOrdinal?: number;
+  sessionLapOrdinals?: Record<string, number>;
+}
+
+/** One lap of one car on the replay clock. */
+export interface RaceReplayLap {
+  slot: number;
+  lapNumber: number;
+  startSec: number;
+  endSec: number;
+  lapTimeSec: number | null;
+  isValid: boolean;
+}
+
+/** The game's running order (replay slots, first to last) from `timeSec` until the next snapshot. */
+export interface RaceRunningOrder {
+  timeSec: number;
+  order: number[];
+}
+
+export type RaceReplayEventKind = 'pit' | 'contact' | 'penalty' | 'penaltyServed';
+
+/** A moment of the session on the race replay's timeline. */
+export interface RaceReplayEvent {
+  kind: RaceReplayEventKind;
+  /** Replay clock, seconds: the pit entry, the first touch, the penalty. */
+  timeSec: number;
+  slot: number;
+  /** Contact: the other car's slot; absent for a wall or an object. */
+  otherSlot?: number;
+  /** Contact with a wall or an object: what was hit, as the replay names it. Penalty: its text. */
+  label?: string;
+  /** Contact: the strongest impact of the touch, as the replay records it. */
+  impact?: number;
+  /** Pit: seconds from pit entry to exit (null when the car never left the lane), and stopped for service. */
+  pitLaneSec?: number | null;
+  serviceSec?: number | null;
+}
+
+/** Everything the race replay needs besides the car poses, which come in time windows. */
+export interface RaceReplayOverview {
+  replayName: string;
+  sessionType?: string;
+  /** The replay clock span the laps cover, in seconds. */
+  startSec: number;
+  endSec: number;
+  /** Pose samples per second and seconds per pose window (`/race/poses?window=`). */
+  poseHz: number;
+  windowSec: number;
+  /** The circuit layout (circuitSpecs) the replay was driven on, when known. */
+  layoutKey?: string;
+  trackVenue?: string;
+  trackCourse?: string;
+  sceneDesc?: string;
+  cars: RaceReplayCar[];
+  laps: RaceReplayLap[];
+  runningOrder: RaceRunningOrder[];
+  /** Pit stops, contacts and penalties in time order. */
+  events: RaceReplayEvent[];
+}
