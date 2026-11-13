@@ -80,6 +80,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   const [uncontrolledView, setUncontrolledView] = useState<'2d' | '3d'>('2d');
   const [uncontrolledExpanded, setUncontrolledExpanded] = useState(false);
   const activeView = controlledView ?? uncontrolledView;
+  const [kept3d, setKept3d] = useState(false);
   const isExpanded = controlledExpanded ?? uncontrolledExpanded;
 
   const handleToggleView = (nextView: '2d' | '3d') => {
@@ -125,17 +126,24 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 
   if (!trajectory) return null;
 
-  if (activeView === '3d') return <GhostSyncContext.Provider value={ghostSync}><Suspense fallback={<div className="relative h-full min-h-[360px] w-full bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
-    <Replay3DView trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory ?? null : null}
-      currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => handleToggleView('2d')}
-      colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
-      onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))} trackGeometry={trackGeometry}
-      isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded}
-      showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
-  </Suspense></GhostSyncContext.Provider>;
+  // Once opened, the 3D view stays loaded while the page shows: back in 2D it is hidden (its keys and drawing stop).
+  const is3d = activeView === '3d';
+  if (is3d && !kept3d) setKept3d(true);
+  const view3d = (is3d || kept3d) && <div className="contents" hidden={!is3d}>
+    <Suspense fallback={<div className="relative h-full min-h-[360px] w-full bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
+      <Replay3DView trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory ?? null : null} active={is3d}
+        currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => handleToggleView('2d')}
+        colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
+        onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))} trackGeometry={trackGeometry}
+        isExpanded={is3d && isExpanded} onToggleExpanded={handleToggleExpanded}
+        showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
+    </Suspense>
+  </div>;
 
   return (
     <GhostSyncContext.Provider value={ghostSync}>
+      {view3d}
+      {!is3d && <>
       {!isExpanded && <div className="flex items-start justify-end px-2 py-1 gap-2 shrink-0 text-xs">
         <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy}
           isCompareMode={isCompareMode} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
@@ -205,6 +213,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         />
       )}
       {!isExpanded && <ReplayTelemetryHud currentPoint={currentPoint ?? trajectory.points[currentIndex]} />}
+      </>}
     </GhostSyncContext.Provider>
   );
 };

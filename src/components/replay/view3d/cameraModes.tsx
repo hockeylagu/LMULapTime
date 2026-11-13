@@ -42,7 +42,7 @@ export function useCameraModeShortcuts(map: React.RefObject<HTMLElement | null>,
   const handle = useEffectEvent((event: KeyboardEvent) => {
     if (event.repeat || replayShortcutBlocked(event)) return;
     const container = map.current, expanded = document.querySelector('[data-map-expanded]');
-    if (!container || container.closest('[inert]') || expanded && expanded !== container) return;
+    if (!container || container.closest('[inert], [hidden]') || expanded && expanded !== container) return;
     if (!(event.target instanceof Node && container.contains(event.target))) return;
     const mode = CAMERA_MODES.find(option => option.shortcut === event.key);
     if (mode) { event.preventDefault(); onMode(mode.value); }

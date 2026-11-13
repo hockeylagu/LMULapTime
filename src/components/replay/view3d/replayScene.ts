@@ -265,8 +265,11 @@ export async function createReplayScene(
       }
     }
   };
+  /** Kept loaded behind the 2D map. */
+  const hidden = () => host.closest('[hidden]') !== null;
   invalidate = () => {
-    if (disposed || frame || document.hidden) return;
+    // Nor while kept hidden behind the 2D map: showing it again resizes, which draws.
+    if (disposed || frame || document.hidden || hidden()) return;
     frame = requestAnimationFrame(now => { frame = 0; draw(now); });
   };
   /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker; wheels and lights follow it. */
@@ -279,9 +282,9 @@ export async function createReplayScene(
   };
   let viewportWidth = 0, viewportHeight = 0;
   const resize = () => {
-    if (disposed) return;
+    if (disposed || hidden()) return; // Keep the size it had.
     const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
-    if (width === viewportWidth && height === viewportHeight) return;
+    if (width === viewportWidth && height === viewportHeight) { invalidate(); return; } // Shown again at the same size.
     viewportWidth = width; viewportHeight = height;
     renderer.setSize(width, height, false); rig.resize(width / height);
     // ResizeObserver runs after animation callbacks, before paint. A canvas resize clears its pixels:

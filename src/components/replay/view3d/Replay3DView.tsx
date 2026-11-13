@@ -45,10 +45,12 @@ interface Props {
   showFrictionCircle?: boolean;
   onToggleFrictionCircle?: () => void;
   isExpanded?: boolean;
+  /** False while kept loaded behind the 2D map: the view is hidden and takes the focus again when shown. */
+  active?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
 }
 
-export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy, currentPoint, fadedLine, onToggleFadedLine, trackGeometry, showFrictionCircle, onToggleFrictionCircle, isExpanded: controlledExpanded, onToggleExpanded}: Props) {
+export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy, currentPoint, fadedLine, onToggleFadedLine, trackGeometry, showFrictionCircle, onToggleFrictionCircle, isExpanded: controlledExpanded, onToggleExpanded, active = true}: Props) {
   const map = useRef<HTMLDivElement>(null), [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
   const handleToggleExpanded = (expanded?: boolean) => {
@@ -99,7 +101,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
     onCycleGhostSync: baseline ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode, ghostSync.markerDistM !== null)) : undefined,
     onToggleMarker: () => toggleGhostMarker(ghostSync, primaryDists[activeIndex] ?? 0),
     onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded(), onToggleView: onReturnTo2D});
-  useEffect(() => { map.current?.focus({preventScroll: true}); }, []);
+  useEffect(() => { if (active) map.current?.focus({preventScroll: true}); }, [active]);
   // What drives the car and wheels, for the curious: hover the toolbar rather than read it under every frame.
   const sources = state?.ready ? [state.cars, state.wheelMotion, baseline ? {distance: 'Same-station ghost', time: 'Same-time ghost', anchored: 'Ghost on time from marker A'}[ghostSync.mode] : ''].filter(Boolean).join(' · ') : undefined;
 

@@ -69,13 +69,13 @@ export function useGpsMapShortcuts({
     const cameraAction = event.key.toLowerCase() === 'c' ? onCenter : event.key.toLowerCase() === 'f' ? onToggleFollow : undefined;
     if (cameraAction) {
       const expandedMap = document.querySelector('[data-map-expanded]');
-      if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event) || expandedMap && expandedMap !== container) return;
+      if (event.repeat || !container || container.closest('[inert], [hidden]') || !isReplaySurfaceTarget(event) || expandedMap && expandedMap !== container) return;
       event.preventDefault(); cameraAction(); return;
     }
     const mapAction = event.key.toLowerCase() === 'm' ? onToggleExpanded : event.key.toLowerCase() === 'e' ? onToggleView : undefined;
     if (mapAction) {
       // M and E work from any replay surface, but only for this live map and never while another map is expanded.
-      if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event)) return;
+      if (event.repeat || !container || container.closest('[inert], [hidden]') || !isReplaySurfaceTarget(event)) return;
       const expandedMap = document.querySelector('[data-map-expanded]');
       if (expandedMap && expandedMap !== container) return;
       event.preventDefault();

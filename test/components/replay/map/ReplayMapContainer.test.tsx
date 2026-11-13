@@ -239,6 +239,18 @@ describe('ReplayMapContainer', () => {
     expect(screen.getByRole('button', { name: /Exit full screen/i })).toBeInTheDocument();
   });
 
+  it('keeps the 3D view loaded and hidden while back in 2D', async () => {
+    render(<ReplayMapContainer {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to 3D view' }));
+    const view = await screen.findByTestId('mock-3d-view');
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to 2D view' }));
+    expect(view).toBeInTheDocument();
+    expect(view.closest('[hidden]')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to 3D view' }));
+    expect(screen.getByTestId('mock-3d-view')).toBe(view); // The same view, not built again.
+    expect(view.closest('[hidden], [inert]')).toBeNull();
+  });
+
   it('notifies onChangeView and respects controlled view prop', async () => {
     const onChangeView = vi.fn();
     const { rerender } = render(<ReplayMapContainer {...baseProps} view="2d" onChangeView={onChangeView} />);

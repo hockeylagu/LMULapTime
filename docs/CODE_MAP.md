@@ -346,7 +346,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   yaw with rotational/vertical damping for Chase mode while preserving user camera/focus offsets
   during Follow/Chase updates; manual camera movement does not change the selected mode.
   `racingLine.ts` drapes depth-tested racing lines on the nearby native road layer; measured
-  coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D, and `src/api/sceneryApi.ts` and `src/api/vehicles/bodyApi.ts`
+  coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D (the 3D view, once opened, stays loaded and hidden behind 2D until the page changes), and `src/api/sceneryApi.ts` and `src/api/vehicles/bodyApi.ts`
   load layouts, chunks and cars through the API client. The existing replay cursor owns time in both views.
 - `trackPackage.ts` validates geometry revisions and route lengths within 0.01m. Routes in `dataPluginRoutes.ts` serve geometry and vehicle logos (`/api/data-plugin/vehicles/logos`).
 - Geometry validation: `hasCompatibleTrackStations` (`shared/domain/trackGeometry.ts`) requires matching geometry revisions before computing geometry-dependent corner analysis; missing geometry leaves recorded-channel analysis available.
