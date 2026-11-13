@@ -72,7 +72,7 @@ export interface SceneEnvironment {
    * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
    */
   captureVenue(): void;
-  /** Writes this scene's haze into the shader chunks: call before compiling its materials outside a render. */
+  /** Writes this scene's haze terms into the uniforms hazed materials read; each of the scene's renders does it too. */
   applyHaze(): void;
   /**
    * Before a frame renders: colours the haze toward the view and draws the shadow cascades that are due. True while cached
@@ -138,7 +138,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   sky.onBeforeRender = (_renderer, _scene, camera: Camera) => { sky.position.copy(camera.position); sky.updateMatrixWorld(); };
   scene.background = null;
   // The haze takes its colour from the sky just above the horizon toward the view (update); the sun's light, the height term and
-  // the distance shape are in the fog chunks (haze.ts).
+  // the distance shape are in the hazed materials' programs (haze.ts).
   const haze = hazeColour(venue.sky, lighting.sunDirection, weather), heading = new Vector3(), skyHaze = sky.material.uniforms.hazeColour.value as Color;
   const fog = new FogExp2(haze(0, new Color(), skyHaze), hazeDensity(venue.sky, venue.daylight, weather, sunElevationDeg));
   scene.fog = fog;
@@ -149,7 +149,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   const groundRadiance = GROUND_ALBEDO * Math.max(0, lighting.sunDirection.y) / Math.PI;
   const applyHaze = createHaze({originY: origin.y, height: heightHaze(venue.sky, venue.daylight, weather), sunDirection: lighting.sunDirection.clone().normalize(),
     sunRadiance: sunRgb.clone(), sunward: sunwardHaze(venue.sky, weather)});
-  // Programs compile on a scene's render (and the warm-up's compile, `applyHaze`): each writes this scene's haze terms back first.
+  // Hazed materials read the terms of the scene that rendered last: each scene writes its own before it renders.
   applyHaze(); scene.onBeforeRender = applyHaze;
   const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({color: sunRgb.clone().multiplyScalar(groundRadiance), side: DoubleSide}));
   reflectedGround.rotation.x = -Math.PI / 2; reflectedGround.position.y = ENVIRONMENT_GROUND_Y;
@@ -197,6 +197,9 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
       camera.position.copy(probeAt); camera.updateMatrixWorld();
+      // The scene's world matrices update once per frame, not per render (sceneShell), and the capture may come before the first
+      // frame: without this, the sun's light has no direction yet and the probe sees the venue unlit by it.
+      scene.updateMatrixWorld();
       const shown = dynamic.map(object => object.visible);
       try {
         dynamic.forEach(object => { object.visible = false; });

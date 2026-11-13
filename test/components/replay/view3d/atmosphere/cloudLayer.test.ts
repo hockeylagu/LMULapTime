@@ -1,14 +1,16 @@
-import { Color, DataTexture, PerspectiveCamera, RedFormat, RGBAFormat, Scene, ShaderChunk, Vector3, type Mesh, type MeshStandardMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
+import { DataTexture, PerspectiveCamera, RedFormat, RGBAFormat, Scene, Vector3, type Mesh, type MeshStandardMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
 import { describe, expect, it } from 'vitest';
 import { cloudSheets, type CloudMoment } from '../../../../../src/components/replay/view3d/atmosphere/clouds.js';
-import { createCloudLayer, patchCloudShader } from '../../../../../src/components/replay/view3d/atmosphere/cloudLayer.js';
-import { createHaze } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { createCloudLayer } from '../../../../../src/components/replay/view3d/atmosphere/cloudLayer.js';
+import { isHazed } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
 import { testClouds } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const moment = (cells: string): CloudMoment => ({cells, upperDrift: 0, lowerDrift: 0, startUpperDrift: -10, startLowerDrift: -10});
 const light = {sunDirection: new Vector3(0.6, 0.8, 0), sunGreen: 10, cloudCover: 0.25};
-const haze = () => createHaze({originY: 0, height: {amount: 0.5, rate: 0.01, exponent: 2}, sunDirection: new Vector3(0, 1, 0), sunRadiance: new Color(1, 1, 1), sunward: 0.3})();
-const program = () => ({uniforms: {}, vertexShader: '#include <common>\n#include <fog_vertex>', fragmentShader: '#include <common>\n#include <opaque_fragment>\n#include <fog_fragment>'});
+const program = () => ({
+  uniforms: {}, vertexShader: '#include <common>\n#include <fog_pars_vertex>\n#include <fog_vertex>',
+  fragmentShader: '#include <common>\n#include <fog_pars_fragment>\n#include <opaque_fragment>\n#include <fog_fragment>',
+});
 const uniformsOf = (mesh: Mesh) => {
   const shader = program();
   (mesh.material as MeshStandardMaterial).onBeforeCompile(shader as unknown as WebGLProgramParametersWithUniforms, null as unknown as WebGLRenderer);
@@ -68,21 +70,15 @@ describe('cloud layer', () => {
   });
 
   it('patches the program: the cloud\'s colour and alpha, drawn at the far limit, under half the haze distance', () => {
-    haze();
-    const shader = program();
-    patchCloudShader(shader);
+    const shader = program(), clouds = testClouds(), layer = createCloudLayer(clouds, cloudSheets(clouds, moment('0fff0'), 0), light);
+    const material = (layer.group.children[0] as Mesh).material as MeshStandardMaterial;
+    material.onBeforeCompile(shader as unknown as WebGLProgramParametersWithUniforms, null as unknown as WebGLRenderer);
+    layer.dispose();
+    expect(isHazed(material)).toBe(true);
     expect(shader.vertexShader).toContain('gl_Position.z = gl_Position.w;');
     expect(shader.vertexShader).toContain('vCloudRay = vec3( position.x, position.y, - position.z );');
     expect(shader.fragmentShader.indexOf('outgoingLight = (')).toBeLessThan(shader.fragmentShader.indexOf('#include <opaque_fragment>'));
     expect(shader.fragmentShader).toContain('exp( - 0.5 * fogDensity * vFogDepth )');
     expect(shader.fragmentShader).not.toContain('#include <fog_fragment>');
-  });
-
-  it('refuses a haze it does not know', () => {
-    const fog = ShaderChunk.fog_fragment;
-    try {
-      ShaderChunk.fog_fragment = 'gl_FragColor.rgb = fogColor;';
-      expect(() => { patchCloudShader(program()); }).toThrow(/haze changed/);
-    } finally { ShaderChunk.fog_fragment = fog; }
   });
 });

@@ -14,6 +14,7 @@ export function testLayout(): SceneryLayout {
   const horizon: SceneryChunk = { ...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb', bounds: box(-5000, -5000), textures: [] };
   return {
     layoutKey: 'test', sourceGeometryRevision: 'g', routeLengthM: 4000, pitLaneLengthM: 400, shadowRangeM: 750, environmentProbe: { position: [0, 0, 0] },
+    roadHeight: { sha256: 'h', byteLength: 140, cellM: 0.25, tileCells: 8, originM: [0, 0], tilesX: 1, tilesZ: 1, tiles: 1, heightOffsetM: 0, heightStepM: 0.001, corridorM: 5 },
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 1, horizonDistanceM: 1, skylineHeightM: 1, skylineMinDistanceM: 1, terrainScaleExtentM: 1, pitBandM: 1 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
     camera: testCamera(),

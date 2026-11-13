@@ -1,7 +1,9 @@
 import { Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Vector2, type IUniform, type Material, type Texture } from 'three';
+import { hazeProgram } from '../../atmosphere/haze.js';
 import { digitalFlagClock } from './flagSurface.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from './patchSurfaceShader.js';
 import { list, value } from './shaderContext.js';
+import { surfaceTextureUnits } from './shaderParts.js';
 import { readSurfaceConfig, type SurfaceConfig } from './surfaceConfig.js';
 import type { SurfaceTextureSource } from './textureSource.js';
 
@@ -55,6 +57,7 @@ export function bindSurfaceProgram(material: MeshStandardMaterial, config: Surfa
   material.onBeforeCompile = shader => { patchSurfaceShader(shader, config, uniforms); };
   const programKey = computeCustomProgramCacheKey(config);
   material.customProgramCacheKey = () => programKey;
+  hazeProgram(material);
   material.map = loaded.layerA ?? loaded.albedo ?? loaded.on ?? null;
   material.needsUpdate = true;
 }
@@ -114,21 +117,26 @@ function buildMaterial(original: MeshStandardMaterial, config: SurfaceConfig, lo
   if (ownsTextures) material.addEventListener('dispose', () => { for (const texture of Object.values(loaded)) texture.dispose(); });
   bindSurfaceProgram(material, config, loaded);
   material.userData.surfaceConfigured = true;
+  material.userData.surfaceTextureUnits = surfaceTextureUnits(config);
   return material;
 }
 
 /**
  * Rebuilds a scenery mesh's native material from its GLB surface description (`extras.lmuSurface`): loads every map through
  * `textures`, then patches the standard program with the family's GLSL. A mesh without a surface description keeps its glTF
- * material. Without `shared` the material is the mesh's own and frees its textures when disposed (unless `ownsTextures` is false);
+ * material, hazed. Without `shared` the material is the mesh's own and frees its textures when disposed (unless `ownsTextures` is false);
  * with it, meshes of the same surface, textures and GLB state share one, which `shared` disposes. An unknown surface, or a map the
  * chunk does not declare, rejects.
  */
 export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceTextureSource, ownsTextures = true, shared?: SharedSurfaceMaterials): Promise<void> {
   const original = singleMaterial(mesh);
-  if (!original || original.userData.surfaceConfigured === true) return;
-  const config = readSurfaceConfig(original.userData);
-  if (!config) return;
+  if (original?.userData.surfaceConfigured === true) return;
+  const config = original && readSurfaceConfig(original.userData);
+  if (!original || !config) {
+    // The glTF material stays, drawing the scene's haze like the surface program does.
+    for (const material of [mesh.material].flat()) hazeProgram(material);
+    return;
+  }
   const loaded: Record<string, Texture> = {};
   await Promise.all(Object.entries(config.maps).map(async ([key, map]) => { if (map) loaded[key] = await textures.load(map); }));
   const placeholder: Texture | undefined = loaded.layerA ?? loaded.albedo ?? loaded.on;

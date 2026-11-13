@@ -108,6 +108,22 @@ export interface SceneryRangeFields {kind: 'main' | 'pit'; lapStartM: number; la
 /** Compact chunk: no `asset` (derived from `sha256`); `textures` are indices into the row's `textures` list. */
 export type CompactHorizonChunk = SceneryChunkFields & {kind: 'horizon'; textures: number[]};
 export type CompactSectorChunk = SceneryChunkFields & SceneryRangeFields & {textures: number[]};
+/**
+ * The layout's road height grid, file `scenery/heights/<sha256>.bin` (docs/SCENE_PACKAGE.md#road-height): raw little-endian uint32 tile index
+ * [tilesZ * tilesX] (0xFFFFFFFF = no tile, else the stored tile number), uint16 heights [tiles * tileCells * tileCells] (0 = no data, else
+ * heightOffsetM + (code - 1) * heightStepM; cell i along +x, j along +z at j * tileCells + i), then ambiguity bits [tiles * tileCells * tileCells / 8]
+ * (cell c = bit c & 7 of byte c >> 3). Grid cell (tx * tileCells + i, tz * tileCells + j) has its centre at originM + (cell + 0.5) * cellM, in the
+ * scenery GLBs' world x and z (y up, no root transform).
+ */
+export interface SceneryRoadHeight {
+  sha256: string; byteLength: number; cellM: number; tileCells: number; originM: [number, number]; tilesX: number; tilesZ: number; tiles: number;
+  heightOffsetM: number; heightStepM: number; corridorM: number;
+}
+
+/** The file size a road height row implies. */
+export const roadHeightBytes = (grid: Pick<SceneryRoadHeight, 'tileCells' | 'tilesX' | 'tilesZ' | 'tiles'>): number =>
+  4 * grid.tilesX * grid.tilesZ + grid.tiles * grid.tileCells * grid.tileCells * (2 + 1 / 8);
+
 export interface CompactLayoutRow {
   layoutKey: string;
   sourceGeometryRevision: string;
@@ -116,6 +132,8 @@ export interface CompactLayoutRow {
   shadowRangeM: number;
   /** Where the venue's environment (reflection and irradiance) is captured, in LMU local metres. */
   environmentProbe: {position: Vec3};
+  /** Road height grid of the drivable corridor. */
+  roadHeight: SceneryRoadHeight;
   daylight: SceneryDaylight;
   horizon: CompactHorizonChunk;
   sectors: CompactSectorChunk[];
@@ -144,7 +162,7 @@ export const STREAMING_KEYS = ['residentBehindM', 'residentAheadM', 'freeCameraR
 const SESSIONS = ['race', 'qualify', 'practice1', 'practice2'];
 const TEXTURE_KEYS = ['sha256', 'byteLength', 'width', 'height', 'levels', 'format', 'srgb', 'gpuBytes'];
 const CHUNK_COMMON = ['id', 'kind', 'bounds', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'shadowDrawCalls', 'shadowTriangles', 'geometryBytes', 'meshes', 'materials', 'textures'];
-const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
+const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'roadHeight', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
 const MATERIAL_KEYS = ['key', 'vertices', 'indices', 'primitives', 'draws'];
 export const MATERIAL_KEY = /^[0-9a-f]{16}$/;
 const MAX_LAYOUTS = 100, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192, MAX_MATERIALS = 8192;
@@ -300,6 +318,31 @@ function parseChunk(value: unknown, what: string, rowTextures: number): CompactH
   return value as CompactSectorChunk;
 }
 
+const ROAD_HEIGHT_KEYS = ['sha256', 'byteLength', 'cellM', 'tileCells', 'originM', 'tilesX', 'tilesZ', 'tiles', 'heightOffsetM', 'heightStepM', 'corridorM'];
+const MAX_HEIGHT_TILES = 1 << 20;
+
+/** A road height row: its shape and that `byteLength` is the size the grid implies. Whether the file matches is package validation's. */
+function parseRoadHeight(value: unknown, what: string): SceneryRoadHeight {
+  const grid = record(value, what);
+  exactKeys(grid, ROAD_HEIGHT_KEYS, what);
+  sha256(grid.sha256, `${what}.sha256`);
+  const cellM = positive(grid.cellM, `${what}.cellM`);
+  if (cellM > 2) throw Error(`${what}.cellM: ${cellM} is above 2 m`);
+  const tileCells = positiveCount(grid.tileCells, `${what}.tileCells`, 256);
+  if (tileCells < 8 || (tileCells & (tileCells - 1))) throw Error(`${what}.tileCells: ${tileCells} is not a power of two from 8 to 256`);
+  if (!Array.isArray(grid.originM) || grid.originM.length !== 2) throw Error(`${what}.originM: not [x, z]`);
+  grid.originM.forEach((v: unknown, i: number) => { if (Math.abs(finite(v, `${what}.originM[${i}]`)) > 100_000) throw Error(`${what}.originM[${i}]: outside 100 km`); });
+  const tilesX = positiveCount(grid.tilesX, `${what}.tilesX`, MAX_HEIGHT_TILES), tilesZ = positiveCount(grid.tilesZ, `${what}.tilesZ`, MAX_HEIGHT_TILES);
+  const tiles = positiveCount(grid.tiles, `${what}.tiles`, MAX_HEIGHT_TILES);
+  if (tilesX * tilesZ > MAX_HEIGHT_TILES * 16 || tiles > tilesX * tilesZ) throw Error(`${what}: ${tiles} tiles in a ${tilesX} x ${tilesZ} grid`);
+  finite(grid.heightOffsetM, `${what}.heightOffsetM`);
+  positive(grid.heightStepM, `${what}.heightStepM`);
+  nonNegative(grid.corridorM, `${what}.corridorM`);
+  const expected = roadHeightBytes({tileCells, tilesX, tilesZ, tiles});
+  if (grid.byteLength !== expected) throw Error(`${what}.byteLength: ${JSON.stringify(grid.byteLength)} is not the ${expected} bytes the grid implies`);
+  return value as SceneryRoadHeight;
+}
+
 /** One compact layout row against the catalog texture table. */
 function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[], used: Set<number>): CompactLayoutRow {
   const row = record(value, what);
@@ -313,6 +356,7 @@ function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[
   const probe = record(row.environmentProbe, `${what}.environmentProbe`);
   exactKeys(probe, ['position'], `${what}.environmentProbe`);
   vec3(probe.position, `${what}.environmentProbe.position`);
+  parseRoadHeight(row.roadHeight, `${what}.roadHeight`);
   parseDaylight(row.daylight, `${what}.daylight`);
   const refs = array(row.textures, `${what}.textures`, MAX_TEXTURES), seen = new Set<number>();
   refs.forEach((item, i) => {

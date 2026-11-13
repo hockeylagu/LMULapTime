@@ -3,13 +3,15 @@ import {
   type Object3D, type PerspectiveCamera, type Scene, type WebGLRenderer,
 } from 'three';
 import type { SceneryShadows } from '../../../../../shared/types/scenes/scenery.js';
+import { SHADOW_ONLY_LAYER } from '../cars/carBatching.js';
 import { createShadowCasterPass } from './shadowCasterPass.js';
 import { cascadeCentres, sunSquareAxes, type ShadowCascadeLayout, type SunSquareAxes } from './shadowCascades.js';
 
 /**
- * Cascades reaching this far are redrawn every frame with every caster, the cars included. Farther ones are cached: drawn without
- * the cars, again once their centre has moved an eighth of their side, at most one per frame (a redraw of a 1 km square is ~1,000
- * draws). Every shadow pass re-draws each caster it meets, the frame's main cost (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
+ * Cascades reaching this far are live: each frame the cars are drawn over their static depth, which is redrawn only when the cascade's
+ * held centre has drifted (see `holdM`). Farther ones are cached: drawn without the cars, again once their centre has moved an eighth
+ * of their side, at most one per frame (a redraw of a 1 km square is ~1,000 draws).
+ * Every shadow pass re-draws each caster it meets, the frame's main cost (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
  */
 const LIVE_CASCADE_SPLIT_M = 100;
 const CACHED_REDRAW_SIDE_FRACTION = 1 / 8;
@@ -34,7 +36,10 @@ export interface CascadeShadows {
   state: CascadeShadowState;
   /** The sun moved: every cascade is redrawn from the new direction. `lightTravel` is unit, from the sun toward the ground. */
   setLight(lightTravel: Vector3): void;
-  /** Before a frame: redraws the live cascades and the cached cascade most due. True while cached ones are still due. */
+  /**
+   * Before a frame: redraws the cascades whose held centre has drifted, draws `dynamic` (every moving caster: one left out freezes in
+   * the held depth) over the live ones, and redraws the cached cascade most due. True while cached ones are still due.
+   */
   update(view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[]): boolean;
   dispose(): void;
 }
@@ -69,11 +74,30 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   const target = new WebGLRenderTarget(sizePx, heightPx, {format: RedFormat, depthTexture: depth, generateMipmaps: false});
   // A sampler needs its depth texture to exist before the first draw.
   renderer.initRenderTarget(target);
-  const cascades = layout.cascades.map(cascade => ({
-    cascade, camera: new OrthographicCamera(), live: cascade.splitM <= LIVE_CASCADE_SPLIT_M,
-    viewport: new Vector4(cascade.tile[1], cascade.tile[0] * sizePx + cascade.tile[2], tilePx, tilePx),
-    drawnCentre: null as [number, number] | null,
-  }));
+  const lightCamera = () => {
+    // It also sees the shadow-only layer: the near cars' depth-only batches draw there and nowhere else.
+    const camera = new OrthographicCamera();
+    camera.layers.enable(SHADOW_ONLY_LAYER);
+    return camera;
+  };
+  const sliceStartM = (i: number) => i === 0 ? layout.nearM : layout.cascades[i - 1].splitM;  const cascades = layout.cascades.map((cascade, i) => {
+    const live = cascade.splitM <= LIVE_CASCADE_SPLIT_M, redrawM = CACHED_REDRAW_SIDE_FRACTION * cascade.sideM;
+    // A live cascade's held square must keep the view line of its slice inside the tile the surfaces select from (halfExtent of the side
+    // around the centre), or the near end of the slice falls to the next, coarser cascade: the drift it may hold is what is left of
+    // that half-extent past half the slice. The cached cascades are sized with margin to spare; the live ones are tight (the first one
+    // has nearly none), and one that cannot hold a texel of drift is drawn whole every frame as before.
+    const marginM = shadows.select.halfExtent * cascade.sideM - (cascade.splitM - sliceStartM(i)) / 2;
+    const holdM = live ? Math.min(redrawM, marginM) : redrawM;
+    return {
+      cascade, camera: lightCamera(), live, holdM, held: live && holdM >= cascade.texelM,
+      viewport: new Vector4(cascade.tile[1], cascade.tile[0] * sizePx + cascade.tile[2], tilePx, tilePx),
+      drawnCentre: null as [number, number] | null,
+    };
+  });
+  // The static depth of the held live cascades, in the atlas' own tiles, of the atlas' depth type: the shadow pass copies it as stored.
+  const staticDepth = cascades.some(row => row.held) ? new DepthTexture(sizePx, heightPx, UnsignedIntType) : null;
+  const staticTarget = staticDepth && new WebGLRenderTarget(sizePx, heightPx, {format: RedFormat, depthTexture: staticDepth, generateMipmaps: false});
+  if (staticTarget) renderer.initRenderTarget(staticTarget);
   const state: CascadeShadowState = {
     atlas: depth,
     matrices: cascades.map(() => new Matrix4()),
@@ -81,14 +105,16 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   };
   const casters = createShadowCasterPass(renderer, scene), light = lightTravel.clone(), eye = new Vector3(), forward = new Vector3();
   let axes = sunSquareAxes(light);
-  const draw = (i: number, centre: [number, number], view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[]) => {
-    const {cascade, camera, live, viewport} = cascades[i];
-    const sliceStartM = i === 0 ? layout.nearM : layout.cascades[i - 1].splitM;
-    const alongLightM = eye.clone().addScaledVector(forward, (sliceStartM + cascade.splitM) / 2).dot(light);
-    placeCascadeCamera(camera, axes, light, centre, alongLightM, cascade.sideM);
-    casters.draw(target, viewport, camera, view, live ? [] : dynamic, live ? 0 : CACHED_MIN_CASTER_TEXELS * cascade.texelM);
-    state.matrices[i].multiplyMatrices(BIAS, camera.projectionMatrix).multiply(camera.matrixWorldInverse);
-    cascades[i].drawnCentre = centre;
+  const layersOf = (indices: readonly number[]) => indices.map(i => ({viewport: cascades[i].viewport, light: cascades[i].camera}));
+  // Puts the cascades' cameras at their new centres; what is drawn from them follows (`moved`).
+  const place = (indices: readonly number[], centres: Array<[number, number]>) => {
+    for (const i of indices) {
+      const {cascade, camera} = cascades[i];
+      const alongLightM = eye.clone().addScaledVector(forward, (sliceStartM(i) + cascade.splitM) / 2).dot(light);
+      placeCascadeCamera(camera, axes, light, centres[i], alongLightM, cascade.sideM);
+      state.matrices[i].multiplyMatrices(BIAS, camera.projectionMatrix).multiply(camera.matrixWorldInverse);
+      cascades[i].drawnCentre = centres[i];
+    }
   };
   return {
     state,
@@ -100,18 +126,31 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       view.updateMatrixWorld();
       view.getWorldPosition(eye); view.getWorldDirection(forward);
       const centres = cascadeCentres(layout, eye, forward, axes);
-      // How far each cached cascade has drifted, in eighths of its side; never drawn counts as most due.
-      const due = cascades.map(({live, drawnCentre, cascade}, i) => live ? -1 : !drawnCentre ? Infinity
-        : Math.max(Math.abs(centres[i][0] - drawnCentre[0]), Math.abs(centres[i][1] - drawnCentre[1])) / (CACHED_REDRAW_SIDE_FRACTION * cascade.sideM));
-      cascades.forEach(({live}, i) => { if (live) draw(i, centres[i], view, dynamic); });
+      // How far each cascade's centre has drifted from its held one, in its hold distance; never drawn counts as most due.
+      const due = cascades.map(({drawnCentre, holdM}, i) => !drawnCentre ? Infinity
+        : Math.max(Math.abs(centres[i][0] - drawnCentre[0]), Math.abs(centres[i][1] - drawnCentre[1])) / holdM);
+      const indicesOf = (pick: (row: (typeof cascades)[number]) => boolean) => cascades.flatMap((row, i) => pick(row) ? [i] : []);
+      // The live cascades share one scene walk and material swap per kind, a cached one has its own caster floor so draws alone; each
+      // cascade keeps its own camera and viewport. Held live: static casters (cars left out) into the static target when moved, then
+      // every frame its tile is drawn into the atlas from it and the cars over that. Whole live: everything into the atlas each frame.
+      const held = indicesOf(row => row.held), whole = indicesOf(row => row.live && !row.held);
+      const moved = held.filter(i => due[i] >= 1);
+      if (moved.length) { place(moved, centres); casters.draw(staticTarget!, layersOf(moved), view, dynamic, 0); }
+      if (whole.length) { place(whole, centres); casters.draw(target, layersOf(whole), view, [], 0); }
+      if (held.length) {
+        casters.drawRoots(target, layersOf(held), view, dynamic, staticTarget!);
+      }
       // Until every cached cascade has been drawn once, all of them at once; afterwards the most due one, if one is due.
       const settled = cascades.every(row => row.live || row.drawnCentre);
-      const order = due.map((value, i) => [value, i] as const).filter(([value]) => value >= 1).sort((a, b) => b[0] - a[0]);
-      for (const [, i] of settled ? order.slice(0, 1) : order) draw(i, centres[i], view, dynamic);
+      const order = due.map((value, i) => [value, i] as const).filter(([value, i]) => !cascades[i].live && value >= 1).sort((a, b) => b[0] - a[0]);
+      for (const [, i] of settled ? order.slice(0, 1) : order) {
+        place([i], centres);
+        casters.draw(target, layersOf([i]), view, dynamic, CACHED_MIN_CASTER_TEXELS * cascades[i].cascade.texelM);
+      }
       return settled && order.length > 1;
     },
     dispose() {
-      depth.dispose(); target.dispose();
+      depth.dispose(); target.dispose(); staticDepth?.dispose(); staticTarget?.dispose();
     },
   };
 }

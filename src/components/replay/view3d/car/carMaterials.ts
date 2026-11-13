@@ -1,6 +1,7 @@
 import { DoubleSide, MeshPhysicalMaterial, type Data3DTexture, MeshStandardMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
+import { hazeProgram } from '../atmosphere/haze.js';
 import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
 import { bindSurfaceProgram } from '../scenery/materials/configureSurfaceMaterial.js';
 import type { SurfaceConfig, SurfaceMap } from '../scenery/materials/surfaceConfig.js';
@@ -131,7 +132,9 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   else if (!surface) {
     // Three's own program otherwise: the same ambient lookup as every other surface of the scene.
     material.onBeforeCompile = shader => { patchAmbientLookup(shader); };
-    material.customProgramCacheKey = () => 'lmu-car-ambient';
+    // three shares a program between materials with the same key: the key names every hook these materials get, the cascade
+    // shadow added below included, so no material with other hooks takes this program.
+    material.customProgramCacheKey = () => 'lmu-car-ambient-cascade';
   }
   if (!surface) {
     // Paint and the materials on three's light loop take the sun's shadow from the cascades too (the surface program patches itself).
@@ -139,6 +142,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     if (typeof influence !== 'number' || influence < 0) throw Error(`Car material ${recipe.name} has no normal shadow influence`);
     material.onBeforeCompile = (shader, renderer) => { own(shader, renderer); patchCascadeShadow(shader, influence); };
   }
+  hazeProgram(material);
   material.shadowSide = DoubleSide;
   material.name = recipe.name;
   const occlusion = recipe.reflectionOcclusion;

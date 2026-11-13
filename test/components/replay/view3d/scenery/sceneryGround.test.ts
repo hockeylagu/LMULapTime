@@ -7,6 +7,8 @@ vi.mock('three-mesh-bvh/worker', async () => {
   return {GenerateMeshBVHWorker: class {async generate(geometry: BufferGeometry) { return new MeshBVH(geometry, {indirect: true}); } dispose() {}}};
 });
 
+const noGrid = () => null;
+
 it('uses BVH terrain intersections to bring an obstructed camera above banking and leaves clear views alone', async () => {
   const sheet = (values: number[]) => {
     const geometry = new BufferGeometry(); geometry.setAttribute('position', new Float32BufferAttribute(values, 3));
@@ -16,7 +18,7 @@ it('uses BVH terrain intersections to bring an obstructed camera above banking a
   // A banking rising from 10 m to 16 m over x 0..10, nothing past its top edge (native z 0..100).
   const banking = sheet([0, 10, 0, 10, 16, 0, 10, 16, 100, 0, 10, 0, 10, 16, 100, 0, 10, 100]), origin = new Vector3();
   // Car at the bottom, eye 5 m past the top and below it: the top edge three quarters of the way out blocks the view.
-  const collision = createSceneryGround();
+  const collision = createSceneryGround(noGrid);
   try {
     await collision.add('bank', banking);
     const eye = new Vector3(15, 14, -50), corrected = collision.resolve(eye, new Vector3(1, 10.6, -50), origin, new Vector3());
@@ -34,7 +36,7 @@ it('keeps the eye above resident ground, preserves native handedness, and releas
   const root = new Group(), road = new Mesh(new BoxGeometry(20, 1, 20), new MeshBasicMaterial());
   road.name = 'terrain__OPAQUE'; road.position.set(100, 4.5, 200); root.add(road);
   const original = road.geometry.getAttribute('position').array.slice();
-  const collision = createSceneryGround(), origin = new Vector3(100, 2, 200), eye = new Vector3(0, 0, 0), look = new Vector3(0, 3.5, -3);
+  const collision = createSceneryGround(noGrid), origin = new Vector3(100, 2, 200), eye = new Vector3(0, 0, 0), look = new Vector3(0, 3.5, -3);
   try {
     await collision.add('road', root);
     expect(collision.resolve(eye, look, origin, new Vector3()).y).toBeCloseTo(4.2);
@@ -57,7 +59,7 @@ it('answers the highest opaque surface in reach, picking the right bridge layer 
     triangle('road__OPAQUE', [0, 1, 0, 10, 2, 0, 0, 1, 10], [0, 1, 2]), triangle('bridge__OPAQUE', [0, 6, 0, 10, 7, 0, 0, 6, 10], [0, 1, 2]),
     triangle('FILLER_GROUND__OPAQUE', [-50, 3, -50, 50, 3, -50, -50, 3, 50], [0, 1, 2]), triangle('decal__BLEND', [0, 1.6, 0, 10, 1.6, 0, 0, 1.6, 10], [0, 1, 2]),
   );
-  const ground = createSceneryGround();
+  const ground = createSceneryGround(noGrid);
   try {
     expect(ground.surfaceHeight({x: 5, y: 1.82, z: 1})).toBeNull(); // Nothing resident yet.
     await ground.add('chunk', root);
@@ -74,7 +76,7 @@ it('answers the highest opaque surface in reach, picking the right bridge layer 
 
 it('uses a coarse chunk for the camera only, never for wheel and line heights', async () => {
   const root = new Group(); root.add(triangle('road__OPAQUE', [0, 1, 0, 10, 1, 0, 0, 1, 10], [0, 1, 2]));
-  const eye = new Vector3(), ground = createSceneryGround();
+  const eye = new Vector3(), ground = createSceneryGround(noGrid);
   try {
     await ground.add('horizon', root, true);
     expect(ground.surfaceHeight({x: 2, y: 1.2, z: 2})).toBeNull();
@@ -86,7 +88,7 @@ it('uses a coarse chunk for the camera only, never for wheel and line heights', 
 it('applies native transforms to large terrain triangles', async () => {
   const root = new Group(); root.position.y = 2;
   root.add(triangle('terrain__OPAQUE', [-1000, 0, -1000, 1000, 0, -1000, 0, 0, 1000], [0, 1, 2]));
-  const ground = createSceneryGround();
+  const ground = createSceneryGround(noGrid);
   try {
     await ground.add('terrain', root);
     expect(ground.surfaceHeight({x: 0, y: 2.32, z: 0})).toBeCloseTo(2);
@@ -96,7 +98,7 @@ it('applies native transforms to large terrain triangles', async () => {
 
 it('builds chunks concurrently and ignores a removal from a load the chunk no longer belongs to', async () => {
   const chunk = (y: number) => { const root = new Group(); root.add(triangle('road__OPAQUE', [0, y, 0, 10, y, 0, 0, y, 10], [0, 1, 2])); return root; };
-  const ground = createSceneryGround(), stale = chunk(1), current = chunk(2), other = chunk(5);
+  const ground = createSceneryGround(noGrid), stale = chunk(1), current = chunk(2), other = chunk(5);
   try {
     const first = ground.add('a', stale);
     await Promise.all([ground.add('a', current), ground.add('b', other), expect(first).rejects.toThrow('removed')]);
@@ -105,5 +107,20 @@ it('builds chunks concurrently and ignores a removal from a load the chunk no lo
     expect(ground.surfaceHeight({x: 1, y: 5.1, z: 1})).toBeCloseTo(5);
     ground.remove('a', current);
     expect(ground.surfaceHeight({x: 1, y: 2.1, z: 1})).toBeNull();
+  } finally { ground.dispose(); }
+});
+
+it('answers road height from the grid on its corridor and casts rays off it or for another deck', async () => {
+  // The grid holds a road at 2 m for x < 50; rays see a sheet at 0 m everywhere.
+  const ground = createSceneryGround((x: number) => (x < 50 ? 2 : null));
+  const root = new Group(), sheet = new Mesh(new BoxGeometry(200, 0, 200), new MeshBasicMaterial());
+  sheet.name = 'road__OPAQUE'; root.add(sheet);
+  try {
+    expect(ground.surfaceHeight({x: 10, y: 2.5, z: 0})).toBe(2); // before any chunk is resident
+    expect(ground.surfaceHeight({x: 60, y: 0.5, z: 0})).toBeNull();
+    await ground.add('sheet', root);
+    expect(ground.surfaceHeight({x: 60, y: 0.5, z: 0})).toBeCloseTo(0);
+    // Below the grid's deck (2 m above the 0.15 m window), the lower surface comes from the rays.
+    expect(ground.surfaceHeight({x: 10, y: 0.5, z: 0})).toBeCloseTo(0);
   } finally { ground.dispose(); }
 });

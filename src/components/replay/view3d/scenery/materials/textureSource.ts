@@ -43,7 +43,8 @@ async function loadSurfaceTexture(ktx2: CachedKtx2Loader, renderer: WebGLRendere
   // Trilinear: three's KTX2 loader gives raw (RGBA8, R8) textures nearest filtering, which shows texels.
   texture.minFilter = texture.mipmaps.length > 1 ? LinearMipmapLinearFilter : LinearFilter;
   texture.magFilter = LinearFilter;
-  startStreaming(texture, renderer, ktx2.detail(original));
+  // Once whole on the GPU the texture and the loader's cache let its levels go.
+  startStreaming(texture, ktx2.detail(original), ktx2.file(original));
   texture.needsUpdate = true;
   return texture;
 }

@@ -2,7 +2,7 @@ import type { CompressedTexture, Texture, WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { fetchBinary } from '../../../../api/apiClient.js';
 import { fetchBinaryInBackground } from '../../../../api/backgroundBinary.js';
-import type { DetailLoader, MipLevel } from './materials/mipStreaming.js';
+import type { DetailLoader, LevelFile, MipLevel } from './materials/mipStreaming.js';
 
 /** KTX2 layout: the header's size and level count, then one index entry per level (offset, length, uncompressed length), largest level first. */
 const WIDTH = 20, HEIGHT = 24, LEVEL_COUNT = 40, INDEX = 80, ENTRY = 24;
@@ -48,8 +48,10 @@ export function withoutLevelsAbove(file: ArrayBuffer, maxPx: number | undefined)
  * scene sharpens the texture (`detail()`).
  */
 export class CachedKtx2Loader extends KTX2Loader {
-  private readonly cache = new Map<string, Promise<CompressedTexture>>();
+  // Not `cache`: three's Loader keeps the fetch cache mode under that name.
+  private readonly loads = new Map<string, Promise<CompressedTexture>>();
   private readonly details = new WeakMap<Texture, DetailLoader>();
+  private readonly files = new WeakMap<Texture, LevelFile>();
 
   constructor(renderer: WebGLRenderer, private readonly textureDetail?: TextureDetail) {
     super();
@@ -57,20 +59,20 @@ export class CachedKtx2Loader extends KTX2Loader {
   }
 
   override load(url: string, onLoad: (texture: CompressedTexture) => void, _onProgress?: (event: ProgressEvent) => void, onError?: (error: unknown) => void): void {
-    let pending = this.cache.get(url);
+    let pending = this.loads.get(url);
     if (!pending) {
       const file = this.manager.resolveURL(this.path + url), maxPx = this.textureDetail?.maxPx?.(url), start = this.textureDetail?.start?.(url);
-      const parse = (buffer: ArrayBuffer) => new Promise<CompressedTexture>((resolve, reject) => { this.parse(withoutLevelsAbove(buffer, maxPx), resolve, reject); });
-      pending = start === undefined ? fetchBinary(file).then(parse) : fetchBinary(this.manager.resolveURL(this.path + start.url)).then(parse).then(texture => {
+      const parse = this.parser(url), read = this.levelFile(url);
+      pending = (start === undefined ? fetchBinary(file).then(parse) : fetchBinary(this.manager.resolveURL(this.path + start.url)).then(parse).then(texture => {
         // The levels the start file leaves out, as far as `maxPx` allows: they are the full file's largest ones.
         const top = texture.mipmaps[0], longest = Math.max(top.width, top.height);
         const missing = Array.from({length: start.skip}, (_, level) => longest << (start.skip - level)).filter(px => maxPx === undefined || px <= maxPx).length;
         let levels: Promise<MipLevel[]> | undefined;
-        if (missing) this.details.set(texture, {missing, load: () => levels ??= fetchBinaryInBackground(file).then(parse).then(full => (full.mipmaps as MipLevel[]).slice(0, missing))});
+        if (missing) this.details.set(texture, {missing, load: () => levels ??= fetchBinaryInBackground(file).then(parse).then(full => (full.mipmaps as MipLevel[]).slice(0, missing)), ...read});
         return texture;
-      });
-      this.cache.set(url, pending);
-      pending.catch(() => { if (this.cache.get(url) === pending) this.cache.delete(url); });
+      })).then(texture => { this.files.set(texture, read); return texture; });
+      this.loads.set(url, pending);
+      pending.catch(() => { if (this.loads.get(url) === pending) this.loads.delete(url); });
     }
     void pending.then(onLoad, onError);
   }
@@ -80,10 +82,26 @@ export class CachedKtx2Loader extends KTX2Loader {
     return this.details.get(texture);
   }
 
+  /** A texture this loader read, to let go of its cached copy; undefined for one it did not read. */
+  file(texture: Texture): LevelFile | undefined {
+    return this.files.get(texture);
+  }
+
+  /** The parse of one file's bytes, cut to the size the package gives it. */
+  private parser(url: string): (buffer: ArrayBuffer) => Promise<CompressedTexture> {
+    const maxPx = this.textureDetail?.maxPx?.(url);
+    return buffer => new Promise<CompressedTexture>((resolve, reject) => { this.parse(withoutLevelsAbove(buffer, maxPx), resolve, reject); });
+  }
+
+  /** A file's `drop` removes it from the cache: the levels its textures hold then live only as long as those textures need them. */
+  private levelFile(url: string): LevelFile {
+    return {drop: () => { this.loads.delete(url); }};
+  }
+
   /** Frees every cached original's mip data. */
   override dispose(): void {
-    for (const pending of this.cache.values()) pending.then(texture => texture.dispose(), () => undefined);
-    this.cache.clear();
+    for (const pending of this.loads.values()) pending.then(texture => texture.dispose(), () => undefined);
+    this.loads.clear();
     super.dispose();
   }
 }

@@ -39,7 +39,10 @@ export type SceneryLayoutOf<Clouds> = SceneryLayoutRow & {
 
 /** The layout the viewer draws: cloud maps decoded. */
 export type SceneryLayout = SceneryLayoutOf<SceneryClouds>;
-export type SceneryLayoutResource = SceneryLayout & { packageRevision: string };
+/** The drivable surface's height from the layout's road height grid, by lookup; null where the grid has none (off its corridor). */
+export type RoadHeightLookup = (x: number, z: number) => number | null;
+/** The layout as the 3D view uses it: its cloud maps and road height grid read. */
+export type SceneryLayoutResource = SceneryLayout & { packageRevision: string; roadHeightAt: RoadHeightLookup };
 
 /** The layout JSON `/api/data-plugin/scenery/<layoutKey>` serves: the cloud maps are files (`CloudMapFile`) the client fetches. */
 export type SceneryLayoutPayload = SceneryLayoutOf<SceneryCloudsFile> & { packageRevision: string };

@@ -100,3 +100,17 @@ it('reads a texture without a start file whole, cut to its given size', async ()
   expect([body.image.width, body.mipmaps.length, body.mipmaps[0].data[0], ktx2.detail(body)]).toEqual([1024, 11, 1, undefined]);
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
+
+it('lets go of a cached file on drop', async () => {
+  const fetchMock = serve({'/t/road.ktx2.zst': ktx2File(2048), '/t/road-start.ktx2.zst': startFile(2048), '/t/sign.ktx2.zst': ktx2File(256)});
+  const ktx2 = loader({start: url => (url.includes('road') ? {url: url.replace('.ktx2', '-start.ktx2'), skip: 2} : undefined)});
+  const road = await ktx2.loadAsync('/t/road.ktx2.zst'), sign = await ktx2.loadAsync('/t/sign.ktx2.zst');
+  // The same drop serves a texture with a start file and one without.
+  expect(ktx2.detail(road)?.drop).toBe(ktx2.file(road)?.drop);
+  expect(ktx2.file(sign)?.drop).toBeTypeOf('function');
+  expect(await ktx2.loadAsync('/t/road.ktx2.zst')).toBe(road);
+  ktx2.file(road)?.drop();
+  const calls = fetchMock.mock.calls.length;
+  const again = await ktx2.loadAsync('/t/road.ktx2.zst');
+  expect([again === road, await ktx2.loadAsync('/t/sign.ktx2.zst') === sign, fetchMock.mock.calls.length - calls]).toEqual([false, true, 1]);
+});

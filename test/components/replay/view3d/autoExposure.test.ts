@@ -85,4 +85,40 @@ describe('autoExposure', () => {
     expect([exposure.target, before]).not.toContain(compiled[1].target);
     exposure.dispose();
   });
+
+  it('reads the metering target into one reused pack buffer, once its fence has signalled, and adapts to the reading', async () => {
+    const frames: Array<() => void> = [], flush = () => frames.splice(0).forEach(callback => callback());
+    vi.stubGlobal('requestAnimationFrame', (callback: () => void) => frames.push(callback));
+    const half = 0x3c00; // 1.0 as a half float: every metered cell reads 1.
+    const calls: string[] = [], signals = ['pending', 'signalled'];
+    const gl = {
+      PIXEL_PACK_BUFFER: 1, STREAM_READ: 2, RGBA: 3, HALF_FLOAT: 4, IMPLEMENTATION_COLOR_READ_FORMAT: 5, IMPLEMENTATION_COLOR_READ_TYPE: 6,
+      SYNC_GPU_COMMANDS_COMPLETE: 7, WAIT_FAILED: 8, TIMEOUT_EXPIRED: 9, ALREADY_SIGNALED: 10,
+      getParameter: (name: number) => name === 5 ? 3 : 4,
+      createBuffer: () => { calls.push('createBuffer'); return {}; }, deleteBuffer: () => calls.push('deleteBuffer'),
+      bindBuffer: () => {}, bufferData: () => calls.push('bufferData'), readPixels: () => calls.push('readPixels'),
+      fenceSync: () => ({}), flush: () => {}, deleteSync: () => calls.push('deleteSync'),
+      clientWaitSync: () => { calls.push('wait'); return signals.shift() === 'pending' ? 9 : 10; },
+      getBufferSubData: (_target: number, _offset: number, into: Uint16Array) => { calls.push('getBufferSubData'); into.fill(half); },
+    };
+    const invalidated = vi.fn();
+    const renderer = {
+      getContext: () => gl, getRenderTarget: () => null, setRenderTarget() {}, render() {}, toneMappingExposure: 1,
+      getDrawingBufferSize: (size: {set(x: number, y: number): unknown}) => size.set(8, 8),
+    } as unknown as WebGLRenderer;
+    const exposure = createAutoExposure(renderer, testCamera(), sun(30, 40), invalidated);
+    try {
+      exposure.render({} as never, {} as never);
+      expect(calls).toEqual(['createBuffer', 'bufferData', 'readPixels']);
+      flush(); // The fence has not signalled: no data is fetched yet.
+      expect(calls).not.toContain('getBufferSubData');
+      flush(); await Promise.resolve();
+      expect(calls.slice(-3)).toEqual(['wait', 'getBufferSubData', 'deleteSync']);
+      expect(invalidated).toHaveBeenCalled(); // The first reading is unadapted.
+      for (let frame = 0; frame < 4; frame++) exposure.render({} as never, {} as never); // The next reading, four frames on.
+      expect(calls.filter(call => call === 'createBuffer')).toHaveLength(1);
+      expect(calls.filter(call => call === 'readPixels')).toHaveLength(2);
+    } finally { exposure.dispose(); vi.unstubAllGlobals(); }
+    expect(calls.at(-1)).toBe('deleteBuffer');
+  });
 });

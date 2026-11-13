@@ -1,13 +1,16 @@
-import { BatchedMesh, BoxGeometry, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, type BufferGeometry, type Material } from 'three';
+import { BatchedMesh, BoxGeometry, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, type BufferAttribute, type BufferGeometry, type Material } from 'three';
 import { expect, it } from 'vitest';
 import type { SceneryMaterialTotals } from '../../../../../shared/packageContract/index.js';
+import { surfaceTextureUnits } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
+import type { SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
+import { surface } from './surfaceFixture.js';
 import { createSceneryBatches } from '../../../../../src/components/replay/view3d/scenery/sceneryBatches.js';
 
 const BOX = {vertices: 24, indices: 36};
 /** The package's totals for `key`: `primitives` boxes drawn `draws` times. */
 const totals = (key: string, primitives: number, draws: number): SceneryMaterialTotals => ({key, vertices: BOX.vertices * primitives, indices: BOX.indices * primitives, primitives, draws});
 /** A configured surface material (shared across chunks by the loader) with the package key `key`. */
-const material = (key?: string, options = {}) => { const made = new MeshStandardMaterial(options); made.userData.surfaceConfigured = true; if (key) made.userData.lmuMaterial = key; return made; };
+const material = (key?: string, options = {}) => { const made = new MeshStandardMaterial(options); made.userData.surfaceConfigured = true; made.userData.surfaceTextureUnits = 10; if (key) made.userData.lmuMaterial = key; return made; };
 const chunk = (...meshes: Array<[BufferGeometry, Material]>) => {
   const root = new Group();
   // As the chunk loader: each mesh keeps its GLB material's package key.
@@ -24,7 +27,7 @@ const shown = (batch: BatchedMesh, count: number) => Array.from({length: count},
 
 it('draws a material once across chunks, each chunk shown while it is in the scene and visible', () => {
   const scenery = new Group(), asphalt = material('a'), shared = new BoxGeometry();
-  const batches = createSceneryBatches(scenery, [totals('a', 2, 3)]);
+  const batches = createSceneryBatches(scenery, [totals('a', 2, 3)], 16);
   const first = chunk([shared, asphalt], [shared, asphalt]), second = chunk([new BoxGeometry(), asphalt]);
   const created = batches.add(first);
   expect(created).toHaveLength(1);
@@ -50,7 +53,7 @@ it('draws a material once across chunks, each chunk shown while it is in the sce
 });
 
 it("grows a batch's culling bounds with each chunk it draws", () => {
-  const asphalt = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 2, 2)]);
+  const asphalt = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 2, 2)], 16);
   const [batch] = batches.add(chunk([new BoxGeometry(), asphalt]));
   if (batch.boundingSphere === null) batch.computeBoundingSphere(); // As a first frame culling it.
   const far = chunk([new BoxGeometry(), asphalt]); far.children[0].position.x = 1000;
@@ -59,36 +62,38 @@ it("grows a batch's culling bounds with each chunk it draws", () => {
 });
 
 it('splits a material by shadow flags, each part reserving the material totals', () => {
-  const asphalt = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 2, 2)]);
+  const asphalt = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 2, 2)], 16);
   const root = chunk([new BoxGeometry(), asphalt], [new BoxGeometry(), asphalt]);
   (root.children[1] as Mesh).castShadow = true;
   const created = batches.add(root);
   expect(created.map(batch => [batch.castShadow, batch.maxInstanceCount])).toEqual([[false, 2], [true, 2]]);
 });
 
-it('keeps its own draw for a glTF material, a transparent, camera-facing or hooked mesh, and gives back a removed chunk', () => {
-  const batches = createSceneryBatches(new Group(), [totals('a', 1, 1)]);
+it('keeps its own draw for a glTF material, a camera-facing or hooked mesh, and gives back a removed chunk', () => {
+  const batches = createSceneryBatches(new Group(), [totals('a', 1, 1), totals('g', 1, 1)], 16);
   const card = new Mesh(new BoxGeometry(), material('c')); card.customDepthMaterial = new MeshDepthMaterial(); card.userData.lmuMaterial = 'c';
   const flag = new Mesh(new BoxGeometry(), material('f')); flag.onBeforeRender = () => {}; flag.userData.lmuMaterial = 'f';
   const root = chunk([new BoxGeometry(), material('a')], [new BoxGeometry(), material('g', {transparent: true})]);
   // A mesh without a surface description keeps its chunk's own glTF material: it cannot share a batch with other chunks.
   const gltf = new MeshStandardMaterial(); gltf.userData.lmuMaterial = 'a';
   root.add(card, flag, Object.assign(new Mesh(new BoxGeometry(), gltf), {userData: {lmuMaterial: 'a'}}));
-  const [batch] = batches.add(root);
-  expect((root.children as Mesh[]).map(mesh => mesh.visible)).toEqual([false, true, true, true, true]);
+  const [batch, glass] = batches.add(root);
+  // The see-through surface batches too, its instances sorted back to front; the opaque batch is not sorted.
+  expect((root.children as Mesh[]).map(mesh => mesh.visible)).toEqual([false, false, true, true, true]);
+  expect([batch.sortObjects, glass.sortObjects]).toEqual([false, true]);
   batches.remove(root);
   expect(() => batch.getVisibleAt(0)).toThrow();
 });
 
 it('goes by each mesh\'s own key when two package materials share one configured material', () => {
-  const concrete = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 1, 1), totals('b', 1, 1)]);
+  const concrete = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 1, 1), totals('b', 1, 1)], 16);
   const root = chunk([new BoxGeometry(), concrete], [new BoxGeometry(), concrete]);
   root.children[1].userData.lmuMaterial = 'b';
   expect(batches.add(root).map(batch => [batch.material, batch.maxInstanceCount])).toEqual([[concrete, 1], [concrete, 1]]);
 });
 
 it('throws when a chunk does not match the package facts', () => {
-  const make = () => createSceneryBatches(new Group(), [totals('a', 1, 1), totals('b', 2, 2)]);
+  const make = () => createSceneryBatches(new Group(), [totals('a', 1, 1), totals('b', 2, 2)], 16);
   expect(() => make().add(chunk([new BoxGeometry(), material()]))).toThrow('without its package key');
   expect(() => make().add(chunk([new BoxGeometry(), material('z')]))).toThrow('not in the layout');
   expect(() => make().add(chunk([new BoxGeometry(), material('a')], [new BoxGeometry(), material('a')]))).toThrow('two materials');
@@ -98,4 +103,40 @@ it('throws when a chunk does not match the package facts', () => {
   expect(() => make().add(chunk([shared, asphalt], [shared, asphalt]))).toThrow('draws more');
   const kerb = material('b'), plain = new BoxGeometry().toNonIndexed();
   expect(() => make().add(chunk([new BoxGeometry(), kerb], [plain, kerb]))).toThrow('different attributes');
+});
+
+it("drops a batch's CPU arrays after the upload that follows its material's last primitive", () => {
+  const asphalt = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 2, 2)], 16);
+  const [batch] = batches.add(chunk([new BoxGeometry(), asphalt]));
+  const buffers = [batch.geometry.index!, ...Object.values(batch.geometry.attributes)] as BufferAttribute[];
+  const upload = () => buffers.forEach(buffer => buffer.onUploadCallback());
+  const bytes = () => buffers.map(buffer => buffer.array.length);
+  upload(); // A chunk is still to come: the batch keeps writing into its arrays.
+  expect(bytes().every(length => length > 0)).toBe(true);
+  batches.add(chunk([new BoxGeometry(), asphalt]));
+  expect(bytes().every(length => length > 0)).toBe(true); // Not uploaded yet: the pending ranges still read them.
+  upload();
+  expect(bytes()).toEqual(buffers.map(() => 0));
+  expect(buffers.map(buffer => [buffer.updateRanges.length, buffer.count > 0])).toEqual(buffers.map(() => [0, true]));
+  // Its geometry keeps the batch's bounds: a sort or a warm-up draw never computes them from the emptied arrays.
+  expect(batch.geometry.boundingSphere!.radius).toBeCloseTo(batch.boundingSphere!.radius);
+  expect(batch.geometry.boundingBox!.equals(batch.boundingBox!)).toBe(true);
+});
+
+const MAP: SurfaceMap = {texture: 't', uv: 'uv0', scale: [1, 1], srgb: true};
+const TERRAIN_KEYS = ['layerA', 'layerB', 'layerC', 'layerD', 'normalA', 'normalB', 'mix', 'pattern', 'splatter', 'splatterOverlay'];
+
+it("keeps a material whose program needs more texture units than three allows (with the batch's two vertex textures) as its own draw", () => {
+  const heavy = material('t'), light = material('s'), batches = createSceneryBatches(new Group(), [totals('t', 1, 1), totals('s', 1, 1)], 16);
+  const terrain = (count: number) => surfaceTextureUnits(surface('terrain', {maps: Object.fromEntries(TERRAIN_KEYS.slice(0, count).map(key => [key, MAP])), flags: {layers: '4'}}));
+  heavy.userData.surfaceTextureUnits = terrain(10); light.userData.surfaceTextureUnits = terrain(9);
+  const root = chunk([new BoxGeometry(), heavy], [new BoxGeometry(), light]);
+  const created = batches.add(root);
+  expect(created.map(batch => batch.material)).toEqual([light]);
+  expect((root.children as Mesh[]).map(mesh => [mesh.visible, mesh.material])).toEqual([[true, heavy], [false, light]]);
+});
+
+it('throws for a configured material without its unit count', () => {
+  const bare = material('a'); delete bare.userData.surfaceTextureUnits;
+  expect(() => createSceneryBatches(new Group(), [totals('a', 1, 1)], 16).add(chunk([new BoxGeometry(), bare]))).toThrow('texture unit count');
 });

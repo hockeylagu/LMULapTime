@@ -1,4 +1,4 @@
-import { Box3, CubeCamera, HalfFloatType, LinearMipmapLinearFilter, MeshStandardMaterial, PMREMGenerator, Vector3, WebGLCubeRenderTarget, type IUniform, type Material, type Mesh, type WebGLRenderTarget, type Object3D, type Scene, type Texture, type WebGLRenderer } from 'three';
+import { Box3, CubeCamera, HalfFloatType, LinearMipmapLinearFilter, MeshStandardMaterial, PMREMGenerator, Vector3, WebGLCubeRenderTarget, type IUniform, type Material, type Mesh, type Object3D, type Scene, type Texture, type WebGLRenderer } from 'three';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { convolveReflection, type ReflectionCubes } from '../reflectionCube.js';
 import { sceneryReflectionUniforms } from '../scenery/materials/sceneryReflection.js';
@@ -81,7 +81,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   // The prefiltered target exists from the start, converted from the empty cube: its size is a program define, so a car's
   // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
   const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
-  const prefiltered: WebGLRenderTarget = generator.fromCubemap(target.texture);
+  const prefiltered: WebGLCubeRenderTarget = generator.fromCubemap(target.texture);
   let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true;
   /** What the next update does once the faces are drawn: prefilter them for three's materials, then convolve them for the paint. */
   let pending: 'prefilter' | 'convolve' | null = null;

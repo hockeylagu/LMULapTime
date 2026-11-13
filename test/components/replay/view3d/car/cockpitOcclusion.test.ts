@@ -31,8 +31,8 @@ const compile = (recipe: CarMaterialRecipe) => {
   const material = createCarMaterial(recipe, appearance, () => new Texture(), testShading(), volume);
   const shader = {
     uniforms: {} as Record<string, IUniform>,
-    vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>\n#include <project_vertex>',
-    fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <shadowmap_pars_fragment>\n#include <lights_physical_pars_fragment>\n#include <lights_fragment_begin>\n#include <lights_fragment_maps>\n#include <lights_fragment_end>',
+    vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>\n#include <project_vertex>\n#include <fog_pars_vertex>\n#include <fog_vertex>',
+    fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <shadowmap_pars_fragment>\n#include <lights_physical_pars_fragment>\n#include <lights_fragment_begin>\n#include <lights_fragment_maps>\n#include <lights_fragment_end>\n#include <fog_pars_fragment>\n#include <fog_fragment>',
   };
   material.onBeforeCompile(shader as never, undefined as never);
   return {material, shader};

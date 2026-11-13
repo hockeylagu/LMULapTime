@@ -1,6 +1,7 @@
 import {BufferAttribute, BufferGeometry, DoubleSide, Mesh, Ray, Vector3, type Object3D} from 'three';
 import type {MeshBVH} from 'three-mesh-bvh';
 import {GenerateMeshBVHWorker} from 'three-mesh-bvh/worker';
+import type { RoadHeightLookup } from '../../../../../shared/types/scenes/scenery.js';
 
 interface NativePosition { x: number; y: number; z: number }
 /** Highest surface from 0.15 m above `point.y` down to `reach` metres below it (native coordinates). */
@@ -54,7 +55,7 @@ function mergePositions(meshes: Mesh[], meshRoles: number[]): {geometry: BufferG
 }
 
 export interface SceneryGround {
-  /** Highest resident opaque scanned surface under a point, excluding the filler ground; null outside the resident chunks. */
+  /** The road height grid's surface under a point; off the grid, the highest resident opaque scanned surface (no filler ground); else null. */
   surfaceHeight: SurfaceHeight;
   /**
    * Builds a chunk's ray tree (in the BVH worker) while the chunk root is still in native coordinates. A coarse chunk (the
@@ -74,7 +75,7 @@ export interface SceneryGround {
  * the camera checks. Each triangle keeps its role, so a query only accepts the surfaces it used to. Chunks build concurrently,
  * one per worker.
  */
-export function createSceneryGround(): SceneryGround {
+export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGround {
   const workers = Array.from({length: WORKER_COUNT}, () => new GenerateMeshBVHWorker()), idle = [...workers];
   const waiting: ((worker: GenerateMeshBVHWorker) => void)[] = [];
   const acquire = () => new Promise<GenerateMeshBVHWorker>(resolve => { const worker = idle.pop(); if (worker) resolve(worker); else waiting.push(resolve); });
@@ -108,6 +109,10 @@ export function createSceneryGround(): SceneryGround {
   return {
     surfaceHeight(point, reach = 1.5) {
       if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || !Number.isFinite(point.z)) return null;
+      // The package's grid answers on its corridor; a height outside the query's window (the other deck of a bridge) or off the
+      // grid falls back to the resident chunks' rays.
+      const grid = roadHeightAt(point.x, point.z);
+      if (grid !== null && grid <= point.y + SURFACE_ABOVE_M && grid >= point.y - reach) return grid;
       heightRay.origin.set(point.x, point.y + SURFACE_ABOVE_M, point.z);
       const distance = nearestHit(heightRay, WHEEL, 0, SURFACE_ABOVE_M + reach);
       return distance === null ? null : heightRay.origin.y - distance;

@@ -1,6 +1,7 @@
 import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshStandardMaterial, RedFormat, RepeatWrapping, RGBAFormat, ShaderChunk, Vector2, Vector3, type Camera, type Texture } from 'three';
 import type { CloudMapLevels, SceneryClouds, SceneryCloudMaterial } from '../../../../../shared/types/scenes/clouds.js';
 import type { CloudSheet } from './clouds.js';
+import { hazeProgram } from './haze.js';
 
 /**
  * The replay's clouds, drawn: one mesh per placed sheet (clouds.ts) with the first of its materials, lit by the package's cloud
@@ -25,7 +26,6 @@ export interface CloudLayer {
   dispose(): void;
 }
 
-const FOG_DISTANCE = 'fogDensity * vFogDepth';
 if (!ShaderChunk.opaque_fragment.includes('gl_FragColor = vec4( outgoingLight, diffuseColor.a );')) throw Error('three.js opaque_fragment changed: the cloud layer needs updating');
 
 const CLOUD_VERTEX_PARS = `
@@ -138,14 +138,11 @@ function cloudUniforms(clouds: SceneryClouds, material: SceneryCloudMaterial, li
   };
 }
 
-/** The program of a cloud sheet: three's standard program (for the environment lookup and the haze) with the cloud's own colour and alpha. */
-export function patchCloudShader(shader: { vertexShader: string; fragmentShader: string }): void {
-  // The scene's haze, with the distance halved in the exponent: a cloud takes the square root of the haze's distance term.
-  if (!ShaderChunk.fog_fragment.includes(FOG_DISTANCE)) throw Error('The replay haze changed: the cloud layer needs updating');
+/** The program of a cloud sheet: three's standard program (for the environment lookup) with the cloud's own colour and alpha; its haze is added by `hazeProgram`. */
+function patchCloudShader(shader: { vertexShader: string; fragmentShader: string }): void {
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>${CLOUD_VERTEX_PARS}`).replace('#include <fog_vertex>', `#include <fog_vertex>${CLOUD_VERTEX}`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>${CLOUD_FRAGMENT_PARS}`)
-    .replace('#include <opaque_fragment>', `${CLOUD_FRAGMENT}#include <opaque_fragment>`)
-    .replace('#include <fog_fragment>', ShaderChunk.fog_fragment.replace(FOG_DISTANCE, `0.5 * ${FOG_DISTANCE}`));
+    .replace('#include <opaque_fragment>', `${CLOUD_FRAGMENT}#include <opaque_fragment>`);
 }
 
 /** A sheet's geometry in scene axes around the eye, with its vertex frame (LMU local axes) and fade. */
@@ -182,6 +179,7 @@ export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], li
     made = new MeshStandardMaterial({ transparent: true, depthWrite: false, side: DoubleSide, forceSinglePass: true });
     made.onBeforeCompile = shader => { Object.assign(shader.uniforms, uniforms); patchCloudShader(shader); };
     made.customProgramCacheKey = () => 'cloud-sheet';
+    hazeProgram(made, 0.5); // The haze's distance halved in the exponent: a cloud takes the square root of the haze's distance term.
     materials.set(cloud.name, made);
     return made;
   };

@@ -1,13 +1,14 @@
 import { Mesh, Object3D, Vector3, type Box3, type Material, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
 import { createGeometryWarmup } from './geometryWarmup.js';
 import { surfaceTextureMaps } from './materials/configureSurfaceMaterial.js';
-import { isStreaming, streamTexture, whenUploaded } from './materials/mipStreaming.js';
+import { fullPixels, isStreaming, streamTexture, whenUploaded } from './materials/mipStreaming.js';
 
 /** Upload slice while the scene shows (a frame each), and behind the loading screen (a task each). */
 const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
 /**
- * Bytes of missing top levels uploaded per frame once the first frame is out. The budget is bytes, not time: an upload call returns
- * before the GPU has copied the data, so time does not bound its cost.
+ * Bytes of full textures uploaded per frame once the first frame is out: a sharpening swaps a texture whole and counts its full
+ * bytes; a frame swaps while it is under the budget, so the first swap goes even if it is bigger. The budget is bytes, not time: an upload call returns before the
+ * GPU has copied the data, so time does not bound its cost.
  */
 const SHARPEN_BYTES_PER_FRAME = 2 * 1024 * 1024;
 
@@ -38,8 +39,8 @@ export interface SceneWarmup {
 
 /**
  * A chunk compiles its programs and uploads its textures before it joins the scene: a texture per frame while the scene shows, in
- * long slices behind the loading screen. Scenery textures join on their reduced levels; once the first frame is out, their missing
- * top levels stream in, in bands of rows, one texture after another: the car's first, then the scenery nearest the camera, the
+ * long slices behind the loading screen. Scenery textures join on their reduced levels; once the first frame is out, they sharpen
+ * whole, one texture after another within the frame's byte budget: the car's first, then the scenery nearest the camera, the
  * largest first within the same chunk. `changed` asks for a frame.
  */
 export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, prepare: () => void,
@@ -53,16 +54,15 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
   /** Car textures first (-1), then by the camera's distance to the nearest chunk using the texture; unplaced ones last. */
   const distance = (texture: Texture) => cars.has(texture) ? -1
     : (places.get(texture) ?? []).reduce((nearest, box) => Math.min(nearest, box.distanceToPoint(eye)), Infinity);
-  const pixels = (texture: Texture) => { const top = (texture.mipmaps as {width: number; height: number}[] | undefined)?.[0]; return top ? top.width * top.height : 0; };
   const sharpen = () => {
     sharpenFrame = 0;
     if (disposed) return;
     let uploaded = 0;
     camera.getWorldPosition(eye);
-    const order = [...blurry].map(texture => ({texture, distance: distance(texture), pixels: pixels(texture)}))
+    const order = [...blurry].map(texture => ({texture, distance: distance(texture), pixels: fullPixels(texture)}))
       .sort((a, b) => a.distance - b.distance || b.pixels - a.pixels);
     for (const {texture} of order) {
-      uploaded += streamTexture(texture, renderer, SHARPEN_BYTES_PER_FRAME - uploaded);
+      uploaded += streamTexture(texture, renderer);
       if (!isStreaming(texture)) { blurry.delete(texture); sharp++; }
       if (uploaded >= SHARPEN_BYTES_PER_FRAME) break;
     }
@@ -121,7 +121,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     },
     shown() { shown = true; startSharpen(); },
     // A texture nothing has drawn yet is not on the GPU: it joins the queue at its first upload, so the queue can empty.
-    sharpen(texture) { cars.add(texture); whenUploaded(texture, renderer, () => { blurry.add(texture); startSharpen(); }); },
+    sharpen(texture) { cars.add(texture); whenUploaded(texture, () => { blurry.add(texture); startSharpen(); }); },
     hold(texture) {
       held.add(texture);
       const release = () => {
@@ -135,7 +135,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
       // Car textures: ahead of the scenery, those on the GPU now and the others as each is first drawn.
       const released = [...held];
       held.clear();
-      for (const texture of released) { cars.add(texture); whenUploaded(texture, renderer, () => { blurry.add(texture); startSharpen(); }); }
+      for (const texture of released) { cars.add(texture); whenUploaded(texture, () => { blurry.add(texture); startSharpen(); }); }
     },
     sharpening: () => ({sharp, total: sharp + blurry.size}),
     dispose() { disposed = true; cancelAnimationFrame(sharpenFrame); held.clear(); blurry.clear(); geometryWarmup.dispose(); },

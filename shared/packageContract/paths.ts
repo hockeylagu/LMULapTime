@@ -17,6 +17,8 @@ export const trackLayoutPath = (layoutKey: string): string => `tracks/${layoutKe
 /** Scenery chunk GLB and texture (or start) file of a content hash. */
 export const sceneryChunkPath = (sha256: string): string => `scenery/${sha256}.glb`;
 export const sceneryTexturePath = (sha256: string): string => `scenery/textures/${sha256}.ktx2.zst`;
+/** Scenery road height grid of a content hash (raw little-endian, docs/SCENE_PACKAGE.md#road-height). */
+export const sceneryHeightPath = (sha256: string): string => `scenery/heights/${sha256}.bin`;
 
 /** Vehicle body GLB (exterior, interior or far), texture (or start) file and descriptor. */
 export const bodyGlbPath = (sha256: string): string => `vehicles/${sha256}.glb`;

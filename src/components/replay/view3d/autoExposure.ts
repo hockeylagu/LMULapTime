@@ -222,18 +222,52 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   };
   apply(active);
 
+  let pack: WebGLBuffer | null = null;
+  /**
+   * Reads the metering target back without stalling the frame, called right after its pass while its framebuffer is still bound.
+   * three's `readRenderTargetPixelsAsync` does the same, but each call creates and deletes a pixel-pack buffer and a fence, polls the
+   * fence on a 4 ms timer and calls `getBufferSubData`, which is a synchronous round trip to the GPU process that waits for every
+   * command issued before it: that wait was the whole cost (2.8 % of the main thread). Here one pack buffer serves every reading,
+   * and the data is fetched once the fence has signalled, from a poll on the frame clock (no timers), so the round trip finds the
+   * GPU idle and the next frame's commands not yet issued.
+   */
   const read = async () => {
     reading = true;
-    const started = generation;
+    const started = generation, gl = renderer.getContext() as WebGL2RenderingContext;
+    let sync: WebGLSync | null = null;
     try {
-      await renderer.readRenderTargetPixelsAsync(meter, 0, 0, METER_PX, METER_PX, readback);
+      if (!pack) {
+        // Checked once: the query is itself a round trip in some browsers, and the target's format never changes.
+        if (gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT) !== gl.RGBA || gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) !== gl.HALF_FLOAT) {
+          throw Error('The metering target is not readable as half-float RGBA');
+        }
+        pack = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.bufferData(gl.PIXEL_PACK_BUFFER, readback.byteLength, gl.STREAM_READ);
+      }
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
+      gl.readPixels(0, 0, METER_PX, METER_PX, gl.RGBA, gl.HALF_FLOAT, 0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+      if (!fence) throw Error('The metering fence could not be created');
+      sync = fence;
+      gl.flush();
+      await new Promise<void>((resolve, reject) => {
+        const poll = () => {
+          if (disposed) { resolve(); return; }
+          const status = gl.clientWaitSync(fence, 0, 0);
+          if (status === gl.WAIT_FAILED) reject(Error('The metering fence failed'));
+          else if (status === gl.TIMEOUT_EXPIRED) requestAnimationFrame(poll);
+          else resolve();
+        };
+        requestAnimationFrame(poll);
+      });
       // A reading from before a type switch metered the old window.
       if (disposed || started !== generation) return;
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, readback); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
       let sum = 0;
       for (let i = 0; i < METER_PX * METER_PX; i++) sum += DataUtils.fromHalfFloat(readback[i * 4]);
       metered = Math.log(Math.max(METER_FLOOR, sum / (METER_PX * METER_PX)));
       if (metered !== null && (adapted === null || Math.abs(metered - adapted) > SETTLED_LOG)) invalidate();
-    } finally { reading = false; }
+    } finally { reading = false; if (sync) gl.deleteSync(sync); }
   };
 
   return {
@@ -269,12 +303,14 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       renderer.setRenderTarget(null);
       renderer.render(output, quadCamera);
       if (!reading && frames++ % METER_EVERY_FRAMES === 0) {
-        renderer.setRenderTarget(meter); renderer.render(meterScene, quadCamera); renderer.setRenderTarget(null);
+        renderer.setRenderTarget(meter); renderer.render(meterScene, quadCamera);
         read().catch(() => {}); // A lost context or a disposed target ends metering; the last exposure stays.
+        renderer.setRenderTarget(null);
       }
     },
     dispose() {
       disposed = true;
+      if (pack) renderer.getContext().deleteBuffer(pack);
       hdr.dispose(); meter.dispose(); quad.dispose(); outputMaterial.dispose(); meterMaterial.dispose();
     },
   };

@@ -1,4 +1,5 @@
 import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, Vector3, type Object3D } from 'three';
+import { hazeProgram } from '../atmosphere/haze.js';
 
 /** How far the darkening spreads beyond the body, its strength under the body, and the lift that keeps it off the road. */
 const SPREAD_M = 0.5, STRENGTH = 0.6, LIFT_M = 0.02, CORNER_M = 0.3, TEXELS_PER_M = 24;
@@ -32,6 +33,7 @@ export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBa
   const alpha = new DataTexture(data, width, height, RGBAFormat);
   alpha.magFilter = LinearFilter; alpha.minFilter = LinearFilter; alpha.needsUpdate = true;
   const material = new MeshBasicMaterial({color: 0x000000, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4});
+  hazeProgram(material);
   material.addEventListener('dispose', () => { alpha.dispose(); });
   const shadow = new Mesh(new PlaneGeometry(sizeX, sizeZ), material);
   shadow.name = 'contact-shadow';

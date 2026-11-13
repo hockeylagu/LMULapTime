@@ -3,6 +3,7 @@ import { digitalFlagShaderParts, flagShaderParts } from './flagSurface.js';
 import { glassShaderParts } from './glassSurface.js';
 import { roadDecalShaderParts } from './roadDecalSurface.js';
 import { roadShaderParts } from './roadSurface.js';
+import { REFLECTING_KINDS } from './sceneryReflection.js';
 import { glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type ExtendedParts, type ShaderContext } from './shaderContext.js';
 import { standardShaderParts } from './standardSurface.js';
 import { TERRAIN_WEIGHTS, terrainLayerCount, type SurfaceConfig } from './surfaceConfig.js';
@@ -124,6 +125,24 @@ function familyParts(config: SurfaceConfig, context: ShaderContext, tint: string
   }
 }
 
+/** The maps a surface program declares as samplers, in declaration order. */
+function surfaceMapKeys(config: SurfaceConfig): string[] { return Object.keys(config.maps).sort(); }
+
+export const REFLECTION_SAMPLERS = 2, CASCADE_SAMPLERS = 1, THREE_SAMPLERS = 2;
+/** `batchingTexture` and `batchingIdTexture` of a BatchedMesh's vertex shader (no per-instance colour). */
+export const BATCH_VERTEX_TEXTURES = 2;
+
+/**
+ * Texture units a surface's fragment program samples: its maps (`mapDeclarations`), the reflection cube and integration table of the
+ * reflecting kinds (sceneryReflection.ts), the cascade atlas (patchCascadeShadow, every surface), and three's own two for a scene
+ * with an environment, no area lights, light probes or glTF maps: `envMap` (scene.environment) and `dfgLUT` (the physical program).
+ * The glTF `map` is declared but unread once `map_fragment` is replaced, so the link drops it. A batch adds `BATCH_VERTEX_TEXTURES`
+ * in the vertex stage; three counts both stages against `capabilities.maxTextures`.
+ */
+export function surfaceTextureUnits(config: SurfaceConfig): number {
+  return surfaceMapKeys(config).length + (REFLECTING_KINDS.has(config.kind) ? REFLECTION_SAMPLERS : 0) + CASCADE_SAMPLERS + THREE_SAMPLERS;
+}
+
 /** GLSL for a surface config. `uniforms: false` bakes every tunable into the source (used to compare programs). */
 export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean } = { uniforms: true }): ShaderParts {
   const { maps } = config;
@@ -139,7 +158,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   const context: ShaderContext = { sample, uv, number: glslNumber, vec: glslVec, uniforms: useUniforms };
   const tint = useUniforms ? 'diffuse' : glslVec(list(config.parameters.adjust, 'tint'));
   const parts = familyParts(config, context, tint);
-  const mapDeclarations = Object.keys(maps).sort().map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`).join('\n');
+  const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`).join('\n');
   return {
     declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_flag_elapsed;' : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;

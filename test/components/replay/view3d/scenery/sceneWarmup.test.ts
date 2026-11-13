@@ -3,7 +3,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isStreaming, startStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import { createSceneWarmup } from '../../../../../src/components/replay/view3d/scenery/sceneWarmup.js';
 
-const BC7 = 0x8e8c;
 let frames: (() => void)[] = [];
 beforeEach(() => {
   frames = [];
@@ -14,23 +13,24 @@ afterEach(() => vi.unstubAllGlobals());
 
 /** A renderer double whose textures are on the GPU once `upload` ran for them, as after their first draw. */
 function fixture() {
-  const uploaded = new Set<Texture>(), copies = vi.fn(), gpu = new Map<Texture, object>(), bound: Texture[] = [];
-  const renderer = {
-    getRenderTarget: () => null, setRenderTarget: () => {}, compile: () => {}, compileAsync: () => Promise.resolve(), initTexture: () => {}, render: () => {},
-    getContext: () => ({TEXTURE_2D: 0xde1, TEXTURE_BASE_LEVEL: 0x813c, texParameteri: () => {}}),
-    extensions: {get: (name: string) => (name === 'EXT_texture_compression_bptc' ? {COMPRESSED_RGBA_BPTC_UNORM_EXT: BC7} : null)},
-    properties: {has: (texture: Texture) => uploaded.has(texture), get: (texture: Texture) => ({__webglTexture: gpu.get(texture)})},
-    state: {bindTexture: (_: number, handle: object) => bound.push([...gpu].find(([, value]) => value === handle)![0]), compressedTexSubImage2D: copies},
-  } as unknown as WebGLRenderer;
+  const bound: Texture[] = [], versions = new WeakMap<object, number>();
+  // Like three: a source uploads once per version, then the texture's onUpdate runs. `bound` lists the swaps in order.
+  const initTexture = (texture: Texture) => {
+    if (versions.get(texture.source) === texture.source.version) return;
+    versions.set(texture.source, texture.source.version);
+    if (texture.mipmaps.length === Math.log2(texture.mipmaps[0].width) + 1) bound.push(texture);
+    texture.onUpdate?.(texture);
+  };
+  const renderer = {getRenderTarget: () => null, setRenderTarget: () => {}, compile: () => {}, compileAsync: () => Promise.resolve(), initTexture, render: () => {}} as unknown as WebGLRenderer;
   const changed = vi.fn(), warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, changed);
   /** A `size` px texture (1024 by default) streaming from its quarter-size level. */
   const texture = (size = 1024) => {
     const levels = Array.from({length: Math.log2(size) + 1}, (_, i) => ({data: new Uint8Array(Math.ceil((size >> i) / 4) ** 2 * 16), width: size >> i, height: size >> i}));
     const made = new CompressedTexture(levels, size, size, RGBA_BPTC_Format);
-    startStreaming(made, renderer);
+    startStreaming(made);
     return made;
   };
-  const upload = (made: Texture) => { uploaded.add(made); gpu.set(made, {}); (made.onUpdate as unknown as () => void)(); };
+  const upload = (made: Texture) => { made.needsUpdate = true; renderer.initTexture(made); };
   /** Runs frames until none is asked for; returns how many ran. */
   const drain = () => { let ran = 0; while (frames.length && ran < 100) { frames.shift()!(); ran++; } return ran; };
   return {warmup, texture, upload, drain, changed, bound};
@@ -80,5 +80,20 @@ it('sharpens the car first, then the scenery nearest the camera, the largest fir
     drain();
     expect([...new Set(bound)]).toEqual([car, nearLarge, nearSmall, far]); // The order their missing levels were copied in.
     expect([car, far, nearSmall, nearLarge].some(isStreaming)).toBe(false);
+  } finally { warmup.dispose(); drain(); }
+});
+
+it('swaps whole textures within the frame budget: the first one even if bigger, then one frame each for big ones', () => {
+  const {warmup, texture, upload, drain, bound} = fixture(), [big, other, small, smaller] = [texture(2048), texture(2048), texture(512), texture(512)];
+  try {
+    for (const made of [big, other, small, smaller]) { upload(made); warmup.sharpen(made); }
+    bound.length = 0;
+    warmup.shown();
+    frames.shift()!(); // One frame: the 5.3 MiB swap is over the 2 MiB budget alone, so nothing else goes with it.
+    expect(bound).toHaveLength(1);
+    frames.shift()!();
+    expect(bound).toHaveLength(2);
+    drain();
+    expect([big, other, small, smaller].some(isStreaming)).toBe(false);
   } finally { warmup.dispose(); drain(); }
 });

@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLRenderer } from 'three';
+import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
 import { addSceneEnvironment, sceneLighting, sceneSun, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { hazeProgram } from '../../../../src/components/replay/view3d/atmosphere/haze.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { SUN_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
@@ -20,7 +21,7 @@ vi.mock('three', async importOriginal => {
     dispose() {}
   }};
 });
-const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
+const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), setScissorTest: vi.fn(), getScissorTest: () => false, copyTextureToTexture: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
 /** A venue without daylight unless given one (the scene code keeps its default midday sun for it, though a package always states daylight): the synthetic sky, the probe at the scene origin. */
 const venue = (daylight?: SceneVenue['daylight'], position: [number, number, number] = [0, 0, 0]): SceneVenue => ({daylight: daylight as SceneVenue['daylight'], sky: testSky(), environmentProbe: {position}, shading: testShading()});
 const skyMaterial = (scene: Scene) => (scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>).material;
@@ -34,8 +35,7 @@ it('uses the analytic sky, PMREM and a sun light without three shadow maps, keep
   expect(scene.getObjectByName('sky')).toBeDefined();
   // Without daylight there is no haze to thicken the fog; the fog is exponential in the distance along the ray.
   expect(scene.fog).toBeInstanceOf(FogExp2); expect((scene.fog as FogExp2).density).toBe(0);
-  expect(ShaderChunk.fog_fragment).toContain('1.0 - exp( - fogDensity * vFogDepth )');
-  expect(ShaderChunk.fog_pars_fragment).toContain('const float HAZE_HEIGHT_AMOUNT = 0.0,');
+  expect(ShaderChunk.fog_vertex).toContain('vFogDepth = - mvPosition.z;'); // three's own fog chunks stay as they are.
   expect(skyMaterial(scene).name).toBe('sky-dome');
   // The dome hazes toward its own haze colour (set with the fog's, not three's fog).
   expect(skyMaterial(scene).fog).toBe(false); expect((skyMaterial(scene).uniforms.hazeColour.value as Color).r).toBeGreaterThan(0);
@@ -132,9 +132,12 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
     expect(away.toArray().map(v => +v.toFixed(6))).toEqual(expected.toArray().map(v => +v.toFixed(6)));
     // The haze toward a low sun is brighter than away from it.
     expect(sunward.r).toBeGreaterThan(away.r);
-    // The haze chunks carry this scene's terms: the scene origin's height and the height and sun terms.
-    expect(ShaderChunk.fog_pars_fragment).toContain('const float HAZE_ORIGIN_Y = 0.0;');
-    expect(ShaderChunk.fog_fragment).toContain('HAZE_HEIGHT_AMOUNT');
+    // The scene's haze terms are in the uniforms hazed programs share: its origin height, its sun and its sunward share.
+    const hazed = new MeshBasicMaterial(), shader = {uniforms: {} as Record<string, {value: unknown}>, vertexShader: '#include <fog_pars_vertex>\n#include <fog_vertex>', fragmentShader: '#include <fog_pars_fragment>\n#include <fog_fragment>'};
+    hazeProgram(hazed); hazed.onBeforeCompile(shader as unknown as WebGLProgramParametersWithUniforms, renderer);
+    environment.applyHaze();
+    expect([shader.uniforms.HAZE_ORIGIN_Y.value, (shader.uniforms.HAZE_SUN_DIRECTION.value as Vector3).toArray()]).toEqual([0, sun.toArray()]);
+    expect(shader.uniforms.HAZE_SUNWARD.value).toBeGreaterThan(0);
   } finally { environment.dispose(); }
 });
 
@@ -171,7 +174,7 @@ it("samples the package's cascade set from its first draw, for any camera, and h
   try {
     expect(environment.update()).toBe(false); expect(render).not.toHaveBeenCalled(); // No camera yet.
     environment.setCamera(new PerspectiveCamera(48, 1.5, 0.5, 15000));
-    // The first frame draws the test chase set's three cascades, then the surfaces sample them.
+    // The first frame draws the test chase set's three cascades (its two held tiles copied from their static depth, not rendered), then the surfaces sample them.
     environment.update(); expect(render).toHaveBeenCalledTimes(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
     // The cockpit set (two cascades) replaces it: lit on its own atlas until its first draw.
     environment.setShadowCascades('cockpit'); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
