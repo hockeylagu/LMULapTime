@@ -19,7 +19,8 @@ export function createGeometryWarmup(renderer: WebGLRenderer, nextFrame: () => P
     async upload(root: Object3D, camera: Camera, signal: AbortSignal, budgetMs = sliceMs, pause = nextFrame): Promise<void> {
       const geometries = new Set<BufferGeometry>();
       root.traverse(object => {
-        if (!(object instanceof Mesh) || !object.visible || !(object.geometry instanceof BufferGeometry)) return;
+        // A mesh in no camera layer is never drawn (a batch's stand-in part): nothing of it goes to the GPU.
+        if (!(object instanceof Mesh) || !object.visible || object.layers.mask === 0 || !(object.geometry instanceof BufferGeometry)) return;
         geometries.add((object as Mesh<BufferGeometry>).geometry);
       });
       let deadline = performance.now() + budgetMs;

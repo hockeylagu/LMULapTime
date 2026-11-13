@@ -8,13 +8,14 @@ export interface CarBatches {
 
 interface Part { proxy: Mesh; batch: BatchedMesh; instance: number; matrix: Matrix4; visible: boolean }
 
-function layoutOf(geometry: BufferGeometry): string {
+/** The vertex layout of a geometry: a batch holds geometries of one layout only. */
+export function layoutOf(geometry: BufferGeometry): string {
   const attributes = Object.entries(geometry.attributes).map(([name, attribute]) => `${name}:${attribute.itemSize}:${attribute.normalized}:${attribute.array.constructor.name}`);
   return [geometry.index ? 'indexed' : 'plain', ...attributes.sort()].join('|');
 }
 
 /** An opaque lit car part whose material and geometry a batch can draw: lamps, glass and decals keep their own draws (sorted, or switched per frame). */
-function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>): mesh is Mesh<BufferGeometry, MeshStandardMaterial> {
+export function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>): mesh is Mesh<BufferGeometry, MeshStandardMaterial> {
   const material = mesh.material;
   return !Array.isArray(material) && material instanceof MeshStandardMaterial && !material.transparent && material.visible
     && !mesh.customDepthMaterial && mesh.onBeforeRender === Object3D.prototype.onBeforeRender;

@@ -5,6 +5,7 @@ import { createContactShadow } from '../../../../../src/components/replay/view3d
 it('lays a soft footprint shadow on the car contact plane, darkest under the body and clear at its spread', () => {
   const model = new Group(); model.position.set(5, 1, 5);
   const body = new Mesh(new BoxGeometry(2, 1, 4.6)); body.position.y = 0.5; model.add(body);
+  body.userData.footprint = [-1, 0, -2.3, 1, 1, 2.3]; // The part's box in the model's frame, measured by the body loader.
   const shadow = createContactShadow(model);
   expect(shadow.position.y).toBeCloseTo(0.02); expect(shadow.position.x).toBeCloseTo(0); // Model-local, on the lowest point.
   expect(shadow.geometry.parameters.width).toBeCloseTo(3); expect(shadow.geometry.parameters.height).toBeCloseTo(5.6);
@@ -13,4 +14,8 @@ it('lays a soft footprint shadow on the car contact plane, darkest under the bod
   expect(at(width >> 1, height >> 1)).toBe(Math.round(255 * 0.6));
   expect(at(0, 0)).toBe(0);
   expect(shadow.castShadow).toBe(false); expect(shadow.material).toBeInstanceOf(MeshBasicMaterial);
+});
+
+it('refuses a model without measured parts', () => {
+  expect(() => createContactShadow(new Group().add(new Mesh(new BoxGeometry())))).toThrow('no measured parts');
 });

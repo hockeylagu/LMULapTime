@@ -153,7 +153,7 @@ const layout = {
 /** A texture file's content hash as a body row states it: a name in hex, so the paths the app derives from it stay readable in the loads. */
 const hashOf = (name: string) => Buffer.from(name).toString('hex').padEnd(64, '0');
 const car = {
-  resource: {textures: ['seat', 'trim'].map(name => ({sha256: hashOf(name), levels: 12, start: {sha256: hashOf(`${name}-start`), levels: 10}})), volumes: []}, bytes: new ArrayBuffer(0), volumes: new Map(), vehicleId: 'veh',
+  resource: {textures: ['seat', 'trim'].map(name => ({sha256: hashOf(name), levels: 12, start: {sha256: hashOf(`${name}-start`), levels: 10}})), volumes: []}, files: async () => ({bytes: new ArrayBuffer(0), interiorBytes: null}), volumes: new Map(), vehicleId: 'veh',
   descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true},
       ...['seat', 'trim'].map(name => ({id: name, name, paint: false, surface: {kind: 'diffuse', maps: {albedo: {texture: descriptorTexturePath(hashOf(name)), uv: 'uv0', scale: [1, 1]}}, finish: {roughness: 0.6, metalness: 0}, normalShadowInfluence: 0}}))], glowMaterialIds: ['glow'],
     lamps: [
@@ -394,7 +394,7 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
 });
 
 it('joins the interior file to the body under its chassis node, drawn in the driver cameras', async () => {
-  const withInterior = {...assets, primary: {...assets.primary, interiorBytes: new ArrayBuffer(1)}};
+  const withInterior = {...assets, primary: {...assets.primary, resource: {...assets.primary.resource, interior: {sha256: 'interior', byteLength: 1, triangles: 0, vertices: 0}}, files: async () => ({bytes: new ArrayBuffer(0), interiorBytes: new ArrayBuffer(1)})}};
   const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), withInterior);
   handle.cursor(0, 0); draw();
   const [scene] = lastSceneRender(), dash = scene.getObjectByName('dash-in')!;

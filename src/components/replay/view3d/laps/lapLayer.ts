@@ -1,5 +1,5 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
-import { BufferGeometry, Group, Mesh, MeshBasicMaterial, PropertyBinding, type Material, type Object3D, type Texture, type Vector3 } from 'three';
+import { Box3, BufferGeometry, Group, Matrix4, Mesh, MeshBasicMaterial, PropertyBinding, Vector3, type BufferAttribute, type InterleavedBuffer, type InterleavedBufferAttribute, type Material, type Object3D, type Texture } from 'three';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
@@ -72,15 +72,64 @@ function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn:
   return lit;
 }
 
-/** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */
-export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, carTextures: CarTextures, display: () => DisplayTransform, shading: SceneryShading) {
-  // Only buffers retained by the bounded asset cache keep these parsed templates alive.
-  const templates = new WeakMap<ArrayBuffer, Promise<Group>>();
+/** Drops a buffer's CPU copy once it is on the GPU (three.js keeps it otherwise): called by the renderer after the upload. */
+function releaseUploaded(this: BufferAttribute | InterleavedBuffer): void {
+  (this as {array: unknown}).array = null;
+}
+
+/** A geometry's buffers: its index and each attribute's (an interleaved attribute's shared buffer). */
+export function geometryBuffers(geometry: BufferGeometry): Array<BufferAttribute | InterleavedBuffer> {
+  const attributes = geometry.attributes as Record<string, BufferAttribute | InterleavedBufferAttribute | undefined>;
+  return [geometry.index, ...Object.values(attributes)].flatMap((attribute): Array<BufferAttribute | InterleavedBuffer> => !attribute ? []
+    : (attribute as Partial<InterleavedBufferAttribute>).isInterleavedBufferAttribute ? [(attribute as InterleavedBufferAttribute).data] : [attribute as BufferAttribute]);
+}
+
+/** Each buffer of the geometry drops its CPU copy once the renderer has uploaded it. */
+export function releaseOnUpload(geometry: BufferGeometry): void {
+  for (const buffer of geometryBuffers(geometry)) buffer.onUpload(releaseUploaded);
+}
+
+/**
+ * Prepares a parsed body for its vertices to leave the CPU: each geometry's bounds, and each part's exact box in the body's frame
+ * (`userData.footprint`, min then max), which the contact shadow reads instead of the vertices. With `release`, each buffer then
+ * drops its CPU copy once uploaded.
+ */
+function prepareGeometry(body: Group, release: boolean): void {
+  body.updateWorldMatrix(true, true);
+  const toBody = new Matrix4().copy(body.matrixWorld).invert(), frame = new Matrix4(), point = new Vector3(), box = new Box3();
+  body.traverse(object => {
+    const geometry: unknown = object instanceof Mesh ? object.geometry : null;
+    if (!(geometry instanceof BufferGeometry)) return;
+    const attributes = geometry.attributes as Record<string, BufferAttribute | InterleavedBufferAttribute | undefined>, position = attributes.position;
+    geometry.userData.sharedAsset = true;
+    geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+    if (position) {
+      frame.multiplyMatrices(toBody, object.matrixWorld); box.makeEmpty();
+      for (let index = 0; index < position.count; index++) box.expandByPoint(point.fromBufferAttribute(position, index).applyMatrix4(frame));
+      object.userData.footprint = [...box.min.toArray(), ...box.max.toArray()];
+    }
+    if (release) releaseOnUpload(geometry as BufferGeometry);
+  });
+}
+
+/**
+ * Lap objects own their geometry; replacing them cannot release the track's GPU buffers. `releaseUploaded` drops the bodies'
+ * vertices from the CPU once they are on the GPU: for a scene that never batches a car after its body is first drawn (the race;
+ * the lap view batches each lap's cars from the parsed body). `shareMaterials` gives every car of a body the same material for the
+ * same content (a field of cars drawn from shared batches); without it each car owns its materials (a ghost, or a reflection probe,
+ * changes them).
+ */
+export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, carTextures: CarTextures, display: () => DisplayTransform, shading: SceneryShading,
+  {releaseUploaded: release = false, shareMaterials = false}: {releaseUploaded?: boolean; shareMaterials?: boolean} = {}) {
+  // Parsed once per body for the scene's life; the files themselves are read for the parse only.
+  const templates = new Map<string, Promise<Group>>();
   const loadTemplate = (car: LoadedBody): Promise<Group> => {
-    let pending = templates.get(car.bytes);
+    // By folder too: a scene that batches a body's cars drops the parse's vertices for that body alone.
+    const key = `${car.resource.folder}:${car.resource.sha256}:${car.resource.interior?.sha256 ?? ''}`;
+    let pending = templates.get(key);
     if (!pending) {
       const parse = (bytes: ArrayBuffer) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '').then(result => result.scene);
-      pending = Promise.all([parse(car.bytes), car.interiorBytes ? parse(car.interiorBytes) : null]).then(([body, interior]) => {
+      pending = car.files().then(({bytes, interiorBytes}) => Promise.all([parse(bytes), interiorBytes ? parse(interiorBytes) : null])).then(([body, interior]) => {
         // The interior's parts hang under its chassis node and join the body's: one model, whose driver-camera parts the
         // cockpit view switches.
         if (interior) {
@@ -88,12 +137,11 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
           if (!chassis || !parts) throw Error(`Car ${car.vehicleId} has no chassis node for its interior`);
           chassis.add(...parts.children);
         }
-        body.traverse(object => {
-          if (object instanceof Mesh && object.geometry instanceof BufferGeometry) object.geometry.userData.sharedAsset = true;
-        });
+        prepareGeometry(body, release);
         return body;
       });
-      templates.set(car.bytes, pending);
+      templates.set(key, pending);
+      pending.catch(() => { if (templates.get(key) === pending) templates.delete(key); });
     }
     return pending;
   };
@@ -158,6 +206,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     }));
     return {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
+  /** With `shareMaterials`, the materials of each parsed body, by content: every car of the body draws with the same ones. */
+  const sharedMaterials = new WeakMap<Group, Map<string, Material>>();
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
   const partsOf = (car: LoadedBody) => {
@@ -186,7 +236,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
     // One material per lamp, and one per distinct material content: a car file repeats a material under many names.
-    const lampMaterials = new Map<CarLamp, Material>(), materials = new Map<string, Material>();
+    const lampMaterials = new Map<CarLamp, Material>();
+    let materials = shareMaterials ? sharedMaterials.get(template) : undefined;
+    if (!materials) { materials = new Map<string, Material>(); if (shareMaterials) sharedMaterials.set(template, materials); }
     const replace = (material: Material) => {
       const recipe = recipeOf(material), key = carMaterialKey(recipe, appearance);
       let created = materials.get(key);
@@ -278,7 +330,16 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     preloaded.set(assets, built);
     return built;
   };
-  return Object.assign(load, {preload});
+  /**
+   * A car of `body` drawn part by part on the model's shared geometry: a batch copies the whole body, every distance level
+   * included, so many cars in one scene would hold that copy each.
+   */
+  const car = async (body: LoadedBody) => {
+    const model = await loadModel(body), built = makeCar(MAP_COLORS.carBody, false, model);
+    model.add(createContactShadow(model));
+    return built;
+  };
+  return Object.assign(load, {preload, car});
 }
 
 export type LapLayer = Awaited<ReturnType<ReturnType<typeof createLapLayerLoader>>>;

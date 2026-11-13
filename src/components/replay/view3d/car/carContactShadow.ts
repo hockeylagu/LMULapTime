@@ -1,4 +1,4 @@
-import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, type Object3D } from 'three';
+import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, Vector3, type Object3D } from 'three';
 
 /** How far the darkening spreads beyond the body, its strength under the body, and the lift that keeps it off the road. */
 const SPREAD_M = 0.5, STRENGTH = 0.6, LIFT_M = 0.02, CORNER_M = 0.3, TEXELS_PER_M = 24;
@@ -6,10 +6,16 @@ const SPREAD_M = 0.5, STRENGTH = 0.6, LIFT_M = 0.02, CORNER_M = 0.3, TEXELS_PER_
 /**
  * Grounds the car: the standard real-time contact shadow under the car's footprint, a ground-plane quad whose alpha falls from STRENGTH inside the body outline (a rounded rectangle over the model's
  * bounds) to nothing SPREAD_M beyond it. It sits on the model's lowest point (the tyre contact plane) and moves with the body.
+ * The bounds are the union of its parts' exact boxes in the model's frame (`userData.footprint`, measured from their vertices
+ * once per body: the vertices may have left the CPU since).
  */
 export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBasicMaterial> {
-  model.updateWorldMatrix(true, true);
-  const bounds = new Box3().setFromObject(model, true).applyMatrix4(model.matrixWorld.clone().invert());
+  const bounds = new Box3(), part = new Box3();
+  model.traverse(object => {
+    const footprint: unknown = object.userData.footprint;
+    if (Array.isArray(footprint) && footprint.length === 6) bounds.union(part.set(new Vector3().fromArray(footprint as number[]), new Vector3().fromArray(footprint as number[], 3)));
+  });
+  if (bounds.isEmpty()) throw Error('Car model has no measured parts for its contact shadow');
   const halfX = (bounds.max.x - bounds.min.x) / 2, halfZ = (bounds.max.z - bounds.min.z) / 2;
   const sizeX = 2 * (halfX + SPREAD_M), sizeZ = 2 * (halfZ + SPREAD_M);
   const width = Math.max(8, Math.round(sizeX * TEXELS_PER_M)), height = Math.max(8, Math.round(sizeZ * TEXELS_PER_M));
