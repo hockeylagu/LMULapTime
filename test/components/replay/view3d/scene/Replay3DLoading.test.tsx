@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { Replay3DLoading, Replay3DStreaming } from '../../../../../src/components/replay/view3d/laps/Replay3DLoading.js';
-import { describeLoad, NO_LOAD_PROGRESS } from '../../../../../src/components/replay/view3d/laps/loadProgress.js';
+import { Replay3DLoading, Replay3DStreaming } from '../../../../../src/components/replay/view3d/scene/Replay3DLoading.js';
+import { describeLoad, NO_LOAD_PROGRESS } from '../../../../../src/components/replay/view3d/scene/loadProgress.js';
 
 const started = {...NO_LOAD_PROGRESS, track: 1};
 

@@ -1,6 +1,6 @@
 import { Euler, Quaternion } from 'three';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
-import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import { findIndexAtDistance } from '../../../../utils/lapAlignment.js';
 
 export interface RenderPose { x: number; y: number; z: number; yaw?: number; orientation?: Quaternion; index: number; fraction: number }
 

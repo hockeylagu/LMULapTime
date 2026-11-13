@@ -1,6 +1,6 @@
 import { Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
-import { isContinuousPose } from './replayPose.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import { isContinuousPose } from '../scene/replayPose.js';
 
 const UP = new Vector3(0, 1, 0);
 

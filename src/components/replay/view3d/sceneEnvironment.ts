@@ -1,5 +1,5 @@
 import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, LinearMipmapLinearFilter, MathUtils, Mesh, MeshBasicMaterial, NoToneMapping, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
-import { nativeToScene } from './sceneFrame.js';
+import { nativeToScene } from './scene/sceneFrame.js';
 import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
 import { holdCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
 import { shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';

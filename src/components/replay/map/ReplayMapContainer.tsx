@@ -10,9 +10,9 @@ import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { GpsMapModeBar } from './display/GpsMapModeBar.js';
 import { useStoredToggle } from './useStoredToggle.js';
 import { GhostSyncContext, ghostSyncControls, useGhostSync } from '../inspector/ghostSyncContext.js';
-import { Replay3DLoading } from '../view3d/laps/Replay3DLoading.js';
+import { Replay3DLoading } from '../view3d/scene/Replay3DLoading.js';
 
-const Replay3DView = lazy(() => import('../view3d/Replay3DView.js'));
+const Replay3DView = lazy(() => import('../view3d/laps/Replay3DView.js'));
 
 export interface ReplayMapContainerProps {
   trajectory: ReplayTrajectoryData | null;

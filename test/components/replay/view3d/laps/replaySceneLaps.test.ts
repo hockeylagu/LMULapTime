@@ -2,8 +2,8 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { descriptorTexturePath } from '../../../../../shared/packageContract/index.js';
 import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene, type ShaderMaterial } from 'three';
-import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
-import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
+import { createReplayScene } from '../../../../../src/components/replay/view3d/laps/replayScene.js';
+import { disposeObjects } from '../../../../../src/components/replay/view3d/scene/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import { isStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import { SUN_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';

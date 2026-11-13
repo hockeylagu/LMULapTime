@@ -1,8 +1,8 @@
 import { expect, it, vi } from 'vitest';
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
-import { makeCar, setCameraDistance, setCockpitView } from '../../../../src/components/replay/view3d/sceneObjects.js';
-import { disposeObjects } from '../../../../src/components/replay/view3d/laps/disposeObjects.js';
-import { rigModel } from '../../../helpers/scenes/rigModel.js';
+import { makeCar, setCameraDistance, setCockpitView } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { disposeObjects } from '../../../../../src/components/replay/view3d/scene/disposeObjects.js';
+import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 
 it('places the textured model at the replay pose and adds a hidden pose marker', () => {
   const car = makeCar('#38bdf8', false, rigModel()), envelope = car.getObjectByName('body-envelope')!;

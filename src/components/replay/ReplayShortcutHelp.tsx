@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../utils/replayShortcuts.js';
 import { useModalFocus } from '../common/useModalFocus.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
-import { CAMERA_MODES } from './view3d/cameraModes.js';
+import { CAMERA_MODES } from './view3d/camera/cameraModes.js';
 
 const shortcuts = [
   ['Shift + wheel', 'Zoom around the mouse'], ['Shift + drag', 'Zoom into a range'],

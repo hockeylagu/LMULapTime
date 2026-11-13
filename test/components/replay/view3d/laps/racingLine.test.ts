@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M, syncRacingLine } from '../../../../src/components/replay/view3d/racingLine.js';
-import { getHeatmapColor } from '../../../../src/components/replay/map/replayMapUtils.js';
-import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { inverseToneCurve, toneCurve } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M, syncRacingLine } from '../../../../../src/components/replay/view3d/laps/racingLine.js';
+import { getHeatmapColor } from '../../../../../src/components/replay/map/replayMapUtils.js';
+import { TELEMETRY_COLORS } from '../../../../../src/utils/themeColors.js';
+import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
+import { inverseToneCurve, toneCurve } from '../../../../../src/components/replay/view3d/autoExposure.js';
 
 const curve = {a: 2.5, b: 0.6}, display = {toneCurve: curve, outputGamma: 1};
 

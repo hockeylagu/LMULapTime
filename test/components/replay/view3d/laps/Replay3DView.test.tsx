@@ -1,20 +1,20 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import Replay3DView from '../../../../src/components/replay/view3d/Replay3DView.js';
-import { createReplayScene } from '../../../../src/components/replay/view3d/replayScene.js';
-import { fetchSceneryLayout } from '../../../../src/api/sceneryApi.js';
-import { fetchBody } from '../../../../src/api/vehicles/bodyApi.js';
-import { CAMERA_MODES } from '../../../../src/components/replay/view3d/cameraModes.js';
-import { ReplayShortcutHelp } from '../../../../src/components/replay/ReplayShortcutHelp.js';
-import { replayShortcutBlocked } from '../../../../src/utils/replayShortcuts.js';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../src/components/replay/inspector/replayPlaybackCursor.js';
+import Replay3DView from '../../../../../src/components/replay/view3d/laps/Replay3DView.js';
+import { createReplayScene } from '../../../../../src/components/replay/view3d/laps/replayScene.js';
+import { fetchSceneryLayout } from '../../../../../src/api/sceneryApi.js';
+import { fetchBody } from '../../../../../src/api/vehicles/bodyApi.js';
+import { CAMERA_MODES } from '../../../../../src/components/replay/view3d/camera/cameraModes.js';
+import { ReplayShortcutHelp } from '../../../../../src/components/replay/ReplayShortcutHelp.js';
+import { replayShortcutBlocked } from '../../../../../src/utils/replayShortcuts.js';
+import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
+import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../../src/components/replay/inspector/replayPlaybackCursor.js';
 
 const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
-vi.mock('../../../../src/components/replay/view3d/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
+vi.mock('../../../../../src/components/replay/view3d/laps/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
 const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
-vi.mock('../../../../src/api/sceneryApi.js', () => ({fetchSceneryLayout: vi.fn(async () => layout)}));
-vi.mock('../../../../src/api/vehicles/bodyApi.js', () => ({fetchBody: vi.fn(async (vehicleId: string) => ({vehicleId}))}));
+vi.mock('../../../../../src/api/sceneryApi.js', () => ({fetchSceneryLayout: vi.fn(async () => layout)}));
+vi.mock('../../../../../src/api/vehicles/bodyApi.js', () => ({fetchBody: vi.fn(async (vehicleId: string) => ({vehicleId}))}));
 
 const trajectory: ReplayTrajectoryData = {replayName: 'test', pointsCount: 7, layoutKey: 'portimao_wec', geometryRevision: 'g', vehicleIdentity: {vehicleId: 'CAR_VEH'},
   bounds: {minX: 0, maxX: 6, minZ: 0, maxZ: 0, spanX: 6, spanZ: 0},

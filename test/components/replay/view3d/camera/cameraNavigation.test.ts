@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three';
-import { MAX_CAMERA_DISTANCE, MIN_CAMERA_DISTANCE, panCamera, zoomCamera } from '../../../../src/components/replay/view3d/cameraNavigation.js';
+import { MAX_CAMERA_DISTANCE, MIN_CAMERA_DISTANCE, panCamera, zoomCamera } from '../../../../../src/components/replay/view3d/camera/cameraNavigation.js';
 
 it('zooms perspective about its target, reversibly and within orbit limits', () => {
   const target = new Vector3(5, 2, -8), camera = new PerspectiveCamera(48);

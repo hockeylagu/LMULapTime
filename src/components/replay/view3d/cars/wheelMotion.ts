@@ -1,5 +1,5 @@
-import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
-import { isContinuousPose } from './replayPose.js';
+import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import { isContinuousPose } from '../scene/replayPose.js';
 
 /**
  * Tyre surface speed over road speed, `1 + slip ratio` from the live capture (SAE: -1 locked, >0 spinning).

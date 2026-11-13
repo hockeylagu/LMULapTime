@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three';
-import { computeChaseTargetYaw, createChaseCameraTracker, trackCamera } from '../../../../src/components/replay/view3d/cameraTracking.js';
-import { panCamera, zoomCamera } from '../../../../src/components/replay/view3d/cameraNavigation.js';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
+import { computeChaseTargetYaw, createChaseCameraTracker, trackCamera } from '../../../../../src/components/replay/view3d/camera/cameraTracking.js';
+import { panCamera, zoomCamera } from '../../../../../src/components/replay/view3d/camera/cameraNavigation.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 
 it.each([new PerspectiveCamera(48), new OrthographicCamera(-80, 80, 80, -80)])('keeps manual orbit, pan and zoom offsets while following elevation and position', camera => {
   const previous = new Vector3(100, 10, 200), next = new Vector3(110, 13, 190), focus = previous.clone();

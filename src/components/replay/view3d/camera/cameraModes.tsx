@@ -1,11 +1,11 @@
 import React, { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { Camera } from 'lucide-react';
-import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
-import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../common/dropdown/dropdownStyles.js';
+import { replayShortcutBlocked } from '../../../../utils/replayShortcuts.js';
+import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../../common/dropdown/dropdownStyles.js';
 import { isDriverCamera } from './driverCameras.js';
-import type { SceneryCameraType } from '../../../../shared/types/scenes/scenery.js';
-import type { ShadowCascadeSet } from './shadows/shadowCascades.js';
+import type { SceneryCameraType } from '../../../../../shared/types/scenes/scenery.js';
+import type { ShadowCascadeSet } from '../shadows/shadowCascades.js';
 
 export type CameraMode = 'follow' | 'chase' | 'cockpit' | 'hood' | 'roof' | 'orbit' | 'trackside' | 'top';
 export const CAMERA_MODES: ReadonlyArray<{value: CameraMode; label: string; shortcut: string}> = [

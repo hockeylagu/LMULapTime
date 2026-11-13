@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
-import { createWheelTravel } from '../../../../src/components/replay/view3d/wheelMotion.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import { createWheelTravel } from '../../../../../src/components/replay/view3d/cars/wheelMotion.js';
 
 const a: ReplayTrajectoryPoint = {x: 0, y: 1, z: 0, rotY: 0, timeSec: 0};
 const b: ReplayTrajectoryPoint = {...a, z: -10, timeSec: 1};

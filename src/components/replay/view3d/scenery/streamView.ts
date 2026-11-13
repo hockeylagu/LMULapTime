@@ -1,5 +1,5 @@
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
-import type { CameraMode } from '../cameraModes.js';
+import type { CameraMode } from '../camera/cameraModes.js';
 import type { StreamView } from './residency.js';
 
 /** Re-plan residency only after the view moved this far: chunks are hundreds of metres long. */

@@ -6,8 +6,8 @@ import { fetchBody, type LoadedBody } from '../../../../api/vehicles/bodyApi.js'
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import type { RaceClock } from '../../race/raceClock.js';
 import type { RacePoseCache } from '../../race/racePoseCache.js';
-import type { CameraMode } from '../cameraModes.js';
-import { NO_LOAD_PROGRESS, type SceneLoadProgress } from '../laps/loadProgress.js';
+import type { CameraMode } from '../camera/cameraModes.js';
+import { NO_LOAD_PROGRESS, type SceneLoadProgress } from '../scene/loadProgress.js';
 import { createRaceScene, type RaceSceneHandle } from './raceScene.js';
 
 interface Options {

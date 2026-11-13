@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { createTracksideCameras } from '../../../../src/components/replay/view3d/tracksideCameras.js';
+import { createTracksideCameras } from '../../../../../src/components/replay/view3d/camera/tracksideCameras.js';
 
 it('places fixed spots to the left of travel, ahead of the stretch each one covers', () => {
   // Driving native -Z (forward) for 1 km: the car's left is native +X, which the scene keeps as +X.

@@ -3,7 +3,7 @@ import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.j
 import type { VehicleHandlingCalibration } from '../../../../../shared/types/dataPlugin.js';
 import { RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import { getSteerAngleDeg } from '../../../../../shared/domain/formatters.js';
-import { createWheelAnimation, type WheelAnimation } from '../wheelAnimation.js';
+import { createWheelAnimation, type WheelAnimation } from '../cars/wheelAnimation.js';
 import { createLampStates, type LampStates } from '../car/lampStates.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 

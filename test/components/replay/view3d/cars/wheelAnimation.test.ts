@@ -1,11 +1,11 @@
 import { expect, it, vi } from 'vitest';
 import { Group, Quaternion, Vector3 } from 'three';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { makeCar } from '../../../../src/components/replay/view3d/sceneObjects.js';
-import { createWheelAnimation } from '../../../../src/components/replay/view3d/wheelAnimation.js';
-import { sampleRenderPose } from '../../../../src/components/replay/view3d/replayPose.js';
-import { attachWheelRigs } from '../../../../src/components/replay/view3d/wheelGeometry.js';
-import { rigModel } from '../../../helpers/scenes/rigModel.js';
+import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { createWheelAnimation } from '../../../../../src/components/replay/view3d/cars/wheelAnimation.js';
+import { sampleRenderPose } from '../../../../../src/components/replay/view3d/scene/replayPose.js';
+import { attachWheelRigs } from '../../../../../src/components/replay/view3d/cars/wheelGeometry.js';
+import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 
 const lap: ReplayTrajectoryData = {replayName: 'test', pointsCount: 2, bounds: {minX: 0, maxX: 0, minZ: -5, maxZ: 0, spanX: 0, spanZ: 5}, points: [
   {x: 0, y: 0.33, z: 0, rotX: 0, rotY: 0, rotZ: 0, timeSec: 0},

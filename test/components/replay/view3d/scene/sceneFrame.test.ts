@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Group, OrthographicCamera, Vector3 } from 'three';
-import { nativeToScene } from '../../../../src/components/replay/view3d/sceneFrame.js';
+import { nativeToScene } from '../../../../../src/components/replay/view3d/scene/sceneFrame.js';
 
 it('matches the 2D map handedness: native +X is right and native +Z is up', () => {
   const origin = {x: 10, y: 20, z: 30};

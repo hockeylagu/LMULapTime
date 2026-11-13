@@ -1,9 +1,9 @@
 import { Quaternion, Vector3, type Group, type Object3D } from 'three';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { attachWheelRigs, type WheelRig } from './wheelGeometry.js';
 import { createSteerAngle, createSteeringWheelAngle, createWheelTravel, type WheelLap } from './wheelMotion.js';
-import { isContinuousPose, sampleRenderPose, type RenderPose } from './replayPose.js';
-import type { SurfaceHeight } from './scenery/sceneryGround.js';
+import { isContinuousPose, sampleRenderPose, type RenderPose } from '../scene/replayPose.js';
+import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 
 export interface WheelAnimation { update(pose: RenderPose): void; refreshHeights(): void; description: string }
 /** Bounds only the road-contact estimate; measured suspension travel is drawn as recorded. */

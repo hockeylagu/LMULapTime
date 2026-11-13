@@ -1,16 +1,16 @@
 import { Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
-import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import type { MapColorMode } from '../map/replayMapUtils.js';
-import { ghostDistanceAt, type GhostSyncMode } from '../map/ghostSync.js';
-import { sampleRenderPose, sampleStationPose } from './replayPose.js';
-import { nativeToScene } from './sceneFrame.js';
-import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
-import { setCameraDistance } from './sceneObjects.js';
-import type { CameraMode } from './cameraModes.js';
-import type { SceneLoadProgress } from './laps/loadProgress.js';
-import { stationAt } from './scenery/streamView.js';
-import { createSceneShell, type SceneContent } from './scene/sceneShell.js';
+import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
+import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
+import type { MapColorMode } from '../../map/replayMapUtils.js';
+import { ghostDistanceAt, type GhostSyncMode } from '../../map/ghostSync.js';
+import { sampleRenderPose, sampleStationPose } from '../scene/replayPose.js';
+import { nativeToScene } from '../scene/sceneFrame.js';
+import { createLapLayerLoader, type LapCars, type LapLayer } from './lapLayer.js';
+import { setCameraDistance } from '../cars/sceneObjects.js';
+import type { CameraMode } from '../camera/cameraModes.js';
+import type { SceneLoadProgress } from '../scene/loadProgress.js';
+import { stationAt } from '../scenery/streamView.js';
+import { createSceneShell, type SceneContent } from '../scene/sceneShell.js';
 
 export interface ReplaySceneHandle {
   wheelMotion: string;

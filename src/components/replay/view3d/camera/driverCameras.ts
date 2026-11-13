@@ -1,5 +1,5 @@
 import { Euler, Vector3, type Object3D } from 'three';
-import type { CarCamera } from '../../../../shared/types/scenes/car.js';
+import type { CarCamera } from '../../../../../shared/types/scenes/car.js';
 
 /**
  * Car-mounted cameras, named by the car descriptor after their role: the driver's eye (`cockpit`, cockpit mesh `in`), the bonnet camera

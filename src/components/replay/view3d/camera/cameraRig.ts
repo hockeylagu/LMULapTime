@@ -4,9 +4,9 @@ import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from 
 import type { CameraMode } from './cameraModes.js';
 import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
-import type { LoadedBody } from '../../../api/vehicles/bodyApi.js';
-import { setCockpitView } from './sceneObjects.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import { setCockpitView } from '../cars/sceneObjects.js';
 import { createTracksideCameras } from './tracksideCameras.js';
 
 const DEFAULT_CHASE_DISTANCE_M = 7.8;

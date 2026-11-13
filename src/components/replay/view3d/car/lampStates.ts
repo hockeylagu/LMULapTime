@@ -1,7 +1,7 @@
 import { Mesh, ShaderMaterial, type Material, type Object3D, type Texture } from 'three';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
-import type { RenderPose } from '../replayPose.js';
+import type { RenderPose } from '../scene/replayPose.js';
 
 type LampStatesRow = NonNullable<CarLamp['states']>;
 

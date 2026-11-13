@@ -1,11 +1,11 @@
 import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, type Vector3 } from 'three';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { computeBaselineDeltaByIdx, computeGainLossByIdx, getHeatmapColor, type MapColorMode } from '../map/replayMapUtils.js';
-import { computeLapComparisons } from '../../../utils/replayComparison.js';
-import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../utils/lapAlignment.js';
-import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
-import type { SurfaceHeight } from './scenery/sceneryGround.js';
-import { inverseToneCurve, type DisplayTransform } from './autoExposure.js';
+import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
+import { computeBaselineDeltaByIdx, computeGainLossByIdx, getHeatmapColor, type MapColorMode } from '../../map/replayMapUtils.js';
+import { computeLapComparisons } from '../../../../utils/replayComparison.js';
+import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
+import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
+import type { SurfaceHeight } from '../scenery/sceneryGround.js';
+import { inverseToneCurve, type DisplayTransform } from '../autoExposure.js';
 
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
 export const RACING_LINE_WIDTH_M = 0.6;

@@ -15,7 +15,7 @@ import { RacePlaybackBar } from './RacePlaybackBar.js';
 import { useRaceReplayKeys, useRaceUrlSync } from './useRaceReplayControls.js';
 import { RaceReplayHeader } from './RaceReplayHeader.js';
 import { initialRaceTime } from './raceLaps.js';
-import { Replay3DLoading } from '../view3d/laps/Replay3DLoading.js';
+import { Replay3DLoading } from '../view3d/scene/Replay3DLoading.js';
 
 const Race3DView = lazy(() => import('./Race3DView.js'));
 

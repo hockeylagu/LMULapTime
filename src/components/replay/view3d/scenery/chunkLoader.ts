@@ -3,7 +3,7 @@ import { Mesh, type Material, type Object3D, type WebGLRenderer } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import type { SceneryChunk, SceneryTexture } from '../../../../../shared/types/scenes/scenery.js';
 import { fetchSceneryChunk, SCENERY_FILES } from '../../../../api/sceneryApi.js';
-import { disposeObjects } from '../laps/disposeObjects.js';
+import { disposeObjects } from '../scene/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
 import { configureSurfaceMaterial, createSharedSurfaceMaterials } from './materials/configureSurfaceMaterial.js';
 import { createSurfaceTexturePool, imageUriMap } from './materials/textureSource.js';

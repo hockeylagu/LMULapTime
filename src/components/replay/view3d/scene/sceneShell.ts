@@ -2,11 +2,11 @@ import { Box3, Group, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, 
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
-import type { RenderPose } from '../replayPose.js';
+import type { RenderPose } from './replayPose.js';
 import type { CarTextures } from '../laps/lapLayer.js';
-import { disposeObjects } from '../laps/disposeObjects.js';
-import { exposureType, shadowCascadeSet, type CameraMode } from '../cameraModes.js';
-import { createCameraRig, type CameraRig } from '../cameraRig.js';
+import { disposeObjects } from './disposeObjects.js';
+import { exposureType, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
+import { createCameraRig, type CameraRig } from '../camera/cameraRig.js';
 import { addSceneEnvironment, sceneSun, VENUE_PROBE_PX } from '../sceneEnvironment.js';
 import { linkPrefilters } from '../prefilterLink.js';
 import { linkConvolution } from '../reflectionCube.js';
@@ -15,14 +15,14 @@ import { CAR_REFLECTION_PX, CAR_REFLECTION_STEPS, createCarReflection } from '..
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
 import { createSceneryBatches } from '../scenery/sceneryBatches.js';
-import { NO_LOAD_PROGRESS, type SceneLoadProgress } from '../laps/loadProgress.js';
+import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
-import type { WheelAnimation } from '../wheelAnimation.js';
+import type { WheelAnimation } from '../cars/wheelAnimation.js';
 import { createSceneryStream } from '../scenery/sceneryStream.js';
 import { createSceneWarmup } from '../scenery/sceneWarmup.js';
 import { startStreaming } from '../scenery/materials/mipStreaming.js';
-import { isDriverCamera } from '../driverCameras.js';
+import { isDriverCamera } from '../camera/driverCameras.js';
 import { isFreeCameraMode, viewMoved } from '../scenery/streamView.js';
 
 /** What a scene shows on the circuit: the lap view's cars and lines, or the race replay's cars. */

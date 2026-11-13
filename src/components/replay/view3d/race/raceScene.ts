@@ -6,14 +6,14 @@ import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '..
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { raceClassTone } from '../../race/raceClassTone.js';
 import { createLapLayerLoader } from '../laps/lapLayer.js';
-import { disposeObjects } from '../laps/disposeObjects.js';
-import type { SceneLoadProgress } from '../laps/loadProgress.js';
-import type { CameraMode } from '../cameraModes.js';
-import { isDriverCamera } from '../driverCameras.js';
-import type { RenderPose } from '../replayPose.js';
-import { nativeToScene } from '../sceneFrame.js';
+import { disposeObjects } from '../scene/disposeObjects.js';
+import type { SceneLoadProgress } from '../scene/loadProgress.js';
+import type { CameraMode } from '../camera/cameraModes.js';
+import { isDriverCamera } from '../camera/driverCameras.js';
+import type { RenderPose } from '../scene/replayPose.js';
+import { nativeToScene } from '../scene/sceneFrame.js';
 import { createSceneShell, type SceneContent } from '../scene/sceneShell.js';
-import { setCameraDistance } from '../sceneObjects.js';
+import { setCameraDistance } from '../cars/sceneObjects.js';
 import { createRaceCarMotion, freezeCar, updateCarMatrices, windowPoints, type RaceCarMotion } from './raceCarMotion.js';
 import { createFieldBatches, type FieldCar } from './fieldBatches.js';
 

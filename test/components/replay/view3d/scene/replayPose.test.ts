@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { sampleRenderPose, sampleStationPose } from '../../../../src/components/replay/view3d/replayPose.js';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
+import { sampleRenderPose, sampleStationPose } from '../../../../../src/components/replay/view3d/scene/replayPose.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 
 const points: ReplayTrajectoryPoint[] = [
   {x: 0, y: 4, z: 0, rotY: 0, timeSec: 0}, {x: 10, y: 6, z: 0, rotY: 0.2, timeSec: 0.2},

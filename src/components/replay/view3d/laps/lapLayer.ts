@@ -16,12 +16,12 @@ import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
 import { createGhostClock } from '../../map/ghostSync.js';
-import { makeCar } from '../sceneObjects.js';
-import { createWheelAnimation } from '../wheelAnimation.js';
-import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine, syncRacingLine } from '../racingLine.js';
+import { makeCar } from '../cars/sceneObjects.js';
+import { createWheelAnimation } from '../cars/wheelAnimation.js';
+import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine, syncRacingLine } from './racingLine.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { DisplayTransform } from '../autoExposure.js';
-import { disposeObjects } from './disposeObjects.js';
+import { disposeObjects } from '../scene/disposeObjects.js';
 
 export interface LapCars {
   primary: LoadedBody;

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { Euler, Group, Quaternion, Vector3 } from 'three';
-import type { CarCamera } from '../../../../shared/types/scenes/car.js';
-import { driverCamera, driverPose, isDriverCamera } from '../../../../src/components/replay/view3d/driverCameras.js';
+import type { CarCamera } from '../../../../../shared/types/scenes/car.js';
+import { driverCamera, driverPose, isDriverCamera } from '../../../../../src/components/replay/view3d/camera/driverCameras.js';
 
 const camera = (name: CarCamera['name'], position: [number, number, number], orientation: [number, number, number] = [0, 0, 0]): CarCamera =>
   ({ name, position, orientation, fov: [89, 49], clipPlanes: [0.1, 700], cockpitView: name === 'cockpit' ? 'in' : 'out' });

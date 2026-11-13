@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import { createRaceCarMotion, windowPoints } from '../../../../../src/components/replay/view3d/race/raceCarMotion.js';
-import { makeCar } from '../../../../../src/components/replay/view3d/sceneObjects.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
 import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 
 const channel = (name: typeof RACE_POSE_CHANNELS[number]) => RACE_POSE_CHANNELS.indexOf(name);

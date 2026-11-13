@@ -4,7 +4,7 @@ import { ReplayMapContainer } from '../../../../src/components/replay/map/Replay
 import { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/types.js';
 
-vi.mock('../../../../src/components/replay/view3d/Replay3DView.js', () => ({
+vi.mock('../../../../src/components/replay/view3d/laps/Replay3DView.js', () => ({
   default: ({ onReturnTo2D, isExpanded, onToggleExpanded }: { onReturnTo2D: () => void; isExpanded?: boolean; onToggleExpanded?: (e: boolean) => void }) => (
     <div data-testid="mock-3d-view" data-map-expanded={isExpanded ? '' : undefined}>
       <button type="button" aria-label="Switch to 2D view" onClick={onReturnTo2D}>2D</button>

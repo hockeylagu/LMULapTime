@@ -1,31 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import type { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
-import { MapFullscreenButton } from '../map/display/MapFullscreenButton.js';
-import { MapViewSwitchButton } from '../map/display/MapViewSwitchButton.js';
-import { MapControlsOverlay } from '../map/MapControlsOverlay.js';
-import { GpsCircuitMinimap } from '../map/GpsCircuitMinimap.js';
-import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
-import { GpsMapTelemetryHud } from '../map/display/GpsMapTelemetryHud.js';
-import { GpsMapTelemetryDock } from '../map/telemetry/GpsMapTelemetryDock.js';
-import { GpsMapExpandedOverlays } from '../map/display/GpsMapExpandedOverlays.js';
-import { ReplayFrictionCircle } from '../map/ReplayFrictionCircle.js';
-import { HeatmapLegendBar } from '../map/HeatmapLegendBar.js';
-import { useGpsSceneDynamics } from '../map/scene/useGpsSceneDynamics.js';
-import { GpsMapModeBar } from '../map/display/GpsMapModeBar.js';
-import { useStoredToggle } from '../map/useStoredToggle.js';
+import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
+import type { TrackBoundaryGeometry } from '../../../../../shared/types/trackGeometry.js';
+import { MapFullscreenButton } from '../../map/display/MapFullscreenButton.js';
+import { MapViewSwitchButton } from '../../map/display/MapViewSwitchButton.js';
+import { MapControlsOverlay } from '../../map/MapControlsOverlay.js';
+import { GpsCircuitMinimap } from '../../map/GpsCircuitMinimap.js';
+import { ReplayTelemetryHud } from '../../inspector/ReplayTelemetryHud.js';
+import { GpsMapTelemetryHud } from '../../map/display/GpsMapTelemetryHud.js';
+import { GpsMapTelemetryDock } from '../../map/telemetry/GpsMapTelemetryDock.js';
+import { GpsMapExpandedOverlays } from '../../map/display/GpsMapExpandedOverlays.js';
+import { ReplayFrictionCircle } from '../../map/ReplayFrictionCircle.js';
+import { HeatmapLegendBar } from '../../map/HeatmapLegendBar.js';
+import { useGpsSceneDynamics } from '../../map/scene/useGpsSceneDynamics.js';
+import { GpsMapModeBar } from '../../map/display/GpsMapModeBar.js';
+import { useStoredToggle } from '../../map/useStoredToggle.js';
 import {
   projectTrajectoryPoints, projectBoundaryPoints, computeTrackBoundaryPathD, buildContinuousSvgPath,
   type MapColorMode,
-} from '../map/replayMapUtils.js';
-import { useReplayScene } from './laps/useReplayScene.js';
-import { Replay3DLoading, Replay3DStreaming } from './laps/Replay3DLoading.js';
-import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from './cameraModes.js';
-import { useGpsMapShortcuts } from '../map/useGpsMapShortcuts.js';
-import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
-import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../inspector/ghostSyncContext.js';
-import { nextGhostSyncMode } from '../map/ghostSync.js';
+} from '../../map/replayMapUtils.js';
+import { useReplayScene } from './useReplayScene.js';
+import { Replay3DLoading, Replay3DStreaming } from '../scene/Replay3DLoading.js';
+import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
+import { useGpsMapShortcuts } from '../../map/useGpsMapShortcuts.js';
+import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
+import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../../inspector/ghostSyncContext.js';
+import { nextGhostSyncMode } from '../../map/ghostSync.js';
 
 interface Props {
   trajectory: ReplayTrajectoryData;

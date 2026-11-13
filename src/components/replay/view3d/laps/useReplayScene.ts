@@ -4,11 +4,11 @@ import { fetchSceneryLayout } from '../../../../api/sceneryApi.js';
 import { fetchBody, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import { ReplayPlaybackCursorContext } from '../../inspector/replayPlaybackCursor.js';
-import { createReplayScene, type ReplaySceneHandle } from '../replayScene.js';
+import { createReplayScene, type ReplaySceneHandle } from './replayScene.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
-import type { CameraMode } from '../cameraModes.js';
+import type { CameraMode } from '../camera/cameraModes.js';
 import type { GhostSyncMode } from '../../map/ghostSync.js';
-import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
+import { NO_LOAD_PROGRESS, type SceneLoadProgress } from '../scene/loadProgress.js';
 
 interface Options {
   host: RefObject<HTMLDivElement | null>;
