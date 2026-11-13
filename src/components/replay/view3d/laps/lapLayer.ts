@@ -8,6 +8,7 @@ import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { descriptorTexturePath, normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
 import { carMaterialKey, createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
 import { batchCarParts } from '../car/carBatches.js';
+import { cockpitVolumeTexture } from '../car/cockpitOcclusion.js';
 import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp } from '../car/carLamps.js';
 import { createLampStates, flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
@@ -149,7 +150,13 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       ? [[descriptorTexturePath(row.sha256), {path: descriptorTexturePath(row.start.sha256), skip: row.levels - row.start.levels}] as const] : []));
     const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
       [path, await carTextures.load(path, interior, frames.has(path) ? undefined : starts.get(path))] as const)));
-    return {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
+    // The cabin volumes, built once a livery; each material samples its own copy of the same source.
+    const volumes = new Map(car.resource.volumes.map(row => {
+      const path = `volumes/${row.sha256}.bin`, bytes = car.volumes.get(path);
+      if (!bytes) throw Error(`Car ${car.vehicleId} has no cabin volume ${path}`);
+      return [path, cockpitVolumeTexture(bytes, row)] as const;
+    }));
+    return {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
@@ -164,11 +171,16 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, interiorPaths, hiddenNames} = await partsOf(car);
+    const {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths, hiddenNames} = await partsOf(car);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
       carTextures.copied(copy, original, interiorPaths.get(path) === true);
       return copy;
+    };
+    const volumeOf = (path: string) => {
+      const original = volumes.get(path);
+      if (!original) throw Error(`Car ${car.vehicleId} declares no cabin volume ${path}`);
+      return original.clone();
     };
     const model = template.clone(true), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
@@ -178,7 +190,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const replace = (material: Material) => {
       const recipe = recipeOf(material), key = carMaterialKey(recipe, appearance);
       let created = materials.get(key);
-      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading); materials.set(key, created); }
+      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading, volumeOf); materials.set(key, created); }
       return created;
     };
     for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, [...drawn, ...surfaces], rainFlashes, (lamp, current) => {

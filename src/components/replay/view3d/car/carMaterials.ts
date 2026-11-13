@@ -1,4 +1,4 @@
-import { DoubleSide, MeshPhysicalMaterial, MeshStandardMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
+import { DoubleSide, MeshPhysicalMaterial, type Data3DTexture, MeshStandardMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
@@ -8,6 +8,7 @@ import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
 import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
 import { configureCarPaint, PAINT_MAPS } from './carPaint.js';
 import { bindCarSurfaceReflection } from './carReflection.js';
+import { bindCockpitOcclusion } from './cockpitOcclusion.js';
 
 const UV_CHANNEL: Record<string, number> = { uv0: 0, uv1: 1, uv2: 2, uv3: 3 };
 
@@ -56,7 +57,7 @@ export function materialTexturePaths(recipe: CarMaterialRecipe, appearance: CarA
  * them with one. Car files often repeat a material under several names (one per part).
  */
 export function carMaterialKey(recipe: CarMaterialRecipe, appearance: CarAppearance): string {
-  return JSON.stringify([recipe.paint, recipe.paint ? appearance.paint : recipe.surface ?? null, albedoPath(recipe, appearance) ?? null]);
+  return JSON.stringify([recipe.paint, recipe.paint ? appearance.paint : recipe.surface ?? null, albedoPath(recipe, appearance) ?? null, recipe.reflectionOcclusion ?? null]);
 }
 
 /** The map's own copy of a shared texture: repeat-wrapped (car UVs keep their native range) and decoded by the map's colour role. */
@@ -75,9 +76,10 @@ function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Textur
  * appearance has one, else the recipe's own map. Car paint is layered paint (carPaint.ts); the other shader kinds
  * map to a standard or physical material with the albedo map.
  * `texture` returns a copy of the KTX2 texture at a `textures/<sha256>.ktx2.zst` path, the caller's to set up: each map has its own for its UV channel.
- * `shading` is the scenery package's shading section, read by the car paint.
+ * `shading` is the scenery package's shading section, read by the car paint. `volume` returns a copy of the cabin volume at a
+ * `volumes/<sha256>.bin` path, for a material with a cockpit reflection occlusion (cockpitOcclusion.ts).
  */
-export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture, shading: SceneryShading): MeshStandardMaterial {
+export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture, shading: SceneryShading, volume?: (path: string) => Data3DTexture): MeshStandardMaterial {
   const config = recipe.paint ? appearance.paint : recipe.surface;
   if (!config) throw Error(`Car material ${recipe.name} has no shader configuration`);
   const surface = nativeSurface(recipe, appearance);
@@ -139,5 +141,12 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   }
   material.shadowSide = DoubleSide;
   material.name = recipe.name;
+  const occlusion = recipe.reflectionOcclusion;
+  if (occlusion) {
+    if (!volume) throw Error(`Car material ${recipe.name}: no cabin volume for its reflection occlusion`);
+    const loaded = volume(occlusion.volume);
+    bindCockpitOcclusion(material, {volume: loaded, box: occlusion}, surface ? 'surface' : 'standard');
+    material.addEventListener('dispose', () => { loaded.dispose(); });
+  }
   return material;
 }

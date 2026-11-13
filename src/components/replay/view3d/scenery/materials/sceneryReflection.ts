@@ -43,6 +43,9 @@ export const SCENERY_REFLECTION_GLSL = `
   uniform samplerCube surface_reflection; uniform sampler2D surface_integration;
   uniform float surface_reflectionReady, surface_reflectionLodScale, surface_dielectricF0;
   float surfaceReflectionRoughness = 1.0, surfaceReflectionSpecular = 1.0; vec3 surfaceReflectionAlbedo = vec3(0.0);
+  #ifdef COCKPIT_OCCLUSION
+    float surfaceReflectionOcclusion = 1.0; // Set in \`main\` by a car material inside the cockpit (car/cockpitOcclusion.ts).
+  #endif
   void surfaceIndirectSpecular(const in vec3 radiance, const in vec3 irradiance, const in vec3 clearcoatRadiance, const in vec3 geometryPosition,
     const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in PhysicalMaterial material,
     inout ReflectedLight reflectedLight) {
@@ -54,6 +57,9 @@ export const SCENERY_REFLECTION_GLSL = `
     vec2 split = texture2D(surface_integration, vec2(saturate(dot(geometryNormal, geometryViewDir)), roughness)).rg;
     vec3 r = transformDirectionByInverseViewMatrix(reflect(-geometryViewDir, geometryNormal), viewMatrix);
     vec3 light = surface_reflectionReady > 0.5 ? textureLod(surface_reflection, r, surface_reflectionLodScale * roughness).rgb : radiance;
+    #ifdef COCKPIT_OCCLUSION
+      light *= cockpitReflectionScale(r, surfaceReflectionOcclusion);
+    #endif
     vec3 reflectance = mix(vec3(surfaceReflectionSpecular * (split.y + surface_dielectricF0 * split.x)), mix(surfaceReflectionAlbedo, vec3(1.0), split.y), material.metalness);
     reflectedLight.indirectSpecular += light * reflectance;
   }
