@@ -190,3 +190,29 @@ it.each([30, 60, 144])('keeps the chosen following distance on play and resume a
     expect(camera.position.distanceTo(pausedEye)).toBe(0);
   }
 });
+
+it('turns smoothly through a steady corner whose points lie unevenly apart', () => {
+  // A 60 m radius at 108 km/h, sampled alternately 0.4 m and 5 m apart, as a lap served at a point spacing is.
+  const radius = 60, speed = 30, points: ReplayTrajectoryPoint[] = [];
+  for (let s = 0, i = 0; s < 150; s += i++ % 2 ? 5 : 0.4) {
+    const angle = s / radius;
+    points.push({x: radius * (Math.cos(angle) - 1), y: 0, z: -radius * Math.sin(angle), timeSec: s / speed, rotY: angle, speedKmh: speed * 3.6});
+  }
+  const tracker = createChaseCameraTracker(), camera = new PerspectiveCamera(48), focus = new Vector3(), target = new Vector3();
+  camera.position.set(0, 2.2, -7.8); tracker.reset(target, 0, 0);
+  const steps: number[] = [];
+  let index = 0, previousYaw: number | undefined;
+  for (let t = 1 / 60; t < 4.5; t += 1 / 60) {
+    while (points[index + 1].timeSec! <= t) index++;
+    const a = points[index], b = points[index + 1], fraction = (t - a.timeSec!) / (b.timeSec! - a.timeSec!);
+    // The scene mirrors native Z.
+    target.set(a.x + (b.x - a.x) * fraction, 0, -(a.z + (b.z - a.z) * fraction));
+    tracker.track(camera, focus, target, a.rotY! + (b.rotY! - a.rotY!) * fraction, points, index, fraction, true);
+    const yaw = Math.atan2(focus.x - camera.position.x, focus.z - camera.position.z);
+    if (previousYaw !== undefined && t > 1.5) steps.push(Math.atan2(Math.sin(yaw - previousYaw), Math.cos(yaw - previousYaw)));
+    previousYaw = yaw;
+  }
+  // A steady corner turns the view by nearly the same step every frame once the lag has settled.
+  const change = Math.max(...steps.slice(1).map((step, i) => Math.abs(step - steps[i]))) * 180 / Math.PI;
+  expect(change).toBeLessThan(0.08); // 0.32 when the camera followed the movement from point to point
+});
