@@ -193,10 +193,15 @@ export async function createReplayScene(
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(sceneryRoot); scene.add(world);
+  // Nothing under the scenery moves: a chunk's root or a batch freezes once, when it first joins (a batch that leaves and returns
+  // keeps its matrices).
+  const frozen = new WeakSet<Object3D>(), freeze = (object: Object3D) => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; };
+  sceneryRoot.updateWorldMatrix(true, false); freeze(sceneryRoot);
   freezeScenery = () => {
-    sceneryRoot.traverse(object => { object.matrixWorldAutoUpdate = true; });
-    sceneryRoot.updateWorldMatrix(true, true);
-    sceneryRoot.traverse(object => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; });
+    for (const joined of sceneryRoot.children) {
+      if (frozen.has(joined)) continue;
+      frozen.add(joined); joined.updateWorldMatrix(false, true); joined.traverse(freeze);
+    }
   };
   freezeScenery();
   const showLayer = () => { world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root); rig.setLayer(layer); };
