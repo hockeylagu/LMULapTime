@@ -183,6 +183,21 @@ function timeAtDistance(track: RaceProgressTrack, slot: number, target: number, 
   return null;
 }
 
+/** First finite distance sample of `slot` in `[fromSec, toSec]`, when `fromSec` itself falls in a leading gap. */
+function firstProgressIn(track: RaceProgressTrack, slot: number, fromSec: number, toSec: number): { sec: number; distance: number } | null {
+  const exact = progressAt(track, slot, fromSec);
+  if (exact !== null) return { sec: fromSec, distance: exact };
+  const distances = track.bySlot.get(slot);
+  if (!distances) return null;
+  const first = Math.max(0, Math.ceil((fromSec - track.fromSec) * track.hz));
+  const last = Math.min(distances.length - 1, Math.floor((toSec - track.fromSec) * track.hz));
+  for (let i = first; i <= last; i++) {
+    const distance = distances[i];
+    if (distance !== null) return { sec: track.fromSec + i / track.hz, distance };
+  }
+  return null;
+}
+
 /**
  * Behind the class leader now, on the road: the time since the leader passed the car's place on the track, on the lap the
  * car is on. Null when either car is off the track or between laps, or the leader's lap has no such moment yet.
@@ -193,12 +208,13 @@ function liveGap(index: RaceStandingsIndex, slot: number, leaderSlot: number, ti
   const lap = index.lapsBySlot.get(slot)?.find(entry => entry.startSec <= timeSec && timeSec < entry.endSec);
   const leaderLap = lap && index.lapsBySlot.get(leaderSlot)?.find(entry => entry.lapNumber === lap.lapNumber);
   const here = progressAt(track, slot, timeSec);
-  const leaderStart = leaderLap ? progressAt(track, leaderSlot, leaderLap.startSec) : null;
-  if (!leaderLap || here === null || leaderStart === null) return null;
+  const leaderEnd = leaderLap ? Math.min(leaderLap.endSec, timeSec) : timeSec;
+  const leaderStart = leaderLap ? firstProgressIn(track, leaderSlot, leaderLap.startSec, leaderEnd) : null;
+  if (!leaderLap || here === null || !leaderStart) return null;
   // Each car's distance has its own zero: the leader reaches the car's place on the track this far into its lap.
   const length = track.trackLengthM;
-  const target = leaderStart + (((here - leaderStart) % length) + length) % length;
-  const passed = timeAtDistance(track, leaderSlot, target, leaderLap.startSec, Math.min(leaderLap.endSec, timeSec));
+  const target = leaderStart.distance + (((here - leaderStart.distance) % length) + length) % length;
+  const passed = timeAtDistance(track, leaderSlot, target, leaderStart.sec, leaderEnd);
   return passed === null ? null : { kind: 'time', sec: timeSec - passed };
 }
 

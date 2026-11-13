@@ -103,6 +103,31 @@ describe('raceStandingsAt', () => {
     expect(rows.find(row => row.car.slot === 3)!.gap).toEqual({ kind: 'laps', laps: 1 });
   });
 
+  it('computes live gaps even when the class leader starts slightly before its first progress sample', () => {
+    const progress = {
+      trackLengthM: 1000,
+      fromSec: 0,
+      hz: 1,
+      cars: [
+        // Leader lap 1 starts at 1.2s, while its first non-null 1 Hz sample is at t = 2s.
+        { slot: 1, distances: [null, null, 100, 150, 200, 250, 300] },
+        { slot: 2, distances: [null, null, 50, 100, 150, 200, 250] },
+      ],
+    };
+    const race = {
+      ...overview(),
+      cars: overview().cars.slice(0, 2).map(car => ({ ...car, carClass: 'GT3' })),
+      laps: [
+        { slot: 1, lapNumber: 1, startSec: 1.2, endSec: 20, lapTimeSec: 18.8, isValid: true },
+        { slot: 2, lapNumber: 1, startSec: 1.2, endSec: 21, lapTimeSec: 19.8, isValid: true },
+      ],
+      runningOrder: [{ timeSec: 0, order: [1, 2] }],
+    };
+    const rows = raceStandingsAt(indexRaceStandings(race, progress), 5);
+    expect(rows.find(row => row.car.slot === 1)!.gap).toEqual({ kind: 'leader' });
+    expect(rows.find(row => row.car.slot === 2)!.gap).toEqual({ kind: 'time', sec: 1 });
+  });
+
   it('compares best laps in practice and qualifying, valid laps only', () => {
     // The game orders qualifying by best lap.
     const rows = raceStandingsAt(indexRaceStandings({ ...overview('Qualifying'), runningOrder: [{ timeSec: 0, order: [1, 2, 3, 4] }] }), 600);
