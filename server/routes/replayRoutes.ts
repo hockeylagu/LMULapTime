@@ -1,3 +1,5 @@
+import { dataPlugin } from '../plugins/dataPlugin.js';
+import { resolveVehicleHandling } from '../../shared/domain/vehicles/handling.js';
 import path from 'path';
 import { Router } from 'express';
 import { ServerContext } from '../core/serverContext.js';
@@ -174,6 +176,7 @@ export function createReplayRouter(context: ServerContext): Router {
         cars: composed.drivers.flatMap(driver => typeof driver.slot === 'number' && driver.carClass !== SAFETY_CAR_CLASS ? [{
           slot: driver.slot, name: driver.name, carClass: driver.carClass, carNumber: driver.carNumber, team: driver.team,
           vehicleId: driver.vehicleId, isPlayer: driver.isPlayer,
+          handling: resolveVehicleHandling(dataPlugin.vehicle({vehicleId: driver.vehicleId, carType: driver.carType, carClass: driver.carClass}) ?? undefined),
           sessionDriverOrdinal: driver.sessionDriverOrdinal, sessionLapOrdinals: driver.sessionLapOrdinals,
           retired: nonFinishStatus(finishStatus(driver.sessionDriverOrdinal)),
         }] : []),

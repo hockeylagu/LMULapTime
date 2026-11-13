@@ -408,6 +408,8 @@ export interface RaceReplayCar {
   carNumber?: string;
   team?: string;
   vehicleId?: string;
+  /** The car's steering and wheelbase from the package (fallbacks where it has none): the 3D view steers its wheels by it. */
+  handling?: VehicleHandlingCalibration;
   isPlayer?: boolean;
   /** The session driver this car is, when the name matches one; opens its laps in the lap view. */
   sessionDriverOrdinal?: number;

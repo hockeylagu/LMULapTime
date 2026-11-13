@@ -1,5 +1,5 @@
 import { decodeLapColumns, type LapColumn, type LapValue, type StoredLapColumns } from '../core/replay/lapColumnsCodec.js';
-import { RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
+import { RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, RACE_STEPPED_CHANNELS, type RacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
 
 /** Race replay pose samples per second, and seconds per window the client fetches. */
 export const RACE_POSE_HZ = 10;
@@ -20,7 +20,11 @@ interface StoredLap extends StoredLapColumns {
   constants?: Record<string, LapValue>;
 }
 
-const KEYS = ['timeSec', ...RACE_POSE_CHANNELS, 'inGarage', 'isTeleport'];
+/** The stored lap columns the channels read: most by their own name, the lamp flags and the four deflections from theirs. */
+const LAMP_KEYS = ['headlights', 'pitLimiter', 'rainLight'] as const;
+const DEFLECTIONS = ['deflFL', 'deflFR', 'deflRL', 'deflRR'];
+const KEYS = ['timeSec', ...RACE_POSE_CHANNELS.filter(key => key !== 'lamps' && !DEFLECTIONS.includes(key)), ...LAMP_KEYS,
+  'suspensionDeflections', 'inGarage', 'isTeleport'];
 const ANGLE = new Set(['rotX', 'rotY', 'rotZ']);
 const IN_PIT = RACE_POSE_CHANNELS.indexOf('inPit');
 
@@ -34,7 +38,14 @@ const finite = (value: LapValue | null | undefined): value is number => typeof v
 export function resampleLapPoses(blob: Uint8Array, hz = RACE_POSE_HZ): LapPoses {
   const stored = decodeLapColumns<StoredLap>(blob, KEYS);
   const time = channel(stored, 'timeSec');
-  const values = RACE_POSE_CHANNELS.map(key => channel(stored, key));
+  // Each channel as a column of numbers (or flags) over the stored samples.
+  const deflections = channel(stored, 'suspensionDeflections'), lampColumns = LAMP_KEYS.map(key => channel(stored, key));
+  const values: LapColumn[] = RACE_POSE_CHANNELS.map(key => {
+    const corner = DEFLECTIONS.indexOf(key);
+    if (corner >= 0) return deflections.map(value => (Array.isArray(value) ? value[corner] : null));
+    if (key === 'lamps') return lampColumns[0].map((_, i) => LAMP_KEYS.reduce((bits, name, k) => bits | (lampColumns[k][i] === true ? RACE_LAMP[name] : 0), 0));
+    return channel(stored, key);
+  });
   const garage = channel(stored, 'inGarage');
   const teleport = channel(stored, 'isTeleport');
   const n = stored.pointsLength;
@@ -67,6 +78,7 @@ export function resampleLapPoses(blob: Uint8Array, hz = RACE_POSE_HZ): LapPoses 
       const b = values[c][j];
       if (!finite(a)) return;
       const to = finite(b) ? b : a;
+      if (RACE_STEPPED_CHANNELS.has(c)) { data[k * RACE_POSE_CHANNEL_COUNT + c] = nearest === j ? to : a; return; }
       data[k * RACE_POSE_CHANNEL_COUNT + c] = ANGLE.has(key)
         ? a + Math.atan2(Math.sin(to - a), Math.cos(to - a)) * f
         : a + (to - a) * f;

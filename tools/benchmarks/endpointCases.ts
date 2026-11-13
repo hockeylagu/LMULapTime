@@ -114,5 +114,6 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('race-overview', '/api/session/:sessionId/race', base ? `${base}/race` : undefined);
   // The first window: the server resamples its laps on a worker the first time, then serves it from memory.
   add('race-poses', '/api/session/:sessionId/race/poses', base ? `${base}/race/poses?window=0` : undefined);
+  add('race-progress', '/api/session/:sessionId/race/progress', base ? `${base}/race/progress` : undefined);
   return cases;
 }

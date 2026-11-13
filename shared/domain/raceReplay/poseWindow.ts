@@ -3,11 +3,20 @@
  * what the race replay draws. The server builds windows from the stored laps, the client
  * interpolates between samples.
  */
-/** `inPit` is 1 in the pit lane or the garage, else 0; it is set even where the car has no pose (stopped in its box). */
-export const RACE_POSE_CHANNELS = ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'speedKmh', 'inPit'] as const;
+/**
+ * `inPit` is 1 in the pit lane or the garage, else 0; it is set even where the car has no pose (stopped in its box). `steerYaw`
+ * and `brake` are the replay's normalized steering and brake; `lamps` the lit lamp flags (`RACE_LAMP`); `deflFL`..`deflRR` each
+ * corner's suspension deflection as the replay records it.
+ */
+export const RACE_POSE_CHANNELS = ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'speedKmh', 'inPit', 'steerYaw', 'brake', 'lamps',
+  'deflFL', 'deflFR', 'deflRL', 'deflRR'] as const;
 export type RacePoseChannel = typeof RACE_POSE_CHANNELS[number];
 export const RACE_POSE_CHANNEL_COUNT = RACE_POSE_CHANNELS.length;
+/** The `lamps` channel's flags. */
+export const RACE_LAMP = { headlights: 1, pitLimiter: 2, rainLight: 4 } as const;
 const ANGLE_CHANNELS = new Set<number>([3, 4, 5]);
+/** Flags: a sample's own value, never a blend of two. */
+export const RACE_STEPPED_CHANNELS: ReadonlySet<number> = new Set([RACE_POSE_CHANNELS.indexOf('inPit'), RACE_POSE_CHANNELS.indexOf('lamps')]);
 
 export interface RacePoseWindow {
   /** Replay time of the first sample, seconds. */
@@ -21,7 +30,7 @@ export interface RacePoseWindow {
 }
 
 const MAGIC = 0x50524d4c; // "LMRP" little endian
-const VERSION = 2;
+const VERSION = 3;
 const HEADER_BYTES = 28;
 
 export function encodeRacePoseWindow(window: RacePoseWindow): Uint8Array {
@@ -94,7 +103,8 @@ export function sampleRacePose(window: RacePoseWindow, carIndex: number, timeSec
     return true;
   }
   for (let c = 0; c < RACE_POSE_CHANNEL_COUNT; c++) {
-    out[c] = ANGLE_CHANNELS.has(c) ? lerpAngle(data[base + c], data[next + c], f) : data[base + c] + (data[next + c] - data[base + c]) * f;
+    out[c] = RACE_STEPPED_CHANNELS.has(c) ? data[(f < 0.5 ? base : next) + c]
+      : ANGLE_CHANNELS.has(c) ? lerpAngle(data[base + c], data[next + c], f) : data[base + c] + (data[next + c] - data[base + c]) * f;
   }
   return true;
 }
