@@ -210,7 +210,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 1. **Decode pipeline** (`server/replay/decode/`):
    - `replayParser.ts`: reads header, driver index, and slice markers (`docs/VCR_FORMAT.md`).
-   - `replayTrajectory.ts` (`extractReplayTrajectory`, `extractReplayDriverTrajectories`): matches events by opcode (`docs/VCR_FORMAT.md` §3.3) and extracts trajectory points via `replayPose.ts` and `replayTrajectoryFinalizer.ts`; `replayPitCodes.ts` names the pit state codes.
+   - `replayTrajectory.ts` (`extractReplayTrajectory`, `extractReplayDriverTrajectories`): matches events by opcode (`docs/VCR_FORMAT.md` §3.3) and extracts trajectory points via `scene/replayPose.ts` and `replayTrajectoryFinalizer.ts`; `replayPitCodes.ts` names the pit state codes.
    - `replayLapBuilder.ts` / `replayLapPoints.ts`: slices samples into discrete laps; `garageState.ts` handles pit and garage transitions.
    - Pit flag recovery: `replayLapClassification.ts`; clean replay lap validation: `isCleanReplayLap` (`shared/domain/lapComparison.ts`). Missed laps return `ReplayLapNotRecordedError` (404).
 2. **Worker ingestion**:
@@ -308,30 +308,65 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   and hash-checks its cloud map `.bin` files, and `bodyPackage.ts` checks the vehicle bodies and their descriptors; `dataPlugin.ts` parses the manifest
   (exactly schema, id, version) and wires them. `dataPluginRoutes.ts` serves `/scenery/:layoutKey`, `/scenery/files/...`, `/vehicles/:identity/body`,
   `/vehicles/files/...` and `/rendering/files/...`; `src/api/sceneryApi.ts` fetches the cloud map files a layout names and `shared/domain/scenery/cloudMaps.ts`
-  slices them into mips.
+  slices them into mips; it also fetches the layout's road height grid, which `shared/domain/scenery/roadHeight.ts` reads into a lookup
+  (`roadHeightAt` on the layout resource).
   `src/components/replay/view3d/` owns the lazy Three.js viewer, cameras and
-  discontinuity-safe XYZ/quaternion attitude sampling in `replayPose.ts`, preserving recorded body
-  height and available pitch/roll. `sceneFrame.ts` owns native-to-render handedness.
+  discontinuity-safe XYZ/quaternion attitude sampling in `scene/replayPose.ts`, preserving recorded body
+  height and available pitch/roll. `scene/sceneFrame.ts` owns native-to-render handedness.
   `scenery/` streams the track: `residency.ts` is the pure resident-set rule (lap-distance window, free-camera radius, hysteresis),
   `sceneryStream.ts` loads and unloads chunks around a view with bounded concurrency and texture reference counts, `chunkLoader.ts`
   parses chunk GLBs (Meshopt, KTX2 through `cachedKtx2Loader.ts`), and `streamView.ts` turns the replay position and camera mode into
   a stream view. `sceneryGround.ts` builds one `three-mesh-bvh` ray tree per resident chunk (in the library's worker) that answers both
-  wheel/line contact heights and camera ground/obstruction checks, each triangle tagged with the queries it serves. Its
+  wheel/line contact heights and camera ground/obstruction checks, each triangle tagged with the queries it serves; contact heights read
+  the road height grid first and cast rays only off it or for another deck. Its
   native-coordinate position-only geometry is chunk-owned and never exported. `sceneryBatches.ts` draws each opaque material once
   across chunks: one `BatchedMesh` per package material key (`lmuMaterial`) and shadow flags, sized once from the layout's
-  material totals; a chunk's instances show while the chunk does.
+  material totals; a chunk's instances show while the chunk does, and a material's batches drop their CPU arrays once its last chunk is uploaded.
   `scene/sceneShell.ts` is the 3D view without its content: renderer, scenery stream, ground, batches, sky and environment, auto
   exposure, the car reflection, cameras, warm-up, the draw loop and resize/hidden handling; content plugs in as a `SceneContent`
-  (root, the car the reflection probe renders, a per-frame hook, re-drape, dispose). `replayScene.ts` is the shell with the lap
+  (root, the car the reflection probe renders, a per-frame hook, re-drape, dispose). One shell serves both views on a circuit:
+  `scene/sceneShells.ts` keeps it per layout, geometry and package revision (`acquire`; a broken shell is replaced, one whose first
+  view failed before it started is dropped), the replay inspector page providing it (`SceneShellsContext`); a view attaches its
+  element (`attach`: only the canvas and its resize observer move), starts the shell or shows its content in place of the last
+  view's (`show`, the camera placed afresh by `rig.unplace`), and leaving detaches and disposes only its own content, so a
+  race ↔ lap switch keeps one WebGL context, the scenery, textures, shadows and parsed bodies. `laps/replayScene.ts` is the shell with the lap
   layer (the lap view; `ReplaySceneHandle`), `race/raceScene.ts` the shell with every car of a session (the race replay; the
-  followed car its full model, unbatched, interior kept, every other car its body model at the body's distance levels for its camera distance, interior parts dropped, matrices frozen and updated once per frame, skipped out of view; `race/fieldBatches.ts` draws those cars' opaque parts from batches shared by the cars of a body (a second lap layer loader with `shareMaterials`: one multi-draw per material for all of them, one copy of the body's geometry, the parsed vertices dropped once copied and each batch's once uploaded), every car of a body loading at once (two bodies at a time, nearest first); a class-coloured box (one instanced draw) only while a body loads or for a car without one; the lap layer loader parses each body once per scene and loader (keyed by folder and file hashes) for all its liveries, and with `releaseUploaded` each vertex buffer drops its CPU copy once on the GPU; a car joining after the first frame warms at once rather than behind the streaming scenery; `race/raceCarMotion.ts` rebuilds each full model's wheel animation and lamp states from its samples of each pose window, and refits its wheels to the road after a scenery change, both only once the car is next drawn; the scenery streams ahead of the followed car by its track station from the race progress grid (`trackStation`, around the camera without it); chase look-ahead and trackside spots run along the followed car's samples of the current pose window; a followed car still in its garage box places the camera on its nearest pose, else the first car on track) and `race/useRaceScene.ts` drives it from the race clock, the pose windows and the followed car.
-  `cameraRig.ts` owns the cameras, OrbitControls and how each mode follows the car (`RigCar`: the model, its game cameras, the
+  followed car its full model with its interior kept for the driver cameras; `race/raceField.ts` draws every other car by tier:
+  near (the nearest 6 in view inside the body's far-model distance `far.fromM`, entering at 0.85 of it) as its full model with
+  wheels, lamps and shadows, interior parts dropped; a body's full models are built together (one body at a time) the first time
+  one of its cars turns near, batched with the others of the body, and kept (driving back through the grid builds nothing); far as the body's far model
+  (`cars/farCars.ts`: one parse per far file, each livery's paint and retextured materials from the textures' start files, only the
+  triangles of the option parts its appearance shows), batched with every other car of the body (glass and blended pieces too, sorted in their batch), still and without shadows; out of
+  view hidden; every car of a body loads its far model at once (two bodies at a time, nearest the followed car first); a
+  class-coloured box (one instanced draw) only while a body loads or for a car without one; the lap layer loader parses each body
+  once per scene and loader (keyed by folder and file hashes) for all its liveries; `race/raceTrack.ts` gives a car's samples of a
+  pose window as its wheels' and lamps' track; the scenery streams ahead of the followed car by its track station from the race progress grid (`trackStation`, around the camera without it); chase look-ahead and trackside spots run along the followed car's samples of the current pose window; a followed car still in its garage box places the camera on its nearest pose, else the first car on track) and `race/useRaceScene.ts` drives it from the race clock, the pose windows and the followed car.
+  `cars/` is the car renderer both views share: `carParts.ts` a car's flat part table (anchors: the body, wheel, steer and spin
+  nodes and the steering wheel; each part a fixed matrix to its anchor; the car out of three's matrix walk, `sync` placing what
+  moved once a frame; cockpit view and camera-distance levels), `carBatching.ts` one batching system (one `BatchedMesh` per
+  material and shadow flags; a single car's batches ride in the car, a body's far cars share batches in the parent frame; a batch
+  draws only while one of its parts shows), `carMotion.ts` the wheels and lamps along a track, built and refitted only once the car
+  is drawn, `drawnCar.ts` every full-model car of a scene (`createCarSets`: `build` the one path for the own car, the lap's or the
+  followed car, a set of one with its own materials and interior, and a body's near cars, one set sharing the body's materials
+  without interior; glass and decals sorted in their batch; `ghost` the lap's ghost part by part. `createDrawnCars` under it: part
+  tables, motion, batches shared by the set, solid parts casting from one shadow-only batch on `SHADOW_ONLY_LAYER`),
+  `carTemplates.ts` the scene's parsed bodies (the shell's `carTemplates`: a parse shared by the builds asking while it is pending,
+  then dropped, unless held: the race holds the bodies with cars near the camera, so following one builds without parsing), `carModels.ts` each livery's model from them (materials by content, lamps and glow, textures from start files;
+  `shareMaterials` for cars drawn many at once, whose dropped models leave the shared materials), plus the wheel files
+  (`wheelGeometry.ts`, `wheelAnimation.ts`, `wheelMotion.ts`) and `sceneObjects.ts` (`makeCar`). `src/api/vehicles/bodyStore.ts`
+  fetches each body once per VEH id and package revision for a view (the lap view keeps the last four, the race every livery).
+  `batching/batchedParts.ts` is the one batching toolkit of scenery and cars: a sized `BatchedMesh`, hidden instances, bounds before
+  the CPU copies go, the release on upload, and shown counts (a batch draws only while one of its owners shows instances).
+  `scene/useSceneHost.ts` is the 3D views' shared lifecycle (one scene per key, abort, progress and error state, disposal) and
+  `scene/Scene3DFrame.tsx` their shared frame (host, camera controls, loading and streaming cards, slots for each view's panels);
+  both views stay loaded behind 2D once opened (the scene stops drawing while hidden).
+  `camera/cameraRig.ts` owns the cameras, OrbitControls and how each mode follows the car (`RigCar`: the model, its game cameras, the
   samples around it for the chase look-ahead), and
   `scenery/sceneWarmup.ts` compiles and uploads each chunk (with the batches it created) before it joins, then sharpens reduced textures: the car's first, then the chunk nearest the camera, the largest first within it.
   `laps/useReplayScene.ts` retains the scene for a layout/geometry/package revision; selecting
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
-  `laps/loadProgress.ts` weighs the load steps `replayScene.ts` reports for `laps/Replay3DLoading.tsx`: the loading card (the shared
+  `scene/loadProgress.ts` weighs the load steps `laps/replayScene.ts` reports for `scene/Replay3DLoading.tsx`: the loading card (the shared
   `LoadingState` with its rings tilted) and, after the first frame, the corner note counting scenery chunks and textures still sharpening.
   The 3D toolbar's Line menu (`GpsMapModeBar.tsx`) hides the racing lines or picks their colouring.
   Canvas resizes repaint before the browser paints, avoiding a black frame when embedded toolbars change height.
@@ -341,17 +376,17 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   cell codes and layer drifts, its coverage and the sun visibility; the loader's checks are in `server/plugins/cloudPackage.ts`), the drawn clouds (`atmosphere/cloudLayer.ts`: one mesh per placed sheet, lit by the package's cloud lighting), the first PMREM environment, the venue capture at the layout's
   `environmentProbe` that replaces it, and the car-following shadow sun. Cars come from the `cars` catalog: `car/carMaterials.ts` builds materials from the
   descriptor (surfaces in the app's names, version 4, every value filled: `finish` per material, paint `regions` / `uvScale`; `car/carPaint.ts`: regional car paint from the package's paint description; `car/carContactShadow.ts`: the under-car shadow;
-  `car/carReflection.ts`: the cube-map reflection probe at the car; `car/cockpitOcclusion.ts`: the cockpit reflection occlusion, each occluded material marching its reflected ray through the body's cabin volume (a 3D texture `bodyApi.ts` fetches with the body) and dimming the probe's reflection where the cabin closes it; `car/carLamps.ts`: the unlit glow of headlight and brake lamps; `car/carBatches.ts`: the followed car's opaque parts drawn as one multi-draw per material, materials shared by content through `carMaterialKey`, the parts kept as invisible stand-ins that wheel animation and cockpit/distance switching still move), `shadows/` the sun's one shadow, the package's cascades (`shadowCascades.ts` layout, centres and sun axes; `cascadeShadows.ts` the atlas pass, its cached far cascades redrawn one a frame when they drift; `cascadeSampling.ts` the uniforms and GLSL, `patchCascadeShadow` multiplying the sun in three's light loop for scenery and car materials by each material's `normalShadowInfluence` (no three shadow map); `sceneEnvironment.ts` draws the set `cameraModes.tsx` `shadowCascadeSet` picks (cockpit: cockpit; every other view, overhead included: chase); `shadowCasterPass.ts` the caster draw, in plain depth while the scene itself draws into a reversed float depth buffer (`replayScene.ts`, `autoExposure.ts`: a banner 1 cm in front of its wall stays in front at any distance)), `autoExposure.ts` meters, white-balances, tone-maps and encodes with the scenery catalog's `camera` type for the view (`cameraModes.tsx` `exposureType`), `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
+  `car/carReflection.ts`: the cube-map reflection probe at the car; `car/cockpitOcclusion.ts`: the cockpit reflection occlusion, each occluded material marching its reflected ray through the body's cabin volume (a 3D texture `bodyApi.ts` fetches with the body) and dimming the probe's reflection where the cabin closes it; `car/carLamps.ts`: the unlit glow of headlight and brake lamps), `shadows/` the sun's one shadow, the package's cascades (`shadowCascades.ts` layout, centres and sun axes; `cascadeShadows.ts` the atlas pass, its cached far cascades redrawn one a frame when they drift; `cascadeSampling.ts` the uniforms and GLSL, `patchCascadeShadow` multiplying the sun in three's light loop for scenery and car materials by each material's `normalShadowInfluence` (no three shadow map); `sceneEnvironment.ts` draws the set `camera/cameraModes.tsx` `shadowCascadeSet` picks (cockpit: cockpit; every other view, overhead included: chase); `shadowCasterPass.ts` the caster draw, in plain depth while the scene itself draws into a reversed float depth buffer (`laps/replayScene.ts`, `autoExposure.ts`: a banner 1 cm in front of its wall stays in front at any distance)), `autoExposure.ts` meters, white-balances, tone-maps and encodes with the scenery catalog's `camera` type for the view (`camera/cameraModes.tsx` `exposureType`), `cars/wheelGeometry.ts` reads the four wheel rigs, `cars/wheelAnimation.ts` fits the model origin to the lap median and drives
   roll/steer/travel per corner (travel from the telemetry's ride height, else the replay's suspension deflection, each corner's
-  rest fitted to the road as the scenery streams in; else the road under the tyre) plus the steering wheel, `driverCameras.ts` places the Cockpit/Hood/Roof views on the descriptor's game
-  cameras, and `sceneObjects.ts` places the car, switches the cockpit mesh variant and styles ghosts. Brake boards are part of the scenery GLBs.
-  `racingLine.ts` drapes the 2D-coloured line ribbons and re-drapes them as chunks stream in; `tracksideCameras.ts` places the fixed trackside spots.
-  `cameraNavigation.ts` owns projection-aware keyboard pan/zoom. The 3D view shares
+  rest fitted to the road as the scenery streams in; else the road under the tyre) plus the steering wheel, `camera/driverCameras.ts` places the Cockpit/Hood/Roof views on the descriptor's game
+  cameras, and `cars/sceneObjects.ts` makes the car and styles ghosts. Brake boards are part of the scenery GLBs.
+  `laps/racingLine.ts` drapes the 2D-coloured line ribbons and re-drapes them as chunks stream in; `camera/tracksideCameras.ts` places the fixed trackside spots.
+  `camera/cameraNavigation.ts` owns projection-aware keyboard pan/zoom. The 3D view shares
   `useGpsMapShortcuts.ts` with 2D; OrbitControls handles pointer input without consuming replay arrows.
-  `cameraModes.ts` owns mode labels/keys and `cameraTracking.ts` provides velocity-blended target
+  `camera/cameraModes.tsx` owns mode labels/keys and `camera/cameraTracking.ts` provides velocity-blended target
   yaw with rotational/vertical damping for Chase mode while preserving user camera/focus offsets
   during Follow/Chase updates; manual camera movement does not change the selected mode.
-  `racingLine.ts` drapes depth-tested racing lines on the nearby native road layer; measured
+  `laps/racingLine.ts` drapes depth-tested racing lines on the nearby native road layer; measured
   coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D (the 3D view, once opened, stays loaded and hidden behind 2D until the page changes), and `src/api/sceneryApi.ts` and `src/api/vehicles/bodyApi.ts`
   load layouts, chunks and cars through the API client (a body's GLBs only through `LoadedBody.files()`, read for the parse and not held after it; the loader stores each part's box as `userData.footprint`, which the contact shadow reads instead of the vertices). The existing replay cursor owns time in both views.
 - `trackPackage.ts` validates geometry revisions and route lengths within 0.01m. Routes in `dataPluginRoutes.ts` serve geometry and vehicle logos (`/api/data-plugin/vehicles/logos`).

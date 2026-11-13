@@ -241,7 +241,7 @@ of the prefiltered environment is a program define, and an unset environment is 
 The first step towards a full race grid ([RACE_REPLAY.md](RACE_REPLAY.md)). Each car file already holds one primitive per
 native material, but many materials repeat the same content under other names (a median car: 94 drawn parts, 33 distinct
 contents). The car now builds one material per content (`carMaterialKey`) and draws its opaque parts that share one as a
-`BatchedMesh` (`car/carBatches.ts`); glass, decals, displays and lamps keep their own draws. The parts stay in the model as
+`BatchedMesh` (now `cars/carBatching.ts` with the part table in `cars/carParts.ts`); glass, decals, displays and lamps keep their own draws. The parts stay in the model as
 stand-ins in no camera layer, so wheel animation and cockpit/distance switching move them; `sync` copies them to the batch
 once a frame. The ghost is not batched (its see-through parts draw in a fixed order).
 

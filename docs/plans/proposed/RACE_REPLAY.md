@@ -18,8 +18,12 @@ the ~0.9 GB of car textures still keep their CPU levels for mip streaming). Sinc
 the cars of each body (18 bodies, 42 liveries for 62 cars at Le Mans): 2,884 → 1,747 draws at the start, one GPU copy per
 body, but the same ~35 fps: the frame is bound by the main thread (per-draw work ~25 %, wheel ground rays ~12 %, matrix walk
 ~8 %), and a body still splits into ~60 batches, one per material. Each car's wheel build and road fit now wait until the car is
-drawn (out-of-view cars no longer refit at each window or scenery change; not yet benchmarked). Next: fewer materials per body
-(the package's material consolidation). The
+drawn (out-of-view cars no longer refit at each window or scenery change; not yet benchmarked). Since the car renderer rework
+(2026-11-13, REPLAY_3D_ARCHITECTURE.md R1–R5) the field draws by tier: the nearest 6 cars in view inside their body's far
+distance (`far.fromM`, from package schema 13) as full models with wheels, lamps and shadows, every other car in view as its
+body's far model (a few primitives, liveries retextured, batched per body, still, no shadows), out of view nothing; the lap
+view and the race share one part table, batching and wheel motion (`view3d/cars/`). Not yet benchmarked (once, after all the
+architecture items). The
 scenery streams ahead of the followed car by its station from the progress grid; trackside spots stand along the followed
 car's samples of the pose window; a followed car still in its garage box puts the camera on its nearest pose or the first car
 on track. The full models roll, steer and travel their suspension and light their lamps from the window (2026-11-13: the
@@ -113,10 +117,10 @@ view on one session clock, with seek, playback speed and a followed car. Any ses
 1. Pose stream + session clock + 2D map with all cars and the tower (no pipeline dependency).
 2. Incidents dropdown and hover tooltips.
 3. 3D with full models near the camera and class-coloured boxes as a temporary far LOD.
-4. Every car its body model at the body's distance levels (done 2026-11-13); a pipeline LOD export only if draws demand it.
+4. Every car its body model at the body's distance levels (done 2026-11-13), then near full models and the package's far
+   models by tier (done 2026-11-13).
 
 ## Open
 
 - Pose rate (10 vs 20 Hz) after a playback check.
-- Draw count of a bunched full field: per-body batches done (2026-11-13); next the materials per body, a package change with
-  the pipeline session.
+- Frame rate of a bunched full field with the far models: measured once with the architecture bench (REPLAY_3D_ARCHITECTURE.md V).
