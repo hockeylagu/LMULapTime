@@ -55,7 +55,8 @@ export class RaceReplayService {
     const slots = new Set(request.cars.map(car => car.slot));
     const laps: RaceReplayLap[] = timedLaps(this.store.getReplayLaps(request.replayName)).filter(lap => slots.has(lap.driverSlot)).map(lap => ({
       slot: lap.driverSlot, lapNumber: lap.lapNumber, startSec: lap.startSec, endSec: lap.endSec,
-      lapTimeSec: lap.lapTimeSec ?? null, isValid: lap.isValid === true,
+      lapTimeSec: lap.lapTimeSec ?? null, s1Sec: lap.s1Sec ?? null, s2Sec: lap.s2Sec ?? null, s3Sec: lap.s3Sec ?? null,
+      isValid: lap.isValid === true,
     }));
     const { layoutKey } = getCircuitSpecification(request.trackVenue, request.trackCourse, request.sceneDesc, request.replayName);
     const starts = laps.map(lap => lap.startSec);

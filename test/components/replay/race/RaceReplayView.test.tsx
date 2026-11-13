@@ -61,6 +61,10 @@ describe('RaceReplayView', () => {
     expect(within(screen.getByTestId('race-standings')).getByText('You')).toBeTruthy();
     // The followed car's laps on the timeline; following Bea shows her one lap.
     expect(screen.getByTestId('race-lap-ticks').textContent).toBe('12');
+    // The followed car's timing on the map: session time, its lap of the race's, the lap so far.
+    const timing = screen.getByRole('complementary', { name: 'Lap and sector timing' });
+    expect(screen.getByTestId('race-lap-heading').textContent).toMatch(/Session.*0:30.*Lap 1 \/ 2/);
+    expect(within(timing).queryByRole('button', { name: 'Timing' })).toBeNull();
     fireEvent.click(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Bea/ }));
     expect(screen.getByTestId('race-lap-ticks').textContent).toBe('1');
     // The gap column switches between the class leader and the car ahead.

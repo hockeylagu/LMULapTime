@@ -15,6 +15,8 @@ import { GpsSectorMarkers } from '../map/scene/GpsSectorMarkers.js';
 import { GpsStartFinishLine } from '../map/scene/GpsStartFinishLine.js';
 import { FOCUS_RING, SURFACE_FOCUS_RING } from '../../common/buttonStyles.js';
 import { RaceCarMarkers, type RaceCarPosition } from './RaceCarMarkers.js';
+import { RaceLapTiming } from './RaceLapTiming.js';
+import { raceLapCount } from './raceLaps.js';
 import { RaceCarTooltip } from './RaceCarTooltip.js';
 import { isOutAt, type RaceStandingsIndex } from './raceStandings.js';
 import type { RaceClock } from './raceClock.js';
@@ -85,6 +87,7 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
   const carBounds = useMemo(() => (trackBounds ? null : windowBounds(window)), [trackBounds, window]);
   const bounds = trackBounds ?? carBounds;
   const cars = useMemo(() => new Map<number, RaceReplayCar>(overview.cars.map(car => [car.slot, car])), [overview.cars]);
+  const totalLaps = useMemo(() => raceLapCount(overview), [overview]);
   const pitted = racePitSlots(window, timeSec);
   // Only the race's cars: the windows also carry the pace car.
   const positions = racePositionsAt(window, timeSec, bounds).filter(position => cars.has(position.slot)).map(position =>
@@ -140,8 +143,10 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
         ) : (
           <div role="status" className="absolute inset-0 flex items-center justify-center text-sm text-lmu-muted">Loading the cars…</div>
         )}
+        {bounds && <RaceLapTiming clock={clock} car={followSlot === null ? undefined : cars.get(followSlot)} laps={overview.laps}
+          totalLaps={totalLaps} className="absolute left-3 top-3 z-10" />}
         {bounds && !window && (
-          <div role={poseError ? 'alert' : 'status'} className="absolute left-3 top-3 flex items-center gap-2 rounded-md border border-lmu-border bg-lmu-card px-3 py-1.5 text-xs text-lmu-text-soft">
+          <div role={poseError ? 'alert' : 'status'} className="absolute bottom-3 left-3 flex items-center gap-2 rounded-md border border-lmu-border bg-lmu-card px-3 py-1.5 text-xs text-lmu-text-soft">
             {poseError ? <>Cars unavailable here: {poseError}
               <button type="button" onClick={poses.retry} className={`underline underline-offset-4 ${FOCUS_RING}`}>Retry</button></> : 'Loading the cars…'}
           </div>

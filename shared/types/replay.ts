@@ -423,6 +423,10 @@ export interface RaceReplayLap {
   startSec: number;
   endSec: number;
   lapTimeSec: number | null;
+  /** Sector times, seconds (null when the replay has none). */
+  s1Sec?: number | null;
+  s2Sec?: number | null;
+  s3Sec?: number | null;
   isValid: boolean;
 }
 

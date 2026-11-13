@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import React, { useId } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { ReplayLapSummary } from '../../../../../shared/types/index.js';
 import { formatTime } from '../../../../../shared/domain/formatters.js';
@@ -11,6 +11,8 @@ export interface GpsMapLapTimingPanelProps {
   primaryLapSummary?: ReplayLapSummary;
   baselineLapSummary?: ReplayLapSummary;
   liveSplit?: LiveSectorSplit | null;
+  /** Replaces the lap header and its collapse toggle (the race replay's session time and lap count): always open. */
+  heading?: React.ReactNode;
   className?: string;
 }
 
@@ -19,8 +21,9 @@ const deltaColor = (delta: number | null) => delta === null ? 'text-lmu-muted'
 const signed = (delta: number) => `${delta > 0 ? '+' : ''}${delta.toFixed(3)}s`;
 
 /** Recorded whole-lap and individual sector times, plus the live change within the cursor's sector. */
-export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSummary: baseline, liveSplit, className }: GpsMapLapTimingPanelProps) {
-  const [collapsed, toggleCollapsed] = useStoredToggle('lmu-map-timing-collapsed-v1', false);
+export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSummary: baseline, liveSplit, heading, className }: GpsMapLapTimingPanelProps) {
+  const [storedCollapsed, toggleCollapsed] = useStoredToggle('lmu-map-timing-collapsed-v1', false);
+  const collapsed = !heading && storedCollapsed;
   const id = useId();
   const rows = [
     { label: 'Lap', value: primary?.lapTimeSec, baseline: baseline?.lapTimeSec },
@@ -32,13 +35,13 @@ export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSu
   return <aside aria-label="Lap and sector timing" data-map-control
     onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
     className={`pointer-events-auto w-[340px] max-w-full rounded-xl bg-lmu-strip/95 border border-lmu-border ${className ?? '2xl:absolute 2xl:right-0 2xl:top-13'}`}>
-    {/* One header line: the collapse toggle fills the row-label column, the lap selectors sit over their times. */}
-    <GpsMapLapSelectors primaryLapNumber={primary?.lapNumber} baselineLapNumber={baseline?.lapNumber}
+    {/* One header line: the collapse toggle fills the row-label column, the lap selectors sit over their times (or the heading). */}
+    {heading ?? <GpsMapLapSelectors primaryLapNumber={primary?.lapNumber} baselineLapNumber={baseline?.lapNumber}
       toggle={<button type="button" aria-label="Timing" title={collapsed ? 'Show timing' : 'Hide timing'}
         aria-expanded={!collapsed} aria-controls={id} onClick={toggleCollapsed}
         className={`-ml-1 flex h-7 w-7 items-center justify-center rounded text-lmu-muted hover:bg-lmu-raised hover:text-lmu-text ${FOCUS_RING}`}>
         {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-      </button>} />
+      </button>} />}
     {/* Stays mounted so the toggle's aria-controls always resolves; the lap selectors above stay usable. */}
     <div id={id} hidden={collapsed} className="px-3 pb-2">
       {rows.map(row => {
