@@ -1,11 +1,11 @@
 import React, { useContext } from 'react';
 import type { CompareLapPagination } from './compare/CompareLapPagination.js';
-import { X, Play, Pause, RotateCcw, Flag, ArrowLeftRight, Users, ChevronLeft, ChevronRight, LoaderCircle, ListOrdered } from 'lucide-react';
+import { X, Flag, ArrowLeftRight, ChevronLeft, ChevronRight, LoaderCircle, ListOrdered } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './compare/ReplayCompareLapPicker.js';
 import type { CompareLapControls } from './compare/compareLapControls.js';
 import { ReplayCompareButton } from './compare/ReplayCompareButton.js';
-import { ReplayInspectorTitle } from './ReplayInspectorTitle.js';
+import { ReplayHeaderShell } from './ReplayHeaderShell.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { PLAYBACK_SPEEDS } from './replayFullscreenControls.js';
@@ -77,36 +77,22 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   const nextLap = currentLapIndex >= 0 ? trajectory?.laps?.[currentLapIndex + 1] : undefined;
   const selectedDriver = drivers.find(driver => driver.slot === selectedDriverSlot);
   const openRace = useContext(RaceModeContext);
-  const driverLabel = selectedDriver ? `${selectedDriver.carNumber ? `#${selectedDriver.carNumber} ` : ''}${selectedDriver.name}${selectedDriver.isPlayer ? ' (You)' : ''}` : '';
 
   return (
-    <header className="relative min-h-14 py-1.5 px-4 bg-lmu-strip border-b border-lmu-border grid grid-cols-[minmax(320px,1fr)_auto_auto] gap-6 items-center shrink-0 z-[80]">
-      {/* Left: Back button + Title & Info */}
-      <ReplayInspectorTitle
-        onClose={onClose}
-        metadata={metadata}
-        trajectory={trajectory}
-        selectedDriver={selectedDriver}
-      />
-
-      {/* Center: Driver Selector, Lap Selector & Live State */}
-      <div className="flex items-center gap-2 justify-self-center min-w-0">
-          <Select<number>
-            aria-label="Select Driver"
-            title={driverLabel || (isLoading ? 'Loading drivers…' : 'No drivers available')}
-            disabled={isPrimaryBusy || drivers.length === 0}
-            busy={isPrimaryBusy}
-            value={selectedDriverSlot}
-            onChange={onSelectDriver}
-            placeholder={isLoading ? 'Loading drivers…' : drivers.length ? 'Select driver' : 'No drivers available'}
-            icon={<Users aria-hidden="true" className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />}
-            options={drivers.flatMap(driver => typeof driver.slot === 'number' ? [{
-              value: driver.slot,
-              label: `${driver.carNumber ? `#${driver.carNumber} ` : ''}${driver.name}${driver.isPlayer ? ' (You)' : ''}`,
-            }] : [])}
-            className="w-[220px] shrink-0"
-          />
-
+    <ReplayHeaderShell
+      onClose={onClose} metadata={metadata} trajectory={trajectory}
+      titleActions={openRace && (
+        <button type="button" onClick={() => openRace(selectedDriverSlot, trajectory?.currentLap ?? null)} disabled={isLoading}
+          title="Race replay: every car of the session on one clock, from this lap"
+          className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-lmu-border bg-lmu-bg px-2.5 text-xs text-lmu-text-soft hover:bg-lmu-card disabled:opacity-40 ${FOCUS_RING}`}>
+          <ListOrdered aria-hidden="true" className="h-3.5 w-3.5 text-lmu-accent-text" />Race
+        </button>
+      )}
+      drivers={drivers} selectedDriverSlot={selectedDriverSlot} onSelectDriver={onSelectDriver}
+      busy={isPrimaryBusy} loadingDrivers={isLoading}
+      playback={{ disabled: isPrimaryBusy || !trajectory?.points.length, isPlaying, onTogglePlay, onRewind,
+        speed: playbackSpeed, speeds: PLAYBACK_SPEEDS, onSelectSpeed: onSelectPlaybackSpeed }}
+    >
         {trajectory?.laps && trajectory.laps.length > 0 && (
           <div role="group" aria-label="Lap" className="flex items-center gap-1">
             <button
@@ -144,14 +130,6 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               <ChevronRight aria-hidden="true" className="w-3.5 h-3.5" />
             </button>
           </div>
-        )}
-
-        {openRace && (
-          <button type="button" onClick={() => openRace(selectedDriverSlot, trajectory?.currentLap ?? null)} disabled={isLoading}
-            title="Race replay: every car of the session on one clock, from this lap"
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-lmu-border bg-lmu-bg px-2.5 text-xs text-lmu-text-soft hover:bg-lmu-card disabled:opacity-40 ${FOCUS_RING}`}>
-            <ListOrdered aria-hidden="true" className="h-3.5 w-3.5 text-lmu-accent-text" />Race
-          </button>
         )}
 
         {!isCompareMode ? (
@@ -231,41 +209,6 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         )}
 
         {isTrajLoading && <span role="status" className="text-[11px] text-lmu-muted">Loading lap…</span>}
-
-      </div>
-
-      {/* Right: Playback controls */}
-      <div role="group" aria-label="Playback" className="flex items-center gap-2 justify-self-end pl-5 border-l border-lmu-border">
-        <button
-          onClick={onRewind}
-          disabled={isPrimaryBusy || !trajectory?.points.length}
-          aria-label="Rewind to start"
-          className={`p-1.5 rounded-xl bg-lmu-card hover:bg-white/10 text-lmu-muted hover:text-white border border-lmu-border transition-colors cursor-pointer disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:cursor-not-allowed disabled:hover:bg-lmu-card ${FOCUS_RING}`}
-          title="Rewind to start"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={onTogglePlay}
-          disabled={isPrimaryBusy || !trajectory?.points.length}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded bg-lmu-raised hover:bg-lmu-raised/80 text-white font-semibold text-xs transition-all cursor-pointer disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:cursor-not-allowed disabled:hover:bg-lmu-raised ${FOCUS_RING}`}
-        >
-          {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">{isPlaying ? 'Pause' : 'Play'}</span>
-        </button>
-
-        <Select<number>
-          aria-label="Playback speed"
-          title="Playback speed: , slower, . faster"
-          value={playbackSpeed}
-          onChange={onSelectPlaybackSpeed}
-          options={PLAYBACK_SPEEDS.map(speed => ({ value: speed, label: `${speed}×` }))}
-          mono
-          align="end"
-        />
-      </div>
-    </header>
+    </ReplayHeaderShell>
   );
 });

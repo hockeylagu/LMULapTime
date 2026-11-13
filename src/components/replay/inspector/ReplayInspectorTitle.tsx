@@ -12,6 +12,8 @@ export interface ReplayInspectorTitleProps {
   metadata: ReplayMetadata | null;
   trajectory: ReplayTrajectoryData | null;
   selectedDriver?: ReplayDriverEntry | null;
+  /** Buttons right after Info. */
+  actions?: React.ReactNode;
 }
 
 type CarSource = { vehicleId?: string; carType?: string; carClass?: string };
@@ -20,7 +22,7 @@ const formatBytes = (b: number): string => b < 1048576 ? `${(b / 1024).toFixed(1
 const formatDuration = (s: number): string => `${Math.floor(s / 60)}m ${String(Math.floor(s % 60)).padStart(2, '0')}s`;
 
 /** Track context stays visible; replay metadata is available in a keyboard-accessible disclosure. */
-export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onClose, metadata, trajectory, selectedDriver }) => {
+export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onClose, metadata, trajectory, selectedDriver, actions }) => {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -59,7 +61,7 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
 
   return (
     <div className="flex items-center gap-4 min-w-0">
-      {/* History back (the page's onClose is navigate(-1)): there is no fixed return URL to link to. */}
+      {/* The page decides where Back goes: history back from the lap view, the lap view from the race replay. */}
       <button type="button" onClick={onClose} title="Return to previous page"
         className="flex items-center gap-1.5 py-1.5 text-lmu-muted hover:text-white text-xs shrink-0 cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text">
         <ArrowLeft className="w-4 h-4" /> Back
@@ -101,6 +103,7 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
           </dl>
         </div>
       </details>
+      {actions}
     </div>
   );
 };
