@@ -6,7 +6,7 @@ import { linkClickHandler } from '../../../utils/linkClick.js';
 import { ReplayGlyph, REPLAY_ACTION, REPLAY_BUSY, REPLAY_LABELLED, REPLAY_TELEMETRY_TEXT } from './ReplayGlyph.js';
 
 export interface ReplayLaunchButtonProps {
-  /** "Replay + telemetry" with the car's own DuckDB telemetry, "Replay" with the replay only. */
+  /** "Lap telemetry" with the car's own DuckDB telemetry, "Replay" with the replay only. */
   hasDuckDb: boolean;
   sessionId?: string;
   to?: string;
@@ -51,7 +51,7 @@ export const ReplayLaunchButton: React.FC<ReplayLaunchButtonProps> = ({ hasDuckD
   const content = (
     <>
       <ReplayGlyph telemetry={hasDuckDb} />
-      <span className={hasDuckDb ? REPLAY_TELEMETRY_TEXT : ''}>{hasDuckDb ? 'Replay + telemetry' : 'Replay'}</span>
+      <span className={hasDuckDb ? REPLAY_TELEMETRY_TEXT : ''}>{hasDuckDb ? 'Lap telemetry' : 'Replay'}</span>
     </>
   );
 

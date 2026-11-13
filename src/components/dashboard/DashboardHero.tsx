@@ -8,6 +8,7 @@ import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.
 import { PaceBadge } from '../common/PaceBadge.js';
 import { CarIdentity } from '../vehicle/CarIdentity.js';
 import { ReplayLaunchButton } from '../common/replay/ReplayLaunchButton.js';
+import { SessionReplayButton } from '../common/replay/SessionReplayButton.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/vehicleMapping.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
@@ -186,6 +187,16 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNumber ?? undefined)}
                 data-testid="hero-launch-replay-btn"
                 title={latestOuting.bestLapNumber ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNumber})` : 'Open telemetry'}
+              />
+            )}
+            {latestOuting.hasReplay && (
+              <SessionReplayButton
+                sessionId={latestOuting.id}
+                to={Number.isInteger(latestOuting.driverOrdinal) && Number.isInteger(latestOuting.bestLapOrdinal)
+                  ? `/telemetry?sessionId=${encodeURIComponent(latestOuting.id)}&driverOrdinal=${latestOuting.driverOrdinal}&lapOrdinal=${latestOuting.bestLapOrdinal}&view=2d&mode=race`
+                  : `/telemetry?sessionId=${encodeURIComponent(latestOuting.id)}&mode=race&view=2d`}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-lmu-card hover:bg-lmu-raised text-lmu-text-soft hover:text-white border border-lmu-border hover:border-lmu-rule font-semibold text-xs transition-colors cursor-pointer"
+                data-testid="hero-session-replay-btn"
               />
             )}
             <Link

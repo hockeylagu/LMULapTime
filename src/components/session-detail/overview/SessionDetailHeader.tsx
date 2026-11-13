@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { ArrowLeft, ChevronRight, ListOrdered, Sliders } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Sliders } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { getSessionTypeStyle } from '../../common/sessionTypeStyles.js';
 import { ReplayLaunchButton } from '../../common/replay/ReplayLaunchButton.js';
+import { SessionReplayButton } from '../../common/replay/SessionReplayButton.js';
 import { BenchmarkLadder } from '../../common/BenchmarkLadder.js';
 import { WeekendSessionLink, WeekendSessionType } from '../../../../shared/domain/weekendSessions.js';
 import { sessionLapComparePath, sessionRaceReplayPath, sessionTelemetryPath } from '../sessionDetailHelpers.js';
@@ -15,7 +16,6 @@ import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { Select } from '../../common/dropdown/Select.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
 import { EMPTY_ARRAY } from '../../../utils/emptyDefaults.js';
-import { useSessionDataContext } from '../../../api/sessionDataContext.js';
 
 /** The neutral jump buttons of the header: the icon carries the only color. */
 const JUMP_BUTTON =
@@ -53,12 +53,6 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
-  const { scan } = useSessionDataContext();
-  const replayJob = scan?.sessionReplayJobs?.find((item) => item.sessionId === session.id);
-  const raceReplayBlocked = replayJob?.status === 'processing'
-    || (replayJob?.status === 'queued' && !replayJob.playable)
-    || (replayJob?.status === 'failed' && !replayJob.playable);
 
   const handleOpenReplay = (targetLap?: number) => {
     void navigate(telemetryPath(targetLap));
@@ -119,17 +113,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 onClick={() => handleOpenReplay()}
                 title={hasDuckDb ? 'Open session replay and telemetry' : 'Open session replay'}
               />
-              {!raceReplayBlocked && (
-                <Link
-                  to={raceReplayPath}
-                  onClick={linkClickHandler(() => { void navigate(raceReplayPath); })}
-                  title="Session replay: every car of the session on one clock"
-                  className={`${JUMP_BUTTON} ${FOCUS_RING}`}
-                >
-                  <ListOrdered aria-hidden="true" className="w-3.5 h-3.5 text-lmu-accent-text" />
-                  <span>Session replay</span>
-                </Link>
-              )}
+              <SessionReplayButton sessionId={session.id} to={raceReplayPath} />
             </>
           )}
 

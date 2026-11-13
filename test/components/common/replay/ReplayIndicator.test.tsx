@@ -149,8 +149,8 @@ describe('ReplayIndicator', () => {
     expect(onClick).toHaveBeenCalledOnce();
 
     rerender(button(false, true));
-    expect(screen.getByRole('button', { name: 'Replay + telemetry' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Replay + telemetry' })).toHaveAttribute('title', expect.stringContaining('Replay cache unavailable; using 100Hz telemetry'));
+    expect(screen.getByRole('button', { name: 'Lap telemetry' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Lap telemetry' })).toHaveAttribute('title', expect.stringContaining('Replay cache unavailable; using 100Hz telemetry'));
     rerender(button(false, false));
     expect(screen.getByRole('button', { name: /Replay failed/ })).toBeDisabled();
   });

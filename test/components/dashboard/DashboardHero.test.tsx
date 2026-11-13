@@ -144,7 +144,7 @@ describe('DashboardHero', () => {
     expect(badge.className).toContain('text-lmu-accent-soft');
   });
 
-  it('renders the Replay + telemetry button when the session has DuckDB telemetry', () => {
+  it('renders the Lap telemetry button when the session has DuckDB telemetry', () => {
     const duckSessions = [
       {
         ...mockSessions[1],
@@ -163,8 +163,15 @@ describe('DashboardHero', () => {
 
     const replayBtn = screen.getByTestId('hero-launch-replay-btn');
     expect(replayBtn).toBeInTheDocument();
-    expect(replayBtn).toHaveTextContent('Replay + telemetry');
+    expect(replayBtn).toHaveTextContent('Lap telemetry');
     expect(replayBtn.querySelector('svg')).toHaveAttribute('data-replay-glyph', 'telemetry');
+
+    const sessionReplayBtn = screen.getByTestId('hero-session-replay-btn');
+    const detailsBtn = screen.getByTestId('hero-inspect-session-btn');
+    expect(sessionReplayBtn).toHaveTextContent('Session replay');
+    expect(sessionReplayBtn).toHaveAttribute('href', expect.stringContaining('mode=race'));
+    expect(replayBtn.compareDocumentPosition(sessionReplayBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sessionReplayBtn.compareDocumentPosition(detailsBtn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders pace sparkline and recent momentum metrics', () => {
