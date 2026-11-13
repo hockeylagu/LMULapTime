@@ -31,6 +31,8 @@ export const ReplayInspectorPage: React.FC = () => {
     markerDistM, setMarkerDistM,
   }), [syncMode, markerDistM, searchParams, setSearchParams]);
   const isRace = searchParams.get('mode') === 'race';
+  // Leaving the race replay, the lap view comes back on the lap it showed instead of loading it again.
+  const [fromRace, setFromRace] = useState(false);
   const openRace = useCallback((slot: number | null, lapNumber: number | null) => updateSearchParams(searchParams, setSearchParams, {
     mode: 'race', car: slot === null ? null : String(slot), lap: lapNumber === null ? null : String(lapNumber), t: null,
   }), [searchParams, setSearchParams]);
@@ -54,11 +56,18 @@ export const ReplayInspectorPage: React.FC = () => {
         initialTimeSec={numberParam(searchParams.get('t'))}
         initialSlot={numberParam(searchParams.get('car'))}
         initialLapNumber={numberParam(searchParams.get('lap'))}
-        onClose={() => void navigate(-1)}
-        onOpenLap={(driver, lap) => updateSearchParams(searchParams, setSearchParams, {
-          mode: null, t: null, car: null, lap: null, driverOrdinal: String(driver), lapOrdinal: String(lap),
-          baselineSessionId: null, baselineDriverOrdinal: null, baselineLapOrdinal: null,
-        })}
+        // Race mode replaced the lap view's history entry: Back returns to that lap view.
+        onClose={() => {
+          setFromRace(true);
+          updateSearchParams(searchParams, setSearchParams, { mode: null, t: null, car: null, lap: null });
+        }}
+        onOpenLap={(driver, lap) => {
+          setFromRace(true);
+          updateSearchParams(searchParams, setSearchParams, {
+            mode: null, t: null, car: null, lap: null, driverOrdinal: String(driver), lapOrdinal: String(lap),
+            baselineSessionId: null, baselineDriverOrdinal: null, baselineLapOrdinal: null,
+          });
+        }}
         onStateChange={(timeSec, slot) => updateSearchParams(searchParams, setSearchParams, {
           t: String(timeSec), car: slot === null ? null : String(slot), lap: null,
         })}
@@ -91,6 +100,7 @@ export const ReplayInspectorPage: React.FC = () => {
         initialBaselineDriverOrdinal={Number.isInteger(baselineDriverOrdinal) && baselineDriverOrdinal >= 0 ? baselineDriverOrdinal : 0}
         initialBaselineLapOrdinal={Number.isInteger(baselineLapOrdinal) && baselineLapOrdinal >= 0 ? baselineLapOrdinal : undefined}
         initialCornerNumber={corner ? parseInt(corner, 10) : undefined}
+        resumeShownLap={fromRace}
         isExpanded={fullscreen === 'true' || fullscreen === '1'}
         onToggleExpanded={(expanded) => updateSearchParams(searchParams, setSearchParams, { fullscreen: expanded })}
         view={view}

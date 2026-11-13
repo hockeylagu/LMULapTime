@@ -26,6 +26,8 @@ export interface ReplayInspectorContentProps {
   initialBaselineSessionId?: string | null;
   initialBaselineDriverOrdinal?: number;
   initialBaselineLapOrdinal?: number | null;
+  /** Back from the race replay: the lap last shown comes back without loading. */
+  resumeShownLap?: boolean;
   /** A corner to open on the Corners tab once the lap (and its comparison lap) are loaded. */
   initialCornerNumber?: number | null;
   isExpanded?: boolean;
@@ -46,6 +48,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   initialBaselineDriverOrdinal,
   initialBaselineLapOrdinal,
   initialCornerNumber,
+  resumeShownLap,
   isExpanded,
   onToggleExpanded,
   view: controlledView,
@@ -110,6 +113,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     initialBaselineSessionId,
     initialBaselineDriverOrdinal,
     initialBaselineLapOrdinal,
+    resumeShownLap,
   });
 
   const [uncontrolledView, setUncontrolledView] = useState<'2d' | '3d'>('2d');

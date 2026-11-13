@@ -28,7 +28,22 @@ export interface UseReplayInspectorDataProps {
   initialBaselineSessionId?: string | null;
   initialBaselineDriverOrdinal?: number;
   initialBaselineLapOrdinal?: number | null;
+  /** Back from the race replay: the lap last shown, if it is the asked one, shows again without loading. */
+  resumeShownLap?: boolean;
 }
+
+/** The lap the lap view last showed; the race replay replaces the lap view, which comes back on it. */
+interface ShownLap {
+  sessionId: string;
+  driverOrdinal: number;
+  lapOrdinal: number;
+  metadata: ReplayMetadata;
+  trajectory: ReplayTrajectoryData;
+  slot: number | null;
+  resolution: TelemetryResolution;
+  source: 'duckdb' | 'vcr';
+}
+let lastShownLap: ShownLap | null = null;
 
 export function useReplayInspectorData({
   isOpen,
@@ -40,12 +55,15 @@ export function useReplayInspectorData({
   initialBaselineSessionId,
   initialBaselineDriverOrdinal,
   initialBaselineLapOrdinal,
+  resumeShownLap = false,
 }: UseReplayInspectorDataProps) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [resumed] = useState(() => resumeShownLap && lastShownLap?.sessionId === sessionId
+    && lastShownLap.driverOrdinal === (initialDriverOrdinal ?? 0) && lastShownLap.lapOrdinal === (initialLapOrdinal ?? 0) ? lastShownLap : null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId);
-  const [metadata, setMetadata] = useState<ReplayMetadata | null>(null);
-  const [trajectory, setTrajectory] = useState<ReplayTrajectoryData | null>(null);
-  const [selectedDriverSlot, setSelectedDriverSlot] = useState<number | null>(null);
+  const [metadata, setMetadata] = useState<ReplayMetadata | null>(resumed?.metadata ?? null);
+  const [trajectory, setTrajectory] = useState<ReplayTrajectoryData | null>(resumed?.trajectory ?? null);
+  const [selectedDriverSlot, setSelectedDriverSlot] = useState<number | null>(resumed?.slot ?? null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isTrajLoading, setIsTrajLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,8 +86,8 @@ export function useReplayInspectorData({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [chartZoomRange, setChartZoomRange] = useState<{ start: number; end: number } | null>(null);
-  const [telemetryResolution, setTelemetryResolution] = useState<TelemetryResolution>(DEFAULT_TELEMETRY_RESOLUTION);
-  const [selectedSource, setSelectedSource] = useState<'duckdb' | 'vcr'>('duckdb');
+  const [telemetryResolution, setTelemetryResolution] = useState<TelemetryResolution>(resumed?.resolution ?? DEFAULT_TELEMETRY_RESOLUTION);
+  const [selectedSource, setSelectedSource] = useState<'duckdb' | 'vcr'>(resumed?.source ?? 'duckdb');
 
   const animRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
@@ -155,17 +173,20 @@ export function useReplayInspectorData({
         setBaselineLapOrdinal(initialBaselineLapOrdinal ?? null);
         setBaselineDriverOrdinal(initialBaselineDriverOrdinal ?? 0);
       }
-      // Clear the previous session while the newly selected session loads.
-      setMetadata(null);
-      setTrajectory(null);
-      setSelectedDriverSlot(null);
-      setIsTrajLoading(false);
-      setIsLoading(true);
-      setError(null);
+      // Clear the previous session while the newly selected session loads (a resumed lap is already shown).
+      if (!resumed || sessionLoadedKey !== null) {
+        setMetadata(null);
+        setTrajectory(null);
+        setSelectedDriverSlot(null);
+        setIsTrajLoading(false);
+        setIsLoading(true);
+        setError(null);
+      }
     }
   }
 
   // Load the selected session's metadata and initial trajectory.
+  const skipLoadRef = useRef(resumed !== null);
   const loadSession = useEffectEvent(() => {
     trajectoryControllerRef.current?.abort();
     trajectoryRequestIdRef.current++;
@@ -175,6 +196,10 @@ export function useReplayInspectorData({
       return;
     }
 
+    if (skipLoadRef.current) {
+      skipLoadRef.current = false;
+      return;
+    }
     let isMounted = true;
     const requestId = ++trajectoryRequestIdRef.current;
     lastTrajectoryRequestRef.current = null;
@@ -239,6 +264,11 @@ export function useReplayInspectorData({
       trajectoryControllerRef.current?.abort();
     };
   });
+  useEffect(() => {
+    if (!activeSessionId || !metadata || !trajectory) return;
+    lastShownLap = { sessionId: activeSessionId, driverOrdinal: selectedDriverOrdinal, lapOrdinal: selectedLapOrdinal, metadata, trajectory,
+      slot: selectedDriverSlot, resolution: telemetryResolution, source: selectedSource };
+  }, [activeSessionId, selectedDriverOrdinal, selectedLapOrdinal, metadata, trajectory, selectedDriverSlot, telemetryResolution, selectedSource]);
   // Lap/driver changes already load through fetchTrajectory. Their successful locator updates
   // must not clear the session again or remount an expanded map.
   useEffect(() => loadSession(), [isOpen, activeSessionId, replayLoadVersion]);
