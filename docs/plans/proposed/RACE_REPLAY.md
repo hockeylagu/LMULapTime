@@ -6,6 +6,25 @@ tower; the followed car's incidents (pit stops, contacts, penalties) in a dropdo
 hover tooltip for a car on the map or in the standings (no always-on labels: too crowded), gaps of a
 minute or more as m:ss.s, live between line crossings; the lap map's toolbar and keys. Measured on Le Mans R1 (63 cars): a window is ~1 MB, 0.2–1.6 s the first time (worker
 start + about 70 laps decoded), ~2 ms once its laps are cached. Next: step 3 (3D). Its first part is done: the followed car draws as one multi-draw per material content (94 → 33 draws for a median car; see REPLAY_3D_PERFORMANCE.md); the grid reuses those batches with an instance per car (about 5,700 → 200 draws for Le Mans R1, counted from the package).
+Step 3 v1 implemented 2026-11-12: the race's 2D/3D button opens the scene shell shared with the lap view; the followed car is
+its full model and the cameras ride on it. Since 2026-11-13 every other car is its body model too, at the body's own distance
+levels (`extras.lod`, already in the package) instead of a class-coloured box (now only while a car loads, or a car without
+a body): liveries of one body share its GLB and parsed geometry, the other cars draw part by part (no per-car batch copy, which
+held ~3 GB for 41 cars), drop their interior parts, update their matrices once per frame and are skipped out of view. Cost
+(dev build, headless Edge, 1080p): bunched start of 44 cars 48–65 fps at ~1,800–2,400 draws against 134–167 fps with boxes;
+spread field ~75–120 fps against ~110–145. Memory keeps only what draws: GLB bytes are read for the parse only and the
+race's vertex buffers leave the CPU once uploaded (Le Mans start, 61 cars: JS heap 3.6 → 2.5 GB, CPU car geometry 680 → 51 MB;
+the ~0.9 GB of car textures still keep their CPU levels for mip streaming). Since then the field draws from batches shared by
+the cars of each body (18 bodies, 42 liveries for 62 cars at Le Mans): 2,884 → 1,747 draws at the start, one GPU copy per
+body, but the same ~35 fps: the frame is bound by the main thread (per-draw work ~25 %, wheel ground rays ~12 %, matrix walk
+~8 %), and a body still splits into ~60 batches, one per material. Each car's wheel build and road fit now wait until the car is
+drawn (out-of-view cars no longer refit at each window or scenery change; not yet benchmarked). Next: fewer materials per body
+(the package's material consolidation). The
+scenery streams ahead of the followed car by its station from the progress grid; trackside spots stand along the followed
+car's samples of the pose window; a followed car still in its garage box puts the camera on its nearest pose or the first car
+on track. The full models roll, steer and travel their suspension and light their lamps from the window (2026-11-13: the
+windows carry steering, brake, a lamp bitmask and the four deflections, 15 channels, about 1.6 MB for 45 cars). Not yet: the
+game clock's daylight, labels.
 
 ## Goal
 
@@ -66,8 +85,8 @@ view on one session clock, with seek, playback speed and a followed car. Any ses
 - **Pipeline exporter**: a low-poly body per car model (~3–5k triangles, one material) plus a small
   livery texture per appearance. The package grows by a few MB per model; agree the budget with the
   pipeline session (the user wants the package to stay small).
-- App: instanced LOD bodies per model, livery per instance (texture array or atlas); full models for
-  the followed car and the N nearest (N from a frame-time check, start at 3); swap with hysteresis.
+- App: done without a pipeline step, from the bodies' own distance levels (see the status above); a low-poly export stays an
+  option if the draw count of a full field needs it.
 - Budget: the 16 ms frame target. A full model is ~100 draws (116 materials on the 911), so 60
   full cars (~6,000 draws ≈ 36 ms) are out of reach.
 - Labels above the cars: one screen-space layer, not per-car meshes.
@@ -94,10 +113,10 @@ view on one session clock, with seek, playback speed and a followed car. Any ses
 1. Pose stream + session clock + 2D map with all cars and the tower (no pipeline dependency).
 2. Incidents dropdown and hover tooltips.
 3. 3D with full models near the camera and class-coloured boxes as a temporary far LOD.
-4. Pipeline LOD export with liveries, then swap the boxes for it.
+4. Every car its body model at the body's distance levels (done 2026-11-13); a pipeline LOD export only if draws demand it.
 
 ## Open
 
 - Pose rate (10 vs 20 Hz) after a playback check.
-- Number of full-detail cars after a frame-time check.
-- LOD package budget, agreed with the pipeline session.
+- Draw count of a bunched full field: per-body batches done (2026-11-13); next the materials per body, a package change with
+  the pipeline session.
