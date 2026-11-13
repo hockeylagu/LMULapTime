@@ -1,9 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReplayInspectorContent } from './inspector/ReplayInspectorContent.js';
 import { GhostSyncContext, type GhostSyncState } from './inspector/ghostSyncContext.js';
 import { parseGhostSyncMode } from './map/ghostSync.js';
+import { RaceReplayView } from './race/RaceReplayView.js';
+import { RaceModeContext } from './race/raceModeContext.js';
+
+/** A finite number from a URL value, or null. */
+const numberParam = (value: string | null): number | null => {
+  const parsed = value === null || value === '' ? NaN : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 export const ReplayInspectorPage: React.FC = () => {
   const navigate = useNavigate();
@@ -22,6 +30,10 @@ export const ReplayInspectorPage: React.FC = () => {
     setMode: mode => updateSearchParams(searchParams, setSearchParams, { sync: mode === 'distance' ? null : mode }),
     markerDistM, setMarkerDistM,
   }), [syncMode, markerDistM, searchParams, setSearchParams]);
+  const isRace = searchParams.get('mode') === 'race';
+  const openRace = useCallback((slot: number | null, lapNumber: number | null) => updateSearchParams(searchParams, setSearchParams, {
+    mode: 'race', car: slot === null ? null : String(slot), lap: lapNumber === null ? null : String(lapNumber), t: null,
+  }), [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -35,6 +47,25 @@ export const ReplayInspectorPage: React.FC = () => {
 
   if (!sessionId) return null;
 
+  if (isRace) {
+    return (
+      <RaceReplayView
+        sessionId={sessionId}
+        initialTimeSec={numberParam(searchParams.get('t'))}
+        initialSlot={numberParam(searchParams.get('car'))}
+        initialLapNumber={numberParam(searchParams.get('lap'))}
+        onClose={() => void navigate(-1)}
+        onOpenLap={(driver, lap) => updateSearchParams(searchParams, setSearchParams, {
+          mode: null, t: null, car: null, lap: null, driverOrdinal: String(driver), lapOrdinal: String(lap),
+          baselineSessionId: null, baselineDriverOrdinal: null, baselineLapOrdinal: null,
+        })}
+        onStateChange={(timeSec, slot) => updateSearchParams(searchParams, setSearchParams, {
+          t: String(timeSec), car: slot === null ? null : String(slot), lap: null,
+        })}
+      />
+    );
+  }
+
   const driverOrdinal = Number(searchParams.get('driverOrdinal') ?? 0);
   const lapOrdinal = Number(searchParams.get('lapOrdinal') ?? 0);
   const baselineDriverOrdinal = Number(searchParams.get('baselineDriverOrdinal') ?? 0);
@@ -43,6 +74,7 @@ export const ReplayInspectorPage: React.FC = () => {
   const corner = searchParams.get('corner');
 
   return (
+    <RaceModeContext.Provider value={openRace}>
     <GhostSyncContext.Provider value={ghostSync}>
       <ReplayInspectorContent
         isOpen
@@ -65,5 +97,6 @@ export const ReplayInspectorPage: React.FC = () => {
         onViewChange={(newView) => updateSearchParams(searchParams, setSearchParams, { view: newView })}
       />
     </GhostSyncContext.Provider>
+    </RaceModeContext.Provider>
   );
 };

@@ -1,5 +1,6 @@
-import type { ReplayMetadata, ReplayTrafficResponse, ReplayTrajectoryData } from '../../shared/types/index.js';
-import { apiErrorMessage, fetchJson, isAbortError } from './apiClient.js';
+import type { RaceReplayOverview, ReplayMetadata, ReplayTrafficResponse, ReplayTrajectoryData } from '../../shared/types/index.js';
+import { apiErrorMessage, fetchBinary, fetchJson, isAbortError } from './apiClient.js';
+import { decodeRacePoseWindow, type RacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
 import { fetchLiveLapEvidence } from './liveEvidenceApi.js';
 import { fuseLiveTelemetry } from '../../shared/domain/live/liveTelemetryFusion.js';
 import { withReplayWheelSlip } from '../../shared/domain/live/replayWheelSlip.js';
@@ -26,6 +27,16 @@ export function sessionTelemetryPath(sessionId: string, request: SessionTelemetr
 
 export function fetchSessionTelemetryMetadata(sessionId: string, init?: RequestInit): Promise<ReplayMetadata> {
   return fetchJson<ReplayMetadata>(`/api/session/${encodeURIComponent(sessionId)}/telemetry/metadata`, init);
+}
+
+/** Every car of the session replay on the replay clock: cars, laps and running order (poses come in windows). */
+export function fetchRaceOverview(sessionId: string, init?: RequestInit): Promise<RaceReplayOverview> {
+  return fetchJson<RaceReplayOverview>(`/api/session/${encodeURIComponent(sessionId)}/race`, init);
+}
+
+/** Pose window `index` (from index × windowSec seconds) of every car of the session replay. */
+export async function fetchRacePoseWindow(sessionId: string, index: number, init?: RequestInit): Promise<RacePoseWindow> {
+  return decodeRacePoseWindow(await fetchBinary(`/api/session/${encodeURIComponent(sessionId)}/race/poses?window=${index}`, init));
 }
 
 /** The lap with its live capture fused in when it has one; wheel slip from the replay's wheel speeds otherwise. */

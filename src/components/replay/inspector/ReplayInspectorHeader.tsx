@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import type { CompareLapPagination } from './compare/CompareLapPagination.js';
-import { X, Play, Pause, RotateCcw, Flag, ArrowLeftRight, Users, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, Flag, ArrowLeftRight, Users, ChevronLeft, ChevronRight, LoaderCircle, ListOrdered } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './compare/ReplayCompareLapPicker.js';
 import type { CompareLapControls } from './compare/compareLapControls.js';
@@ -10,6 +10,7 @@ import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { PLAYBACK_SPEEDS } from './replayFullscreenControls.js';
 import { Select } from '../../common/dropdown/Select.js';
+import { RaceModeContext } from '../race/raceModeContext.js';
 
 /** Previous/next lap: square companions of the lap dropdown, in its well and hairline. */
 const LAP_STEP_BUTTON =
@@ -75,6 +76,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   const previousLap = trajectory?.laps?.[currentLapIndex - 1];
   const nextLap = currentLapIndex >= 0 ? trajectory?.laps?.[currentLapIndex + 1] : undefined;
   const selectedDriver = drivers.find(driver => driver.slot === selectedDriverSlot);
+  const openRace = useContext(RaceModeContext);
   const driverLabel = selectedDriver ? `${selectedDriver.carNumber ? `#${selectedDriver.carNumber} ` : ''}${selectedDriver.name}${selectedDriver.isPlayer ? ' (You)' : ''}` : '';
 
   return (
@@ -142,6 +144,14 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               <ChevronRight aria-hidden="true" className="w-3.5 h-3.5" />
             </button>
           </div>
+        )}
+
+        {openRace && (
+          <button type="button" onClick={() => openRace(selectedDriverSlot, trajectory?.currentLap ?? null)} disabled={isLoading}
+            title="Race replay: every car of the session on one clock, from this lap"
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-lmu-border bg-lmu-bg px-2.5 text-xs text-lmu-text-soft hover:bg-lmu-card disabled:opacity-40 ${FOCUS_RING}`}>
+            <ListOrdered aria-hidden="true" className="h-3.5 w-3.5 text-lmu-accent-text" />Race
+          </button>
         )}
 
         {!isCompareMode ? (

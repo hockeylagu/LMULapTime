@@ -1,6 +1,11 @@
 # Race replay: every car on the map and in 3D
 
-Status: proposed 2026-11-08. Nothing built. Decisions below are the user's.
+Status: proposed 2026-11-08; decisions below are the user's. Order steps 1 and 2 implemented 2026-11-12
+(uncommitted): pose windows, session clock, Race mode in the inspector, 2D map with every car, standings
+tower; the followed car's incidents (pit stops, contacts, penalties) in a dropdown as in the game, a
+hover tooltip for a car on the map or in the standings (no always-on labels: too crowded), gaps of a
+minute or more as m:ss.s. Measured on Le Mans R1 (63 cars): a window is ~1 MB, 0.2–1.6 s the first time (worker
+start + about 70 laps decoded), ~2 ms once its laps are cached. Next: step 3 (3D). Its first part is done: the followed car draws as one multi-draw per material content (94 → 33 draws for a median car; see REPLAY_3D_PERFORMANCE.md); the grid reuses those batches with an instance per car (about 5,700 → 200 draws for Le Mans R1, counted from the package).
 
 ## Goal
 
@@ -18,7 +23,7 @@ view on one session clock, with seek, playback speed and a followed car. Any ses
 | Data | Built **on demand** from the stored laps into a server memory cache; no new database table. |
 | 3D cars | Full models for the followed car and the few nearest; **low-poly LOD cars with the real livery** for the rest. |
 | Cameras | Chase / Cockpit / Hood / Roof on any car, trackside cameras following the selected car, free orbit. |
-| Overlays (v1) | Standings tower, event timeline (pit, contact, penalty), car labels. Flags and weather later. |
+| Overlays (v1) | Standings tower, the followed car's incidents (pit, contact, penalty) in a dropdown, a car tooltip on hover (no always-on labels). Flags and weather later. |
 
 ## What already exists
 
@@ -72,7 +77,8 @@ view on one session clock, with seek, playback speed and a followed car. Any ses
 ### 5. Overlays
 
 - Standings tower from `replay_running_order` (class order, gaps), clickable.
-- Event timeline under the playback strip from `replay_driver_events`; click seeks a few seconds before.
+- Incidents of the followed car from `replay_driver_events` in a dropdown (what, who, when); a pick seeks 3 s before.
+- A car's timing line as a tooltip when it is hovered on the map or in the standings.
 
 ## Impact
 
@@ -85,7 +91,7 @@ view on one session clock, with seek, playback speed and a followed car. Any ses
 ## Order
 
 1. Pose stream + session clock + 2D map with all cars and the tower (no pipeline dependency).
-2. Event timeline and labels.
+2. Incidents dropdown and hover tooltips.
 3. 3D with full models near the camera and class-coloured boxes as a temporary far LOD.
 4. Pipeline LOD export with liveries, then swap the boxes for it.
 
