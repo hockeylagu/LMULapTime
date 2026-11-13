@@ -153,6 +153,16 @@ const TARGETS: TargetScreenshot[] = [
     `,
   },
   {
+    name: 'Race Mode Replay (Bahrain LMP3 Race & Standings Tower)',
+    url: 'http://localhost:5173/?demo=1#/telemetry?sessionId=2026_09_30_23_37_59-24R1&mode=race&t=180',
+    outputPath: path.join(process.cwd(), 'assets', 'race_replay.png'),
+    waitMs: 5000,
+    evalBeforeCapture: `
+      const toastBtn = document.querySelector('button[aria-label="Dismiss toast"], button[aria-label="Close"]');
+      if (toastBtn) toastBtn.click();
+    `,
+  },
+  {
     name: 'Session Detail (Bahrain LMP3 Race Stint)',
     url: 'http://localhost:5173/?demo=1#/session/2026_09_30_23_37_59-24R1',
     outputPath: path.join(process.cwd(), 'assets', 'session_detail.png'),

@@ -18,19 +18,22 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 
 ### 🗺️ Replay & Telemetry Studio
 - **100 Hz columnar DuckDB telemetry**: Ingests native telemetry at microsecond precision, smoothly interpolated across the start/finish timing loop.
-- **2D track map**: Recorded trajectories with color-coded speed, pedal zones and a live telemetry cursor. Bundled SVGs cover 32 layouts; calibrated road boundaries and physical profiles require an optional local data package.
-- **Fullscreen GPS map**: Follow-car camera with minimap HUD overlay, dynamic friction circle, sector lines, brake distance boards, and a docked live telemetry playback strip.
-- **Synchronized multi-channel traces**: Speed, lap delta, throttle & brake (with ABS/TC events), stepped gear changes, steering angle with real-time understeer/oversteer/scrub balance indicators, G-forces, dampers, tire temperatures & pressures, and Hypercar hybrid energy (SoC, Virtual Energy, Regen).
-- **Three-phase corner breakdown**: Micro-splits deconstructing every turn into Entry (braking point, trail brake decay), Rotation (apex minimum speed, yaw rate), and Exit (throttle pick-up timing, traction).
+- **2D track map & resizable layout**: Recorded trajectories with color-coded speed, pedal zones, delta/gain-loss heatmaps, and a live telemetry cursor in a resizable panel beside the charts. Bundled SVGs cover 32 layouts; calibrated road boundaries and physical profiles require an optional local data package.
+- **3D Replay View** *(requires optional local data package)*: Switch between 2D and 3D with one button. Streams track scenery, sky/clouds, and cascaded sun shadows in Three.js, with official car liveries, rolling wheels, turning steering wheels, headlights/brake/rain/pit lamps, Chase/Cockpit/Hood/Roof/Trackside cameras, and a draped 3D racing line (`Line` menu).
+- **Fullscreen GPS map**: Follow-car camera with minimap HUD overlay, dynamic friction circle, sector lines, brake distance boards, ghost sync modes (`Distance`, `Time`, `From A`), and a docked live telemetry playback strip.
+- **Synchronized multi-channel traces**: Speed, lap delta, throttle & brake (with ABS/TC events), stepped gear changes, steering angle with real-time understeer/oversteer/scrub balance indicators, G-forces, dampers, tire temperatures & pressures, per-wheel slip, and Hypercar hybrid energy (SoC, Virtual Energy, Regen).
+- **Three-phase corner breakdown**: Micro-splits deconstructing every turn into Entry (braking point, trail brake decay), Rotation (apex minimum speed, yaw rate), and Exit (throttle pick-up timing, traction), with a shared measure marker (`Set A` / `X`) for segment deltas.
 
 ![Fullscreen GPS Map - Follow-Car & Minimap HUD](assets/fullscreen_gps_map.png)
 
 ![Fullscreen GPS Map - Portimão Circuit Layout, Pit Lane & Runoff](assets/fullscreen_gps_map_portimao.png)
 
-### 🎬 Every Driver's Telemetry, from the Replays
-- **Reverse-engineered replay format**: LMU's binary `.Vcr` replays (`gMb1.002f`) are decoded to extract the trajectory and telemetry of every car in the session: position, speed, throttle and brake (with ABS/TC), steering, gear and brake temperatures.
+### 🎬 Every Driver's Telemetry & Race Mode
+![Race Mode Replay - Every Car on One Clock & Standings Tower](assets/race_replay.png)
+- **Race Mode (every car on one clock)**: Watch the entire field move together on a shared session clock (1–16x) with a live standings tower, class gaps and intervals, pit/DNF states, an incident jump menu, and one-click switching between Race Mode and Lap View.
+- **Reverse-engineered replay format**: LMU's binary `.Vcr` replays (`gMb1.002f`) are decoded to extract the trajectory and telemetry of every car in the session: position, speed, throttle and brake (with ABS/TC), steering, gear, wheel speeds/slip, headlights, and brake temperatures.
 - **Your own laps at 100 Hz**: LMU's native DuckDB telemetry is read and fused with the replay trajectory, cut cleanly at the timing line.
-- **Compare against anyone**: any of your laps against any other driver's lap from the same layout, aligned on track position: speed and delta traces, pedals, racing lines on the map, sector and corner gaps.
+- **Compare against anyone**: any of your laps against any other driver's lap from the same layout, aligned on track position (or synced by time / from marker A): speed and delta traces, pedals, racing lines on the map, sector and corner gaps.
 - **Built for big files**: replays of several hundred MB are decoded in worker threads and cached, so the next look is instant.
 
 ### 🏆 Leaderboard & Rivals
@@ -42,7 +45,7 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 ### 🏎️ Dashboard & Sessions
 ![Session Detail & Stint Analysis](assets/session_detail.png)
 - **True Pace & Consistency**: Calculates true pace (top 3 clean laps average), theoretical best, and lap consistency score exclusively from clean flying laps (out, in, and start laps filtered out).
-- **Multiclass race analysis**: Full classification standings, position deltas, sector splits vs best same car, tire wear degradation profiles, and stewards penalty logs.
+- **Multiclass race analysis**: Class-aware standings, grid/finish position deltas, sector splits vs best same car, plan-vs-actual fuel/VE/tyre strategy debriefs, tire wear degradation profiles, and stewards penalty logs.
 - **Multi-session progression**: Interactive pace trajectory tracking performance evolution across stints, cars, and layouts.
 
 ![Dashboard Overview](assets/dashboard.png)
@@ -51,12 +54,14 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 ![Live Race Dashboard - Race Stint, Pit Window & Pedals](assets/live_dashboard.png)
 - **Second-screen display**: a glanceable fullscreen page for the rig monitor, opened automatically when LMU runs (tray double-click puts it on the chosen display).
 - **Fuel & Virtual Energy strategy**: per-lap use from the last laps, spare per lap, laps to the pit window, and the MFD settings for the next stop (refuel / VE, tyres).
+- **Hypercar hybrid deployment advice**: live battery charge-cycle guidance (`deploymentKw` or map steps) with countdowns to the next change in practice, qualifying, and race.
+- **Wet & dry tyre crossover**: advises slick-to-wet and wet-to-slick pit stops from track wetness, and flags tyre changes from per-wheel wear forecasts.
 - **Lap timing**: current lap and sector splits against your best, track conditions, and a live throttle & brake trace.
 - **Offline demo**: practice, qualifying and race scenarios to try it without driving (`#/live?demo=1`).
 - **Live capture & learning**: each session is recorded to its own DuckDB file, reconciled with the results XML, and feeds validated fuel/VE forecast corrections (`LMU_LIVE_LEARNING=0` disables them). See [live capture storage](docs/LIVE_CAPTURE_FORMAT.md).
 
 ### 🎯 Coaching
-- **Corner analysis**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) for every turn, with consistency scoring.
+- **Corner analysis**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) for every turn, with consistency scoring and faster-class comparison fallback when no same-car lap is faster.
 - **Deterministic coaching**: driving deficits ranked by time lost, repeatability and confidence (`priority = timeLoss * repeatability * confidence`).
 - **AI Race Engineer** (optional, Google Gemini): explains the findings and suggests setup changes.
 
@@ -166,7 +171,7 @@ To adjust your paths or driver profile:
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite 8](https://vitejs.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [Recharts](https://recharts.org/), [Lucide React](https://lucide.dev/)
+- **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite 8](https://vitejs.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [Three.js](https://threejs.org/), [Recharts](https://recharts.org/), [Lucide React](https://lucide.dev/)
 - **Backend**: [Node.js](https://nodejs.org/), [Express 5](https://expressjs.com/), [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) (WAL Mode), [DuckDB](https://duckdb.org/), [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser), [@google/genai](https://github.com/googleapis/genai-js)
 - **Diagnostics & Tooling**: TypeScript Telemetry Recorder (`tools/telemetryRecorder.ts`), TSX analysis scripts
 - **Test Suite**: [Vitest](https://vitest.dev/), Testing Library, happy-dom
