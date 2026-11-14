@@ -45,6 +45,22 @@ it('shares one depth material among casters that draw alike: same side, and for 
   expect(seen[2][3]).not.toBe(dGrille);
 });
 
+it('gives a batch its own depth material beside a plain mesh of the same material (three builds their programs apart)', () => {
+  const scene = new Scene(), material = new MeshStandardMaterial();
+  const batch = new BatchedMesh(1, 100, 300, material), plain = new Mesh(new BoxGeometry(), material), other = new Mesh(new BoxGeometry(), material);
+  batch.addInstance(batch.addGeometry(new BoxGeometry()));
+  for (const mesh of [batch, plain, other]) { mesh.castShadow = true; scene.add(mesh); }
+  scene.updateMatrixWorld(true);
+  let seen: Material[] = [];
+  const renderer = {
+    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
+    render() { seen = [batch, plain, other].map(mesh => mesh.material as Material); },
+  } as unknown as WebGLRenderer;
+  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}], new PerspectiveCamera(), [], 0);
+  expect(seen[1]).toBe(seen[2]); expect(seen[0]).not.toBe(seen[1]);
+  expect(seen.every(depth => depth instanceof MeshDepthMaterial && depth.side === BackSide)).toBe(true);
+});
+
 it('draws the shadow in plain depth while the scene uses a reversed depth range, then goes back to it', () => {
   const calls: Array<boolean | string> = [];
   const renderer = {

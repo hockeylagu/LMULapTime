@@ -1,5 +1,5 @@
 import {
-  AlwaysDepth, BackSide, BatchedMesh, DoubleSide, FrontSide, GLSL3, Line, Mesh, MeshDepthMaterial, OrthographicCamera, PlaneGeometry, Points, Scene,
+  AlwaysDepth, BackSide, BatchedMesh, DoubleSide, FrontSide, GLSL3, InstancedMesh, Line, Mesh, MeshDepthMaterial, OrthographicCamera, PlaneGeometry, Points, Scene,
   ShaderMaterial, Sprite, type BufferGeometry, type Material, type Object3D, type PerspectiveCamera, type Side, type Texture, type Vector4,
   type WebGLRenderer, type WebGLRenderTarget,
 } from 'three';
@@ -40,6 +40,13 @@ const castsShadow = (material: Material) => !material.transparent || material.al
 const NO_SHADOW = new MeshDepthMaterial({ visible: false });
 
 /**
+ * How a caster draws: three builds a batched, an instanced and a plain mesh's program apart, so a depth material drawn by two kinds
+ * looks its program up again at every switch between them.
+ */
+type CasterKind = 'batch' | 'instanced' | 'mesh';
+const kindOf = (mesh: Mesh): CasterKind => mesh instanceof BatchedMesh ? 'batch' : mesh instanceof InstancedMesh ? 'instanced' : 'mesh';
+
+/**
  * A quad over the viewport that writes, at each texel, the depth `baseDepth` holds at the same texel (no colour). A depth texture's
  * region is copied by drawing, not by a framebuffer blit: Direct3D 11 copies a depth resource only whole, and a blit of part of one
  * there (WebGL on Windows) silently copies nothing.
@@ -63,28 +70,32 @@ function depthCopyQuad(): {scene: Scene; camera: OrthographicCamera; material: S
 export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): ShadowCasterPass {
   let depthCopy: ReturnType<typeof depthCopyQuad> | null = null;
   // Casters that draw the same way share one depth material, so the pass draws them one after another without switching material
-  // (every switch uploads the material's uniforms again): keyed by the card turn, side, alpha cut and the textures the cut reads.
+  // (every switch uploads the material's uniforms again): keyed by the caster's kind, the card turn, side, alpha cut and the
+  // textures the cut reads.
   const depthMaterials = new Map<string, MeshDepthMaterial>();
-  let byMaterial = new WeakMap<Material, MeshDepthMaterial>(); // The key's result per scene material, so the key is built once.
+  // The key's result per scene material and caster kind, so the key is built once.
+  let byMaterial = new WeakMap<Material, Partial<Record<CasterKind, MeshDepthMaterial>>>();
   // The texture listeners a cut-out's depth material put on, taken off when the pass goes.
   const listening: Array<[Texture, () => void]> = [];
   const depthOf = (mesh: Mesh, material: Material): MeshDepthMaterial => {
     if (!castsShadow(material)) return NO_SHADOW;
-    const known = byMaterial.get(material);
-    if (known) return known;
+    const kind = kindOf(mesh), known = byMaterial.get(material) ?? {};
+    byMaterial.set(material, known);
+    const found = known[kind];
+    if (found) return found;
     const custom = mesh.customDepthMaterial ?? null, side = material.shadowSide ?? SHADOW_SIDE[material.side];
     const alphaTest = material.alphaToCoverage ? 0.5 : material.alphaTest, source = material as Material & {map?: Texture | null; alphaMap?: Texture | null};
     const [map, alphaMap] = alphaTest > 0 ? [source.map ?? null, source.alphaMap ?? null] : [null, null];
-    const key = `${custom?.uuid ?? ''}|${side}|${alphaTest}|${map?.id ?? ''}|${alphaMap?.id ?? ''}`;
+    const key = `${kind}|${custom?.uuid ?? ''}|${side}|${alphaTest}|${map?.id ?? ''}|${alphaMap?.id ?? ''}`;
     let depth = depthMaterials.get(key);
-    if (depth) { byMaterial.set(material, depth); return depth; }
+    if (depth) { known[kind] = depth; return depth; }
     depth = new MeshDepthMaterial({side, alphaTest, map, alphaMap});
     // Camera-facing cards keep their shadow-pass turn (patchSurfaceShader's billboard depth material).
     if (custom) {
       depth.onBeforeCompile = (shader, renderer) => custom.onBeforeCompile(shader, renderer);
       depth.customProgramCacheKey = () => custom.customProgramCacheKey();
     }
-    depthMaterials.set(key, depth); byMaterial.set(material, depth);
+    depthMaterials.set(key, depth); known[kind] = depth;
     // A depth material that cuts by a texture goes with it.
     const drop = () => { depth.dispose(); depthMaterials.delete(key); byMaterial = new WeakMap(); };
     for (const texture of [map, alphaMap]) if (texture) { texture.addEventListener('dispose', drop); listening.push([texture, drop]); }

@@ -133,8 +133,9 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
   if (original?.userData.surfaceConfigured === true) return;
   const config = original && readSurfaceConfig(original.userData);
   if (!original || !config) {
-    // The glTF material stays, drawing the scene's haze like the surface program does.
-    for (const material of [mesh.material].flat()) hazeProgram(material);
+    // The glTF material stays, drawing the scene's haze like the surface program does. Two-sided and blended (puddle decals), it
+    // draws once with both sides, as a configured one does.
+    for (const material of [mesh.material].flat()) { hazeProgram(material); material.forceSinglePass = true; }
     return;
   }
   const loaded: Record<string, Texture> = {};

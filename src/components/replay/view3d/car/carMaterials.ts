@@ -106,6 +106,10 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   // Alpha-masked parts (grilles, meshes, decals): alpha to coverage over the 4x MSAA target smooths their cut edges.
   if (config.renderState?.alphaMask) { material.alphaTest = 0.5; material.alphaToCoverage = true; material.side = DoubleSide; }
   if (config.renderState?.alphaBlend) { material.transparent = true; material.depthWrite = false; }
+  // A blended two-sided part (number plates, decals) draws once with both sides, as the scenery's do (configureSurfaceMaterial.ts):
+  // three otherwise draws it twice and marks the material changed before each, so every draw looks its program up again. Glass
+  // keeps the two passes.
+  material.forceSinglePass = config.kind !== 'glass' && config.kind !== 'windscreen' && config.kind !== 'windscreenInside';
   if (surface) {
     const loaded: Record<string, Texture> = {};
     for (const [key, map] of Object.entries(surface.maps)) loaded[key] = mapTexture(texture, map!);

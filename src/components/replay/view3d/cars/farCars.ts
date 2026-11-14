@@ -29,6 +29,8 @@ function ambient(material: MeshStandardMaterial): MeshStandardMaterial {
   material.onBeforeCompile = shader => { patchAmbientLookup(shader); };
   material.customProgramCacheKey = () => 'lmu-far-car-ambient';
   hazeProgram(material);
+  // Seen from afar, a blended two-sided primitive draws once with both sides (three's two passes look its program up twice a draw).
+  material.forceSinglePass = true;
   return material;
 }
 
