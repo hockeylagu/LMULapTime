@@ -28,6 +28,8 @@ export interface CascadeShadowState {
    */
   atlas: DepthTexture;
   matrices: Matrix4[];
+  /** `matrices` packed in order, as the samplers read them: a typed array is uploaded as is, an array of matrices is copied per draw. */
+  packedMatrices: Float32Array<ArrayBuffer>;
   /** Per cascade: where its tile starts (u, v) and its size (u, v), as fractions of the stacked texture. */
   tiles: Vector4[];
 }
@@ -101,6 +103,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   const state: CascadeShadowState = {
     atlas: depth,
     matrices: cascades.map(() => new Matrix4()),
+    packedMatrices: new Float32Array(cascades.length * 16),
     tiles: cascades.map(({viewport: {x, y}}) => new Vector4(x / sizePx, y / heightPx, tilePx / sizePx, tilePx / heightPx)),
   };
   const casters = createShadowCasterPass(renderer, scene), light = lightTravel.clone(), eye = new Vector3(), forward = new Vector3();
@@ -112,7 +115,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       const {cascade, camera} = cascades[i];
       const alongLightM = eye.clone().addScaledVector(forward, (sliceStartM(i) + cascade.splitM) / 2).dot(light);
       placeCascadeCamera(camera, axes, light, centres[i], alongLightM, cascade.sideM);
-      state.matrices[i].multiplyMatrices(BIAS, camera.projectionMatrix).multiply(camera.matrixWorldInverse);
+      state.matrices[i].multiplyMatrices(BIAS, camera.projectionMatrix).multiply(camera.matrixWorldInverse).toArray(state.packedMatrices, i * 16);
       cascades[i].drawnCentre = centres[i];
     }
   };

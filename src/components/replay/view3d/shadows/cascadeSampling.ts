@@ -1,4 +1,4 @@
-import { Matrix4, ShaderChunk, Vector2, Vector3, Vector4, type DepthTexture, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import { ShaderChunk, Vector2, type DepthTexture, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
 import type { SceneryShadows } from '../../../../../shared/types/scenes/scenery.js';
 import { cascadeDepthRangeM, type CascadeShadowState } from './cascadeShadows.js';
 import type { ShadowCascadeLayout } from './shadowCascades.js';
@@ -17,15 +17,16 @@ const CARD_SELF_SHADOW_TEXELS = 14;
 /**
  * The sun shadow inputs every lit program shares (scenery and cars); `surface_cascadeCount` 0 leaves everything lit. The atlas
  * sampler must hold a depth texture from the first draw: with none, three binds its empty colour texture and WebGL drops the draw on
- * the sampler mismatch.
+ * the sampler mismatch. The arrays are packed typed arrays: three uploads them as they are, where an array of vectors or matrices is
+ * copied into one on every draw of every lit program.
  */
 export const cascadeShadowUniforms = {
   surface_cascadeAtlas: { value: null as DepthTexture | null },
   surface_cascadeCount: { value: 0 },
-  surface_cascadeMatrices: { value: Array.from({ length: MAX_SHADOW_CASCADES }, () => new Matrix4()) },
-  surface_cascadeTiles: { value: Array.from({ length: MAX_SHADOW_CASCADES }, () => new Vector4()) },
-  surface_cascadeCardDepth: { value: Array.from({ length: MAX_SHADOW_CASCADES }, () => 0) },
-  surface_cascadeTaps: { value: Array.from({ length: MAX_SHADOW_TAPS }, () => new Vector3()) },
+  surface_cascadeMatrices: { value: new Float32Array(MAX_SHADOW_CASCADES * 16) },
+  surface_cascadeTiles: { value: new Float32Array(MAX_SHADOW_CASCADES * 4) },
+  surface_cascadeCardDepth: { value: new Float32Array(MAX_SHADOW_CASCADES) },
+  surface_cascadeTaps: { value: new Float32Array(MAX_SHADOW_TAPS * 3) },
   surface_cascadeTapCount: { value: 0 },
   /** One atlas texel across and up, as a fraction of the stacked texture. */
   surface_cascadeTexel: { value: new Vector2() },
@@ -37,7 +38,7 @@ export const cascadeShadowUniforms = {
 } satisfies Record<string, IUniform>;
 
 /**
- * Points the surfaces at a cascade set: its atlases and matrices (shared, so the per-frame redraws reach the shaders without a
+ * Points the surfaces at a cascade set: its atlases and packed matrices (shared, so the per-frame redraws reach the shaders without a
  * copy) and the package's filter, select, fade and normal offset.
  */
 export function sampleCascadeShadows(shadows: SceneryShadows, layout: ShadowCascadeLayout, state: CascadeShadowState): void {
@@ -46,13 +47,13 @@ export function sampleCascadeShadows(shadows: SceneryShadows, layout: ShadowCasc
   if (taps.length > MAX_SHADOW_TAPS) throw Error(`The surfaces sample at most ${MAX_SHADOW_TAPS} shadow filter taps, not ${taps.length}`);
   const u = cascadeShadowUniforms;
   u.surface_cascadeAtlas.value = state.atlas;
+  u.surface_cascadeMatrices.value = state.packedMatrices;
   cascades.forEach((cascade, i) => {
-    u.surface_cascadeMatrices.value[i] = state.matrices[i];
-    u.surface_cascadeTiles.value[i] = state.tiles[i];
+    state.tiles[i].toArray(u.surface_cascadeTiles.value, i * 4);
     const skipM = Math.max(CARD_SELF_SHADOW_M, CARD_SELF_SHADOW_TEXELS * cascade.texelM);
     u.surface_cascadeCardDepth.value[i] = skipM / cascadeDepthRangeM(cascade.sideM);
   });
-  taps.forEach(({ offset, weight }, i) => u.surface_cascadeTaps.value[i].set(offset[0], offset[1], weight));
+  taps.forEach(({ offset, weight }, i) => u.surface_cascadeTaps.value.set([offset[0], offset[1], weight], i * 3));
   u.surface_cascadeTapCount.value = taps.length;
   // The atlases are stacked upward (cascadeShadows.ts): a texel up is 1 / count of one across.
   u.surface_cascadeTexel.value.set(texelSize, texelSize / shadows.atlas.count);

@@ -116,6 +116,8 @@ describe('cascade shadows', () => {
     expect(cascades.state.matrices[0].equals(before[0])).toBe(false);
     expect(cascades.state.matrices[1].equals(before[1])).toBe(true);
     expect(cascades.state.matrices[2].equals(before[2])).toBe(true);
+    // The samplers' packed copy follows each redraw.
+    expect(Array.from(cascades.state.packedMatrices.slice(0, 16))).toEqual(cascades.state.matrices[0].elements.map(Math.fround));
   });
 
   it('maps a point at a cascade centre to the middle of its tile', () => {
