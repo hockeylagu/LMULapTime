@@ -25,6 +25,17 @@ describe('replay shortcuts on buttons', () => {
     expect(isReplaySurfaceTarget(space(button))).toBe(false);
   });
 
+  it('lets Space play after a mouse click on the timeline slider, but not after Tab focus', () => {
+    const slider = document.createElement('input'); slider.type = 'range';
+    document.body.appendChild(slider);
+    expect(replayShortcutBlocked(space(slider))).toBe(true);
+    slider.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    slider.focus();
+    expect(replayShortcutBlocked(space(slider))).toBe(false);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(replayShortcutBlocked(space(slider))).toBe(true);
+  });
+
   it('marks a chart clicked with the mouse so its focus ring stays off until Tab or blur', () => {
     const chart = document.createElement('div'); chart.dataset.replaySurface = 'chart';
     const inner = document.createElement('span'); chart.append(inner); document.body.append(chart);
