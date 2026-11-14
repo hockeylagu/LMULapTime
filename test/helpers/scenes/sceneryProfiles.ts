@@ -7,11 +7,12 @@ import type { SceneryCamera, SceneryCameraTypeProfile, SceneryHosekSky, SceneryS
 function cameraType(window: SceneryCameraTypeProfile['meteringWindow'], adaptationScale: number, targets: [number, number]): SceneryCameraTypeProfile {
   return {
     meteringWindow: window, adaptationScale, weatherBlendRate: 0.25,
+    adaptation: { sensitivity: 0.25, speedLimit: 1, delayS: 0, darkAdaptation: { scale: -1, sensitivity: -1, speedLimit: -1 } },
     profiles: [
-      { sunTarget: 0, targetExposure: targets[0], lightDarkBorder: 1.5, minExposure: 0, maxExposure: 4, whiteBalanceK: 7000, toneCurve: { a: 2.5, b: 0.6 }, weatherLerpPower: 1,
-        overcast: { targetExposure: targets[0] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 5, whiteBalanceK: 7500, toneCurve: { a: 2, b: 0.5 } } },
-      { sunTarget: 60, targetExposure: targets[1], lightDarkBorder: 1.25, minExposure: 0, maxExposure: 1, whiteBalanceK: 6500, toneCurve: { a: 3, b: 0.7 }, weatherLerpPower: 1,
-        overcast: { targetExposure: targets[1] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 2, whiteBalanceK: 7200, toneCurve: { a: 2.4, b: 0.6 } } },
+      { sunTarget: 0, targetExposure: targets[0], lightDarkBorder: 1.5, minExposure: 0, maxExposure: 4, whiteBalanceK: 7000, toneCurve: { a: 2.5, b: 0.6 }, sunGlareScalar: 1, weatherLerpPower: 1,
+        overcast: { targetExposure: targets[0] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 5, whiteBalanceK: 7500, toneCurve: { a: 2, b: 0.5 }, sunGlareScalar: 0.5 } },
+      { sunTarget: 60, targetExposure: targets[1], lightDarkBorder: 1.25, minExposure: 0, maxExposure: 1, whiteBalanceK: 6500, toneCurve: { a: 3, b: 0.7 }, sunGlareScalar: 1, weatherLerpPower: 1,
+        overcast: { targetExposure: targets[1] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 2, whiteBalanceK: 7200, toneCurve: { a: 2.4, b: 0.6 }, sunGlareScalar: 0.5 } },
     ],
     ambientOcclusion: { radiusM: 0.4, samples: 8, scale: 2, colour: 0.4 },
   };
@@ -24,7 +25,7 @@ export function testCamera(): SceneryCamera {
     types: {
       external: cameraType({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, 0.4, [0.4, 0.2]),
       onboard: cameraType({ x: 0.2, y: 0.2, width: 0.6, height: 0.6 }, 0.4, [0.35, 0.18]),
-      tv: cameraType({ x: 0.1, y: 0, width: 0.8, height: 0.9 }, 0.6, [0.3, 0.15]),
+      tv: { ...cameraType({ x: 0.1, y: 0, width: 0.8, height: 0.9 }, 0.6, [0.3, 0.15]), lodMultiplier: 2 },
     },
   };
 }
@@ -50,9 +51,9 @@ export function testShading(): SceneryShading {
       centre: { along: 'viewForward', at: 'sliceMidpoint', firstSliceStartsAt: 'nearM' },
       orientation: { followsView: false, u: 'horizontalAcrossSun', v: 'sunVerticalPlane' },
       cameras: {
-        chase: { nearM: 0.1, farM: 300, splitRatio: 0.9, count: 3, splitsM: [20, 80, 300] },
-        cockpit: { nearM: 0.01, farM: 200, splitRatio: 0.9, count: 2, splitsM: [30, 200] },
-        tv: { nearM: 1, farM: 500, splitRatio: null, count: null, splitsM: null },
+        chase: { nearM: 0.1, farM: 300, farScale: 1, splitRatio: 0.9, count: 3, splitsM: [20, 80, 300], depthBias: [5e-5, 5e-5, 6e-5], slopeBias: 1, biasClamp: 0 },
+        cockpit: { nearM: 0.01, farM: 200, farScale: 1, splitRatio: 0.9, count: 2, splitsM: [30, 200], depthBias: [5e-5, 5e-5], slopeBias: 1, biasClamp: 0 },
+        tv: { nearM: 1, farM: 200, farScale: 3, splitRatio: 0.68, count: 2, splitsM: null, depthBias: [5e-5, 5e-5], slopeBias: 1, biasClamp: 0 },
       },
     },
     sunVisibility: { occlusion: { bias: 0.01, curve: 'sqrt', dryMax: 1, wetMax: 0.5 }, view: { fovRad: 0.4, near: 1, far: 1000, resolution: 8, refreshFrames: 10, readFrame: 5 }, horizon: { limit: 0, gain: 5 } },
@@ -137,6 +138,7 @@ export function testSky(): ScenerySky {
       ],
     },
     clouds: testClouds(),
+    sunDisc: { sun: { widthDeg: 0.5, diskIntensity: 0.075, scatterColour: true, glow: { enabled: true, sizeDeg: 25, intensity: 0.001 } }, moon: { widthDeg: 0.5, brightnessScale: 1, scatterColour: false, glow: { enabled: true, sizeDeg: 15, intensity: 0.02 } }, drawBelowHorizon: false },
   };
 }
 
@@ -179,7 +181,7 @@ export const TEST_HAZE_WEIGHTS = { hazeCloudyScale: 1, hazeStormScale: 1, hazeDa
  * is shaped for the viewer tests and is not a valid published block.
  */
 export function packageShadows(): SceneryShading['shadows'] {
-  const shadows = testShading().shadows, camera = (nearM: number, farM: number, splitRatio: number, count: number) => ({ nearM, farM, splitRatio, count, splitsM: resolveShadowSplits(nearM, farM, splitRatio, count) });
+  const shadows = testShading().shadows, camera = (nearM: number, farM: number, splitRatio: number, count: number) => ({ nearM, farM, farScale: 1, splitRatio, count, splitsM: resolveShadowSplits(nearM, farM, splitRatio, count), depthBias: Array<number>(count).fill(5e-5), slopeBias: 1, biasClamp: 0 });
   return { ...shadows, atlas: { ...shadows.atlas, cascadeTiles: [[0, 0, 0], [0, 32, 0], [1, 0, 0], [1, 32, 0], [0, 0, 32], [0, 32, 32]] },
     cameras: { chase: camera(0.1, 300, 0.9, 3), cockpit: camera(0.01, 200, 0.9, 2), tv: shadows.cameras.tv } };
 }

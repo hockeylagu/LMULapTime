@@ -124,6 +124,14 @@ export interface SceneryRoadHeight {
 export const roadHeightBytes = (grid: Pick<SceneryRoadHeight, 'tileCells' | 'tilesX' | 'tilesZ' | 'tiles'>): number =>
   4 * grid.tilesX * grid.tilesZ + grid.tiles * grid.tileCells * grid.tileCells * (2 + 1 / 8);
 
+/** One local irradiance probe (see CompactLayoutRow.irradianceProbes). */
+export interface SceneryIrradianceProbe {
+  name: string;
+  position: Vec3;
+  rangeM: number;
+  volumes: Array<{name: string; positions: number[]; triangles: number[]}>;
+}
+
 export interface CompactLayoutRow {
   layoutKey: string;
   sourceGeometryRevision: string;
@@ -132,6 +140,11 @@ export interface CompactLayoutRow {
   shadowRangeM: number;
   /** Where the venue's environment (reflection and irradiance) is captured, in LMU local metres. */
   environmentProbe: {position: Vec3};
+  /**
+   * The scene's local irradiance probes in LMU local metres: position, influence range and the influence volumes, each a closed mesh (flat xyz
+   * `positions`, flat `triangles` indexing them). A volume the scene names without a mesh is not listed. How the game blends a probe is not established.
+   */
+  irradianceProbes: SceneryIrradianceProbe[];
   /** Road height grid of the drivable corridor. */
   roadHeight: SceneryRoadHeight;
   daylight: SceneryDaylight;
@@ -162,10 +175,10 @@ export const STREAMING_KEYS = ['residentBehindM', 'residentAheadM', 'freeCameraR
 const SESSIONS = ['race', 'qualify', 'practice1', 'practice2'];
 const TEXTURE_KEYS = ['sha256', 'byteLength', 'width', 'height', 'levels', 'format', 'srgb', 'gpuBytes'];
 const CHUNK_COMMON = ['id', 'kind', 'bounds', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'shadowDrawCalls', 'shadowTriangles', 'geometryBytes', 'meshes', 'materials', 'textures'];
-const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'roadHeight', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
+const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'irradianceProbes', 'roadHeight', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
 const MATERIAL_KEYS = ['key', 'vertices', 'indices', 'primitives', 'draws'];
 export const MATERIAL_KEY = /^[0-9a-f]{16}$/;
-const MAX_LAYOUTS = 100, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192, MAX_MATERIALS = 8192;
+const MAX_IRRADIANCE_PROBES = 64, MAX_LAYOUTS = 100, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192, MAX_MATERIALS = 8192;
 
 /** A venue-shared chunk (vNNN) is written once and used by several layouts of the venue. */
 const isSharedChunk = (chunk: {id: string}) => /^v\d+$/.test(chunk.id);
@@ -179,6 +192,7 @@ export function layoutRowProblems(row: any, {links = true}: {links?: boolean} = 
   const problems: string[] = [];
   if (!(typeof row.shadowRangeM === 'number' && row.shadowRangeM > 0)) problems.push(`shadowRangeM ${JSON.stringify(row.shadowRangeM)} is not a positive number`);
   if (!(Array.isArray(row.environmentProbe?.position) && row.environmentProbe.position.length === 3 && row.environmentProbe.position.every(Number.isFinite))) problems.push(`environmentProbe ${JSON.stringify(row.environmentProbe)} is not 3 finite numbers`);
+  if (!Array.isArray(row.irradianceProbes)) problems.push('irradianceProbes is not a list');
   if (!row.horizon || row.horizon.kind !== 'horizon') problems.push('missing horizon chunk');
   const ids = [row.horizon?.id, ...row.sectors.map((sector: any) => sector.id)];
   if (new Set(ids).size !== ids.length) problems.push('duplicate chunk ids');
@@ -343,6 +357,29 @@ function parseRoadHeight(value: unknown, what: string): SceneryRoadHeight {
   return value as SceneryRoadHeight;
 }
 
+/** Local irradiance probes: unique names, a position, a non-negative range, and volumes that are closed triangle meshes over their own positions. */
+function parseIrradianceProbes(value: unknown, what: string): void {
+  const names = new Set<string>();
+  array(value, what, MAX_IRRADIANCE_PROBES).forEach((item, i) => {
+    const at = `${what}[${i}]`, probe = record(item, at);
+    orderedKeys(probe, ['name', 'position', 'rangeM', 'volumes'], at);
+    const name = text(probe.name, `${at}.name`, 64);
+    if (names.has(name)) throw Error(`${at}.name: ${name} is listed twice`);
+    names.add(name);
+    vec3(probe.position, `${at}.position`);
+    nonNegative(probe.rangeM, `${at}.rangeM`);
+    array(probe.volumes, `${at}.volumes`, 16).forEach((entry, j) => {
+      const where = `${at}.volumes[${j}]`, volume = record(entry, where);
+      orderedKeys(volume, ['name', 'positions', 'triangles'], where);
+      text(volume.name, `${where}.name`, 64);
+      const positions = array(volume.positions, `${where}.positions`, 3 * 4096), triangles = array(volume.triangles, `${where}.triangles`, 3 * 8192);
+      if (!positions.length || positions.length % 3 || !positions.every(Number.isFinite)) throw Error(`${where}.positions: expected xyz triples`);
+      if (triangles.length < 12 || triangles.length % 3 || !triangles.every(index => Number.isInteger(index) && (index as number) >= 0 && (index as number) < positions.length / 3))
+        throw Error(`${where}.triangles: expected index triples into positions`);
+    });
+  });
+}
+
 /** One compact layout row against the catalog texture table. */
 function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[], used: Set<number>): CompactLayoutRow {
   const row = record(value, what);
@@ -356,6 +393,7 @@ function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[
   const probe = record(row.environmentProbe, `${what}.environmentProbe`);
   exactKeys(probe, ['position'], `${what}.environmentProbe`);
   vec3(probe.position, `${what}.environmentProbe.position`);
+  parseIrradianceProbes(row.irradianceProbes, `${what}.irradianceProbes`);
   parseRoadHeight(row.roadHeight, `${what}.roadHeight`);
   parseDaylight(row.daylight, `${what}.daylight`);
   const refs = array(row.textures, `${what}.textures`, MAX_TEXTURES), seen = new Set<number>();

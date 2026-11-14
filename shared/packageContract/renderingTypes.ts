@@ -22,6 +22,8 @@ export interface SceneryCameraLook {
   maxExposure: number;
   whiteBalanceK: number;
   toneCurve: SceneryToneCurve;
+  /** fSunGlareScalar: the sun glare's strength in this look. */
+  sunGlareScalar: number;
 }
 
 /** One time-of-day profile of a camera type: the clear look, and the overcast look it blends to with the weather. */
@@ -42,6 +44,12 @@ export interface SceneryCameraTypeProfile {
   meteringWindow: { x: number; y: number; width: number; height: number };
   /** The exponent s of the metered luminance in the exposure law. */
   adaptationScale: number;
+  /**
+   * How the auto exposure moves toward its target (YEBIS ToneMapping keys): fAdaptationSensitivity, fAdaptationSpeedLimit (largest change per
+   * second), fAutoExposureDelayTime (seconds), and the fDarkAdaptation* trio for a darkening scene. Every installed preset has −1 in the dark trio;
+   * the values are published as the files hold them (what −1 selects in YEBIS is not established).
+   */
+  adaptation: { sensitivity: number; speedLimit: number; delayS: number; darkAdaptation: { scale: number; sensitivity: number; speedLimit: number } };
   /** Rate per second of the clear to overcast profile blend. */
   weatherBlendRate: number;
   /** By sun elevation, ascending. */
@@ -59,7 +67,10 @@ export interface SceneryCamera {
   outputGamma: number;
   /** The scene luminance the exposure is divided by in the tone pass. */
   sceneLuminanceScale: number;
-  types: Record<SceneryCameraType, SceneryCameraTypeProfile>;
+  types: Record<Exclude<SceneryCameraType, 'tv'>, SceneryCameraTypeProfile> & {
+    /** `lodMultiplier`: the median LODMultiplier of the layouts' trackside cameras; the game scales LOD distances by it for a TV view. */
+    tv: SceneryCameraTypeProfile & { lodMultiplier: number };
+  };
 }
 
 /**
@@ -85,6 +96,18 @@ export interface ScenerySky {
   colourProfiles: ScenerySkyColourProfiles;
   /** The cloud field the replay's cloud cells and drifts place. */
   clouds: SceneryClouds;
+  sunDisc: ScenerySunDisc;
+}
+
+/**
+ * The sun and moon discs and glows as SilverLining.config sets them (the middleware draws and composites them; its formulas are not in a readable file).
+ * widthDeg: disc width in degrees; diskIntensity: the sun disc's intensity; scatterColour: the disc takes the colour of the tone-mapped light it emits;
+ * glow: a radial additive gradient from the body's position, sizeDeg wide with the given intensity; drawBelowHorizon: the sun disc below the horizon.
+ */
+export interface ScenerySunDisc {
+  sun: { widthDeg: number; diskIntensity: number; scatterColour: boolean; glow: { enabled: boolean; sizeDeg: number; intensity: number } };
+  moon: { widthDeg: number; brightnessScale: number; scatterColour: boolean; glow: { enabled: boolean; sizeDeg: number; intensity: number } };
+  drawBelowHorizon: boolean;
 }
 
 /** The Hosek-Wilkie (2012) CIE XYZ sky: its datasets per channel X, Y, Z and the inputs the app cannot derive (atmosphere/hosekSky.ts). */
@@ -193,14 +216,20 @@ export interface SceneryShading {
   sunVisibility: ScenerySunVisibility;
 }
 
-/** The split planes of one camera type; `splitRatio`, `count` and `splitsM` are null together where the package has no set. */
+/** The split planes and depth bias of one camera type (docs/SCENE_PACKAGE.md, Shadows). */
 export interface SceneryShadowCamera {
   nearM: number;
+  /** The camera record's shadow range (`MaxShadowRange`); the shadows end at `farScale` · `farM`. */
   farM: number;
-  splitRatio: number | null;
-  count: number | null;
-  /** The far edge of each cascade, metres, ascending; the last is `farM`. */
+  farScale: number;
+  splitRatio: number;
+  count: number;
+  /** The far edge of each cascade, metres, ascending; the last is `farScale` · `farM`. Null where the viewer resolves them (TV: the ratio follows the zoom). */
   splitsM: number[] | null;
+  /** Per cascade the constant depth bias in depth units (D3D DepthBias = trunc(bias · 2^23 + 0.5) on a 24-bit depth). */
+  depthBias: number[];
+  slopeBias: number;
+  biasClamp: number;
 }
 
 /** The pipeline's docs/SCENE_PACKAGE.md "Shadows". */

@@ -69,7 +69,7 @@ function mixLooks(a: SceneryCameraLook, b: SceneryCameraLook, t: number): Scener
     targetExposure: mix(a.targetExposure, b.targetExposure), lightDarkBorder: mix(a.lightDarkBorder, b.lightDarkBorder),
     minExposure: mix(a.minExposure, b.minExposure), maxExposure: mix(a.maxExposure, b.maxExposure),
     whiteBalanceK: mix(a.whiteBalanceK, b.whiteBalanceK),
-    toneCurve: {a: mix(a.toneCurve.a, b.toneCurve.a), b: mix(a.toneCurve.b, b.toneCurve.b)},
+    toneCurve: {a: mix(a.toneCurve.a, b.toneCurve.a), b: mix(a.toneCurve.b, b.toneCurve.b)}, sunGlareScalar: mix(a.sunGlareScalar, b.sunGlareScalar),
   };
 }
 

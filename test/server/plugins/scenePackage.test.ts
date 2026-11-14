@@ -61,7 +61,7 @@ describe('schema 10 manifest and files', () => {
     expect(plugin.body('TEST_CAR')?.sha256).toBe(built.car.sha256);
   });
 
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, '13', undefined, 14])('rejects manifest schema %s: only schema 13 is supported', schemaVersion => {
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, '14', undefined, 15])('rejects manifest schema %s: only schema 14 is supported', schemaVersion => {
     const built = build();
     built.manifest.schemaVersion = schemaVersion; built.commit();
     expect(state(built)).toBe('invalid');
@@ -187,7 +187,7 @@ describe('scenery validation', () => {
     ['another cascade centre rule', (built: Package) => { (built.rendering.shading.shadows.centre as { at: string }).at = 'splitEnd'; }],
     ['cascades that turn with the view', (built: Package) => { (built.rendering.shading.shadows.orientation as { followsView: boolean }).followsView = true; }],
     ['an extra cascade orientation key', (built: Package) => { (built.rendering.shading.shadows.orientation as Record<string, unknown>).depthM = 400; }],
-    ['a null shadow set with a ratio', (built: Package) => { built.rendering.shading.shadows.cameras.tv.splitRatio = 0.9; }],
+    ['a shadow set without one depth bias per cascade', (built: Package) => { built.rendering.shading.shadows.cameras.tv.depthBias.pop(); }],
     ['a shadow camera type the package does not define', (built: Package) => { (built.rendering.shading.shadows.cameras as Record<string, unknown>).hood = built.rendering.shading.shadows.cameras.tv; }],
     ['a missing sky haze', (built: Package) => { delete (built.rendering.sky as Partial<typeof built.rendering.sky>).haze; }],
     ['a negative sky haze depth', (built: Package) => { built.rendering.sky.haze.depth.overcast = -1; }],

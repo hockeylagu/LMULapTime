@@ -4,7 +4,7 @@ import type { CarCamera } from '../../../../../shared/types/scenes/car.js';
 import { driverCamera, driverPose, isDriverCamera } from '../../../../../src/components/replay/view3d/camera/driverCameras.js';
 
 const camera = (name: CarCamera['name'], position: [number, number, number], orientation: [number, number, number] = [0, 0, 0]): CarCamera =>
-  ({ name, position, orientation, fov: [89, 49], clipPlanes: [0.1, 700], cockpitView: name === 'cockpit' ? 'in' : 'out' });
+  ({ name, position, orientation, fov: [89, 49], clipPlanes: [0.1, 700], cockpitView: name === 'cockpit' ? 'in' : 'out', lodMultiplier: 1, shadow: null });
 const cockpit = camera('cockpit', [0.3, 0.95, 0.31]), hood = camera('hood', [0.3, 0.92, -0.96]), roof = camera('roof', [0.3, 1.5, 0.4]);
 
 /** The scene graph of the 3D view: a z-mirrored world, the posed car and its body model offset by the ground fit. */

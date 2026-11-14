@@ -89,6 +89,13 @@ export interface CarCamera {
   clipPlanes: [number, number];
   /** Which cockpit mesh variant this camera shows. */
   cockpitView: 'in' | 'out';
+  /** The game scales every LOD distance by this in this view. */
+  lodMultiplier: number;
+  /**
+   * The shadow keys the camera sets over the rendering profile's set (`shading.shadows.cameras`): each non-null value replaces that set's, a null
+   * keeps it; null where the camera sets none. `depthBias` (per cascade, the first values are the cascades') and `slopeBias` are both set or both null.
+   */
+  shadow: {nearM: number | null; farM: number | null; splitRatio: number | null; depthBias: number[] | null; slopeBias: number | null} | null;
   [key: string]: unknown;
 }
 
@@ -123,7 +130,8 @@ export interface BodyDescriptor {
   /** One per vehicle id of the body. */
   appearances: CarAppearance[];
   materials: CarMaterialRecipe[];
-  cameras: {frame: string; cockpitViewRule: string; list: CarCamera[]};
+  /** `chase`: the orbiting chase camera's LOD multiplier. */
+  cameras: {frame: string; cockpitViewRule: string; list: CarCamera[]; chase: {lodMultiplier: number}};
 }
 
 export const BODY_DESCRIPTOR_KEYS = ['optionNodes', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras'] as const;
@@ -264,7 +272,10 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
   if (materialIds.size !== (descriptor.materials as unknown[]).length) throw Error(`${what}.materials: duplicate material ids`);
   for (const id of glow) if (!materialIds.has(id)) throw Error(`${what}.glowMaterialIds: glow material ${id} is not in materials`);
   const cameraSet = record(descriptor.cameras, `${what}.cameras`);
-  orderedKeys(cameraSet, ['frame', 'cockpitViewRule', 'list'], `${what}.cameras`);
+  orderedKeys(cameraSet, ['frame', 'cockpitViewRule', 'list', 'chase'], `${what}.cameras`);
+  const chase = record(cameraSet.chase, `${what}.cameras.chase`);
+  orderedKeys(chase, ['lodMultiplier'], `${what}.cameras.chase`);
+  if (!(finite(chase.lodMultiplier, `${what}.cameras.chase.lodMultiplier`) > 0)) throw Error(`${what}.cameras.chase.lodMultiplier: must be positive`);
   text(cameraSet.frame, `${what}.cameras.frame`, 400);
   text(cameraSet.cockpitViewRule, `${what}.cameras.cockpitViewRule`, 400);
   const names = array(cameraSet.list, `${what}.cameras.list`, 64).map((item, i) => {
@@ -276,6 +287,23 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
     if (fov.length !== 2 || fov.some(degrees => degrees <= 5 || degrees >= 175)) throw Error(`${at}.fov: expected two angles in degrees`);
     if (clip.length !== 2 || !(clip[0] > 0 && clip[1] > clip[0])) throw Error(`${at}.clipPlanes: expected near < far`);
     if (camera.cockpitView !== 'in' && camera.cockpitView !== 'out') throw Error(`${at}.cockpitView: expected in or out`);
+    if (!(finite(camera.lodMultiplier, `${at}.lodMultiplier`) > 0)) throw Error(`${at}.lodMultiplier: must be positive`);
+    if (camera.shadow !== null) {
+      const shadow = record(camera.shadow, `${at}.shadow`);
+      orderedKeys(shadow, ['nearM', 'farM', 'splitRatio', 'depthBias', 'slopeBias'], `${at}.shadow`);
+      const optional = (value: unknown, what: string) => value === null ? null : finite(value, `${at}.shadow.${what}`);
+      const near = optional(shadow.nearM, 'nearM'), far = optional(shadow.farM, 'farM'), ratio = optional(shadow.splitRatio, 'splitRatio');
+      if ((near !== null && !(near > 0)) || (far !== null && !(far > 0)) || (near !== null && far !== null && !(far > near)))
+        throw Error(`${at}.shadow: expected 0 < nearM < farM`);
+      if (ratio !== null && !(ratio >= 0 && ratio <= 1)) throw Error(`${at}.shadow.splitRatio: expected 0 to 1`);
+      if ((shadow.depthBias === null) !== (shadow.slopeBias === null)) throw Error(`${at}.shadow: depthBias and slopeBias are set together`);
+      if (shadow.depthBias !== null) {
+        const bias = array(shadow.depthBias, `${at}.shadow.depthBias`, 8).map(value => finite(value, `${at}.shadow.depthBias`));
+        if (!bias.length || bias.some(value => value < 0)) throw Error(`${at}.shadow.depthBias: expected 1 to 8 non-negative values`);
+        if (finite(shadow.slopeBias, `${at}.shadow.slopeBias`) < 0) throw Error(`${at}.shadow.slopeBias: negative`);
+      }
+      if (near === null && far === null && ratio === null && shadow.depthBias === null) throw Error(`${at}.shadow: sets no key (expected null)`);
+    }
     return text(camera.name, `${at}.name`, 64);
   });
   if (!sameList(names, ['cockpit', 'hood', 'roof'])) throw Error(`${what}.cameras.list: expected exactly the cockpit, hood and roof cameras`);

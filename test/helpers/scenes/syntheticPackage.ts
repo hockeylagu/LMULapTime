@@ -81,7 +81,7 @@ export function syntheticPackage() {
   const roadHeight = { ...rowOf(store(sceneryHeightPath, heights)), cellM: 0.25, tileCells: 8, originM: [0, 0], tilesX: 1, tilesZ: 1, tiles: 1, heightOffsetM: 0, heightStepM: 0.001, corridorM: 5 };
   /** The layout row as the compact catalog states it. */
   const scenery = {
-    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750, environmentProbe: { position: [10, 2, -20] }, roadHeight,
+    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750, environmentProbe: { position: [10, 2, -20] }, irradianceProbes: [], roadHeight,
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
     horizon: chunk('horizon', 'horizon', { kind: 'horizon' }),
     sectors: [
@@ -116,10 +116,10 @@ export function syntheticPackage() {
     appearances: [{ alias: 'TEST_CAR', number: '7', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: ['option_NumplateA'] }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
     cameras: { frame: 'native car frame', cockpitViewRule: 'in: the driver camera only', list: [
-      { name: 'cockpit', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in' },
-      { name: 'hood', position: [0.3, 0.92, -0.96], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.5, 800], cockpitView: 'out' },
-      { name: 'roof', position: [0.3, 1.5, 0.2], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out' },
-    ] },
+      { name: 'cockpit', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in', lodMultiplier: 1, shadow: null },
+      { name: 'hood', position: [0.3, 0.92, -0.96], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.5, 800], cockpitView: 'out', lodMultiplier: 1, shadow: null },
+      { name: 'roof', position: [0.3, 1.5, 0.2], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out', lodMultiplier: 1, shadow: null },
+    ], chase: { lodMultiplier: 1.5 } },
   };
   /** The car body row of the top-level `bodies` list; `vehicleIds` is every id the vehicle records give it. */
   const car = {

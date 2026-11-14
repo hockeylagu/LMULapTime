@@ -41,7 +41,7 @@ function ascending(rows: unknown[], what: string, row: (value: Record<string, un
 
 const CAMERA_TYPES = ['external', 'onboard', 'tv'] as const;
 
-const LOOK_KEYS = ['targetExposure', 'lightDarkBorder', 'minExposure', 'maxExposure', 'whiteBalanceK', 'toneCurve'];
+const LOOK_KEYS = ['targetExposure', 'lightDarkBorder', 'minExposure', 'maxExposure', 'whiteBalanceK', 'toneCurve', 'sunGlareScalar'];
 
 /** A look's exposure target, border and limits (0 ≤ min ≤ max, max > 0), white balance and tone curve (a > 0); the clear values and the overcast ones share this shape. */
 function exposureLook(look: Record<string, unknown>, at: string): void {
@@ -51,14 +51,26 @@ function exposureLook(look: Record<string, unknown>, at: string): void {
   if (min < 0 || min > (look.maxExposure as number)) throw Error(`${at}.minExposure: must be between 0 and maxExposure`);
   numbers(look.toneCurve, ['a', 'b'], `${at}.toneCurve`, false);
   if ((look.toneCurve as {a: number}).a <= 0) throw Error(`${at}.toneCurve.a: must be positive`);
+  if (finite(look.sunGlareScalar, `${at}.sunGlareScalar`) < 0) throw Error(`${at}.sunGlareScalar: negative`);
 }
 
-/** One camera type's post-processing: a window inside the frame, a positive adaptation scale and weather blend rate, ascending profiles with clear and overcast looks. */
-function parseCameraType(value: unknown, what: string): void {
+/**
+ * One camera type's post-processing: a window inside the frame, a positive adaptation scale, adaptation rates and weather blend rate, ascending
+ * profiles with clear and overcast looks; the TV type adds a positive LOD multiplier.
+ */
+function parseCameraType(value: unknown, what: string, tv: boolean): void {
   const row = record(value, what);
-  exactKeys(row, ['meteringWindow', 'adaptationScale', 'weatherBlendRate', 'profiles', 'ambientOcclusion'], what);
+  exactKeys(row, ['meteringWindow', 'adaptationScale', 'adaptation', 'weatherBlendRate', 'profiles', 'ambientOcclusion', ...(tv ? ['lodMultiplier'] : [])], what);
   screenWindow(row.meteringWindow, `${what}.meteringWindow`);
   if (finite(row.adaptationScale, `${what}.adaptationScale`) <= 0) throw Error(`${what}.adaptationScale: must be positive`);
+  const adaptation = record(row.adaptation, `${what}.adaptation`);
+  exactKeys(adaptation, ['sensitivity', 'speedLimit', 'delayS', 'darkAdaptation'], `${what}.adaptation`);
+  for (const key of ['sensitivity', 'speedLimit']) if (finite(adaptation[key], `${what}.adaptation.${key}`) <= 0) throw Error(`${what}.adaptation.${key}: must be positive`);
+  if (finite(adaptation.delayS, `${what}.adaptation.delayS`) < 0) throw Error(`${what}.adaptation.delayS: negative`);
+  const dark = record(adaptation.darkAdaptation, `${what}.adaptation.darkAdaptation`);
+  exactKeys(dark, ['scale', 'sensitivity', 'speedLimit'], `${what}.adaptation.darkAdaptation`);
+  for (const key of ['scale', 'sensitivity', 'speedLimit']) finite(dark[key], `${what}.adaptation.darkAdaptation.${key}`);
+  if (tv && finite(row.lodMultiplier, `${what}.lodMultiplier`) <= 0) throw Error(`${what}.lodMultiplier: must be positive`);
   if (finite(row.weatherBlendRate, `${what}.weatherBlendRate`) <= 0) throw Error(`${what}.weatherBlendRate: must be positive`);
   ascending(array(row.profiles, `${what}.profiles`, 32), `${what}.profiles`, (p, at) => {
     exactKeys(p, ['sunTarget', ...LOOK_KEYS, 'weatherLerpPower', 'overcast'], at);
@@ -79,7 +91,7 @@ function parseCamera(value: unknown, what: string): void {
   if (finite(row.sceneLuminanceScale, `${what}.sceneLuminanceScale`) <= 0) throw Error(`${what}.sceneLuminanceScale: must be positive`);
   const types = record(row.types, `${what}.types`);
   exactKeys(types, CAMERA_TYPES, `${what}.types`);
-  for (const type of CAMERA_TYPES) parseCameraType(types[type], `${what}.types.${type}`);
+  for (const type of CAMERA_TYPES) parseCameraType(types[type], `${what}.types.${type}`, type === 'tv');
 }
 
 /** The catalog's shading (SceneryShading): positive scales, ordered limits, known LOD modes and non-empty unit-direction kernels. */
@@ -187,22 +199,28 @@ function exactRecord(value: unknown, expected: Record<string, string | boolean>,
   for (const [key, want] of Object.entries(expected)) if (row[key] !== want) throw Error(`${what}.${key}: expected ${String(want)}`);
 }
 
-/** One camera type's split planes: near and far, then either no set (all null) or a ratio, a count and that many ascending splits ending at far. */
+/**
+ * One camera type's split planes and bias: near, the record's far and the view's far scale, a ratio and a count, then either the count ascending splits
+ * ending at farScale · farM or null (the viewer resolves them), and per cascade a depth bias with one slope bias and clamp.
+ */
 function parseShadowCamera(value: unknown, what: string, maxCascades: number): void {
   const row = record(value, what);
-  exactKeys(row, ['nearM', 'farM', 'splitRatio', 'count', 'splitsM'], what);
-  const near = positive(row.nearM, `${what}.nearM`), far = finite(row.farM, `${what}.farM`);
-  if (far <= near) throw Error(`${what}: farM not beyond nearM`);
-  if (row.splitsM === null) {
-    if (row.splitRatio !== null || row.count !== null) throw Error(`${what}: splitsM is null but splitRatio or count is not`);
-    return;
-  }
+  exactKeys(row, ['nearM', 'farM', 'farScale', 'splitRatio', 'count', 'splitsM', 'depthBias', 'slopeBias', 'biasClamp'], what);
+  const near = positive(row.nearM, `${what}.nearM`), far = finite(row.farM, `${what}.farM`) * positive(row.farScale, `${what}.farScale`);
+  if (far <= near) throw Error(`${what}: farScale · farM not beyond nearM`);
   const ratio = finite(row.splitRatio, `${what}.splitRatio`);
   if (ratio < 0 || ratio > 1) throw Error(`${what}.splitRatio: outside 0–1`);
   const cascades = count(row.count, `${what}.count`, maxCascades);
-  const splits = ascendingNumbers(row.splitsM, `${what}.splitsM`, maxCascades, near, far);
-  if (!cascades || splits.length !== cascades) throw Error(`${what}.splitsM: expected count splits`);
-  if (splits[cascades - 1] !== far) throw Error(`${what}.splitsM: the last split is not farM`);
+  if (!cascades) throw Error(`${what}.count: no cascades`);
+  if (row.splitsM !== null) {
+    const splits = ascendingNumbers(row.splitsM, `${what}.splitsM`, maxCascades, near, far);
+    if (splits.length !== cascades) throw Error(`${what}.splitsM: expected count splits`);
+    if (splits[cascades - 1] !== far) throw Error(`${what}.splitsM: the last split is not farScale · farM`);
+  }
+  const bias = array(row.depthBias, `${what}.depthBias`, maxCascades);
+  if (bias.length !== cascades) throw Error(`${what}.depthBias: expected count values`);
+  bias.forEach((entry, index) => { if (finite(entry, `${what}.depthBias[${index}]`) < 0) throw Error(`${what}.depthBias[${index}]: negative`); });
+  for (const key of ['slopeBias', 'biasClamp']) if (finite(row[key], `${what}.${key}`) < 0) throw Error(`${what}.${key}: negative`);
 }
 
 /** The split-sum table: `width` × `height` 8-bit (scale, bias) pairs, row-major, N·V along a row, roughness down the rows. */
@@ -266,11 +284,31 @@ function parseSun(value: unknown, what: string): Record<string, ScenerySun['layo
   return sunLayouts;
 }
 
+/** The sun and moon discs and glows: non-negative sizes and intensities, boolean switches. */
+function parseSunDisc(value: unknown, what: string): void {
+  const row = record(value, what);
+  exactKeys(row, ['sun', 'moon', 'drawBelowHorizon'], what);
+  flag(row.drawBelowHorizon, `${what}.drawBelowHorizon`);
+  for (const [body, extra] of [['sun', 'diskIntensity'], ['moon', 'brightnessScale']] as const) {
+    const disc = record(row[body], `${what}.${body}`);
+    exactKeys(disc, ['widthDeg', extra, 'scatterColour', 'glow'], `${what}.${body}`);
+    if (!(finite(disc.widthDeg, `${what}.${body}.widthDeg`) > 0)) throw Error(`${what}.${body}.widthDeg: must be positive`);
+    nonNegative(disc[extra], `${what}.${body}.${extra}`);
+    flag(disc.scatterColour, `${what}.${body}.scatterColour`);
+    const glow = record(disc.glow, `${what}.${body}.glow`);
+    exactKeys(glow, ['enabled', 'sizeDeg', 'intensity'], `${what}.${body}.glow`);
+    flag(glow.enabled, `${what}.${body}.glow.enabled`);
+    nonNegative(glow.sizeDeg, `${what}.${body}.glow.sizeDeg`);
+    nonNegative(glow.intensity, `${what}.${body}.glow.intensity`);
+  }
+}
+
 /** The catalog's sky (ScenerySky): five Perez scales, ascending multiplier rows of four, the turbidity, air mass, haze model, sun grids, the sky model's inputs and its colour profiles. */
 /** Validates the sky; returns the layout keys of its per-layout parts (`sun.layouts`, `hosek.layoutAltitudeM`). */
 function parseSky(value: unknown, what: string): {sunLayouts: string[]; altitudeLayouts: string[]} {
   const row = record(value, what);
-  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog', 'sun', 'hosek', 'haze', 'colourProfiles', 'clouds'], what);
+  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog', 'sun', 'hosek', 'haze', 'colourProfiles', 'clouds', 'sunDisc'], what);
+  parseSunDisc(row.sunDisc, `${what}.sunDisc`);
   const sunLayouts = parseSun(row.sun, `${what}.sun`);
   range(row.pollution, ['cloudyDamping'], `${what}.pollution`);
   if (range(row.turbidity, ['base', 'overcast', 'storm', 'pollution', 'min', 'max'], `${what}.turbidity`).min <= 0) throw Error(`${what}.turbidity.min: must be positive`);

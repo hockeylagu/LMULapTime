@@ -45,15 +45,16 @@ export function shadowProblems(shadows: any): string[] {
   const cameras = shadows.cameras;
   if (!cameras || Object.keys(cameras).sort().join() !== 'chase,cockpit,tv') problems.push('cameras are not {chase, cockpit, tv}');
   else for (const [name, set] of Object.entries<any>(cameras)) {
-    if (!number(set?.nearM) || !number(set?.farM) || !(set.nearM > 0 && set.farM > set.nearM)) { problems.push(`${name}: near and far are not 0 < near < far`); continue; }
-    if (set.splitsM === null) {
-      if (set.splitRatio !== null || set.count !== null) problems.push(`${name}: splits are null but the ratio or count is not`);
-      continue;
-    }
-    if (!(number(set.splitRatio) && Number.isInteger(set.count) && Array.isArray(set.splitsM) && set.splitsM.length === set.count)) { problems.push(`${name}: splits do not match the count`); continue; }
-    const expected = resolveShadowSplits(set.nearM, set.farM, set.splitRatio, set.count);
+    const far = number(set?.farM) && number(set?.farScale) ? set.farM * set.farScale : NaN;
+    if (!number(set?.nearM) || !(set.nearM > 0 && far > set.nearM)) { problems.push(`${name}: near and far are not 0 < near < farScale · farM`); continue; }
+    if (!(number(set.splitRatio) && set.splitRatio >= 0 && set.splitRatio <= 1 && Number.isInteger(set.count) && set.count > 0)) { problems.push(`${name}: no split ratio or cascade count`); continue; }
+    if (!(Array.isArray(set.depthBias) && set.depthBias.length === set.count && set.depthBias.every((value: unknown) => number(value) && (value as number) >= 0))) problems.push(`${name}: depthBias is not one value per cascade`);
+    if (!(number(set.slopeBias) && number(set.biasClamp))) problems.push(`${name}: slopeBias or biasClamp is missing`);
+    if (set.splitsM === null) continue;
+    if (!(Array.isArray(set.splitsM) && set.splitsM.length === set.count)) { problems.push(`${name}: splits do not match the count`); continue; }
+    const expected = resolveShadowSplits(set.nearM, far, set.splitRatio, set.count);
     if (expected.some((value, index) => value !== set.splitsM[index])) problems.push(`${name}: splits differ from the split scheme`);
-    if (set.splitsM[set.count - 1] !== set.farM) problems.push(`${name}: the last split is not the far distance`);
+    if (set.splitsM[set.count - 1] !== far) problems.push(`${name}: the last split is not the far distance`);
   }
   return problems;
 }
