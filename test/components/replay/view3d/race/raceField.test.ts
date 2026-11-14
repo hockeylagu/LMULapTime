@@ -63,9 +63,9 @@ const windowOf = (count: number): RacePoseWindow => ({
 });
 
 function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | null> = async slot => body(slot)) {
-  const root = new Group(), changed = vi.fn(), cars = makeCars(count), window = windowOf(count);
+  const root = new Group(), changed = vi.fn(), report = vi.fn(), cars = makeCars(count), window = windowOf(count);
   const shell = {
-    origin: new Vector3(), carTextures: {}, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm: async () => {},
+    origin: new Vector3(), carTextures: {}, report, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm: async () => {},
     placeCar: (car: Object3D, pose: RenderPose) => { car.position.set(pose.x, pose.y, pose.z); car.updateMatrix(); },
   } as unknown as SceneShell;
   const sets = createCarSets(shell.carTemplates, shell.carTextures, {} as SceneryShading, shell.surfaceHeight);
@@ -81,7 +81,7 @@ function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | nul
     field.load(slots.map(slot => ({slot, metres: slot})));
     await vi.waitFor(() => expect(slots.every(slot => field.has(slot))).toBe(true));
   };
-  return {field, root, changed, camera, place, farCar, nearCar, ready, bodyOfSpy, templates: shell.carTemplates as unknown as {hold: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn>}};
+  return {field, root, changed, camera, place, farCar, nearCar, ready, bodyOfSpy, report, templates: shell.carTemplates as unknown as {hold: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn>}};
 }
 
 describe('createRaceField', () => {
@@ -103,6 +103,16 @@ describe('createRaceField', () => {
     field.load([{slot: 1, metres: 10}]);
     await Promise.resolve();
     expect(bodyOfSpy.mock.calls.length).toBe(before);
+  });
+
+  it("counts the cars asked for and those settled for the scene's corner note, a car without a body included", async () => {
+    const {field, report} = setup(3, async slot => (slot === 2 ? null : body(slot)));
+    field.load([{slot: 0, metres: 10}, {slot: 2, metres: 20}]);
+    expect(report).toHaveBeenLastCalledWith({carModels: {loaded: 0, total: 2}});
+    // Car 0's body serves car 1 too; car 2 has none and stays a box.
+    await vi.waitFor(() => expect(report).toHaveBeenLastCalledWith({carModels: {loaded: 3, total: 3}}));
+    report.mockClear(); field.load([{slot: 1, metres: 5}]);
+    expect(report).not.toHaveBeenCalled(); // Nothing new: no report.
   });
 
   it('builds every full model of a body when its first car turns near, and draws the six nearest in view with theirs', async () => {

@@ -56,7 +56,9 @@ it('applies the latest laps if selection changes while the initial scene is stil
   await act(async () => release(scene));
   await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Ghost: Textured car'));
   expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchSceneryLayout).toHaveBeenCalledOnce();
-  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, {primary: carMatch, baseline: carMatch}, expect.any(AbortSignal));
+  // The cars go to the scene while they load, so it can count them.
+  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, expect.any(Promise), expect.any(AbortSignal));
+  await expect((scene.updateLaps.mock.calls[0] as unknown[])[2]).resolves.toEqual({primary: carMatch, baseline: carMatch});
   expect(scene.dispose).not.toHaveBeenCalled();
 });
 

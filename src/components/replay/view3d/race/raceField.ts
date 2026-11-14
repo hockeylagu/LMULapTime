@@ -143,6 +143,16 @@ export function createRaceField(
     return Number.isFinite(bottom) ? bottom : 0;
   };
 
+  /** The scene's corner note counts the cars asked for and those settled (a model, or a box for good), while any load. */
+  let reported = '';
+  const reportLoads = () => {
+    let loaded = 0;
+    for (const car of field.values()) if (car !== null) loaded++;
+    const key = `${loaded}/${field.size}`;
+    if (key === reported) return;
+    reported = key;
+    shell.report({carModels: {loaded, total: field.size}});
+  };
   const loadBody = async (slot: number) => {
     let slots = [slot];
     bodyLoads++;
@@ -185,6 +195,7 @@ export function createRaceField(
     } finally {
       bodyLoads--;
       for (const each of slots) if (field.get(each) === null) field.set(each, 'none');
+      if (!disposed) reportLoads();
     }
   };
   /**
@@ -232,6 +243,7 @@ export function createRaceField(
       if (bodyLoads >= BODY_LOADS) return;
       const waiting = distances.filter(car => !field.has(car.slot)).sort((a, b) => a.metres - b.metres);
       for (const {slot} of waiting.slice(0, BODY_LOADS - bodyLoads)) { field.set(slot, null); void loadBody(slot); }
+      reportLoads();
     },
     beforeDraw(camera) {
       camera.updateMatrixWorld();

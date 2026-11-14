@@ -15,7 +15,8 @@ import type { SceneContent, SceneShell } from '../scene/sceneShell.js';
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
-  updateLaps(trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, signal?: AbortSignal): Promise<boolean>;
+  /** Shows other laps once their cars (`assets`, maybe still loading) are built; the scene's corner note counts them meanwhile. */
+  updateLaps(trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars | Promise<LapCars>, signal?: AbortSignal): Promise<boolean>;
   cursor(index: number, fraction: number): void;
   /** Runs at the start of each animation frame the scene draws, with the frame's time: playback advances its clock there, so the
    * pose drawn is always the frame's own (replayPlaybackCursor.ts). */
@@ -88,6 +89,7 @@ export async function createReplayScene(
     // placed on them afresh. The road under the lap streams in as the camera moves there; its lines re-drape on it.
     layer = await loadLaps(trajectory, baseline, cars, colorBy);
     await carsWarm;
+    shell.report({shaders: 1});
     if (!shell.isAttached(host)) { layer.dispose(); throw new DOMException('The lap view left', 'AbortError'); }
     rig.unplace(); rig.setLayer(layer);
     shell.show(contentOf(layer));
@@ -111,15 +113,21 @@ export async function createReplayScene(
       const compatible = (lap: ReplayTrajectoryData) => lap.layoutKey === layout.layoutKey && lap.geometryRevision === layout.sourceGeometryRevision
         && lap.dataPluginRevision === layout.packageRevision;
       if (!compatible(next) || (comparison && !compatible(comparison))) throw Error('Lap and 3D scene must use the same layout, geometry and package revision.');
-      const request = ++lapRequest;
-      const replacement = await loadLaps(next, comparison, assets, lineMode);
-      if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
-      await shell.warm(replacement.root);
-      if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
-      replacement.ready(); replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
-      layer.dispose(); layer = replacement; shell.show(contentOf(layer)); rig.setLayer(layer);
-      shell.setDaylight(next.daylightClock);
-      return true;
+      const request = ++lapRequest, models = comparison ? 2 : 1;
+      shell.report({carModels: {loaded: 0, total: models}});
+      try {
+        const replacement = await loadLaps(next, comparison, await assets, lineMode);
+        if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
+        await shell.warm(replacement.root);
+        if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
+        replacement.ready(); replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
+        layer.dispose(); layer = replacement; shell.show(contentOf(layer)); rig.setLayer(layer);
+        shell.setDaylight(next.daylightClock);
+        return true;
+      } finally {
+        // A newer request counts its own cars.
+        if (request === lapRequest) shell.report({carModels: {loaded: models, total: models}});
+      }
     },
     beforeFrame: hook => shell.beforeFrame(hook),
     cursor(index, fraction) {

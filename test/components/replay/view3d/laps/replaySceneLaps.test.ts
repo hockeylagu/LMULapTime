@@ -4,6 +4,7 @@ import { descriptorTexturePath } from '../../../../../shared/packageContract/ind
 import { BoxGeometry, CubeCamera, DirectionalLight, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene, type ShaderMaterial } from 'three';
 import { createReplayScene, lapFirstStation } from '../../../../../src/components/replay/view3d/laps/replayScene.js';
 import { createSceneShell, type SceneShell } from '../../../../../src/components/replay/view3d/scene/sceneShell.js';
+import { describeLoad, type SceneLoadProgress } from '../../../../../src/components/replay/view3d/scene/loadProgress.js';
 import { sceneSun } from '../../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/scene/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
@@ -208,10 +209,10 @@ afterEach(() => { for (const shell of shells.splice(0)) shell.dispose(); vi.unst
 
 /** A lap scene in `host` on a new shell of `sceneLayout` (disposed after the test), or on `shell`. */
 function openScene(host: HTMLDivElement, sceneLayout: SceneryLayoutResource, trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null,
-  onFailure: (message: string) => void, cars: Parameters<typeof createReplayScene>[6], shell?: SceneShell) {
+  onFailure: (message: string) => void, cars: Parameters<typeof createReplayScene>[6], shell?: SceneShell, onProgress?: (progress: SceneLoadProgress) => void) {
   const used = shell ?? createSceneShell(sceneLayout, {daylightClock: trajectory.daylightClock, firstView: {kind: 'lap', lapDistanceM: lapFirstStation(trajectory, sceneLayout)}});
   if (!shell) shells.push(used);
-  return createReplayScene(used, host, sceneLayout, trajectory, baseline, onFailure, cars);
+  return createReplayScene(used, host, sceneLayout, trajectory, baseline, onFailure, cars, 'default', onProgress);
 }
 
 it.each([
@@ -471,10 +472,19 @@ it('hands its shell to the next view: one renderer, the canvas moving to its ele
   expect(canvas.parentElement).toBe(first);
   before.dispose();
   expect(canvas.parentElement).toBeNull();
-  const after = await openScene(second, layout, lap, null, vi.fn(), assets, shell);
+  const steps: SceneLoadProgress[] = [];
+  const after = await openScene(second, layout, lap, null, vi.fn(), assets, shell, progress => steps.push(progress));
   expect(shell.renderer.domElement).toBe(canvas);
   expect(canvas.parentElement).toBe(second);
   expect(shell.scene.getObjectsByProperty('name', 'body-envelope').length).toBeGreaterThan(0);
+  // The next view's bar starts past the track, scenery and lighting, and fills as its car builds and compiles.
+  const step = (progress: SceneLoadProgress) => [progress.track, progress.lighting, progress.cars, progress.shaders];
+  expect(step(steps[0])).toEqual([1, 1, 0, 0]); expect(describeLoad(steps[0]).label).toBe('Preparing the car');
+  expect(step(steps.at(-1)!)).toEqual([1, 1, 1, 1]); expect(describeLoad(steps.at(-1)!).fraction).toBe(1);
+  // A new lap counts its cars in the corner note until they show.
+  steps.length = 0;
+  expect(await after.updateLaps({...lap}, lap, Promise.resolve(withGhost))).toBe(true);
+  expect(steps.map(progress => progress.carModels)).toEqual([{loaded: 0, total: 2}, {loaded: 2, total: 2}]);
   after.dispose();
 });
 

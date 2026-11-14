@@ -44,9 +44,10 @@ export function Replay3DLoading({progress = NO_LOAD_PROGRESS, error, onRetry}: P
   );
 }
 
-/** The corner note while the scenery streams in and its textures sharpen behind the first frame: a line each, gone once done. */
+/** The corner note while cars load, the scenery streams in and its textures sharpen behind a shown scene: a line each, gone once done. */
 export function Replay3DStreaming({progress, className = ''}: {progress?: SceneLoadProgress; className?: string}) {
   const lines = [
+    {label: 'Loading cars', done: progress?.carModels.loaded ?? 0, total: progress?.carModels.total ?? 0},
     {label: 'Streaming scenery', done: progress?.circuit.resident ?? 0, total: progress?.circuit.total ?? 0},
     {label: 'Sharpening textures', done: progress?.textures.sharp ?? 0, total: progress?.textures.total ?? 0},
   ].filter(line => line.total > 0 && line.done < line.total);

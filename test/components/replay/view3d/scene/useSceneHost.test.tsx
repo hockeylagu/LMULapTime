@@ -52,7 +52,7 @@ it('reports a failed load for its key, but not an abort or a load that came too 
 
 it('merges progress into the state and runs the registered cleanups with the scene', async () => {
   const cleanupScene = vi.fn();
-  const progress = { track: 1, scenery: { resident: 1, total: 2 }, cars: 0, lighting: 0, shaders: 0, circuit: { resident: 0, total: 0 }, textures: { sharp: 0, total: 0 } };
+  const progress = { track: 1, scenery: { resident: 1, total: 2 }, cars: 0, lighting: 0, shaders: 0, circuit: { resident: 0, total: 0 }, textures: { sharp: 0, total: 0 }, carModels: { loaded: 0, total: 0 } };
   const view = render(<Probe sceneKey="a" create={async context => { context.onDispose(cleanupScene); context.showProgress(progress); return handle(); }} />);
   await settle();
   expect(latest?.state?.progress).toBe(progress);

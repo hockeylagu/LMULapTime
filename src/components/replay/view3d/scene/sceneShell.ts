@@ -178,8 +178,9 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const report = (change: Partial<SceneLoadProgress> = {}) => {
     if (disposed) return;
     const circuit = stream.circuit(), textures = warmup.sharpening();
-    // After the first frame only the streaming counts change; a chunk shown or hidden as the car moves reports nothing.
-    if (!loading && circuit.resident === progress.circuit.resident && circuit.total === progress.circuit.total && !texturesChanged()) return;
+    // After the first frame a view's own steps and the streaming counts report; a chunk shown or hidden as the car moves does not.
+    if (!loading && Object.keys(change).length === 0 && circuit.resident === progress.circuit.resident && circuit.total === progress.circuit.total
+      && !texturesChanged()) return;
     Object.assign(progress, change, loading ? {scenery: stream.underView()} : {}, {circuit, textures});
     onProgress({...progress});
   };
@@ -327,7 +328,11 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     attach(next, nextListener) {
       if (host) shell.detach(host);
       host = next; listener = nextListener;
-      if (started) mount();
+      if (started) {
+        mount();
+        // A view coming to a shown circuit loads only its cars: the bar starts past the track, scenery and lighting.
+        report({cars: 0, shaders: 0, carModels: {loaded: 0, total: 0}});
+      }
     },
     isAttached: view => host === view,
     detach(view) {

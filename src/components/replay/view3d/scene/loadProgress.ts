@@ -15,9 +15,12 @@ export interface SceneLoadProgress {
   circuit: {resident: number; total: number};
   /** The scenery textures sharpening to full detail after the first frame: sharp of those queued so far. */
   textures: {sharp: number; total: number};
+  /** Car models loading behind a shown scene (a new lap's cars, the race's field): loaded of those asked for so far. */
+  carModels: {loaded: number; total: number};
 }
 
-export const NO_LOAD_PROGRESS: SceneLoadProgress = {track: 0, scenery: {resident: 0, total: 0}, cars: 0, lighting: 0, shaders: 0, circuit: {resident: 0, total: 0}, textures: {sharp: 0, total: 0}};
+export const NO_LOAD_PROGRESS: SceneLoadProgress = {track: 0, scenery: {resident: 0, total: 0}, cars: 0, lighting: 0, shaders: 0, circuit: {resident: 0, total: 0}, textures: {sharp: 0, total: 0},
+  carModels: {loaded: 0, total: 0}};
 
 /**
  * Each step's share of the bar, roughly its share of the wait. One Barcelona load (2026-11-12) took 0.24 s for the track, 1.85 s

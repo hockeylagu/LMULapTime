@@ -57,6 +57,13 @@ describe('3D replay streaming note', () => {
     expect(screen.queryByTestId('replay-3d-streaming')).not.toBeInTheDocument();
   });
 
+  it('counts the cars loading behind a shown scene first, and drops the line once they are loaded', () => {
+    const {rerender} = render(<Replay3DStreaming progress={{...started, carModels: {loaded: 1, total: 2}, circuit: {resident: 12, total: 40}}} />);
+    expect(screen.getByTestId('replay-3d-streaming')).toHaveTextContent('Loading cars1/2Streaming scenery12/40');
+    rerender(<Replay3DStreaming progress={{...started, carModels: {loaded: 2, total: 2}, circuit: {resident: 12, total: 40}}} />);
+    expect(screen.getByTestId('replay-3d-streaming')).not.toHaveTextContent('Loading cars');
+  });
+
   it('counts the textures still sharpening, alone once the scenery is all in', () => {
     const {rerender} = render(<Replay3DStreaming progress={{...started, circuit: {resident: 12, total: 40}, textures: {sharp: 5, total: 20}}} />);
     expect(screen.getByTestId('replay-3d-streaming')).toHaveTextContent('Streaming scenery12/40Sharpening textures5/20');

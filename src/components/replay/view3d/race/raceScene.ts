@@ -128,6 +128,7 @@ export async function createRaceScene(
       const firstCar = await pending;
       rig.unplace(); setFollowed(firstCar);
       if (firstCar?.car) await shell.warm(firstCar.car);
+      shell.report({shaders: 1});
       if (!shell.isAttached(host)) throw new DOMException('The race view left', 'AbortError');
       shell.show(content());
       firstCar?.ready();

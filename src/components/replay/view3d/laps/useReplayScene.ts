@@ -98,12 +98,14 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         const handle = await owner.scene;
         if (abort.signal.aborted) return;
         validateLaps(trajectory, baseline);
-        const [primary, comparison] = await Promise.all([laps.loadCar(trajectory), laps.loadCar(baseline)]);
-        if (abort.signal.aborted) return;
+        const bodies = Promise.all([laps.loadCar(trajectory), laps.loadCar(baseline)]);
         if (laps.trajectory !== trajectory || laps.baseline !== baseline) {
-          if (!await handle.updateLaps(trajectory, baseline, {primary: primary!, baseline: comparison}, abort.signal)) return;
+          // The scene counts the cars from the start of their fetch.
+          const assets = bodies.then(([primary, comparison]) => ({primary: primary!, baseline: comparison}));
+          if (!await handle.updateLaps(trajectory, baseline, assets, abort.signal)) return;
           laps.trajectory = trajectory; laps.baseline = baseline;
         }
+        const [primary, comparison] = await bodies;
         if (abort.signal.aborted) return;
         const settings = latest();
         handle.colorLines(settings.colorBy);
