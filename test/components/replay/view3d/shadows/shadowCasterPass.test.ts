@@ -92,3 +92,22 @@ it('walks the scene and swaps materials once for several layers, each rendered w
   expect(calls.map(call => call.viewport.x)).toEqual([0, 2, 4]);
   expect(calls.every(call => call.depth && call.blind)).toBe(true);
 });
+
+it('frees its depth materials and depth-copy quad on dispose, and lets go of the textures they cut by', () => {
+  const scene = new Scene(), fence = new Texture(), grille = new Mesh(new BoxGeometry(), new MeshStandardMaterial({alphaTest: 0.5, map: fence}));
+  grille.castShadow = true; scene.add(grille); scene.updateMatrixWorld(true);
+  const drawn: Array<Material | Material[]> = [];
+  const renderer = {
+    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
+    render(root: Scene) { drawn.push((root.children[0] as Mesh).material); },
+  } as unknown as WebGLRenderer;
+  const pass = createShadowCasterPass(renderer, scene), layers = [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}];
+  pass.drawRoots(new WebGLRenderTarget(4, 4), layers, new PerspectiveCamera(), [scene], new WebGLRenderTarget(4, 4));
+  // The tile takes its base depth first (the copy quad), then the grille draws with its depth material.
+  const [copy, depth] = drawn as [Material, MeshDepthMaterial];
+  expect([copy.type, depth.type]).toEqual(['ShaderMaterial', 'MeshDepthMaterial']);
+  const freed = [vi.spyOn(depth, 'dispose'), vi.spyOn(copy, 'dispose')], unlisten = vi.spyOn(fence, 'removeEventListener');
+  pass.dispose();
+  expect(freed.map(spy => spy.mock.calls.length)).toEqual([1, 1]);
+  expect(unlisten).toHaveBeenCalledWith('dispose', expect.any(Function));
+});

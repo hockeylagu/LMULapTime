@@ -170,7 +170,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       return settled && order.length > 1;
     },
     dispose() {
-      depth.dispose(); target.dispose(); staticDepth?.dispose(); staticTarget?.dispose();
+      depth.dispose(); target.dispose(); staticDepth?.dispose(); staticTarget?.dispose(); casters.dispose();
     },
   };
 }

@@ -25,6 +25,8 @@ export interface ShadowCasterPass {
    */
   drawRoots(target: WebGLRenderTarget, layers: readonly ShadowLayer[], view: PerspectiveCamera | OrthographicCamera, roots: readonly Object3D[],
     base?: WebGLRenderTarget): void;
+  /** Frees the pass's depth materials and depth-copy quad, and lets go of the textures they cut by. */
+  dispose(): void;
 }
 
 const SHADOW_SIDE: Record<Side, Side> = { [FrontSide]: BackSide, [BackSide]: FrontSide, [DoubleSide]: DoubleSide };
@@ -42,7 +44,7 @@ const NO_SHADOW = new MeshDepthMaterial({ visible: false });
  * region is copied by drawing, not by a framebuffer blit: Direct3D 11 copies a depth resource only whole, and a blit of part of one
  * there (WebGL on Windows) silently copies nothing.
  */
-function depthCopyQuad(): {scene: Scene; camera: OrthographicCamera; material: ShaderMaterial} {
+function depthCopyQuad(): {scene: Scene; camera: OrthographicCamera; material: ShaderMaterial; geometry: PlaneGeometry} {
   const material = new ShaderMaterial({
     glslVersion: GLSL3,
     uniforms: {baseDepth: {value: null}},
@@ -52,10 +54,10 @@ function depthCopyQuad(): {scene: Scene; camera: OrthographicCamera; material: S
       void main() { gl_FragDepth = texelFetch( baseDepth, ivec2( gl_FragCoord.xy ), 0 ).r; }`,
     depthTest: true, depthFunc: AlwaysDepth, depthWrite: true, colorWrite: false,
   });
-  const quad = new Mesh(new PlaneGeometry(1, 1), material), scene = new Scene();
+  const geometry = new PlaneGeometry(1, 1), quad = new Mesh(geometry, material), scene = new Scene();
   quad.frustumCulled = false;
   scene.add(quad);
-  return {scene, camera: new OrthographicCamera(), material};
+  return {scene, camera: new OrthographicCamera(), material, geometry};
 }
 
 export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): ShadowCasterPass {
@@ -64,6 +66,8 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
   // (every switch uploads the material's uniforms again): keyed by the card turn, side, alpha cut and the textures the cut reads.
   const depthMaterials = new Map<string, MeshDepthMaterial>();
   let byMaterial = new WeakMap<Material, MeshDepthMaterial>(); // The key's result per scene material, so the key is built once.
+  // The texture listeners a cut-out's depth material put on, taken off when the pass goes.
+  const listening: Array<[Texture, () => void]> = [];
   const depthOf = (mesh: Mesh, material: Material): MeshDepthMaterial => {
     if (!castsShadow(material)) return NO_SHADOW;
     const known = byMaterial.get(material);
@@ -82,7 +86,8 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
     }
     depthMaterials.set(key, depth); byMaterial.set(material, depth);
     // A depth material that cuts by a texture goes with it.
-    for (const texture of [map, alphaMap]) texture?.addEventListener('dispose', () => { depth.dispose(); depthMaterials.delete(key); byMaterial = new WeakMap(); });
+    const drop = () => { depth.dispose(); depthMaterials.delete(key); byMaterial = new WeakMap(); };
+    for (const texture of [map, alphaMap]) if (texture) { texture.addEventListener('dispose', drop); listening.push([texture, drop]); }
     return depth;
   };
   // The pass draws only shadow casters, each with its depth material; everything else is hidden for it, then restored.
@@ -141,5 +146,12 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
   return {
     draw: (target, layers, view, dynamic, minCasterM) => render(target, layers, view, [scene], dynamic, minCasterM, true),
     drawRoots: (target, layers, view, roots, base) => render(target, layers, view, roots, [], 0, false, base),
+    dispose() {
+      for (const [texture, drop] of listening) texture.removeEventListener('dispose', drop);
+      listening.length = 0;
+      for (const depth of depthMaterials.values()) depth.dispose();
+      depthMaterials.clear(); byMaterial = new WeakMap();
+      if (depthCopy) { depthCopy.geometry.dispose(); depthCopy.material.dispose(); depthCopy = null; }
+    },
   };
 }
