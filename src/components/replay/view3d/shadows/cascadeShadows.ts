@@ -9,8 +9,9 @@ import { cascadeCentres, sunSquareAxes, type ShadowCascadeLayout, type SunSquare
 
 /**
  * Cascades reaching this far are live: each frame the cars are drawn over their static depth, which is redrawn only when the cascade's
- * held centre has drifted (see `holdM`). Farther ones are cached: drawn without the cars, again once their centre has moved an eighth
- * of their side, at most one per frame (a redraw of a 1 km square is ~1,000 draws).
+ * held centre has drifted (see `holdM`). Farther ones are cached: their static depth is redrawn once their centre has moved an eighth
+ * of their side, at most one per frame (a redraw of a 1 km square is ~1,000 draws), and the cars are drawn over it each frame as over
+ * a live one's (a far car, a trackside view's, still casts).
  * Every shadow pass re-draws each caster it meets, the frame's main cost (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
  */
 const LIVE_CASCADE_SPLIT_M = 100;
@@ -49,8 +50,8 @@ export interface CascadeShadows {
   /** The sun moved: every cascade is redrawn from the new direction. `lightTravel` is unit, from the sun toward the ground. */
   setLight(lightTravel: Vector3): void;
   /**
-   * Before a frame: redraws the cascades whose held centre has drifted, draws `dynamic` (every moving caster: one left out freezes in
-   * the held depth) over the live ones, and redraws the cached cascade most due. True while cached ones are still due.
+   * Before a frame: redraws the cascades whose held centre has drifted and the cached cascade most due, and draws `dynamic` (every
+   * moving caster: one left out freezes in the held depth) over every held and cached one. True while cached ones are still due.
    */
   update(view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[]): boolean;
   dispose(): void;
@@ -111,8 +112,8 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       drawnCentre: null as [number, number] | null,
     };
   });
-  // The static depth of the held live cascades, in the atlas' own tiles, of the atlas' depth type: the shadow pass copies it as stored.
-  const staticDepth = cascades.some(row => row.held) ? new DepthTexture(sizePx, heightPx, UnsignedIntType) : null;
+  // The static depth of the held and cached cascades, in the atlas' own tiles, of the atlas' depth type: the shadow pass copies it as stored.
+  const staticDepth = cascades.some(row => row.held || !row.live) ? new DepthTexture(sizePx, heightPx, UnsignedIntType) : null;
   const staticTarget = staticDepth && new WebGLRenderTarget(sizePx, heightPx, {format: RedFormat, depthTexture: staticDepth, generateMipmaps: false});
   if (staticTarget) renderer.initRenderTarget(staticTarget);
   const state: CascadeShadowState = {
@@ -152,22 +153,22 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
         : Math.max(Math.abs(centres[i][0] - drawnCentre[0]), Math.abs(centres[i][1] - drawnCentre[1])) / holdM);
       const indicesOf = (pick: (row: (typeof cascades)[number]) => boolean) => cascades.flatMap((row, i) => pick(row) ? [i] : []);
       // The live cascades share one scene walk and material swap per kind, a cached one has its own caster floor so draws alone; each
-      // cascade keeps its own camera and viewport. Held live: static casters (cars left out) into the static target when moved, then
-      // every frame its tile is drawn into the atlas from it and the cars over that. Whole live: everything into the atlas each frame.
+      // cascade keeps its own camera and viewport. Held live and cached: static casters (cars left out) into the static target when
+      // moved, then every frame its tile is drawn into the atlas from it and the cars over that. Whole live: everything into the atlas
+      // each frame.
       const held = indicesOf(row => row.held), whole = indicesOf(row => row.live && !row.held);
       const moved = held.filter(i => due[i] >= 1);
       if (moved.length) { place(moved, centres); casters.draw(staticTarget!, layersOf(moved), view, dynamic, 0); }
       if (whole.length) { place(whole, centres); casters.draw(target, layersOf(whole), view, [], 0); }
-      if (held.length) {
-        casters.drawRoots(target, layersOf(held), view, dynamic, staticTarget!);
-      }
       // Until every cached cascade has been drawn once, all of them at once; afterwards the most due one, if one is due.
       const settled = cascades.every(row => row.live || row.drawnCentre);
       const order = due.map((value, i) => [value, i] as const).filter(([value, i]) => !cascades[i].live && value >= 1).sort((a, b) => b[0] - a[0]);
       for (const [, i] of settled ? order.slice(0, 1) : order) {
         place([i], centres);
-        casters.draw(target, layersOf([i]), view, dynamic, CACHED_MIN_CASTER_TEXELS * cascades[i].cascade.texelM);
+        casters.draw(staticTarget!, layersOf([i]), view, dynamic, CACHED_MIN_CASTER_TEXELS * cascades[i].cascade.texelM);
       }
+      const overlaid = indicesOf(row => row.held || (!row.live && row.drawnCentre !== null));
+      if (overlaid.length) casters.drawRoots(target, layersOf(overlaid), view, dynamic, staticTarget!);
       return settled && order.length > 1;
     },
     dispose() {

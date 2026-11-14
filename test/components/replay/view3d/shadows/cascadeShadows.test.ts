@@ -68,29 +68,29 @@ describe('cascade shadows', () => {
   const sceneRenders = (draws: ReturnType<typeof setUp>['draws'], scene: unknown) => draws.renders.filter(event => event.root === scene);
   const across = (view: PerspectiveCamera, metres: number) => view.position.set(0, 1, 0).addScaledVector(sunSquareAxes(light).u, metres);
 
-  it('draws every cascade into its tile first, then only redraws the live ones from their static depth while the view stays put', () => {
+  it('draws every cascade into its tile first, then only redraws each from its static depth while the view stays put', () => {
     const {cascades, draws, view, scene} = setUp();
     expect(cascades.update(view, [])).toBe(false);
     // The second atlas sits above the first in one 64 x 128 texture.
     expect(draws.renders.map(draw => [draw.viewport.x, draw.viewport.y, draw.viewport.z])).toEqual([[0, 0, 32], [32, 0, 32], [0, 64, 32]]);
-    expect(draws.copies.map(copy => copy.viewport.toArray())).toEqual([[0, 0, 32, 32], [32, 0, 32, 32]]);
+    expect(draws.copies.map(copy => copy.viewport.toArray())).toEqual([[0, 0, 32, 32], [32, 0, 32, 32], [0, 64, 32, 32]]);
     expect(cascades.state.tiles.map(tile => tile.toArray())).toEqual([[0, 0, 0.5, 0.25], [0.5, 0, 0.5, 0.25], [0, 0.5, 0.5, 0.25]]);
     draws.clear();
     cascades.update(view, []);
-    expect(draws.renders).toHaveLength(0); expect(draws.copies).toHaveLength(2);
+    expect(draws.renders).toHaveLength(0); expect(draws.copies).toHaveLength(3);
     expect(sceneRenders(draws, scene)).toHaveLength(0);
   });
 
-  it('draws the cars over each live cascade every frame, and leaves them out of the static and cached depth', () => {
+  it('draws the cars over every cascade each frame, a far one\'s included, and leaves them out of the static depth', () => {
     const {cascades, draws, view, car, scene} = setUp();
     cascades.update(view, [car]);
-    // Static into the held depth, then each live tile's copy and the cars over it, then the cached cascade without them.
-    expect(draws.renders.map(draw => [draw.root === car ? 'car' : 'scene', draw.car])).toEqual([['scene', false], ['scene', false], ['car', true], ['car', true], ['scene', false]]);
-    expect(draws.events.slice(2, 6).map(event => [event.kind, event.viewport.x])).toEqual([['copy', 0], ['render', 0], ['copy', 32], ['render', 32]]);
+    // Static into the held depth, the cached cascade's too, then each tile's copy and the cars over it.
+    expect(draws.renders.map(draw => [draw.root === car ? 'car' : 'scene', draw.car])).toEqual([['scene', false], ['scene', false], ['scene', false], ['car', true], ['car', true], ['car', true]]);
+    expect(draws.events.slice(3, 9).map(event => [event.kind, event.viewport.x, event.viewport.y])).toEqual([['copy', 0, 0], ['render', 0, 0], ['copy', 32, 0], ['render', 32, 0], ['copy', 0, 64], ['render', 0, 64]]);
     draws.clear();
     cascades.update(view, [car]);
-    expect(draws.renders.map(draw => [draw.root === car, draw.viewport.x])).toEqual([[true, 0], [true, 32]]);
-    expect(draws.copies).toHaveLength(2); expect(sceneRenders(draws, scene)).toHaveLength(0);
+    expect(draws.renders.map(draw => [draw.root === car, draw.viewport.x, draw.viewport.y])).toEqual([[true, 0, 0], [true, 32, 0], [true, 0, 64]]);
+    expect(draws.copies).toHaveLength(3); expect(sceneRenders(draws, scene)).toHaveLength(0);
     expect(car.visible).toBe(true);
   });
 
@@ -101,8 +101,8 @@ describe('cascade shadows', () => {
     for (const [acrossM, redrawn] of [[5, [0]], [20, [0, 32]], [40, [0, 32, 0]]] as const) {
       draws.clear(); across(view, acrossM); cascades.update(view, [car]);
       expect(sceneRenders(draws, scene).map(draw => draw.viewport.x)).toEqual(redrawn);
-      expect(draws.copies).toHaveLength(2);
-      expect(draws.renders.filter(draw => draw.root === car)).toHaveLength(2);
+      expect(draws.copies).toHaveLength(3);
+      expect(draws.renders.filter(draw => draw.root === car)).toHaveLength(3);
     }
   });
 
@@ -180,6 +180,7 @@ describe('cascade shadows', () => {
     cascades.update(view, []); events.length = 0;
     cascades.update(view, []);
     expect(events.filter(event => event.kind === 'render' && event.root === scene)).toHaveLength(1);
-    expect(events.filter(event => event.kind === 'copy')).toHaveLength(1);
+    // The held live cascade and the cached one.
+    expect(events.filter(event => event.kind === 'copy')).toHaveLength(2);
   });
 });
