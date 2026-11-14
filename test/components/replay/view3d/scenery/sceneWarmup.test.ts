@@ -97,3 +97,19 @@ it('swaps whole textures within the frame budget: the first one even if bigger, 
     expect([big, other, small, smaller].some(isStreaming)).toBe(false);
   } finally { warmup.dispose(); drain(); }
 });
+
+it('warms a shown scene within the frame byte budget: the first upload whole, then the next frame', async () => {
+  const {warmup, bound} = fixture(), mib = 1024 * 1024;
+  // Uploads return at once: only the bytes end the frame's slice.
+  vi.spyOn(performance, 'now').mockReturnValue(0);
+  const card = () => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)}));
+  try {
+    warmup.shown();
+    const done = warmup.warm([card(), card(), card()], new AbortController().signal);
+    await vi.waitFor(() => expect(bound).toHaveLength(2)); // 1.5 MiB, then 3 MiB: over the 2 MiB budget, the frame ends.
+    expect(frames).toHaveLength(1);
+    frames.shift()!();
+    await done;
+    expect(bound).toHaveLength(3);
+  } finally { warmup.dispose(); vi.restoreAllMocks(); }
+});
