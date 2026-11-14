@@ -80,4 +80,19 @@ describe('createFarGlows', () => {
     expect(dispose).toHaveBeenCalled(); expect(material).toHaveBeenCalled();
     expect(mesh.parent?.parent?.parent).toBeFalsy();
   });
+
+  it('frees the glows it built when their compile fails, and leaves the body without glows', async () => {
+    const parent = new Group(), templates = { body: vi.fn(async () => template()) } as unknown as CarTemplates;
+    const textures = { load: vi.fn(async (_path: string) => new Texture()), copied: vi.fn() };
+    const freed = vi.spyOn(InstancedMesh.prototype, 'dispose');
+    let failed!: () => void;
+    const compiled = new Promise<void>(resolve => { failed = resolve; });
+    const glows = createFarGlows(parent, templates, textures, async () => { failed(); throw Error('compile failed'); }, vi.fn());
+    glows.draw([{ body: body('A'), frame: new Matrix4(), braking: true, headlights: true }]);
+    await compiled;
+    // The brake and headlight lit frames were built, then freed.
+    await vi.waitFor(() => expect(freed).toHaveBeenCalledTimes(2));
+    expect(parent.getObjectsByProperty('isInstancedMesh', true)).toEqual([]);
+    freed.mockRestore();
+  });
 });

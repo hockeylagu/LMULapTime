@@ -120,7 +120,9 @@ export function createFarGlows(parent: Group, templates: CarTemplates, carTextur
       bodies.set(folder, frames);
       changed();
     } catch {
-      // The body's far cars stay without glows.
+      // The body's far cars stay without glows; the glows built before the failure go.
+      const failed = new Group(); for (const {mesh} of frames) failed.add(mesh);
+      free(failed);
       bodies.set(folder, 'failed');
     } finally { loading = false; }
   };
