@@ -78,10 +78,10 @@ describe('shaderParts', () => {
     const parts = shaderParts(surface('diffuse', { maps: { albedo: map('A', true, 'worldPlanar') } }));
     expect(parts.albedo).toContain('vSurfaceXZ * surface_scale_albedo');
   });
-  it('drives the luminous kinds by emission only, with their native multipliers', () => {
+  it('drives the luminous kinds by emission only, with their native multipliers, the bright panels brightest head-on', () => {
     const maps = { albedo: map('A', true) };
-    expect(shaderParts(surface('highLumSun', { maps })).emissive).toBe('lum.rgb*500.0*lum.a');
-    expect(shaderParts(surface('highLumTrackside', { maps })).emissive).toBe('lum.rgb*100.0*lum.a');
+    expect(shaderParts(surface('highLumSun', { maps })).emissive).toBe('lum.rgb*500.0*(1.0+2.0*pow(clamp(dot(normal,normalize(vViewPosition)),0.0,1.0),64.0))*lum.a');
+    expect(shaderParts(surface('highLumTrackside', { maps })).emissive).toBe('lum.rgb*100.0*(1.0+2.0*pow(clamp(dot(normal,normalize(vViewPosition)),0.0,1.0),8.0))*lum.a');
     expect(shaderParts(surface('lowLumEmissive', { maps })).emissive).toBe('lum.rgb*20.0*clamp(vSurfaceColour.rgb,0.0,1.0)*lum.a');
     expect(shaderParts(surface('highLumSun', { maps })).albedo).toContain('diffuseColor.rgb=vec3(0.0)');
   });

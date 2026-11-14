@@ -89,14 +89,19 @@ function waterParts(config: SurfaceConfig, { sample, uv, number, uniforms }: Sha
   return { albedo, normals, emissive: '', physical: 'material.specularColor = vec3(0.04);', occlusion: '' };
 }
 
-/** Luminous kinds: the albedo texture is emission only. */
+/**
+ * Luminous kinds: the albedo texture is emission only. The bright panels glow most toward the eye, up to three times head-on, by
+ * 1 + 2 (N.V)^n: a sun-bright panel narrowly (n 64), a trackside one broadly (n 8).
+ */
 function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): ExtendedParts {
   const kind = config.kind;
   const mult = kind === 'highLumSun' ? '500.0' : kind === 'highLumTrackside' ? '100.0' : '20.0';
+  const facing = kind === 'highLumSun' ? '64.0' : kind === 'highLumTrackside' ? '8.0' : null;
+  const view = facing ? `*(1.0+2.0*pow(clamp(dot(normal,normalize(vViewPosition)),0.0,1.0),${facing}))` : '';
   return {
     albedo: `vec4 lum=${sample('albedo')}; diffuseColor.rgb=vec3(0.0); diffuseColor.a*=lum.a; surfaceSpecular=0.0;`,
     normals: '', physical: '', occlusion: '',
-    emissive: `lum.rgb*${mult}*${kind === 'lowLumEmissive' ? 'clamp(vSurfaceColour.rgb,0.0,1.0)*' : ''}lum.a`,
+    emissive: `lum.rgb*${mult}${view}*${kind === 'lowLumEmissive' ? 'clamp(vSurfaceColour.rgb,0.0,1.0)*' : ''}lum.a`,
   };
 }
 
