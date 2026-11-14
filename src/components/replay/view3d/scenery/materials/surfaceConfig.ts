@@ -3,6 +3,8 @@
  * reads, in its own names, every value filled by the exporter. The runtime reads this contract and nothing else: an unknown
  * version, kind or UV set throws.
  */
+import { isUvAnimation, type SurfaceUvAnimation } from './surfaceAnimation.js';
+
 /** Texture coordinate source: the mesh UV sets 0..3 (glTF TEXCOORD_0..3) or the world XZ projection. */
 export type UvSet = 'uv0' | 'uv1' | 'uv2' | 'uv3' | 'worldPlanar';
 const UV_SETS = new Set<string>(['uv0', 'uv1', 'uv2', 'uv3', 'worldPlanar']);
@@ -20,6 +22,8 @@ export interface SurfaceMap {
   scale: [number, number];
   srgb: boolean;
   normal?: boolean;
+  /** Its UV shift over time, added after the scale (`surfaceAnimation.ts`). */
+  uvAnimation?: SurfaceUvAnimation;
 }
 
 /** One named block of shader parameters (`adjust`, `terrain`, ...): numbers and number lists. */
@@ -60,6 +64,7 @@ export function readSurfaceConfig(userData: Record<string, unknown>): SurfaceCon
   for (const [key, map] of Object.entries(config.maps)) {
     if (!map || typeof map.texture !== 'string' || !UV_SETS.has(map.uv)) throw Error(`Unsupported shader UV: ${name}/${key}`);
     if (!Array.isArray(map.scale) || map.scale.length !== 2 || !map.scale.every(Number.isFinite)) throw Error(`Missing map scale: ${name}/${key}`);
+    if (map.uvAnimation !== undefined && !isUvAnimation(map.uvAnimation)) throw Error(`Unsupported UV animation: ${name}/${key}`);
   }
   return config;
 }

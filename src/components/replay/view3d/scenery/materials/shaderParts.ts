@@ -192,15 +192,16 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   const uv = (key: string, alternateScale?: readonly number[]) => {
     const map = maps[key];
     if (!map) throw Error(`Unsupported shader UV: ${config.name ?? '?'}/${key}`);
-    const source = SAMPLER_UVS[map.uv];
-    if (useUniforms && !alternateScale) return `(${source} * surface_scale_${key})`;
-    return `(${source} * ${vec(alternateScale ?? map.scale)})`;
+    const source = SAMPLER_UVS[map.uv], shift = map.uvAnimation ? ` + surface_shift_${key}` : '';
+    if (useUniforms && !alternateScale) return `(${source} * surface_scale_${key}${shift})`;
+    return `(${source} * ${vec(alternateScale ?? map.scale)}${shift})`;
   };
   const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => maps[key] ? `texture2D(surface_${key}, ${uv(key, scale)})` : fallback;
   const context: ShaderContext = { sample, uv, number, vec, uniforms: useUniforms };
   const tint = useUniforms ? 'diffuse' : glslVec(list(config.parameters.adjust, 'tint'));
   const parts = familyParts(config, context, tint);
-  const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`).join('\n');
+  const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`
+    + (maps[key]!.uvAnimation ? `\nuniform vec2 surface_shift_${key};` : '')).join('\n');
   return {
     declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
       + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,

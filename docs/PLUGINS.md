@@ -282,6 +282,9 @@ A body is split by where it is seen from and has texture start files:
   (`sceneObjects.ts`, `setCameraDistance`). Every LOD distance, scenery `lmuLod` included, is divided by the view's LOD multiplier
   (`CameraRig.lodMultiplier`): a car-mounted game camera's `lodMultiplier`, `cameras.chase.lodMultiplier` in the follow and chase
   views. The trackside views draw every resident scenery instance (their scale follows the zoom), as do the free views.
+- A surface map may carry `uvAnimation` {`mode` scroll | step, `rate`, `step`}: its UV moves by rate · t, or step · floor(rate · t),
+  after its scale, on the replay clock (`scenery/materials/surfaceAnimation.ts`). Texture `frames` are not drawn: the maps that carry
+  them are driven by game state the package does not hold (their texture is the first frame) or name no method.
 - A body texture row may carry `interiorOnly: true` (no outside part uses it; the viewer reads it at full size, the rest of the
   car up to its size limit) and `start`, with the full file's `width`, `height`, `levels` and `format` stated exactly when it has
   a `start`.

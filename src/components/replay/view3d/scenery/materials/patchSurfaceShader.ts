@@ -2,6 +2,7 @@ import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type W
 import { tyreReadsAxle } from '../../car/tyreSurface.js';
 import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
 import { sceneryClock } from './sceneryClock.js';
+import { uvShiftUniform } from './surfaceAnimation.js';
 import { patchAmbientLookup } from './ambientLookup.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
 import { glslNumber, list, surfaceAlphaCut, value } from './shaderContext.js';
@@ -116,7 +117,10 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     tunables.surface_coatLacquerThickness = { value: Math.max(0.001, value(p.clearCoat, 'lacquerThickness')) };
   }
   const mapScaleUniforms: Record<string, IUniform> = {};
-  for (const [key, map] of Object.entries(config.maps)) mapScaleUniforms[`surface_scale_${key}`] = { value: new Vector2(...map!.scale) };
+  for (const [key, map] of Object.entries(config.maps)) {
+    mapScaleUniforms[`surface_scale_${key}`] = { value: new Vector2(...map!.scale) };
+    if (map!.uvAnimation) mapScaleUniforms[`surface_shift_${key}`] = uvShiftUniform(map!.uvAnimation);
+  }
 
   // The family's values, four to a vec4 (the last one padded).
   if (code.constants.length) tunables.surface_constants = { value: Float32Array.from({ length: Math.ceil(code.constants.length / 4) * 4 }, (_, i) => code.constants[i] ?? 0) };
