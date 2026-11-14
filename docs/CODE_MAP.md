@@ -366,7 +366,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   both views stay loaded behind 2D once opened (the scene stops drawing while hidden).
   `camera/cameraRig.ts` owns the cameras, OrbitControls and how each mode follows the car (`RigCar`: the model, its game cameras, the
   samples around it for the chase look-ahead), and
-  `scenery/sceneWarmup.ts` compiles and uploads each chunk (with the batches it created) before it joins, then sharpens reduced textures: the car's first, then the chunk nearest the camera, the largest first within it.
+  `scenery/sceneWarmup.ts` compiles and uploads each chunk (with the batches it created) before it joins, then sharpens reduced textures: the car's first, then the chunk nearest the camera, the largest first within it. The compile skips meshes in no camera layer (batch stand-ins; three would link a program for each), and while the scene shows, uploads go in per-frame slices of time and bytes (`scenery/geometryWarmup.ts` takes the slice).
   `laps/useReplayScene.ts` retains the scene for a layout/geometry/package revision; selecting
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.

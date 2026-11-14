@@ -1,4 +1,4 @@
-import { Box3, CompressedTexture, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, RGBA_BPTC_Format, Scene, Vector3, type Texture, type WebGLRenderer } from 'three';
+import { Box3, CompressedTexture, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, RGBA_BPTC_Format, Scene, Vector3, type Object3D, type Texture, type WebGLRenderer } from 'three';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isStreaming, startStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import { createSceneWarmup } from '../../../../../src/components/replay/view3d/scenery/sceneWarmup.js';
@@ -112,4 +112,18 @@ it('warms a shown scene within the frame byte budget: the first upload whole, th
     await done;
     expect(bound).toHaveLength(3);
   } finally { warmup.dispose(); vi.restoreAllMocks(); }
+});
+
+it('compiles what a camera layer draws, hidden or not, and no stand-in in no layer', async () => {
+  const compiled: Object3D[] = [];
+  const renderer = {getRenderTarget: () => null, setRenderTarget: () => {}, initTexture: () => {}, render: () => {}, compile: () => {},
+    compileAsync: (object: Object3D) => { object.traverse(child => { compiled.push(child); }); return Promise.resolve(); }} as unknown as WebGLRenderer;
+  const warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, () => {});
+  const root = new Group(), drawn = new Mesh(new PlaneGeometry(), new MeshBasicMaterial()), hidden = drawn.clone(), standIn = drawn.clone();
+  hidden.visible = false; standIn.layers.disableAll();
+  root.add(drawn, hidden, standIn);
+  try {
+    await warmup.warm(root, new AbortController().signal);
+    expect(compiled).toEqual([root, drawn, hidden]); // A hidden part may show later (a cockpit, a chunk); a stand-in never draws.
+  } finally { warmup.dispose(); }
 });

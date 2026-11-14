@@ -37,7 +37,7 @@ it('draws a material once across chunks, each chunk shown while it is in the sce
   // A geometry two nodes use is stored once; the originals stay in their chunk, hidden and without geometry.
   expect([batch.getGeometryIdAt(0), batch.getGeometryIdAt(1), batch.getGeometryIdAt(2)]).toEqual([0, 0, 1]);
   const originals = first.children as Mesh[];
-  expect(originals.every(mesh => !mesh.visible && mesh.geometry !== shared && !mesh.geometry.getAttribute('position'))).toBe(true);
+  expect(originals.every(mesh => !mesh.visible && mesh.layers.mask === 0 && mesh.geometry !== shared && !mesh.geometry.getAttribute('position'))).toBe(true);
   // Loaded chunks stay hidden until they join the scene, and the batch stays out of it (its program is not drawn before the warm-up).
   expect([shown(batch, 3), batch.parent]).toEqual([[false, false, false], null]);
   scenery.add(first, second); batches.sync();

@@ -154,8 +154,9 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
         placed.instances.push(ranged);
         moved.push(mesh);
       });
-      // The originals stay in the chunk (their materials are released with it) but draw nothing and hold no geometry.
-      for (const mesh of moved) { mesh.geometry.dispose(); mesh.geometry = MOVED; mesh.visible = false; }
+      // The originals stay in the chunk (their materials are released with it) but draw nothing, hold no geometry and are in no
+      // camera layer, so no program is linked for them (sceneWarmup.ts).
+      for (const mesh of moved) { mesh.geometry.dispose(); mesh.geometry = MOVED; mesh.visible = false; mesh.layers.disableAll(); }
       // A batch's bounds (its frustum culling) cover the instances it had when first computed: they grow with each chunk.
       for (const batch of byBatch.keys()) computeBatchBounds(batch);
       // The last primitive of a material fills its batches: they keep no CPU copy past their next upload.

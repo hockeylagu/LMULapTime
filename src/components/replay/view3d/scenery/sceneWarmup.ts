@@ -21,6 +21,19 @@ function textureBytes(texture: Texture): number {
   return (image?.width ?? 0) * (image?.height ?? 0) * 4;
 }
 
+/**
+ * What a compile walks: the objects of `roots` but the meshes in no camera layer (a batch's stand-in parts, car and scenery). three's
+ * compile links a program for every mesh under the object it is given, hidden or not, in any layer: a stand-in would link a
+ * plain-mesh program that nothing ever draws (over a third of the programs at a race start). The compile walks that object with `traverse`.
+ */
+function drawnView(roots: readonly Object3D[]): Object3D {
+  const view = new Object3D();
+  view.traverse = callback => {
+    for (const root of roots) root.traverse(object => { if (!(object instanceof Mesh) || object.layers.mask !== 0) callback(object); });
+  };
+  return view;
+}
+
 export interface SceneWarmup {
   /**
    * Compiles the programs of `roots` and uploads their textures and geometry, so their first draw does not stall playback; their
@@ -99,7 +112,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
     const previous = renderer.getRenderTarget();
     prepare();
-    const compiled = Promise.all(roots.map(root => renderer.compileAsync(root, camera, scene)));
+    const compiled = renderer.compileAsync(drawnView(roots), camera, scene);
     renderer.setRenderTarget(previous);
     return compiled;
   };
