@@ -71,7 +71,7 @@ files; it never says how to display.
 
 | Measure (production build, headless Edge, 1920x1080, this machine) | Now | Target |
 |---|---|---|
-| Le Mans start, 62 cars, chase: draws per frame | ~1,400 | low hundreds |
+| Le Mans start, 62 cars, chase: draws per frame | ~1,400 | under 1,000 in every frame (a guide; frame time and load come first) |
 | Le Mans start: frame p50 / p95 | 15.8 / 34 ms | ≤ 10 / ≤ 16.7 ms (main thread no longer the limit) |
 | Lap view (Fuji, Silverstone): frame p50 / p99 | 6.7 / 18–25 ms | no worse; p99 ≤ 16.7 ms |
 | Load: lap first frame / race start loaded | 5.0–5.6 s / 32 s | no slower; race faster |
@@ -139,7 +139,8 @@ to per-instance data. Steps, each measured before the next:
 
 P0a, P0b and P1 need no package change and start now. The material field list of P3 is designed before P2's schema is fixed
 (the fidelity session drafts it while P1 runs); P2's two-body prototype can start once P1 has fixed the reading shape. Target after P3:
-draws in the low hundreds at the Le Mans start, main thread no longer the limit. The gain comes from fewer draws and programs
+fewer draws at the Le Mans start, main thread no longer the limit. The user (2026-11-14) relaxed the draw target from the low hundreds
+to under 1,000 in every frame: p50, p95 and the load time are what count. The gain comes from fewer draws and programs
 (the GPU multi-draw is 2.2 % of the frame), not fewer triangles; if triangles still matter after P3, the levers are the app's:
 which tier draws at what distance, culling and shadow casters.
 
