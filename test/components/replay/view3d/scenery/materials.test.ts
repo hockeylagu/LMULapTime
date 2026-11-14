@@ -85,13 +85,26 @@ describe('shaderParts', () => {
     expect(shaderParts(surface('lowLumEmissive', { maps })).emissive).toBe('lum.rgb*20.0*clamp(vSurfaceColour.rgb,0.0,1.0)*lum.a');
     expect(shaderParts(surface('highLumSun', { maps })).albedo).toContain('diffuseColor.rgb=vec3(0.0)');
   });
+  it('lays a dashboard decal over the screen with its own roughness, and multiplies a monitor by its decal', () => {
+    const maps = { albedo: map('A', true), decal: map('D', true) };
+    const decal = shaderParts(surface('dashboard', { maps, flags: { decal: 'on' }, parameters: { dashboard: { roughness: 0.2, decalRoughness: 0.7, emissiveStrength: 9 } } }), { uniforms: false });
+    expect(decal.albedo).toContain('diffuseColor.rgb=mix(diffuseColor.rgb,dashDecal.rgb,dashDecal.a)');
+    expect(decal.albedo).toContain('surfaceRoughness=mix(surfaceRoughness,0.70000000,dashDecal.a)');
+    expect(shaderParts(surface('dashboard', { maps }), { uniforms: false }).albedo).not.toContain('dashDecal');
+    const monitor = shaderParts(surface('externalMonitor', { maps }), { uniforms: false });
+    expect(monitor.albedo).toContain('diffuseColor*=texture2D(surface_albedo');
+    expect(monitor.albedo).not.toContain('vSurfaceColour');
+  });
   it('reads the dashboard controls and ignores vertex colour only for the diffuse shader without it', () => {
     const config = surface('dashboard', { maps: { albedo: map('A', true) }, parameters: { dashboard: { roughness: 0.4, emissiveStrength: 9 } } });
     const dash = shaderParts(config, { uniforms: false });
-    expect(dash.albedo).toContain('surfaceRoughness=0.40000000'); expect(dash.emissive).toBe('diffuseColor.rgb*9.00000000');
+    // The screen's light is a constant light in the diffuse sum: albedo times its strength over pi, less the specular share.
+    const emission = 9 / Math.PI * (1 - 0.5 * (0.4 / 2.4) ** 2);
+    expect(dash.albedo).toContain('surfaceRoughness=0.40000000'); expect(dash.emissive).toBe(`diffuseColor.rgb*${emission.toFixed(8)}`);
+    expect(dash.albedo).toContain('surfaceSpecular=0.5;');
     // With uniforms, the values leave the source for `surface_constants`.
     const shared = shaderParts(config);
-    expect([shared.albedo, shared.emissive, shared.constants]).toEqual([expect.stringContaining('surfaceRoughness=surface_constants[0].x'), 'diffuseColor.rgb*surface_constants[0].y', [0.4, 9]]);
+    expect([shared.albedo, shared.emissive, shared.constants]).toEqual([expect.stringContaining('surfaceRoughness=surface_constants[0].x'), 'diffuseColor.rgb*surface_constants[0].y', [0.4, emission]]);
     expect(shared.declarations).toContain('uniform vec4 surface_constants[1];');
     expect(shaderParts(surface('diffuse', { vertexColour: false, maps: { albedo: map('A', true) } })).albedo).not.toContain('*vSurfaceColour');
     expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true) } })).albedo).toContain('*vSurfaceColour');
@@ -120,8 +133,20 @@ describe('shaderParts', () => {
     const water = shaderParts(surface('water', { maps: { albedo: map('A', true) } }));
     expect(water.albedo).toContain('diffuseColor.a = 1.0;'); expect(water.albedo).not.toContain('waterAlbedo.a');
   });
+  it('keeps glass a mirror unless its occlusion/roughness map is on, and draws windscreens with the glass program', () => {
+    const maps = { albedo: map('A', true), occlusionRoughness: map('R') };
+    expect(shaderParts(surface('glass', { maps }), { uniforms: false }).albedo).toContain('surfaceRoughness=0.0;');
+    const rough = shaderParts(surface('glass', { maps, flags: { occlusionRoughness: 'on' } }), { uniforms: false }).albedo;
+    expect(rough).toContain('surfaceRoughness=surfaceAdjust(texture2D(surface_occlusionRoughness');
+    const screen = shaderParts(surface('windscreen', { maps, flags: { vertexColour: 'albedoMultiply', vertexAlpha: 'opacityMultiply' } }), { uniforms: false });
+    expect(screen.albedo).toContain('diffuseColor.rgb*=vSurfaceColour.rgb;'); expect(screen.albedo).toContain('diffuseColor.a*=vSurfaceColour.a;');
+    expect(screen.finish).toContain('totalSpecular/clamp(diffuseColor.a+0.001');
+  });
   it('samples the alpha-composited glass finish and the clearcoat absorption', () => {
-    expect(shaderParts(surface('glass', { maps: { albedo: map('A', true) } })).finish).toContain('totalSpecular/clamp(diffuseColor.a+0.001');
+    const glassFinish = shaderParts(surface('glass', { maps: { albedo: map('A', true) } })).finish;
+    expect(glassFinish).toContain('totalSpecular/clamp(diffuseColor.a+0.001');
+    // Smooth glass halves the sun's GGX highlight with the sun disc's glint.
+    expect(glassFinish).toMatch(/surfaceRoughness < 0\.1[\s\S]*0\.99985[\s\S]*0\.5 \* \(/);
     const clearcoat = shaderParts(surface('clearcoat', { maps: { albedo: map('A', true) } }));
     expect(clearcoat.absorption).toContain('surface_coatLacquerColour'); expect(clearcoat.physical).toContain('material.clearcoatF0');
   });

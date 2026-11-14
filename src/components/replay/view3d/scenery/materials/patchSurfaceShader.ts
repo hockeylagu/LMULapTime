@@ -1,4 +1,5 @@
 import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import { tyreReadsAxle } from '../../car/tyreSurface.js';
 import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
 import { sceneryClock } from './sceneryClock.js';
 import { patchAmbientLookup } from './ambientLookup.js';
@@ -127,6 +128,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   const neededUvs = new Set<string>();
   for (const map of Object.values(config.maps)) if (map?.uv) neededUvs.add(map.uv);
   const hasUv1 = neededUvs.has('uv1'), hasUv2 = neededUvs.has('uv2'), hasUv3 = neededUvs.has('uv3');
+  const axle = tyreReadsAxle(config);
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
     ${hasUv1 ? '#ifndef USE_UV1\n    attribute vec2 uv1;\n    #endif' : 'vec2 uv1 = vec2(0.0);'}
     ${hasUv2 ? '#ifndef USE_UV2\n    attribute vec2 uv2;\n    #endif' : 'vec2 uv2 = vec2(0.0);'}
@@ -134,8 +136,8 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     attribute vec4 _lmu_colour;
     varying vec2 vSurfaceXZ;
     varying float vSurfaceRandom;
-    varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;
-  `).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;');
+    varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;${axle ? '\n    varying float vSurfaceAxle;' : ''}
+  `).replace('#include <begin_vertex>', `#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;${axle ? ' vSurfaceAxle = objectNormal.x;' : ''}`);
   if (config.billboard) {
     const crown = config.kind === 'vegetation';
     if (crown) shader.uniforms[CROWN_SUN_UNIFORM] = crownSun;

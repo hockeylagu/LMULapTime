@@ -10,7 +10,7 @@ import type { SurfaceKind } from './surfaceConfig.js';
  */
 
 /** The surface families that reflect by this rule. */
-export const REFLECTING_KINDS: ReadonlySet<SurfaceKind> = new Set(['terrain', 'road', 'kerb', 'vegetation', 'standard', 'standardBlend', 'flag', 'roadDecal', 'water']);
+export const REFLECTING_KINDS: ReadonlySet<SurfaceKind> = new Set(['terrain', 'road', 'kerb', 'vegetation', 'standard', 'standardBlend', 'flag', 'roadDecal', 'water', 'tyre']);
 
 /** Shared by every scenery program: set once the venue's cube is convolved (`setSceneryReflection`). */
 export const sceneryReflectionUniforms = {

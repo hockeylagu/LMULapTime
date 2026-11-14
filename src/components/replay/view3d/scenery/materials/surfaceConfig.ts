@@ -9,7 +9,7 @@ const UV_SETS = new Set<string>(['uv0', 'uv1', 'uv2', 'uv3', 'worldPlanar']);
 
 export const SURFACE_KINDS = [
   'terrain', 'road', 'kerb', 'vegetation', 'standard', 'standardBlend', 'clearcoat', 'glass', 'flag', 'digitalFlag', 'roadDecal',
-  'lowLumEmissive', 'highLumTrackside', 'highLumSun', 'dashboard', 'diffuse', 'water',
+  'lowLumEmissive', 'highLumTrackside', 'highLumSun', 'dashboard', 'externalMonitor', 'diffuse', 'water', 'tyre', 'windscreen', 'windscreenInside',
 ] as const;
 export type SurfaceKind = typeof SURFACE_KINDS[number];
 

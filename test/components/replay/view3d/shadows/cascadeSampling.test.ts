@@ -83,7 +83,7 @@ describe('cascade shadow sampling', () => {
     #if UNROLLED_LOOP_INDEX == 0
       { float sunShadow = receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;
         directLight.color *= sunShadow;
-        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; }`);
+        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; surfaceSunShadow = sunShadow; }`);
     // The sun's diffuse takes min(2 * shadow, 1), its specular the shadow: a wrapper of the light model's own direct light.
     const split = shader.fragmentShader.indexOf('#define RE_Direct surfaceSunDirect');
     expect(split).toBeGreaterThan(shader.fragmentShader.indexOf('#define RE_Direct RE_Direct_Physical'));

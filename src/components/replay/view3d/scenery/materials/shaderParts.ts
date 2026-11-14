@@ -1,6 +1,7 @@
+import { tyreReadsAxle, tyreShaderParts } from '../../car/tyreSurface.js';
 import { clearcoatShaderParts } from './clearcoatSurface.js';
 import { digitalFlagShaderParts, flagShaderParts } from './flagSurface.js';
-import { glassShaderParts } from './glassSurface.js';
+import { glassShaderParts, windscreenInsideShaderParts } from './glassSurface.js';
 import { roadDecalShaderParts } from './roadDecalSurface.js';
 import { roadShaderParts } from './roadSurface.js';
 import { REFLECTING_KINDS } from './sceneryReflection.js';
@@ -105,23 +106,42 @@ function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): Extend
   };
 }
 
+/**
+ * Screens: a dashboard (the screen texture times the vertex colour, a decal laid over it by its alpha, with its own roughness) or
+ * an external monitor (screen times decal). The screen lights itself as a constant light inside the diffuse sum, so it shows
+ * albedo times its strength over pi, in the sun's units, with the usual environment lighting on top at half the specular level.
+ * The day strength stands until the scene carries a night level.
+ */
+function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): ExtendedParts {
+  const screen = config.parameters.dashboard, monitor = config.kind === 'externalMonitor';
+  const decal = config.maps.decal && (monitor || config.flags.decal === 'on');
+  const f0 = ((1.4 - 1) / (1.4 + 1)) ** 2;
+  const albedo = monitor
+    ? `diffuseColor*=${sample('albedo')}*${sample('decal')}; surfaceRoughness=${number(value(screen, 'roughness'))};`
+    : `vec4 dash=${sample('albedo')}; diffuseColor*=dash*vSurfaceColour; surfaceRoughness=${number(value(screen, 'roughness'))};
+      ${decal ? `vec4 dashDecal=${sample('decal')}; diffuseColor.rgb=mix(diffuseColor.rgb,dashDecal.rgb,dashDecal.a); surfaceRoughness=mix(surfaceRoughness,${number(value(screen, 'decalRoughness'))},dashDecal.a);` : ''}`;
+  return {
+    albedo: `${albedo} surfaceMetallic=0.0; surfaceSpecular=0.5;`,
+    normals: '', occlusion: '',
+    physical: `material.specularColor=vec3(${glslNumber(f0)}); material.specularColorBlended=vec3(${glslNumber(f0)});`,
+    emissive: `diffuseColor.rgb*${number(value(screen, 'emissiveStrength') / Math.PI * (1 - 0.5 * f0))}`,
+  };
+}
+
 function familyParts(config: SurfaceConfig, context: ShaderContext, tint: string): ExtendedParts {
-  const { sample, number } = context;
+  const { sample } = context;
   switch (config.kind) {
     case 'lowLumEmissive': case 'highLumTrackside': case 'highLumSun':
       return luminousParts(config, context);
-    case 'dashboard':
-      return {
-        albedo: `vec4 dash=${sample('albedo')}; diffuseColor*=dash*vSurfaceColour; surfaceRoughness=${number(value(config.parameters.dashboard, 'roughness'))}; surfaceSpecular=0.0;`,
-        normals: '', physical: '', occlusion: '',
-        emissive: `diffuseColor.rgb*${number(value(config.parameters.dashboard, 'emissiveStrength'))}`,
-      };
+    case 'dashboard': case 'externalMonitor':
+      return screenParts(config, context);
     case 'diffuse':
       return {
         albedo: `vec4 sourceDiffuse=${sample('albedo')}; diffuseColor*=sourceDiffuse${config.vertexColour === false ? '' : '*vSurfaceColour'}; surfaceRoughness=1.0; surfaceSpecular=0.0;`,
         normals: '', physical: '', occlusion: '', emissive: 'vec3(0.0)',
       };
-    case 'glass': return glassShaderParts(config, context);
+    case 'glass': case 'windscreen': return glassShaderParts(config, context);
+    case 'windscreenInside': return windscreenInsideShaderParts(context);
     case 'clearcoat': return clearcoatShaderParts(config, context);
     case 'flag': return flagShaderParts(config, context);
     case 'digitalFlag': return digitalFlagShaderParts(config, context);
@@ -131,6 +151,7 @@ function familyParts(config: SurfaceConfig, context: ShaderContext, tint: string
     case 'vegetation': return vegetationShaderParts(config, context);
     case 'road': case 'kerb': return roadShaderParts(config, context);
     case 'water': return waterParts(config, context, tint);
+    case 'tyre': return tyreShaderParts(config, context);
   }
 }
 
@@ -181,7 +202,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   const parts = familyParts(config, context, tint);
   const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`).join('\n');
   return {
-    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '')
+    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
       + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);

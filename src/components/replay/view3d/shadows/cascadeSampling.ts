@@ -132,10 +132,11 @@ const SUN_LIGHT_INFO = 'getDirectionalLightInfo( directionalLight, directLight )
  * Splits the sun's diffuse from its specular: the sun's light carries the shadow s, and the diffuse a light adds is scaled by
  * `surfaceSunDiffuse` (set at the sun, 1 for the lights before it), so the sun's diffuse takes min(2s, 1) and its specular s. A
  * half-shadowed texel is fully lit in diffuse; only the specular follows the shadow as it is. Wraps whatever `RE_Direct` is defined
- * by then (leaf translucency included, which so takes the diffuse's curve).
+ * by then (leaf translucency included, which so takes the diffuse's curve). `surfaceSunShadow` keeps s for a surface's own light
+ * after the loop (the inside of a windscreen lights its back face by it).
  */
 const SUN_DIFFUSE_SPLIT = `
-float surfaceSunDiffuse = 1.0;
+float surfaceSunDiffuse = 1.0, surfaceSunShadow = 1.0;
 void surfaceSunDirect( const in IncidentLight light, const in vec3 position, const in vec3 normal, const in vec3 viewDir,
   const in vec3 coatNormal, const in PhysicalMaterial material, inout ReflectedLight reflected ) {
   vec3 before = reflected.directDiffuse;
@@ -170,7 +171,7 @@ ${SUN_DIFFUSE_SPLIT}`);
     #if UNROLLED_LOOP_INDEX == 0
       { float sunShadow = receiveShadow ? ${shade('surfaceCascadeShadow( - vViewPosition.z )')} : 1.0;
         directLight.color *= sunShadow;
-        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; }
+        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; surfaceSunShadow = sunShadow; }
     #endif`);
   shader.vertexShader = vertex; shader.fragmentShader = fragment;
   Object.assign(shader.uniforms, cascadeShadowUniforms, { surface_normalShadowInfluence: { value: influence } });
