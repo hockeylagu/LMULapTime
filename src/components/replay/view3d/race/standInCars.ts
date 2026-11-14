@@ -1,5 +1,6 @@
 import { BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Vector3, type Group, type Object3D } from 'three';
 import { hazeProgram } from '../atmosphere/haze.js';
+import { createBlobShadows } from './blobShadows.js';
 
 /** A stand-in's colour: plain grey, no livery, so it does not pass for the car it stands in for. */
 const STAND_IN_GREY = '#9aa0a6';
@@ -7,7 +8,8 @@ const STAND_IN_GREY = '#9aa0a6';
 /**
  * Grey stand-ins for the race's cars still loading: per car class, the far model of the first body of that class to load, one
  * instance per car waiting. A class with none yet borrows the first stand-in compiled; before any, a waiting car draws nothing. Each frame the scene places the cars
- * waiting (`begin`, `place`, `end`); a stand-in draws only the instances placed, none once every car has its own model.
+ * waiting (`begin`, `place`, `end`); a stand-in draws only the instances placed, none once every car has its own model. Each casts no
+ * sun shadow: a contact shadow lies on the road under it (`blobShadows`).
  */
 export interface StandInCars {
   /** Gives `carClass` a stand-in shaped like `car` (a far model's car group, its body under `body-envelope`) unless it has one. */
@@ -55,33 +57,38 @@ export function standInGeometry(car: Group): BufferGeometry {
 export function createStandInCars(root: Object3D, capacity: number, warm: (object: Object3D) => Promise<void>): StandInCars {
   const material = new MeshStandardMaterial({color: STAND_IN_GREY, roughness: 0.6, metalness: 0.1});
   hazeProgram(material);
+  const blobs = createBlobShadows(root, capacity, warm);
   const byClass = new Map<string, {mesh: InstancedMesh; ready: boolean}>();
   /** The first stand-in compiled: a class without its own yet borrows it. */
   let first: {mesh: InstancedMesh; ready: boolean} | null = null, disposed = false;
   return {
     offer(carClass, car) {
       if (disposed || byClass.has(carClass)) return;
-      const mesh = new InstancedMesh(standInGeometry(car), material, capacity);
+      const geometry = standInGeometry(car);
+      geometry.computeBoundingBox();
+      const mesh = new InstancedMesh(geometry, material, capacity);
       // Its instances move every frame and only the placed ones draw: their bounds are not kept.
       mesh.name = 'race-stand-in'; mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = true; mesh.count = 0;
       const entry = {mesh, ready: false};
       byClass.set(carClass, entry);
       warm(mesh).then(() => { if (disposed) return; root.add(mesh); entry.ready = true; first ??= entry; }, () => { byClass.delete(carClass); mesh.geometry.dispose(); });
     },
-    begin() { for (const {mesh} of byClass.values()) mesh.count = 0; },
+    begin() { for (const {mesh} of byClass.values()) mesh.count = 0; blobs.begin(); },
     place(carClass, matrix) {
       const own = byClass.get(carClass), entry = own?.ready ? own : first;
       if (!entry) return false;
       entry.mesh.setMatrixAt(entry.mesh.count++, matrix);
+      blobs.place(matrix, 0, entry.mesh.geometry.boundingBox!);
       return true;
     },
     end() {
       for (const {mesh} of byClass.values()) { mesh.visible = mesh.count > 0; mesh.instanceMatrix.needsUpdate = mesh.count > 0; }
+      blobs.end();
     },
     dispose() {
       disposed = true;
       for (const {mesh} of byClass.values()) { mesh.removeFromParent(); mesh.geometry.dispose(); mesh.dispose(); }
-      byClass.clear(); first = null; material.dispose();
+      byClass.clear(); first = null; material.dispose(); blobs.dispose();
     },
   };
 }

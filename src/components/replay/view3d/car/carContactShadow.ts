@@ -2,23 +2,18 @@ import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry
 import { hazeProgram } from '../atmosphere/haze.js';
 
 /** How far the darkening spreads beyond the body, its strength under the body, and the lift that keeps it off the road. */
-const SPREAD_M = 0.5, STRENGTH = 0.6, LIFT_M = 0.02, CORNER_M = 0.3, TEXELS_PER_M = 24;
+export const CONTACT_SHADOW_SPREAD_M = 0.5, CONTACT_SHADOW_LIFT_M = 0.02;
+const STRENGTH = 0.6, CORNER_M = 0.3, TEXELS_PER_M = 24;
+/** Drawn after the road and before the racing line (renderOrder 2), which stays readable over it. */
+export const CONTACT_SHADOW_ORDER = 1;
 
 /**
- * Grounds the car: the standard real-time contact shadow under the car's footprint, a ground-plane quad whose alpha falls from STRENGTH inside the body outline (a rounded rectangle over the model's
- * bounds) to nothing SPREAD_M beyond it. It sits on the model's lowest point (the tyre contact plane) and moves with the body.
- * The bounds are the union of its parts' exact boxes in the model's frame (`userData.footprint`, measured from their vertices
- * once per body: the vertices may have left the CPU since).
+ * The contact shadow of a footprint `halfX` × `halfZ` metres about its centre: a flat quad (normal up) whose alpha falls from
+ * STRENGTH inside the body outline (a rounded rectangle) to nothing CONTACT_SHADOW_SPREAD_M beyond it. Its alpha map goes with
+ * the material's disposal.
  */
-export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBasicMaterial> {
-  const bounds = new Box3(), part = new Box3();
-  model.traverse(object => {
-    const footprint: unknown = object.userData.footprint;
-    if (Array.isArray(footprint) && footprint.length === 6) bounds.union(part.set(new Vector3().fromArray(footprint as number[]), new Vector3().fromArray(footprint as number[], 3)));
-  });
-  if (bounds.isEmpty()) throw Error('Car model has no measured parts for its contact shadow');
-  const halfX = (bounds.max.x - bounds.min.x) / 2, halfZ = (bounds.max.z - bounds.min.z) / 2;
-  const sizeX = 2 * (halfX + SPREAD_M), sizeZ = 2 * (halfZ + SPREAD_M);
+export function contactShadowQuad(halfX: number, halfZ: number): {geometry: PlaneGeometry; material: MeshBasicMaterial} {
+  const sizeX = 2 * (halfX + CONTACT_SHADOW_SPREAD_M), sizeZ = 2 * (halfZ + CONTACT_SHADOW_SPREAD_M);
   const width = Math.max(8, Math.round(sizeX * TEXELS_PER_M)), height = Math.max(8, Math.round(sizeZ * TEXELS_PER_M));
   const data = new Uint8Array(width * height * 4);
   for (let row = 0; row < height; row++) {
@@ -26,7 +21,7 @@ export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBa
       // Signed distance to the rounded footprint (negative inside), in metres.
       const x = Math.abs(((column + 0.5) / width - 0.5) * sizeX) - (halfX - CORNER_M), z = Math.abs(((row + 0.5) / height - 0.5) * sizeZ) - (halfZ - CORNER_M);
       const distance = Math.hypot(Math.max(x, 0), Math.max(z, 0)) + Math.min(Math.max(x, z), 0) - CORNER_M;
-      const t = Math.min(Math.max((distance + CORNER_M) / (SPREAD_M + CORNER_M), 0), 1);
+      const t = Math.min(Math.max((distance + CORNER_M) / (CONTACT_SHADOW_SPREAD_M + CORNER_M), 0), 1);
       data.fill(Math.round(255 * STRENGTH * (1 - t * t * (3 - 2 * t))), (row * width + column) * 4, (row * width + column) * 4 + 4);
     }
   }
@@ -35,11 +30,26 @@ export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBa
   const material = new MeshBasicMaterial({color: 0x000000, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4});
   hazeProgram(material);
   material.addEventListener('dispose', () => { alpha.dispose(); });
-  const shadow = new Mesh(new PlaneGeometry(sizeX, sizeZ), material);
+  return {geometry: new PlaneGeometry(sizeX, sizeZ).rotateX(-Math.PI / 2), material};
+}
+
+/**
+ * Grounds the car: the standard real-time contact shadow under the car's footprint (`contactShadowQuad` over the model's bounds).
+ * It sits on the model's lowest point (the tyre contact plane) and moves with the body. The bounds are the union of its parts'
+ * exact boxes in the model's frame (`userData.footprint`, measured from their vertices once per body: the vertices may have left
+ * the CPU since).
+ */
+export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBasicMaterial> {
+  const bounds = new Box3(), part = new Box3();
+  model.traverse(object => {
+    const footprint: unknown = object.userData.footprint;
+    if (Array.isArray(footprint) && footprint.length === 6) bounds.union(part.set(new Vector3().fromArray(footprint as number[]), new Vector3().fromArray(footprint as number[], 3)));
+  });
+  if (bounds.isEmpty()) throw Error('Car model has no measured parts for its contact shadow');
+  const {geometry, material} = contactShadowQuad((bounds.max.x - bounds.min.x) / 2, (bounds.max.z - bounds.min.z) / 2);
+  const shadow = new Mesh(geometry, material);
   shadow.name = 'contact-shadow';
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.set((bounds.min.x + bounds.max.x) / 2, bounds.min.y + LIFT_M, (bounds.min.z + bounds.max.z) / 2);
-  // Drawn after the road and before the racing line (renderOrder 2), which stays readable over it.
-  shadow.renderOrder = 1; shadow.castShadow = false; shadow.receiveShadow = false;
+  shadow.position.set((bounds.min.x + bounds.max.x) / 2, bounds.min.y + CONTACT_SHADOW_LIFT_M, (bounds.min.z + bounds.max.z) / 2);
+  shadow.renderOrder = CONTACT_SHADOW_ORDER; shadow.castShadow = false; shadow.receiveShadow = false;
   return shadow;
 }
