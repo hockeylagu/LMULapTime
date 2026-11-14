@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { NoColorSpace, SRGBColorSpace, Texture, Vector2, type IUniform } from 'three';
+import { FrontSide, NoColorSpace, SRGBColorSpace, Texture, Vector2, type IUniform } from 'three';
 import { carMaterialKey, createCarMaterial, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
@@ -62,6 +62,12 @@ it('draws a standard material with its metal/roughness, AO/specular and normal m
   expect(shader.uniforms.surface_reflection).not.toBe(sceneryReflectionUniforms.surface_reflection);
   expect(material.roughness).toBe(0.4);
   expect(material.metalness).toBe(0.6);
+});
+
+it('draws an alpha-masked part one side, as every car part, its edges by alpha to coverage', () => {
+  const masked: CarMaterialRecipe = { ...recipe(), surface: { ...recipe().surface, renderState: { alphaMask: true } } as CarSurface };
+  const material = createCarMaterial(masked, appearance, () => new Texture(), testShading());
+  expect(material.side).toBe(FrontSide); expect(material.alphaToCoverage).toBe(true); expect(material.alphaTest).toBe(0.5);
 });
 
 it('rejects a standard material without its surface description', () => {
