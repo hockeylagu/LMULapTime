@@ -33,12 +33,11 @@ export interface ShadowCasterPass {
 const OPPOSITE: Record<Side, Side> = { [FrontSide]: BackSide, [BackSide]: FrontSide, [DoubleSide]: DoubleSide };
 
 /**
- * The faces a single-sided caster draws, as the reference's shadow pass culls: an opaque one the side the view does not draw (its
- * depth lies behind the lit surface, so the surface does not shadow itself), an alpha-cut one its visible side (a single-sided card,
- * a wire or a fence, has no other). A two-sided caster draws both.
+ * The faces a single-sided caster draws, as the reference's shadow pass culls: an opaque one its visible side, an alpha-cut one the
+ * other (a fence card casts from the back of its pair). A two-sided caster draws both; a material's own `shadowSide` wins (foliage).
  */
 function casterSide(material: Material, alphaCut: boolean): Side {
-  return alphaCut ? material.side : OPPOSITE[material.side];
+  return alphaCut ? OPPOSITE[material.side] : material.side;
 }
 
 /**

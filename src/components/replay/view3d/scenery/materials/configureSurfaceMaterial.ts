@@ -1,4 +1,4 @@
-import { Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Vector2, type IUniform, type Material, type Texture } from 'three';
+import { DoubleSide, Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Vector2, type IUniform, type Material, type Texture } from 'three';
 import { hazeProgram } from '../../atmosphere/haze.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from './patchSurfaceShader.js';
 import { list, value } from './shaderContext.js';
@@ -108,6 +108,8 @@ function buildMaterial(original: MeshStandardMaterial, config: SurfaceConfig, lo
   // Cut-outs (leaf and crowd cards, fences, signs, foliage): a hard alpha cut shimmers, steps at the edges and drops filtered wire
   // as the mesh recedes. In the multisampled scene pass their alpha is their coverage instead (patchSurfaceShader.ts).
   if (material.alphaTest > 0) material.alphaToCoverage = true;
+  // The reference turns its foliage cards toward the sun in the shadow pass, so a card casts whichever side faces it.
+  if (config.kind === 'vegetation') material.shadowSide = DoubleSide;
   // A blended two-sided surface (road lines, skid marks, water) draws once with both sides. Three otherwise draws it twice, back
   // faces then front, and marks the material changed before each, so every draw looks its program up again. Glass keeps the two
   // passes: its panes overlap within one mesh, and the far ones must blend first.

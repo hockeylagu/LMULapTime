@@ -40,8 +40,8 @@ it('shares one depth material among casters that draw alike: same side, and for 
   draw(); draw();
   const [first, again] = seen, [da, db, dTwo, dGrille, dGrille2, dHedge] = first as MeshDepthMaterial[];
   expect(da).toBe(db); expect(dTwo).not.toBe(da); expect(dTwo.side).toBe(DoubleSide);
-  // An opaque single-sided caster draws the faces the view does not, a cut-out the faces it does (the reference's culling).
-  expect([da.side, dGrille.side]).toEqual([BackSide, FrontSide]);
+  // An opaque single-sided caster draws the faces the view does, a cut-out the faces it does not (the reference's culling).
+  expect([da.side, dGrille.side]).toEqual([FrontSide, BackSide]);
   expect(dGrille).toBe(dGrille2); expect([dGrille.alphaTest, dGrille.map]).toEqual([0.5, fence]); expect(dHedge.map).toBe(leaves);
   expect(again).toEqual(first);
   // A cut-out's depth material goes with its texture.
@@ -62,7 +62,7 @@ it('gives a batch its own depth material beside a plain mesh of the same materia
   } as unknown as WebGLRenderer;
   createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: {slope: 1, units: 419}}], new PerspectiveCamera(), [], 0);
   expect(seen[1]).toBe(seen[2]); expect(seen[0]).not.toBe(seen[1]);
-  expect(seen.every(depth => depth instanceof MeshDepthMaterial && depth.side === BackSide)).toBe(true);
+  expect(seen.every(depth => depth instanceof MeshDepthMaterial && depth.side === FrontSide)).toBe(true);
   // Each caster draws with its layer's depth offset.
   expect(seen.map(depth => [depth.polygonOffset, depth.polygonOffsetFactor, depth.polygonOffsetUnits])).toEqual(Array(3).fill([true, 1, 419]));
 });

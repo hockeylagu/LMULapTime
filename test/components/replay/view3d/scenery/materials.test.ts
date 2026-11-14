@@ -346,6 +346,18 @@ it('draws a blended two-sided surface once, both sides in one pass, but glass ba
   expect([glass.transparent, glass.side, glass.forceSinglePass]).toEqual([true, DoubleSide, false]);
 });
 
+it('casts a foliage card from both sides, and leaves the other cut-outs to the caster pass', async () => {
+  const configured = async (config: SurfaceConfig) => {
+    const material = new MeshStandardMaterial({alphaTest: 0.5});
+    material.userData = holder(config);
+    const mesh = new Mesh(new BufferGeometry(), material);
+    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(new Texture())});
+    return mesh.material;
+  };
+  expect((await configured(surface('vegetation', {maps: {albedo: map('A', true)}}))).shadowSide).toBe(DoubleSide);
+  expect((await configured(surface('standard', {maps: {albedo: map('fence', true)}}))).shadowSide).toBeNull();
+});
+
 it('shares one configured material among meshes of the same surface, textures and GLB state, disposed with its last user', async () => {
   const shared = createSharedSurfaceMaterials(), grass = new Texture(), gravel = new Texture();
   const configured = async (texture: Texture, glb: Partial<MeshStandardMaterial> = {}, packageKey = 'fb81305939eff0a5') => {
