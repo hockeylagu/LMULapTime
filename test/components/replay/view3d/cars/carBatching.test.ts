@@ -47,6 +47,13 @@ describe('batchable and layoutOf', () => {
     expect(batchable(new Mesh(geometry, hidden))).toBe(false);
   });
 
+  it('leaves out a surface material with no room for the batch textures', () => {
+    const geometry = new BoxGeometry(1, 1, 1);
+    const withUnits = (units: number) => { const made = new MeshStandardMaterial(); made.userData.surfaceTextureUnits = units; return made; };
+    expect(batchable(new Mesh(geometry, withUnits(14)))).toBe(true);
+    expect(batchable(new Mesh(geometry, withUnits(15)))).toBe(false);
+  });
+
   it('tells vertex layouts apart', async () => {
     expect(layoutOf(new BoxGeometry(1, 1, 1))).toBe(layoutOf(new BoxGeometry(2, 3, 4)));
     expect(layoutOf(new BoxGeometry(1, 1, 1))).not.toBe(layoutOf(new SphereGeometry(1).deleteAttribute('uv')));

@@ -4,6 +4,7 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import { hazeProgram } from '../atmosphere/haze.js';
 import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
 import { bindSurfaceProgram } from '../scenery/materials/configureSurfaceMaterial.js';
+import { surfaceTextureUnits } from '../scenery/materials/shaderParts.js';
 import type { SurfaceConfig, SurfaceMap } from '../scenery/materials/surfaceConfig.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
 import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
@@ -125,6 +126,8 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     for (const [key, map] of Object.entries(surface.maps)) loaded[key] = mapTexture(texture, map!);
     bindSurfaceProgram(material, surface, loaded);
     bindCarSurfaceReflection(material);
+    // The car batching reads it (carBatching.ts); a cabin volume adds its own (below).
+    material.userData.surfaceTextureUnits = surfaceTextureUnits(surface) + (recipe.reflectionOcclusion ? 1 : 0);
     material.addEventListener('dispose', () => { for (const map of Object.values(loaded)) map.dispose(); });
   } else if (path) {
     // Every textured car material and paint has an albedo map; a livery file replaces its texture on the same UV set.

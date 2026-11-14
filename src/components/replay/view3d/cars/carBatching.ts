@@ -1,14 +1,23 @@
 import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, FloatType, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, RedFormat, type BatchedMesh, type Material } from 'three';
+import { BATCH_VERTEX_TEXTURES } from '../scenery/materials/shaderParts.js';
 import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, createSlicer, layoutOf, releaseBatchOnUpload } from '../batching/batchedParts.js';
 import type { CarPart, CarParts } from './carParts.js';
 
+/** Texture units every WebGL 2 GPU has: three counts both stages of a program against them. */
+const GUARANTEED_TEXTURE_UNITS = 16;
+
 /**
  * A lit car part whose material and geometry a batch can draw: lamps keep their own draws (switched per frame), and so do glass and
- * decals (`transparent`) unless the batching sorts them.
+ * decals (`transparent`) unless the batching sorts them. A surface-program material whose samplers (`userData.surfaceTextureUnits`,
+ * carMaterials.ts) leave no room for the batch's vertex textures keeps its own draws: a cabin part with nine maps and the cabin
+ * volume needed 17 units batched, and three bound the 17th to no unit.
  */
 export function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, transparent = false): mesh is Mesh<BufferGeometry, MeshStandardMaterial> {
   const material = mesh.material;
-  return !Array.isArray(material) && material instanceof MeshStandardMaterial && (transparent || !material.transparent) && material.visible
+  if (Array.isArray(material)) return false;
+  const units: unknown = material.userData.surfaceTextureUnits;
+  return material instanceof MeshStandardMaterial && (transparent || !material.transparent) && material.visible
+    && (typeof units !== 'number' || units + BATCH_VERTEX_TEXTURES <= GUARANTEED_TEXTURE_UNITS)
     && !mesh.customDepthMaterial && mesh.onBeforeRender === Object3D.prototype.onBeforeRender;
 }
 
