@@ -97,6 +97,14 @@ prefilter programs (the venue environment's and the car probe's cube sizes), whi
 use; it has no public way to link them ahead (the earlier ahead-of-time link used its internals and is gone). Warm, the two take
 ~10 ms. The cold lap first frame is therefore ~0.2–0.7 s over the 5.0–5.6 s line on a first launch only.
 
+Shader programs at the Le Mans start (2026-11-14, car 27, t = 190): 386 → 191. The warm-up compiles only meshes a camera layer
+draws (batch stand-ins had over a third of the programs, 41b128fc). A surface family's values are a uniform array, so one program
+serves a surface shape (d2748ecb). The race no longer rebuilds the car it already follows when the view becomes ready, which
+relinked ~34 programs (c4970a8c). The scene now shows in 4.1–4.4 s (was 5.5–5.8 s). The p95 frame is 15–17.6 ms with the p50 at
+7.7–8.1 ms (3 interleaved runs), and the worst frame is 78–82 ms. What still splits a car material: two environment sizes (the
+venue's 256 px PMREM and the car probe's 1024 px, ~60 programs, so following a car of another model links in play) and the opaque /
+double-sided flags of glass and decals.
+
 ### Simplest path first
 
 The user (2026-11-13): the right rendering technique for the job, without over-complicating it. The cost is per-car draws, so
