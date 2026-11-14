@@ -1,6 +1,7 @@
 import {
-  BackSide, BatchedMesh, Box2, DoubleSide, FrontSide, Line, Mesh, MeshDepthMaterial, Points, Sprite, Vector2, type BufferGeometry, type Material, type Object3D,
-  type OrthographicCamera, type PerspectiveCamera, type Scene, type Side, type Texture, type Vector4, type WebGLRenderer, type WebGLRenderTarget,
+  AlwaysDepth, BackSide, BatchedMesh, DoubleSide, FrontSide, GLSL3, Line, Mesh, MeshDepthMaterial, OrthographicCamera, PlaneGeometry, Points, Scene,
+  ShaderMaterial, Sprite, type BufferGeometry, type Material, type Object3D, type PerspectiveCamera, type Side, type Texture, type Vector4,
+  type WebGLRenderer, type WebGLRenderTarget,
 } from 'three';
 import { trackShadowEye } from '../scenery/materials/shadowEye.js';
 
@@ -36,8 +37,29 @@ const castsShadow = (material: Material) => !material.transparent || material.al
 /** What a blended surface draws with in the pass: nothing. */
 const NO_SHADOW = new MeshDepthMaterial({ visible: false });
 
+/**
+ * A quad over the viewport that writes, at each texel, the depth `baseDepth` holds at the same texel (no colour). A depth texture's
+ * region is copied by drawing, not by a framebuffer blit: Direct3D 11 copies a depth resource only whole, and a blit of part of one
+ * there (WebGL on Windows) silently copies nothing.
+ */
+function depthCopyQuad(): {scene: Scene; camera: OrthographicCamera; material: ShaderMaterial} {
+  const material = new ShaderMaterial({
+    glslVersion: GLSL3,
+    uniforms: {baseDepth: {value: null}},
+    vertexShader: 'void main() { gl_Position = vec4( position.xy * 2.0, 0.0, 1.0 ); }',
+    fragmentShader: `precision highp sampler2D;
+      uniform sampler2D baseDepth;
+      void main() { gl_FragDepth = texelFetch( baseDepth, ivec2( gl_FragCoord.xy ), 0 ).r; }`,
+    depthTest: true, depthFunc: AlwaysDepth, depthWrite: true, colorWrite: false,
+  });
+  const quad = new Mesh(new PlaneGeometry(1, 1), material), scene = new Scene();
+  quad.frustumCulled = false;
+  scene.add(quad);
+  return {scene, camera: new OrthographicCamera(), material};
+}
+
 export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): ShadowCasterPass {
-  const region = new Box2(), at = new Vector2();
+  let depthCopy: ReturnType<typeof depthCopyQuad> | null = null;
   // Casters that draw the same way share one depth material, so the pass draws them one after another without switching material
   // (every switch uploads the material's uniforms again): keyed by the card turn, side, alpha cut and the textures the cut reads.
   const depthMaterials = new Map<string, MeshDepthMaterial>();
@@ -91,16 +113,11 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
     trackShadowEye(view);
     const depth = renderer.state.buffers.depth, reversed = depth.getReversed();
     const previous = renderer.getRenderTarget(), autoClear = renderer.autoClear, scissorTest = renderer.getScissorTest();
+    if (base) {
+      depthCopy ??= depthCopyQuad();
+      depthCopy.material.uniforms.baseDepth.value = base.depthTexture;
+    }
     try {
-      if (base) {
-        // Each tile's base depth, copied as stored (a framebuffer blit): before the tiles' scissor, which would clip it.
-        renderer.setScissorTest(false);
-        for (const {viewport: {x, y, z: width, w: height}} of layers) {
-          region.min.set(x, y); region.max.set(x + width, y + height);
-          renderer.copyTextureToTexture(base.depthTexture!, target.depthTexture!, region, at.set(x, y));
-        }
-        renderer.setScissorTest(scissorTest);
-      }
       target.scissorTest = true;
       renderer.autoClear = false;
       // The shadow lookups compare plain depth (near 0, far 1), so this pass leaves the scene's reversed depth range.
@@ -109,6 +126,8 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
         target.viewport.copy(viewport); target.scissor.copy(viewport);
         renderer.setRenderTarget(target);
         if (clear) renderer.clear(false, true, false);
+        // Each tile first takes its base depth, as stored, at the same texels.
+        if (base) renderer.render(depthCopy!.scene, depthCopy!.camera);
         for (const root of roots) renderer.render(root, light);
       }
     } finally {

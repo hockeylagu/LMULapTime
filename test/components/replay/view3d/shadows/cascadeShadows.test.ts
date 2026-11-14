@@ -1,4 +1,7 @@
-import { BoxGeometry, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Scene, Vector3, Vector4, type Box2, type DepthTexture, type Texture, type Vector2, type WebGLRenderer, type WebGLRenderTarget } from 'three';
+import {
+  AlwaysDepth, BoxGeometry, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Scene, ShaderMaterial, Vector3, Vector4, type DepthTexture,
+  type WebGLRenderer, type WebGLRenderTarget,
+} from 'three';
 import { describe, expect, it } from 'vitest';
 import { cascadeDepthRangeM, createCascadeShadows, placeCascadeCamera } from '../../../../../src/components/replay/view3d/shadows/cascadeShadows.js';
 import { shadowCascadeLayout, sunSquareAxes } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
@@ -8,9 +11,15 @@ const {shadows} = testShading();
 const layout = shadowCascadeLayout(shadows, shadows.cameras.chase);
 const light = new Vector3(1, -1, 0.5).normalize();
 
-type Event = {kind: 'render'; viewport: Vector4; root: unknown; car: boolean} | {kind: 'copy'; viewport: Vector4; from: unknown; to: unknown; scissor: boolean};
+type Event = {kind: 'render'; viewport: Vector4; root: unknown; car: boolean} | {kind: 'copy'; viewport: Vector4; from: unknown; to: unknown; material: ShaderMaterial};
 
-/** A renderer that records each render (viewport, root, whether the car was drawn) and each depth copy (region, textures, scissor test), in order. */
+/** The depth copy's material when `root` is the pass's depth copy quad (a scene of one quad reading `baseDepth`). */
+const depthCopyOf = (root: unknown) => {
+  const material = root instanceof Scene && root.children[0] instanceof Mesh ? root.children[0].material as unknown : null;
+  return material instanceof ShaderMaterial && 'baseDepth' in material.uniforms ? material : null;
+};
+
+/** A renderer that records each render (viewport, root, whether the car was drawn) and each depth copy draw (viewport, textures), in order. */
 function recordingRenderer(car: Mesh) {
   const events: Event[] = [];
   let target: unknown = null;
@@ -20,11 +29,10 @@ function recordingRenderer(car: Mesh) {
     state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}},
     initRenderTarget() {}, clear() {},
     getRenderTarget: () => target, setRenderTarget(next: unknown) { target = next; },
-    render(root: unknown) { events.push({kind: 'render', viewport: (target as WebGLRenderTarget).viewport.clone(), root, car: car.visible}); },
-    copyTextureToTexture(from: Texture, to: Texture, region: Box2, at: Vector2) {
-      expect([region.min.x, region.min.y]).toEqual([at.x, at.y]); // Each tile from the same texels.
-      const viewport = new Vector4(at.x, at.y, region.max.x - region.min.x, region.max.y - region.min.y);
-      events.push({kind: 'copy', viewport, from, to, scissor: renderer.scissor});
+    render(root: unknown) {
+      const into = target as WebGLRenderTarget, viewport = into.viewport.clone(), copy = depthCopyOf(root);
+      events.push(copy ? {kind: 'copy', viewport, from: copy.uniforms.baseDepth.value, to: into.depthTexture, material: copy}
+        : {kind: 'render', viewport, root, car: car.visible});
     },
   };
   return {renderer: renderer as unknown as WebGLRenderer, events};
@@ -76,9 +84,9 @@ describe('cascade shadows', () => {
   it('draws the cars over each live cascade every frame, and leaves them out of the static and cached depth', () => {
     const {cascades, draws, view, car, scene} = setUp();
     cascades.update(view, [car]);
-    // Static into the held depth, then the live tiles' copies and the cars over each, then the cached cascade without them.
+    // Static into the held depth, then each live tile's copy and the cars over it, then the cached cascade without them.
     expect(draws.renders.map(draw => [draw.root === car ? 'car' : 'scene', draw.car])).toEqual([['scene', false], ['scene', false], ['car', true], ['car', true], ['scene', false]]);
-    expect(draws.events.slice(2, 6).map(event => [event.kind, event.viewport.x])).toEqual([['copy', 0], ['copy', 32], ['render', 0], ['render', 32]]);
+    expect(draws.events.slice(2, 6).map(event => [event.kind, event.viewport.x])).toEqual([['copy', 0], ['render', 0], ['copy', 32], ['render', 32]]);
     draws.clear();
     cascades.update(view, [car]);
     expect(draws.renders.map(draw => [draw.root === car, draw.viewport.x])).toEqual([[true, 0], [true, 32]]);
@@ -98,13 +106,15 @@ describe('cascade shadows', () => {
     }
   });
 
-  it('copies each held tile from its static depth into the atlas, of the same depth type, with the scissor test off', () => {
+  it('copies each held tile from its static depth into the atlas, of the same depth type, by a depth-only draw at the same texels', () => {
     const {cascades, draws, view, scene} = setUp();
     cascades.update(view, []);
     const [copy] = draws.copies, from = copy.from as DepthTexture, to = copy.to as DepthTexture;
     expect(to).toBe(cascades.state.atlas); expect(from).not.toBe(to);
     expect([from.type, from.image.width, from.image.height]).toEqual([to.type, to.image.width, to.image.height]);
-    expect(draws.copies.every(each => !each.scissor)).toBe(true); // A framebuffer blit is clipped by the scissor test.
+    // Not a framebuffer blit: Direct3D 11 copies part of a depth texture as nothing.
+    expect([copy.material.depthFunc, copy.material.depthWrite, copy.material.colorWrite]).toEqual([AlwaysDepth, true, false]);
+    expect(copy.material.fragmentShader).toContain('gl_FragDepth = texelFetch( baseDepth, ivec2( gl_FragCoord.xy ), 0 ).r');
     expect(sceneRenders(draws, scene)).toHaveLength(3);
   });
 

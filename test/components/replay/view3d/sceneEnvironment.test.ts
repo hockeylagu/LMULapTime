@@ -174,15 +174,17 @@ it("samples the package's cascade set from its first draw, for any camera, and h
   try {
     expect(environment.update()).toBe(false); expect(render).not.toHaveBeenCalled(); // No camera yet.
     environment.setCamera(new PerspectiveCamera(48, 1.5, 0.5, 15000));
-    // The first frame draws the test chase set's three cascades (its two held tiles copied from their static depth, not rendered), then the surfaces sample them.
-    environment.update(); expect(render).toHaveBeenCalledTimes(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
+    // The first frame draws the test chase set's three cascades from the scene (its two held tiles then copied from their static depth),
+    // then the surfaces sample them.
+    const sceneRenders = () => render.mock.calls.filter(([root]) => root === scene).length;
+    environment.update(); expect(sceneRenders()).toBe(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
     // The cockpit set (two cascades) replaces it: lit on its own atlas until its first draw.
     environment.setShadowCascades('cockpit'); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
     expect(cascadeShadowUniforms.surface_cascadeAtlas.value).not.toBe(chaseAtlas);
     environment.update(); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(2);
     // The overhead camera is orthographic: the cascades follow it as well.
     render.mockClear(); environment.setShadowCascades('chase'); environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
-    environment.update(); expect(render).toHaveBeenCalledTimes(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
+    environment.update(); expect(sceneRenders()).toBe(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
   } finally { environment.dispose(); }
   expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0); expect(cascadeShadowUniforms.surface_cascadeAtlas.value).toBeNull();
 });
@@ -210,10 +212,11 @@ it("lights the scene by another moment's sun: sky, haze, light, foliage and shad
     environment.setCamera(new PerspectiveCamera(48, 1.5, 0.5, 15000));
     environment.captureVenue(); environment.update();
     const cubemaps = probe.cubemaps, firstEnvironments = probe.render.mock.calls.length;
-    render.mockClear(); environment.update(); const settled = render.mock.calls.length;
+    // A settled frame draws nothing from the scene (the held tiles only take their static depth again).
+    render.mockClear(); environment.update(); const settled = render.mock.calls.filter(([root]) => root === scene).length;
     environment.setSun(at(6 * 3600, 0.4));
     expect(probe.cubemaps - cubemaps).toBe(2); expect(probe.render.mock.calls.length).toBe(firstEnvironments);
     render.mockClear(); environment.update();
-    expect(settled).toBe(0); expect(render.mock.calls.filter(([, camera]) => camera instanceof OrthographicCamera)).toHaveLength(3);
+    expect(settled).toBe(0); expect(render.mock.calls.filter(([root, camera]) => root === scene && camera instanceof OrthographicCamera)).toHaveLength(3);
   } finally { environment.dispose(); }
 });
