@@ -46,12 +46,13 @@ export interface RaceMapCamera {
 const PAN_KEYS: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] };
 
 /**
- * The lap map's keys on the race map, from anywhere on the race replay: + and − zoom, 0 or R shows the circuit, C centres and
- * F follows the followed car, W/A/S/D pan. The camera's own C and F (map focused) and these act once: the first prevents the other.
+ * The lap map's keys on the race map or 3D camera, from anywhere on the race replay: + and − zoom, 0 or R shows the circuit (resets
+ * the camera), C centres and F follows the followed car, W/A/S/D pan, E switches between the 2D map and the 3D view. The camera's own
+ * C and F (map focused) and these act once: the first prevents the other. Off while `active` is false (a view kept loaded, hidden).
  */
-export function useRaceMapKeys(camera: RaceMapCamera): void {
+export function useRaceMapKeys(camera: RaceMapCamera, onToggleView?: () => void, active = true): void {
   const onKey = useEffectEvent((event: KeyboardEvent) => {
-    if (replayShortcutBlocked(event)) return;
+    if (!active || replayShortcutBlocked(event)) return;
     const key = event.key.toLowerCase(), pan = PAN_KEYS[key];
     if (pan) camera.panBy(...pan);
     else if (key === '+' || key === '=') camera.zoomIn();
@@ -59,6 +60,7 @@ export function useRaceMapKeys(camera: RaceMapCamera): void {
     else if (key === '0' || key === 'r') camera.resetPanZoom();
     else if (key === 'c' && !event.repeat) camera.centerOnCar();
     else if (key === 'f' && !event.repeat) camera.setFollowCar(value => !value);
+    else if (key === 'e' && !event.repeat && onToggleView) onToggleView();
     else return;
     event.preventDefault();
   });

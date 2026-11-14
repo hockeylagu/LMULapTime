@@ -14,4 +14,14 @@ describe('replay shortcut help', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(chart).toHaveFocus();
   });
+
+  it('opens the race 3D list with ? from anywhere while shown, and leaves ? alone while hidden', () => {
+    const {rerender} = render(<ReplayShortcutHelp view="race3d" enabled={false} />);
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    rerender(<ReplayShortcutHelp view="race3d" />);
+    fireEvent.keyDown(window, { key: '?' });
+    expect(screen.getByRole('dialog', { name: 'Race 3D shortcuts' })).toHaveTextContent('Chase camera');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Back to the 2D map');
+  });
 });

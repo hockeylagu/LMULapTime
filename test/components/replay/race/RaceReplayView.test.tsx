@@ -154,6 +154,14 @@ describe('RaceReplayView', () => {
     expect(screen.getByRole('button', { name: '2x' }).getAttribute('aria-pressed')).toBe('true');
     act(() => { fireEvent.keyDown(window, { key: '?' }); });
     expect(screen.getByRole('dialog', { name: 'Race replay shortcuts' })).toBeTruthy();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Switch to the 3D view');
+  });
+
+  it('switches to the 3D view with E', async () => {
+    view();
+    await screen.findByTestId('map-controls-overlay');
+    act(() => { fireEvent.keyDown(window, { key: 'e' }); });
+    expect((await screen.findByTestId('race-3d')).closest('[hidden]')).toBeNull();
   });
 
   it('lists the followed car incidents and jumps to just before one', async () => {

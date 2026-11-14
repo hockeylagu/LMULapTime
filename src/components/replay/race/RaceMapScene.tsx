@@ -97,7 +97,7 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
   const followed = positions.find(position => position.slot === followSlot);
 
   const camera = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos: followed, initialZoom: OVERVIEW_ZOOM, initialFollowCar: false });
-  useRaceMapKeys(camera);
+  useRaceMapKeys(camera, onToggleView);
   const { containerRef, viewportRef, currentViewBox, markerScale, zoomLevel, handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } = camera;
   const svg = useMemo(() => bounds && trackGeometry ? {
     left: trackGeometry.leftBoundary ? projectBoundaryPoints(trackGeometry.leftBoundary, bounds, VIEWBOX_SIZE, PADDING) : [],
