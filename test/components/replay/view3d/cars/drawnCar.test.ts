@@ -38,8 +38,8 @@ function model(): Group {
 const batchesIn = (car: Group) => car.children.filter(child => child instanceof BatchedMesh);
 
 describe('createDrawnCars', () => {
-  it('batches a lone car into its own batches, which draw once ready and go with the car', () => {
-    const root = new Group(), set = createDrawnCars([makeCar('#38bdf8', false, model())], () => 0), [drawn] = set.cars;
+  it('batches a lone car into its own batches, which draw once ready and go with the car', async () => {
+    const root = new Group(), set = await createDrawnCars([makeCar('#38bdf8', false, model())], () => 0), [drawn] = set.cars;
     root.add(drawn.car);
     expect(set.shared).toBeNull();
     expect(drawn.parts.own.length).toBeGreaterThan(0);
@@ -53,24 +53,24 @@ describe('createDrawnCars', () => {
     expect(batchesIn(drawn.car)).toHaveLength(0);
   });
 
-  it('batches the cars of a set together, their shared batches for the caller to place', () => {
-    const shared = model(), set = createDrawnCars([makeCar('#38bdf8', false, shared.clone()), makeCar('#38bdf8', false, shared.clone())], () => 0);
+  it('batches the cars of a set together, their shared batches for the caller to place', async () => {
+    const shared = model(), set = await createDrawnCars([makeCar('#38bdf8', false, shared.clone()), makeCar('#38bdf8', false, shared.clone())], () => 0);
     expect(set.shared?.children.length).toBeGreaterThan(0);
     for (const drawn of set.cars) expect(batchesIn(drawn.car)).toHaveLength(0);
     set.dispose();
     expect(set.shared!.children).toHaveLength(0);
   });
 
-  it('leaves the materials other cars draw with when dropped', () => {
+  it('leaves the materials other cars draw with when dropped', async () => {
     const rig = model(), panel = rig.children.find(child => child instanceof Mesh) as Mesh<BoxGeometry, MeshStandardMaterial>;
     const material = panel.material, disposed: unknown[] = [];
     material.addEventListener('dispose', () => disposed.push(material));
-    createDrawnCars([makeCar('#38bdf8', false, rig)], () => 0, {sharedMaterial: each => each === material}).dispose();
+    (await createDrawnCars([makeCar('#38bdf8', false, rig)], () => 0, {sharedMaterial: each => each === material})).dispose();
     expect(disposed).toHaveLength(0);
   });
 
-  it('keeps a car part by part when not batched', () => {
-    const set = createDrawnCars([makeCar('#38bdf8', true, model())], () => 0, {batched: false}), [drawn] = set.cars;
+  it('keeps a car part by part when not batched', async () => {
+    const set = await createDrawnCars([makeCar('#38bdf8', true, model())], () => 0, {batched: false}), [drawn] = set.cars;
     expect(drawn.parts.own).toHaveLength(0);
     expect(batchesIn(drawn.car)).toHaveLength(0);
     expect(() => { set.ready(); set.dispose(); }).not.toThrow();

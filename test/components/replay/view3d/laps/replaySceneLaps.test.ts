@@ -231,21 +231,24 @@ it.each([
 });
 
 it('serializes GPU warm-ups when several new sectors load together', async () => {
+  // The scene loads every sector of the lap, those under the first view first: each waits for the warm-up before it to upload.
   const sectors = Array.from({length: 8}, (_, index) => ({...sector(index), prev: `s${(index + 7) % 8}`, next: `s${(index + 1) % 8}`}));
   const extended = {...layout, routeLengthM: 8000, sectors};
-  const moving = {...lap, points: lap.points.map((point, index) => ({...point, stationM: index * 1000}))};
-  const handle = await openScene(document.createElement('div'), extended, moving, null, vi.fn(), assets);
   const releases: (() => void)[] = [];
   gpu.upload.mockClear().mockImplementation(() => new Promise<void>(resolve => { releases.push(resolve); }));
+  const opening = openScene(document.createElement('div'), extended, lap, null, vi.fn(), assets);
   try {
-    handle.cursor(4, 0); draw();
-    await vi.waitFor(() => expect(gpu.upload).toHaveBeenCalledOnce());
-    releases[0]();
-    await vi.waitFor(() => expect(gpu.upload).toHaveBeenCalledTimes(2));
-    releases[1]();
-    await vi.waitFor(() => expect(gpu.upload).toHaveBeenCalledTimes(3));
-    releases[2]();
-  } finally { releases.forEach(release => release()); handle.dispose(); }
+    for (let upload = 1; upload <= 3; upload++) {
+      await vi.waitFor(() => expect(gpu.upload).toHaveBeenCalledTimes(upload));
+      await new Promise(resolve => { setTimeout(resolve, 20); });
+      expect(gpu.upload).toHaveBeenCalledTimes(upload);
+      releases[upload - 1]();
+    }
+  } finally {
+    gpu.upload.mockImplementation(async () => {});
+    releases.forEach(release => release());
+    (await opening).dispose();
+  }
 });
 
 it('caches static scenery matrices after the scene reflection without freezing the moving car', async () => {

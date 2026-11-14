@@ -1,7 +1,8 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
-import { Box3, BufferGeometry, Matrix4, Mesh, Vector3, type BufferAttribute, type Group, type InterleavedBufferAttribute } from 'three';
+import { Box3, BufferGeometry, Matrix4, Mesh, Vector3, type BufferAttribute, type Group, type InterleavedBufferAttribute, type Object3D } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import { createSlicer } from '../batching/batchedParts.js';
 
 /** The model node the car body's fixed parts hang under, in the body's file and in its interior's. */
 const CHASSIS = 'chassis';
@@ -10,12 +11,18 @@ const CHASSIS = 'chassis';
  * Prepares a parsed body for its vertices to leave the CPU: each geometry's bounds, and each part's exact box in the body's frame
  * (`userData.footprint`, min then max), which the contact shadow reads instead of the vertices.
  */
-function prepareGeometry(body: Group): void {
+async function prepareGeometry(body: Group): Promise<void> {
   body.updateWorldMatrix(true, true);
   const toBody = new Matrix4().copy(body.matrixWorld).invert(), frame = new Matrix4(), point = new Vector3(), box = new Box3();
-  body.traverse(object => {
+  const meshes: Object3D[] = [];
+  body.traverse(object => { if (object instanceof Mesh) meshes.push(object); });
+  // A body's vertices take tens of milliseconds to walk: the walk yields between meshes, so playback keeps its frames.
+  const slice = createSlicer();
+  for (const object of meshes) {
+    // oxlint-disable-next-line no-await-in-loop -- yields between meshes
+    await slice();
     const geometry: unknown = object instanceof Mesh ? object.geometry : null;
-    if (!(geometry instanceof BufferGeometry)) return;
+    if (!(geometry instanceof BufferGeometry)) continue;
     const attributes = geometry.attributes as Record<string, BufferAttribute | InterleavedBufferAttribute | undefined>, position = attributes.position;
     geometry.userData.sharedAsset = true;
     geometry.computeBoundingBox(); geometry.computeBoundingSphere();
@@ -24,7 +31,7 @@ function prepareGeometry(body: Group): void {
       for (let index = 0; index < position.count; index++) box.expandByPoint(point.fromBufferAttribute(position, index).applyMatrix4(frame));
       object.userData.footprint = [...box.min.toArray(), ...box.max.toArray()];
     }
-  });
+  }
 }
 
 export interface CarTemplates {
@@ -49,7 +56,7 @@ export function createCarTemplates(): CarTemplates {
     let pending = templates.get(key) ?? held.get(key);
     if (!pending) {
       const parse = (bytes: ArrayBuffer) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '').then(result => result.scene);
-      pending = car.files().then(({bytes, interiorBytes}) => Promise.all([parse(bytes), interiorBytes ? parse(interiorBytes) : null])).then(([model, interior]) => {
+      pending = car.files().then(({bytes, interiorBytes}) => Promise.all([parse(bytes), interiorBytes ? parse(interiorBytes) : null])).then(async ([model, interior]) => {
         // The interior's parts hang under its chassis node and join the body's: one model, whose driver-camera parts the
         // cockpit view switches.
         if (interior) {
@@ -57,7 +64,7 @@ export function createCarTemplates(): CarTemplates {
           if (!chassis || !parts) throw Error(`Car ${car.vehicleId} has no chassis node for its interior`);
           chassis.add(...parts.children);
         }
-        prepareGeometry(model);
+        await prepareGeometry(model);
         return model;
       });
       templates.set(key, pending);

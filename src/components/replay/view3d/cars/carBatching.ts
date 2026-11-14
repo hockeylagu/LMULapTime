@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, FloatType, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, RedFormat, type BatchedMesh, type Material } from 'three';
-import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, layoutOf, releaseBatchOnUpload } from '../batching/batchedParts.js';
+import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, createSlicer, layoutOf, releaseBatchOnUpload } from '../batching/batchedParts.js';
 import type { CarPart, CarParts } from './carParts.js';
 
 /**
@@ -93,8 +93,10 @@ export interface CarBatchSet {
  * With `shadows`, the batched parts that cast a solid shadow cast it from one shadow-only batch (positions only, on
  * `SHADOW_ONLY_LAYER`) instead of their own batches: one draw per sun shadow layer for the set rather than one per material.
  */
-export function batchCars(tables: readonly CarParts[], {releaseParsed, transparent = false, shadows = false}:
-  {releaseParsed: boolean; transparent?: boolean; shadows?: boolean}): CarBatchSet {
+export async function batchCars(tables: readonly CarParts[], {releaseParsed, transparent = false, shadows = false}:
+  {releaseParsed: boolean; transparent?: boolean; shadows?: boolean}): Promise<CarBatchSet> {
+  // A body's copy into its batches runs to tens of milliseconds: it yields between geometries, so playback keeps its frames.
+  const slice = createSlicer();
   const groups = new Map<string, CarPart[]>(), unbatched = new Set<BufferGeometry>();
   for (const table of tables) for (const part of table.parts) {
     const mesh = part.mesh;
@@ -133,7 +135,12 @@ export function batchCars(tables: readonly CarParts[], {releaseParsed, transpare
       castShadow: first.castShadow && !shadowOnly, receiveShadow: first.receiveShadow, frustumCulled: false, perObjectFrustumCulled: !single, matrixAutoUpdate: false,
     });
     batch.sortObjects = first.material.transparent;
-    const ids = new Map(geometries.map(geometry => [geometry, batch.addGeometry(geometry)]));
+    const ids = new Map<BufferGeometry, number>();
+    for (const geometry of geometries) {
+      ids.set(geometry, batch.addGeometry(geometry));
+      // oxlint-disable-next-line no-await-in-loop -- yields between geometry copies
+      await slice();
+    }
     for (const part of members) {
       part.batch = batch; part.instance = addHiddenInstance(batch, ids.get(part.mesh.geometry)!); part.shown = false;
       part.mesh.layers.disableAll(); part.mesh.castShadow = false; part.mesh.receiveShadow = false;
@@ -143,16 +150,28 @@ export function batchCars(tables: readonly CarParts[], {releaseParsed, transpare
     computeBatchBounds(batch); releaseBatchOnUpload(batch);
     if (single) single.car.add(batch); else shared.add(batch);
     batches.push(batch);
+    // oxlint-disable-next-line no-await-in-loop -- yields between batches
+    await slice();
   }
   if (casting.length) {
-    const geometries = [...new Set(casting.map(part => part.mesh.geometry))], copies = new Map(geometries.map(geometry => [geometry, shadowGeometry(geometry)]));
+    const geometries = [...new Set(casting.map(part => part.mesh.geometry))], copies = new Map<BufferGeometry, BufferGeometry>();
+    for (const geometry of geometries) {
+      copies.set(geometry, shadowGeometry(geometry));
+      // oxlint-disable-next-line no-await-in-loop -- yields between geometry copies
+      await slice();
+    }
     const batch = createBatch({
       draws: casting.length, vertices: geometries.reduce((sum, geometry) => sum + geometry.attributes.position.count, 0),
       indices: geometries.reduce((sum, geometry) => sum + geometry.index!.count, 0), material: SHADOW_ONLY, name: 'car shadow batch',
       castShadow: true, receiveShadow: false, frustumCulled: false, perObjectFrustumCulled: !single, matrixAutoUpdate: false,
     });
     batch.layers.set(SHADOW_ONLY_LAYER);
-    const ids = new Map(geometries.map(geometry => [geometry, batch.addGeometry(copies.get(geometry)!)]));
+    const ids = new Map<BufferGeometry, number>();
+    for (const geometry of geometries) {
+      ids.set(geometry, batch.addGeometry(copies.get(geometry)!));
+      // oxlint-disable-next-line no-await-in-loop -- yields between geometry copies
+      await slice();
+    }
     for (const part of casting) part.shadow = {batch, instance: addHiddenInstance(batch, ids.get(part.mesh.geometry)!)};
     for (const copy of copies.values()) copy.dispose();
     computeBatchBounds(batch); releaseBatchOnUpload(batch);

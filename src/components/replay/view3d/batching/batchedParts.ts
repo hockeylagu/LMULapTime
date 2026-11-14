@@ -20,6 +20,22 @@ export interface BatchOptions {
   matrixAutoUpdate?: boolean;
 }
 
+/** Main-thread time a sliced build runs before it yields a task (`createSlicer`): a frame's share of a 60 Hz budget. */
+const SLICE_MS = 4;
+
+/**
+ * A long build's yield point: awaited between its steps, it yields a task (the browser draws a due frame) once the build has run
+ * `SLICE_MS` since its last yield, else resolves at once.
+ */
+export function createSlicer(): () => Promise<void> {
+  let start = performance.now();
+  return async () => {
+    if (performance.now() - start < SLICE_MS) return;
+    await new Promise<void>(resolve => { setTimeout(resolve, 0); });
+    start = performance.now();
+  };
+}
+
 /** A batch for one material, its instances not sorted (opaque parts only). */
 export function createBatch(options: BatchOptions): BatchedMesh {
   const batch = new BatchedMesh(options.draws, options.vertices, options.indices, options.material);

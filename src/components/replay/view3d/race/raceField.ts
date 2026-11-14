@@ -182,7 +182,7 @@ export function createRaceField(
       const present = built.filter(entry => entry !== null);
       unplaced = present.map(({car}) => car);
       const boxes = present.map(({car}) => boundsOf(car)), tables = present.map(({car}) => buildCarParts(car));
-      const batches = batchCars(tables, {releaseParsed: true, transparent: true});
+      const batches = await batchCars(tables, {releaseParsed: true, transparent: true});
       farSets.push(batches);
       await Promise.all([shell.warm(batches.shared), ...present.map(({car}) => shell.warm(car))]);
       if (disposed) return;

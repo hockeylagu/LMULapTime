@@ -9,6 +9,7 @@ import type { CarTemplates } from './carTemplates.js';
 import { makeCar } from './sceneObjects.js';
 import { buildCarParts, type CarParts } from './carParts.js';
 import { batchCars } from './carBatching.js';
+import { createSlicer } from '../batching/batchedParts.js';
 import { createCarMotion, type CarMotion } from './carMotion.js';
 
 /** A car drawn with its full model: the own car (the lap's car, the race's followed car), the lap's ghost and the race's near cars. */
@@ -43,10 +44,16 @@ export interface DrawnCarsOptions {
  * once its build is done nothing holds the parse (`createCarTemplates`) unless the body is held, and the next car of the body parses
  * its file again.
  */
-export function createDrawnCars(models: readonly Group[], surfaceHeight: SurfaceHeight,
-  {batched = true, transparent = false, sharedMaterial = () => false}: DrawnCarsOptions = {}): DrawnCars {
-  const cars = models.map(car => ({car, parts: buildCarParts(car), motion: createCarMotion(car, surfaceHeight)}));
-  const batches = batched ? batchCars(cars.map(car => car.parts), {releaseParsed: true, transparent, shadows: true}) : null;
+export async function createDrawnCars(models: readonly Group[], surfaceHeight: SurfaceHeight,
+  {batched = true, transparent = false, sharedMaterial = () => false}: DrawnCarsOptions = {}): Promise<DrawnCars> {
+  // A body's cars build over several tasks (a car's tables, then the batches): playback keeps its frames meanwhile.
+  const slice = createSlicer(), cars: DrawnCar[] = [];
+  for (const car of models) {
+    cars.push({car, parts: buildCarParts(car), motion: createCarMotion(car, surfaceHeight)});
+    // oxlint-disable-next-line no-await-in-loop -- yields between cars
+    await slice();
+  }
+  const batches = batched ? await batchCars(cars.map(car => car.parts), {releaseParsed: true, transparent, shadows: true}) : null;
   return {
     cars, shared: batches && cars.length > 1 ? batches.shared : null,
     ready() { batches?.ready(); },
@@ -91,7 +98,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
     async ghost(body: LoadedBody): Promise<DrawnCar> {
       const ghost = makeCar(TELEMETRY_COLORS.baseline, true, await ownModels.model(body));
       ghost.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
-      return createDrawnCars([ghost], surfaceHeight, {batched: false}).cars[0];
+      return (await createDrawnCars([ghost], surfaceHeight, {batched: false})).cars[0];
     },
   };
 }
