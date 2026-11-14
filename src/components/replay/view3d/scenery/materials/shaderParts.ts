@@ -71,10 +71,12 @@ function terrainParts(config: SurfaceConfig, context: ShaderContext): ExtendedPa
 }
 
 function waterParts(config: SurfaceConfig, { sample, uv, number, uniforms }: ShaderContext, tint: string): ExtendedParts {
+  // The albedo's alpha is the water's depth (shore to deep, which grades its look), not its opacity: the water draws opaque, as the
+  // reference's mostly does, until the package carries its opacity.
   const albedo = `
       vec4 waterAlbedo = ${sample('albedo')};
       diffuseColor.rgb = waterAlbedo.rgb * ${tint};
-      diffuseColor.a = waterAlbedo.a;
+      diffuseColor.a = 1.0;
       surfaceRoughness = 0.05;
       surfaceSpecular = 1.0;
     `;

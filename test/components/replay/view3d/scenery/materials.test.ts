@@ -105,6 +105,10 @@ describe('shaderParts', () => {
     expect(water.normals).toContain('dFdx(normal)'); expect(water.normals).toContain('roughnessFactor = sqrt(');
     expect(shaderParts(surface('water', { maps: { albedo: map('A', true) } })).normals).toBe('');
   });
+  it('draws water opaque: its albedo alpha is its depth, not its opacity', () => {
+    const water = shaderParts(surface('water', { maps: { albedo: map('A', true) } }));
+    expect(water.albedo).toContain('diffuseColor.a = 1.0;'); expect(water.albedo).not.toContain('waterAlbedo.a');
+  });
   it('samples the alpha-composited glass finish and the clearcoat absorption', () => {
     expect(shaderParts(surface('glass', { maps: { albedo: map('A', true) } })).finish).toContain('totalSpecular/clamp(diffuseColor.a+0.001');
     const clearcoat = shaderParts(surface('clearcoat', { maps: { albedo: map('A', true) } }));
