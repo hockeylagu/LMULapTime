@@ -103,9 +103,8 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     default:
       throw Error(`Unhandled native car shader kind ${config.kind}`);
   }
-  // Alpha-masked parts (grilles, meshes, decals): alpha to coverage over the 4x MSAA target smooths their cut edges. Every car part
-  // draws one side, as the reference draws them, masked ones included.
-  if (config.renderState?.alphaMask) { material.alphaTest = 0.5; material.alphaToCoverage = true; }
+  // Alpha-masked parts (grilles, meshes, decals): alpha to coverage over the 4x MSAA target smooths their cut edges.
+  if (config.renderState?.alphaMask) { material.alphaTest = 0.5; material.alphaToCoverage = true; material.side = DoubleSide; }
   if (config.renderState?.alphaBlend) { material.transparent = true; material.depthWrite = false; }
   // A blended two-sided part (number plates, decals) draws once with both sides, as the scenery's do (configureSurfaceMaterial.ts):
   // three otherwise draws it twice and marks the material changed before each, so every draw looks its program up again. Glass
