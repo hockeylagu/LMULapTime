@@ -13,6 +13,7 @@ import { addSceneEnvironment, sceneSun } from '../sceneEnvironment.js';
 import { assertHazed } from '../atmosphere/haze.js';
 import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
+import { underCarBaker } from '../car/carContactShadow.js';
 import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
@@ -281,6 +282,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     }
     try {
       sceneryClock.value = rig.timeSec;
+      underCarBaker.flush(renderer); // Bakes at most one car body's under-car shade per frame; every car of that body then shows it.
       content.beforeDraw(camera);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);

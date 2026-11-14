@@ -1,5 +1,6 @@
-import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, Vector3, type Object3D } from 'three';
+import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, Vector3, type Object3D, type WebGLRenderTarget } from 'three';
 import { hazeProgram } from '../atmosphere/haze.js';
+import { bakeArea, bakeUnderCar, underCarQuadGeometry, CONTACT_SHADOW_NAME, type BakeRenderer } from './underCarBake.js';
 
 /** How far the darkening spreads beyond the body, its strength under the body, and the lift that keeps it off the road. */
 export const CONTACT_SHADOW_SPREAD_M = 0.5, CONTACT_SHADOW_LIFT_M = 0.02;
@@ -33,13 +34,72 @@ export function contactShadowQuad(halfX: number, halfZ: number): {geometry: Plan
   return {geometry: new PlaneGeometry(sizeX, sizeZ).rotateX(-Math.PI / 2), material};
 }
 
+type ContactShadow = Mesh<PlaneGeometry, MeshBasicMaterial>;
+
+/** The shadows of one body (they share one bake): its footprint, the cars' shadows (waiting ones have been about to draw), the baked map. */
+interface BodyShade {
+  readonly bounds: Box3;
+  readonly shadows: Set<ContactShadow>;
+  readonly waiting: Set<ContactShadow>;
+  map: WebGLRenderTarget | null;
+}
+
 /**
- * Grounds the car: the standard real-time contact shadow under the car's footprint (`contactShadowQuad` over the model's bounds).
- * It sits on the model's lowest point (the tyre contact plane) and moves with the body. The bounds are the union of its parts'
- * exact boxes in the model's frame (`userData.footprint`, measured from their vertices once per body: the vertices may have left
- * the CPU since).
+ * Bakes the shade under each car body once and hands it to every car of that body. A car's contact shadow starts on the analytic
+ * quad; the first time it is about to draw it asks for the bake, and `flush` (the scene shell calls it before each draw) bakes at
+ * most ONE body per frame, then swaps the baked map in. The map is released with the last shadow of its body.
  */
-export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBasicMaterial> {
+export function createUnderCarBaker() {
+  const bodies = new WeakMap<object, BodyShade>(), active = new Set<BodyShade>();
+  const noop = () => {};
+  const swapIn = (body: BodyShade, shadow: ContactShadow) => {
+    const material = shadow.material, previous = material.alphaMap;
+    shadow.geometry.dispose(); shadow.geometry = underCarQuadGeometry(bakeArea(body.bounds).size);
+    material.alphaMap = body.map!.texture; material.needsUpdate = true;
+    previous?.dispose();
+  };
+  /** Registers a car's shadow under its body `key`; `bounds` is the car's footprint in its own frame. */
+  const register = (key: object, shadow: ContactShadow, bounds: Box3) => {
+    let found = bodies.get(key);
+    if (!found) { found = {bounds, shadows: new Set(), waiting: new Set(), map: null}; bodies.set(key, found); }
+    const body = found;
+    body.shadows.add(shadow);
+    shadow.onBeforeRender = () => { shadow.onBeforeRender = noop; body.waiting.add(shadow); active.add(body); };
+    shadow.material.addEventListener('dispose', () => {
+      body.shadows.delete(shadow); body.waiting.delete(shadow);
+      if (body.shadows.size > 0) return;
+      body.map?.dispose(); body.map = null; active.delete(body);
+      if (bodies.get(key) === body) bodies.delete(key);
+    });
+  };
+  /** Bakes the next body due (at most one) and swaps the shade into every waiting shadow of a baked body. */
+  const flush = (renderer: BakeRenderer) => {
+    let baked = false;
+    for (const body of active) {
+      if (!body.map) {
+        const shadow = [...body.waiting].find(candidate => candidate.parent);
+        if (baked || !shadow?.parent) continue;
+        body.map = bakeUnderCar(renderer, shadow.parent, body.bounds); baked = true;
+      }
+      for (const shadow of body.waiting) swapIn(body, shadow);
+      body.waiting.clear(); active.delete(body);
+    }
+  };
+  /** The baked map of a body, once baked and while a car of it lives. */
+  const mapOf = (key: object) => bodies.get(key)?.map ?? null;
+  return {register, flush, mapOf};
+}
+
+/** The scene's baker: the shell flushes it before each draw. */
+export const underCarBaker = createUnderCarBaker();
+
+/**
+ * Grounds the car: the contact shadow under the car's footprint. It starts as the analytic quad (`contactShadowQuad` over the
+ * model's bounds) and becomes the body's baked under-car shade (`underCarBaker`; `key` names the body). It sits on the model's
+ * lowest point (the tyre contact plane) and moves with the body. The bounds are the union of its parts' exact boxes in the
+ * model's frame (`userData.footprint`, measured from their vertices once per body: the vertices may have left the CPU since).
+ */
+export function createContactShadow(model: Object3D, key: object, baker = underCarBaker): ContactShadow {
   const bounds = new Box3(), part = new Box3();
   model.traverse(object => {
     const footprint: unknown = object.userData.footprint;
@@ -48,8 +108,9 @@ export function createContactShadow(model: Object3D): Mesh<PlaneGeometry, MeshBa
   if (bounds.isEmpty()) throw Error('Car model has no measured parts for its contact shadow');
   const {geometry, material} = contactShadowQuad((bounds.max.x - bounds.min.x) / 2, (bounds.max.z - bounds.min.z) / 2);
   const shadow = new Mesh(geometry, material);
-  shadow.name = 'contact-shadow';
+  shadow.name = CONTACT_SHADOW_NAME;
   shadow.position.set((bounds.min.x + bounds.max.x) / 2, bounds.min.y + CONTACT_SHADOW_LIFT_M, (bounds.min.z + bounds.max.z) / 2);
   shadow.renderOrder = CONTACT_SHADOW_ORDER; shadow.castShadow = false; shadow.receiveShadow = false;
+  baker.register(key, shadow, bounds);
   return shadow;
 }

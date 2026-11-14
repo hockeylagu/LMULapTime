@@ -187,7 +187,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
    */
   const car = async (body: LoadedBody) => {
     const model = await loadModel(body), built = makeCar(MAP_COLORS.carBody, false, model);
-    model.add(createContactShadow(model));
+    model.add(createContactShadow(model, body));
     return built;
   };
   /** Whether every car of a body draws with this material (`shareMaterials`): the loader keeps it, a dropped car leaves it. */
