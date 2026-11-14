@@ -1,4 +1,4 @@
-import { BackSide, BatchedMesh, BoxGeometry, DoubleSide, Mesh, MeshDepthMaterial, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector4, WebGLRenderTarget, type Material, type WebGLRenderer } from 'three';
+import { BackSide, BatchedMesh, BoxGeometry, DoubleSide, FrontSide, Mesh, MeshDepthMaterial, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector4, WebGLRenderTarget, type Material, type WebGLRenderer } from 'three';
 import { expect, it, vi } from 'vitest';
 import { createShadowCasterPass } from '../../../../../src/components/replay/view3d/shadows/shadowCasterPass.js';
 
@@ -39,7 +39,9 @@ it('shares one depth material among casters that draw alike: same side, and for 
   const pass = createShadowCasterPass(renderer, scene), draw = () => pass.draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}], new PerspectiveCamera(), [], 0);
   draw(); draw();
   const [first, again] = seen, [da, db, dTwo, dGrille, dGrille2, dHedge] = first as MeshDepthMaterial[];
-  expect(da).toBe(db); expect(da.side).toBe(BackSide); expect(dTwo).not.toBe(da); expect(dTwo.side).toBe(DoubleSide);
+  expect(da).toBe(db); expect(dTwo).not.toBe(da); expect(dTwo.side).toBe(DoubleSide);
+  // An opaque single-sided caster draws the faces the view does not, a cut-out the faces it does (the reference's culling).
+  expect([da.side, dGrille.side]).toEqual([BackSide, FrontSide]);
   expect(dGrille).toBe(dGrille2); expect([dGrille.alphaTest, dGrille.map]).toEqual([0.5, fence]); expect(dHedge.map).toBe(leaves);
   expect(again).toEqual(first);
   // A cut-out's depth material goes with its texture.

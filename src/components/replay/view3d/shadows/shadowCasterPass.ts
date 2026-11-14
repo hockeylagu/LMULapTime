@@ -30,7 +30,16 @@ export interface ShadowCasterPass {
   dispose(): void;
 }
 
-const SHADOW_SIDE: Record<Side, Side> = { [FrontSide]: BackSide, [BackSide]: FrontSide, [DoubleSide]: DoubleSide };
+const OPPOSITE: Record<Side, Side> = { [FrontSide]: BackSide, [BackSide]: FrontSide, [DoubleSide]: DoubleSide };
+
+/**
+ * The faces a single-sided caster draws, as the reference's shadow pass culls: an opaque one the side the view does not draw (its
+ * depth lies behind the lit surface, so the surface does not shadow itself), an alpha-cut one its visible side (a single-sided card,
+ * a wire or a fence, has no other). A two-sided caster draws both.
+ */
+function casterSide(material: Material, alphaCut: boolean): Side {
+  return alphaCut ? material.side : OPPOSITE[material.side];
+}
 
 /**
  * Blended see-through surfaces (glass, windscreens) cast no sun shadow: the sun lights a cockpit through its windscreen. Cut-outs
@@ -84,8 +93,8 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
     byMaterial.set(material, known);
     const found = known[kind];
     if (found) return found;
-    const custom = mesh.customDepthMaterial ?? null, side = material.shadowSide ?? SHADOW_SIDE[material.side];
-    const alphaTest = material.alphaToCoverage ? 0.5 : material.alphaTest, source = material as Material & {map?: Texture | null; alphaMap?: Texture | null};
+    const alphaTest = material.alphaToCoverage ? 0.5 : material.alphaTest;
+    const custom = mesh.customDepthMaterial ?? null, side = material.shadowSide ?? casterSide(material, alphaTest > 0), source = material as Material & {map?: Texture | null; alphaMap?: Texture | null};
     const [map, alphaMap] = alphaTest > 0 ? [source.map ?? null, source.alphaMap ?? null] : [null, null];
     const key = `${kind}|${custom?.uuid ?? ''}|${side}|${alphaTest}|${map?.id ?? ''}|${alphaMap?.id ?? ''}`;
     let depth = depthMaterials.get(key);
