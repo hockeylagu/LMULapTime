@@ -162,6 +162,9 @@ it("draws each instance within its node's distance range from a car's eye, and e
   batches.cull(new Vector3(205, 0, 0));
   // 199.5 m to the near box now, 99.5 m to the far one, 199.5 m to the kerb's.
   expect([shown(batch, 3), kerbs.parent]).toEqual([[false, true, true], scenery]);
+  // A view's LOD multiplier scales every range, checked again at once though the eye has not moved: 199.5 / 2 is inside 100 m.
+  batches.cull(new Vector3(205, 0, 0), 2);
+  expect(shown(batch, 3)).toEqual([true, true, true]);
   batches.cull(null);
   expect(shown(batch, 3)).toEqual([true, true, true]);
   // A chunk added while a car's eye culls takes its ranges from that eye.

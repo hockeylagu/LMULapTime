@@ -45,6 +45,7 @@ interface FollowedCar {
   motion: CarMotion | null;
   parts: CarParts | null;
   cameras: LoadedBody['descriptor']['cameras']['list'];
+  chaseLodMultiplier: number;
   /** Once warmed up: its batches each draw only while one of their parts shows. */
   ready(): void;
   dispose(): void;
@@ -80,9 +81,9 @@ export async function createRaceScene(
   /** The followed car: the own car, a set of one apart from its body's near cars. */
   const buildFollowed = async (slot: number | null, body: LoadedBody | null): Promise<FollowedCar | null> => {
     if (slot === null) return null;
-    if (!body) return {slot, car: null, motion: null, parts: null, cameras: [], ready() {}, dispose() {}};
+    if (!body) return {slot, car: null, motion: null, parts: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}};
     const set = await sets.build([body], {own: true}), [drawn] = set.cars;
-    return {slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, cameras: body.descriptor.cameras.list, ready: () => set.ready(), dispose: () => set.dispose()};
+    return {slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, cameras: body.descriptor.cameras.list, chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => set.ready(), dispose: () => set.dispose()};
   };
   const pending = buildFollowed(first.slot, first.body);
   pending.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
@@ -97,7 +98,7 @@ export async function createRaceScene(
   const field = createRaceField(shell, sets, root, cars, bodyOf, () => draw(), (slot, car) => standIns.offer(classOf.get(slot) ?? '', car));
   // The chase camera looks ahead along the followed car's own samples of the window, and the trackside spots stand along them.
   let points: ReplayTrajectoryPoint[] = [], distances: number[] = [], pointsOf: {window: RacePoseWindow; slot: number} | null = null;
-  const rigCar = () => ({primary: followed?.car ?? noCar, cameras: followed?.cameras ?? [], trajectory: {points}, primaryDistances: distances});
+  const rigCar = () => ({primary: followed?.car ?? noCar, cameras: followed?.cameras ?? [], chaseLodMultiplier: followed?.chaseLodMultiplier ?? 1, trajectory: {points}, primaryDistances: distances});
   const content = (): SceneContent => ({
     root, reflected: followed?.car ?? noCar,
     beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {

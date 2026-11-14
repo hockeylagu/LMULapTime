@@ -270,7 +270,8 @@ export function createRaceField(
         // round the lap. The world group mirrors native z: the car's centre goes through the root's world matrix.
         if (pose) centre.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z).applyMatrix4(root.matrixWorld);
         if (!pose || !view.intersectsSphere(bounds.set(centre, CAR_RADIUS_M))) { hide(car.far); hide(car.near); car.tier = 'far'; continue; }
-        inView.push({car, metres: camera.position.distanceTo(centre)});
+        // The LOD distance: the view's multiplier keeps detail further out (`CameraRig.lodMultiplier`).
+        inView.push({car, metres: camera.position.distanceTo(centre) / shell.rig.lodMultiplier});
       }
       inView.sort((a, b) => a.metres - b.metres);
       let near = 0;

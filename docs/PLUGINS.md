@@ -170,7 +170,7 @@ What `rendering/index.json` holds:
 {`sensitivity`, `speedLimit`, `delayS`, `darkAdaptation`} (the exposure moves toward the law's in stops: a blend fraction `sensitivity` per
 0.15 s, capped at `speedLimit` stops a second and smoothed twice; a darkening scene takes `darkAdaptation`'s non-negative values;
 `autoExposure.ts` `adaptExposure`; on the wall clock, so it runs on while the replay is paused; it starts at the target when the
-scene loads and carries over camera cuts, seeks and type changes; the delay is 0 everywhere and not applied), a positive `weatherBlendRate` (per second, the rate of the clear to overcast profile blend), `ambientOcclusion` and
+scene loads and carries over camera cuts, seeks and type changes; the delay is 0 everywhere and not applied), `tv` a `lodMultiplier` (below), a positive `weatherBlendRate` (per second, the rate of the clear to overcast profile blend), `ambientOcclusion` and
 `profiles` ascending by `sunElevationDeg`, each with a positive `targetExposure` (T), a positive `lightDarkBorder` (B), `minExposure` and `maxExposure`
 (0 ≤ min ≤ max, max > 0), `whiteBalanceK` and a `toneCurve` {`a` > 0, `b`} (the clear values), a positive `weatherLerpPower` and
 an `overcast` look with the same six values, validated the same way (the package's overcast profile; the viewer does not blend to it yet). The viewer interpolates a profile by sun elevation and holds it past the ends;
@@ -279,7 +279,9 @@ A body is split by where it is seen from and has texture start files:
   `chassis` node (`laps/lapLayer.ts`); a body with an interior and no `chassis` node fails to load.
 - A mesh node in either GLB may carry `extras.lod` {`inM`, `outM`}: it is drawn while `inM` <= camera distance < `outM` (`outM`
   null = no limit). The followed car is always at distance 0, the comparison car at its distance from the camera
-  (`sceneObjects.ts`, `setCameraDistance`).
+  (`sceneObjects.ts`, `setCameraDistance`). Every LOD distance, scenery `lmuLod` included, is divided by the view's LOD multiplier
+  (`CameraRig.lodMultiplier`): a car-mounted game camera's `lodMultiplier`, `cameras.chase.lodMultiplier` in the follow and chase
+  views. The trackside views draw every resident scenery instance (their scale follows the zoom), as do the free views.
 - A body texture row may carry `interiorOnly: true` (no outside part uses it; the viewer reads it at full size, the rest of the
   car up to its size limit) and `start`, with the full file's `width`, `height`, `levels` and `format` stated exactly when it has
   a `start`.

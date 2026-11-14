@@ -17,9 +17,9 @@ export interface SceneryBatches {
    * Draws each instance only within its node's distance range from `eye` (world space): the package's `lmuLod` {inM, outM},
    * measured to the nearest point of the instance's box. Checked again once the eye has moved `CULL_STEP_M`; a batch with no
    * instance in range leaves the scene, so it costs no draw. A null eye draws every instance: the zoomed trackside views, whose
-   * distance scale the package does not carry, and the free views.
+   * distance scale follows the zoom, and the free views. `lodMultiplier` scales every range (the view's, `CameraRig.lodMultiplier`).
    */
-  cull(eye: Vector3 | null): void;
+  cull(eye: Vector3 | null, lodMultiplier?: number): void;
   dispose(): void;
 }
 
@@ -104,10 +104,10 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
   };
   const local = new Vector3();
   /** Where the ranges were last checked (batch space); null while every instance draws. */
-  let culledAt: Vector3 | null = null;
+  let culledAt: Vector3 | null = null, lodSq = 1;
   /** Sets an instance's range flag against the eye (batch space), or in range with none; a new chunk's instances are set before it is shown. */
   const place = (ranged: Ranged, eye: Vector3 | null) => {
-    const distanceSq = eye ? ranged.box.distanceToPoint(eye) ** 2 : 0;
+    const distanceSq = eye ? ranged.box.distanceToPoint(eye) ** 2 / lodSq : 0;
     ranged.inRange = !eye || (distanceSq >= ranged.inSq && distanceSq < ranged.outSq);
   };
   const placeAll = (eye: Vector3 | null) => {
@@ -182,14 +182,16 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
         show(chunk.placed, shown);
       }
     },
-    cull(eye) {
+    cull(eye, lodMultiplier = 1) {
       if (!eye) {
         if (culledAt) { culledAt = null; placeAll(null); }
         return;
       }
       parent.updateWorldMatrix(true, false);
       parent.worldToLocal(local.copy(eye));
-      if (culledAt && local.distanceToSquared(culledAt) < CULL_STEP_M * CULL_STEP_M) return;
+      const scaled = lodMultiplier * lodMultiplier !== lodSq;
+      if (culledAt && !scaled && local.distanceToSquared(culledAt) < CULL_STEP_M * CULL_STEP_M) return;
+      lodSq = lodMultiplier * lodMultiplier;
       culledAt = (culledAt ?? new Vector3()).copy(local);
       placeAll(culledAt);
     },

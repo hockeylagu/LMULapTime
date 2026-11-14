@@ -266,9 +266,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     if (disposed || !content) return;
     if (frameTime !== undefined) frameHook?.(frameTime);
     updateStream();
-    // Zoomed trackside views need the draw distances scaled by a factor the package does not carry yet: trackside and free views
-    // draw everything resident.
-    batches.cull(followsCar(rig.mode) ? rig.camera.position : null);
+    // Zoomed trackside views keep every resident instance (their distance scale follows the zoom), as do the free views.
+    batches.cull(followsCar(rig.mode) ? rig.camera.position : null, rig.lodMultiplier);
     if (texturesChanged()) report(); // Textures sharpen a band per frame, each frame asking for the next.
     const camera = rig.camera;
     desiredEye.copy(camera.position);

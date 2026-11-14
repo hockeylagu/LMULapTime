@@ -321,7 +321,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   the road height grid first and cast rays only off it or for another deck. Its
   native-coordinate position-only geometry is chunk-owned and never exported. `sceneryBatches.ts` draws each opaque material once
   across chunks: one `BatchedMesh` per package material key (`lmuMaterial`) and shadow flags, sized once from the layout's
-  material totals; a chunk's instances show while the chunk does and, for the car-mounted cameras, within their node's `lmuLod` draw
+  material totals; a chunk's instances show while the chunk does and, for the car-following cameras, within their node's `lmuLod` draw
   distance (the batch leaves the scene with no instance in range), and a material's batches drop their CPU arrays once its last chunk is uploaded.
   `scene/sceneShell.ts` is the 3D view without its content: renderer, scenery stream, ground, batches, sky and environment, auto
   exposure, the car reflection, cameras, warm-up, the draw loop and resize/hidden handling; content plugs in as a `SceneContent`

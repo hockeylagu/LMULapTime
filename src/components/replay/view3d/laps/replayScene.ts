@@ -78,7 +78,7 @@ export async function createReplayScene(
       lap.syncParts();
       // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
       // parts follow the camera's distance.
-      if (lap.ghost.visible) setCameraDistance(lap.ghost, camera.position.distanceTo(lap.ghost.getWorldPosition(ghostCentre)));
+      if (lap.ghost.visible) setCameraDistance(lap.ghost, camera.position.distanceTo(lap.ghost.getWorldPosition(ghostCentre)) / shell.rig.lodMultiplier);
     },
     refreshHeights: () => lap.refreshHeights(),
     dispose: () => lap.dispose(),

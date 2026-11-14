@@ -65,7 +65,7 @@ const windowOf = (count: number): RacePoseWindow => ({
 function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | null> = async slot => body(slot), warm: (object: Object3D) => Promise<void> = async () => {}) {
   const root = new Group(), changed = vi.fn(), report = vi.fn(), shareReflection = vi.fn(), cars = makeCars(count), window = windowOf(count);
   const shell = {
-    origin: new Vector3(), carTextures: {}, report, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm, shareReflection,
+    origin: new Vector3(), rig: {lodMultiplier: 1}, carTextures: {}, report, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm, shareReflection,
     placeCar: (car: Object3D, pose: RenderPose) => { car.position.set(pose.x, pose.y, pose.z); car.updateMatrix(); },
   } as unknown as SceneShell;
   const sets = createCarSets(shell.carTemplates, shell.carTextures, {} as SceneryShading, shell.surfaceHeight);

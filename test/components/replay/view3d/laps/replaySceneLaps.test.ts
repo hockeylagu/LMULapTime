@@ -178,10 +178,10 @@ const car = {
         states: null, defaultLit: false, hiddenInOwnCockpit: null, brakeGlowRange: [640, 950]},
     ],
     cameras: {list: [
-      {name: 'cockpit', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
-      {name: 'hood', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
-      {name: 'roof', position: [0.28, 1.5, -0.6], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out'},
-    ]}},
+      {name: 'cockpit', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in', lodMultiplier: 1, shadow: null},
+      {name: 'hood', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out', lodMultiplier: 1, shadow: null},
+      {name: 'roof', position: [0.28, 1.5, -0.6], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out', lodMultiplier: 1, shadow: null},
+    ], chase: {lodMultiplier: 1.5}}},
 } as unknown as LoadedBody;
 const assets = {primary: car, baseline: null}, withGhost = {primary: car, baseline: car};
 let frames: FrameRequestCallback[];

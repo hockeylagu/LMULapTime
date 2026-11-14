@@ -34,6 +34,8 @@ export interface RigPose {
 export interface RigCar {
   readonly primary: Object3D;
   readonly cameras: LoadedBody['descriptor']['cameras']['list'];
+  /** The body's chase camera LOD multiplier (`cameras.chase.lodMultiplier`). */
+  readonly chaseLodMultiplier: number;
   readonly trajectory: {readonly points: ReplayTrajectoryPoint[]};
   readonly primaryDistances: number[];
 }
@@ -57,6 +59,11 @@ export interface CameraRig {
   readonly checksGround: boolean;
   /** The primary car's game camera of a car-mounted view, null in the other views or before the first layer. */
   readonly gameCamera: LoadedBody['descriptor']['cameras']['list'][number] | null;
+  /**
+   * The factor the view scales every LOD distance by (the reference divides the distance by it): the primary car's game camera in a
+   * car-mounted view, its chase camera's in the follow and chase views, 1 in the others.
+   */
+  readonly lodMultiplier: number;
   /** The lap's cars: trackside spots along its line, and the game cameras and cockpit mesh of its primary car. */
   setLayer(layer: RigCar): void;
   /** Moves the camera with the primary car's pose by the mode's rule (the first pose places it). */
@@ -129,6 +136,11 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
     unplace() { placed = false; },
     get checksGround() { return camera === perspective && !isDriverCamera(mode); },
     get gameCamera() { return layer && isDriverCamera(mode) ? driverCamera(layer.cameras, mode) : null; },
+    get lodMultiplier() {
+      if (!layer) return 1;
+      if (isDriverCamera(mode)) return driverCamera(layer.cameras, mode).lodMultiplier;
+      return mode === 'follow' || mode === 'chase' ? layer.chaseLodMultiplier : 1;
+    },
     setLayer(next) {
       layer = next;
       trackside = createTracksideCameras(next.trajectory.points, next.primaryDistances, origin);
