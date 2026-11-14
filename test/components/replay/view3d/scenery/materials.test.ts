@@ -97,7 +97,7 @@ describe('shaderParts', () => {
     expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true) } })).albedo).toContain('*vSurfaceColour');
   });
   it('lays the vertex colour on a standard albedo by its mode, a masked one faded by the albedo alpha', () => {
-    const parts = (vertexColour: string) => shaderParts(surface('standard', { maps: { albedo: map('A', true) }, flags: { vertexColour, roughnessFromAlbedoAlpha: true } })).albedo;
+    const parts = (vertexColour: string) => shaderParts(surface('standard', { maps: { albedo: map('A', true) }, flags: { vertexColour, roughnessFromAlbedoAlpha: 'on' } })).albedo;
     expect(parts('albedoMultiply')).toContain('surfaceAlbedo*=vSurfaceColour.rgb;');
     expect(parts('albedoMultiply')).toContain('mr.g=base.a;');
     expect(parts('albedoMultiplyMasked')).toContain('surfaceAlbedo*=mix(vec3(1.0),vSurfaceColour.rgb,base.a);');
