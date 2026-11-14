@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Group, PerspectiveCamera, Vector3, type Object3D } from 'three';
+import { Group, PerspectiveCamera, Vector3, type Material, type Mesh, type Object3D } from 'three';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import type { RaceReplayCar } from '../../../../../shared/types/replay.js';
 import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
@@ -62,10 +62,10 @@ const windowOf = (count: number): RacePoseWindow => ({
   fromSec: 0, hz: 5, count: 2, slots: Array.from({length: count}, (_, slot) => slot), data: new Float32Array(count * 2 * RACE_POSE_CHANNEL_COUNT),
 });
 
-function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | null> = async slot => body(slot)) {
+function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | null> = async slot => body(slot), warm: (object: Object3D) => Promise<void> = async () => {}) {
   const root = new Group(), changed = vi.fn(), report = vi.fn(), cars = makeCars(count), window = windowOf(count);
   const shell = {
-    origin: new Vector3(), carTextures: {}, report, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm: async () => {},
+    origin: new Vector3(), carTextures: {}, report, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm,
     placeCar: (car: Object3D, pose: RenderPose) => { car.position.set(pose.x, pose.y, pose.z); car.updateMatrix(); },
   } as unknown as SceneShell;
   const sets = createCarSets(shell.carTemplates, shell.carTextures, {} as SceneryShading, shell.surfaceHeight);
@@ -238,5 +238,32 @@ describe('createRaceField', () => {
     expect(root.children.length).toBeGreaterThan(4); // Two far cars, two full models, the shared batches.
     field.dispose();
     expect(root.children).toHaveLength(0);
+  });
+
+  /** The far cars' own materials (the mocked far models'), each spied for its dispose. */
+  const farMaterialSpies = () => [...models.far.values()].flatMap(model => (model as Group).children.map(mesh => vi.spyOn((mesh as Mesh).material as Material, 'dispose')));
+
+  it('frees the far cars a body built when the field goes while they compile', async () => {
+    let compiled!: () => void, compiling!: () => void;
+    const started = new Promise<void>(resolve => { compiling = resolve; }), gate = new Promise<void>(resolve => { compiled = resolve; });
+    const {field, root} = setup(2, undefined, async () => { compiling(); await gate; });
+    field.load([{slot: 0, metres: 10}]);
+    await started;
+    const freed = farMaterialSpies();
+    expect(freed).toHaveLength(4);
+    field.dispose(); compiled();
+    await vi.waitFor(() => expect(freed.every(spy => spy.mock.calls.length === 1)).toBe(true));
+    expect(root.getObjectByName('body-envelope')).toBeUndefined();
+  });
+
+  it('frees the far cars a body built when their compile fails, and keeps those cars stand-ins', async () => {
+    let compiling!: () => void;
+    const started = new Promise<void>(resolve => { compiling = resolve; });
+    const {field} = setup(2, undefined, async () => { compiling(); await Promise.resolve(); throw Error('compile failed'); });
+    field.load([{slot: 0, metres: 10}]);
+    await started;
+    const freed = farMaterialSpies();
+    await vi.waitFor(() => expect(freed.every(spy => spy.mock.calls.length === 1)).toBe(true));
+    expect([field.has(0), field.has(1)]).toEqual([false, false]);
   });
 });

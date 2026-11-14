@@ -160,6 +160,8 @@ export function createRaceField(
   };
   const loadBody = async (slot: number) => {
     let slots = [slot];
+    // Far cars built but not yet in the field: a load that fails or outlives the field frees them.
+    let unplaced: Group[] = [];
     bodyLoads++;
     try {
       const body = await bodyOf(slot);
@@ -177,7 +179,9 @@ export function createRaceField(
         return livery ? {livery, car: makeCar(MAP_COLORS.carBody, false, await farLoader.model(livery))} : null;
       }));
       built.forEach((entry, index) => { if (entry) farModel(slots[index], entry.car); });
-      const present = built.filter(entry => entry !== null), boxes = present.map(({car}) => boundsOf(car)), tables = present.map(({car}) => buildCarParts(car));
+      const present = built.filter(entry => entry !== null);
+      unplaced = present.map(({car}) => car);
+      const boxes = present.map(({car}) => boundsOf(car)), tables = present.map(({car}) => buildCarParts(car));
       const batches = batchCars(tables, {releaseParsed: true, transparent: true});
       farSets.push(batches);
       await Promise.all([shell.warm(batches.shared), ...present.map(({car}) => shell.warm(car))]);
@@ -196,10 +200,12 @@ export function createRaceField(
         };
         of.cars.push(car); field.set(slots[index], car);
       });
+      unplaced = [];
       changed();
     } catch {
       // The cars that cannot load stay stand-ins (below).
     } finally {
+      for (const car of unplaced) { car.removeFromParent(); disposeObjects(car); }
       bodyLoads--;
       for (const each of slots) if (field.get(each) === null) field.set(each, 'none');
       if (!disposed) reportLoads();
