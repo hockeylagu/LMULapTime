@@ -129,9 +129,28 @@ const CASCADE_SHADOW_FRAGMENT_PARS = `
 const SUN_LIGHT_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
 
 /**
- * Gives a lit program the sun's shadow from the cascades: in three's light loop, the sun's light is multiplied by `shade` of the
- * cascade term where the object receives shadows. `influence` is the material's normal shadow influence. The light chunk may already
- * be inlined (car paint's, the scenery's); a program without the sun's light throws.
+ * Splits the sun's diffuse from its specular: the sun's light carries the shadow s, and the diffuse a light adds is scaled by
+ * `surfaceSunDiffuse` (set at the sun, 1 for the lights before it), so the sun's diffuse takes min(2s, 1) and its specular s. A
+ * half-shadowed texel is fully lit in diffuse; only the specular follows the shadow as it is. Wraps whatever `RE_Direct` is defined
+ * by then (leaf translucency included, which so takes the diffuse's curve).
+ */
+const SUN_DIFFUSE_SPLIT = `
+float surfaceSunDiffuse = 1.0;
+void surfaceSunDirect( const in IncidentLight light, const in vec3 position, const in vec3 normal, const in vec3 viewDir,
+  const in vec3 coatNormal, const in PhysicalMaterial material, inout ReflectedLight reflected ) {
+  vec3 before = reflected.directDiffuse;
+  RE_Direct( light, position, normal, viewDir, coatNormal, material, reflected );
+  reflected.directDiffuse = before + ( reflected.directDiffuse - before ) * surfaceSunDiffuse;
+}
+#undef RE_Direct
+#define RE_Direct surfaceSunDirect
+`;
+
+/**
+ * Gives a lit program the sun's shadow from the cascades, as every lit surface of the reference takes it: in three's light loop, the
+ * sun's light is multiplied by `shade` of the cascade term where the object receives shadows, its specular by that shadow and its
+ * diffuse by min(2 * shadow, 1) (`SUN_DIFFUSE_SPLIT`). `influence` is the material's normal shadow influence. The light chunk may
+ * already be inlined (car paint's, the scenery's); a program without the sun's light throws.
  */
 export function patchCascadeShadow(shader: WebGLProgramParametersWithUniforms, influence: number, shade = (shadow: string) => shadow): void {
   const replace = (source: string, from: string, to: string) => {
@@ -145,9 +164,13 @@ ${CASCADE_SHADOW_VERTEX}`);
   let fragment = shader.fragmentShader.replace('#include <lights_fragment_begin>', ShaderChunk.lights_fragment_begin);
   fragment = replace(fragment, '#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>
 ${CASCADE_SHADOW_FRAGMENT_PARS}`);
+  fragment = replace(fragment, '#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>
+${SUN_DIFFUSE_SPLIT}`);
   fragment = replace(fragment, SUN_LIGHT_INFO, `${SUN_LIGHT_INFO}
     #if UNROLLED_LOOP_INDEX == 0
-      directLight.color *= receiveShadow ? ${shade('surfaceCascadeShadow( - vViewPosition.z )')} : 1.0;
+      { float sunShadow = receiveShadow ? ${shade('surfaceCascadeShadow( - vViewPosition.z )')} : 1.0;
+        directLight.color *= sunShadow;
+        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; }
     #endif`);
   shader.vertexShader = vertex; shader.fragmentShader = fragment;
   Object.assign(shader.uniforms, cascadeShadowUniforms, { surface_normalShadowInfluence: { value: influence } });

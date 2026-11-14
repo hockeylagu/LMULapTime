@@ -50,12 +50,11 @@ function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms, eye: s
 }
 
 /**
- * How a family takes the sun's shadow: leaves light their diffuse and translucency with min(2 * shadow, 1), so partly shadowed
- * foliage reads lit and only full shade is dark. Terrain also takes its baked shadow (the splatter's alpha, shaderParts.ts) on the
- * sun: the shade under trees and beside walls is painted into the ground, and lights it as shade.
+ * How a family takes the sun's shadow, before the diffuse's min(2 * shadow, 1) every family takes (cascadeSampling.ts): terrain also
+ * takes its baked shadow (the splatter's alpha, shaderParts.ts) on the sun, so the shade under trees and beside walls, painted into
+ * the ground, lights it as shade.
  */
 function sunShade(kind: SurfaceConfig['kind']): (shadow: string) => string {
-  if (kind === 'vegetation') return shadow => `min(2.0 * ${shadow}, 1.0)`;
   if (kind === 'terrain') return shadow => `min(${shadow}, surfaceBakedShadow)`;
   return shadow => shadow;
 }

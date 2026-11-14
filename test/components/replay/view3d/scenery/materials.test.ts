@@ -237,7 +237,7 @@ describe('patchSurfaceShader', () => {
   it('shades terrain by its baked shadow on the sun as well as the ambient', () => {
     const terrain = patched(surface('terrain', { maps: { layerA: map('A', true), splatter: map('S') }, flags: { layers: '1' } }));
     expect(terrain.fragmentShader).toContain('surfaceBakedShadow=splatter.a;');
-    expect(terrain.fragmentShader).toContain('directLight.color *= receiveShadow ? min(surfaceCascadeShadow( - vViewPosition.z ), surfaceBakedShadow) : 1.0;');
+    expect(terrain.fragmentShader).toContain('float sunShadow = receiveShadow ? min(surfaceCascadeShadow( - vViewPosition.z ), surfaceBakedShadow) : 1.0;');
     expect(patched(surface('standard', { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain(', surfaceBakedShadow)');
   });
   it('turns shadow-pass cards toward the viewing camera, so a card shades what is drawn', () => {
@@ -274,12 +274,15 @@ describe('patchSurfaceShader', () => {
     expect(patched(tree).fragmentShader).toContain('3.00000000');
     expect(patched({ ...tree, flags: {} }).fragmentShader).not.toContain('surfaceLeafDirect');
   });
-  it('doubles the sun shadow term on leaves', () => {
-    const tree = surface('vegetation', { maps: { albedo: map('A', true) } });
-    expect(patched(tree).fragmentShader).toContain('directLight.color *= receiveShadow ? min(2.0 * surfaceCascadeShadow( - vViewPosition.z ), 1.0) : 1.0;');
-    // Every other surface reads the sun's shadow from the cascades as it is.
-    const road = patched(surface('standard', { maps: { albedo: map('A', true) } })).fragmentShader;
-    expect(road).toContain('directLight.color *= receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;'); expect(road).not.toContain('min(2.0 *');
+  it('lights the diffuse of every family by twice the sun shadow and its specular by the shadow, terrain also by its baked shade', () => {
+    for (const kind of ['vegetation', 'standard'] as const) {
+      const shader = patched(surface(kind, { maps: { albedo: map('A', true) } })).fragmentShader;
+      expect(shader).toContain('float sunShadow = receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;');
+      expect(shader).toContain('surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0;');
+      expect(shader).toContain('#define RE_Direct surfaceSunDirect');
+    }
+    const ground = patched(surface('terrain', { maps: { albedo: map('A', true) } })).fragmentShader;
+    expect(ground).toContain('float sunShadow = receiveShadow ? min(surfaceCascadeShadow( - vViewPosition.z ), surfaceBakedShadow) : 1.0;');
   });
   it('shares the digital flag clock uniform object', () => {
     const shader = patched(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) } }));

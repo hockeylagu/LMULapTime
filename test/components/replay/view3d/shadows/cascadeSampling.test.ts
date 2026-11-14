@@ -65,7 +65,7 @@ describe('cascade shadow sampling', () => {
     expect(shader.uniforms.surface_normalShadowInfluence.value).toBe(0.75);
     expect(shader.uniforms.surface_cascadeCount).toBe(cascadeShadowUniforms.surface_cascadeCount);
     expect(shader.vertexShader).toContain('cascadeNormal * ( surface_cascadeNormalOffset * surface_normalShadowInfluence )');
-    expect(shader.fragmentShader).toContain('directLight.color *= receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;');
+    expect(shader.fragmentShader).toContain('float sunShadow = receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;');
     expect(shader.fragmentShader).not.toContain('#define SURFACE_CARD');
     expect(patched({...surface('vegetation'), billboard: true}).fragmentShader.startsWith('#define SURFACE_CARD\n')).toBe(true);
   });
@@ -81,7 +81,13 @@ describe('cascade shadow sampling', () => {
     patchCascadeShadow(shader, 0.5);
     expect(shader.fragmentShader).toContain(`getDirectionalLightInfo( directionalLight, directLight );
     #if UNROLLED_LOOP_INDEX == 0
-      directLight.color *= receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;`);
+      { float sunShadow = receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;
+        directLight.color *= sunShadow;
+        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; }`);
+    // The sun's diffuse takes min(2 * shadow, 1), its specular the shadow: a wrapper of the light model's own direct light.
+    const split = shader.fragmentShader.indexOf('#define RE_Direct surfaceSunDirect');
+    expect(split).toBeGreaterThan(shader.fragmentShader.indexOf('#define RE_Direct RE_Direct_Physical'));
+    expect(shader.fragmentShader).toContain('reflected.directDiffuse = before + ( reflected.directDiffuse - before ) * surfaceSunDiffuse;');
     expect(shader.fragmentShader).toContain('uniform sampler2DShadow surface_cascadeAtlas;');
     expect(shader.vertexShader.indexOf('vCascadePosition = cascadeWorld.xyz')).toBeGreaterThan(shader.vertexShader.indexOf('#include <worldpos_vertex>'));
     expect(shader.uniforms.surface_normalShadowInfluence.value).toBe(0.5);
