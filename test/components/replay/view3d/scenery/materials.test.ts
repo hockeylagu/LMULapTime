@@ -96,6 +96,17 @@ describe('shaderParts', () => {
     expect(shaderParts(surface('diffuse', { vertexColour: false, maps: { albedo: map('A', true) } })).albedo).not.toContain('*vSurfaceColour');
     expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true) } })).albedo).toContain('*vSurfaceColour');
   });
+  it('lays the vertex colour on a standard albedo by its mode, a masked one faded by the albedo alpha', () => {
+    const parts = (vertexColour: string) => shaderParts(surface('standard', { maps: { albedo: map('A', true) }, flags: { vertexColour, roughnessFromAlbedoAlpha: true } })).albedo;
+    expect(parts('albedoMultiply')).toContain('surfaceAlbedo*=vSurfaceColour.rgb;');
+    expect(parts('albedoMultiply')).toContain('mr.g=base.a;');
+    expect(parts('albedoMultiplyMasked')).toContain('surfaceAlbedo*=mix(vec3(1.0),vSurfaceColour.rgb,base.a);');
+    expect(parts('albedoOverlay')).toContain('surfaceOverlay(sqrt(max(surfaceAlbedo,vec3(0.0))),vSurfaceColour.rgb)');
+    const overlay = parts('albedoOverlayMasked');
+    expect(overlay).toContain('mix(vec3(0.5),vSurfaceColour.rgb,base.a)');
+    // The masked modes take the albedo alpha as their mask: neither roughness nor opacity.
+    expect(overlay).not.toContain('mr.g=base.a;'); expect(overlay).toContain('diffuseColor.a*=1.0;');
+  });
   it('adds the blink clock for digital flags and keeps the authored period', () => {
     const parts = shaderParts(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) }, parameters: { blink: { period: 0.5 } } }), { uniforms: false });
     expect(parts.declarations).toContain('uniform float surface_flag_elapsed;'); expect(parts.albedo).toContain('3.141592653589793/0.50000000');

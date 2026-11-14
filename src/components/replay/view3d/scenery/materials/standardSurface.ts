@@ -3,6 +3,18 @@ import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
 type Blend = 'albedo' | 'scalar';
 
+/**
+ * The vertex colour on the albedo: multiplied, or overlaid on the albedo's square root (its perceptual value) and squared back. A
+ * masked mode fades the colour out by the albedo alpha, to white for a multiply and to mid grey (no change) for an overlay.
+ */
+function vertexColourAlbedo(mode: unknown): string {
+  const colour = (neutral: string) => String(mode).endsWith('Masked') ? `mix(vec3(${neutral}),vSurfaceColour.rgb,base.a)` : 'vSurfaceColour.rgb';
+  if (mode === 'albedoMultiply' || mode === 'albedoMultiplyMasked') return `surfaceAlbedo*=${colour('1.0')};`;
+  if (mode === 'albedoOverlay' || mode === 'albedoOverlayMasked')
+    return `surfaceAlbedo=clamp(surfaceOverlay(sqrt(max(surfaceAlbedo,vec3(0.0))),${colour('0.5')}),vec3(0.0),vec3(1.0)); surfaceAlbedo*=surfaceAlbedo;`;
+  return '';
+}
+
 /** Standard and StandardBlend materials, from the package's material flags, maps and parameters. */
 export function standardShaderParts(config: SurfaceConfig, { sample, uv, number, vec, uniforms }: ShaderContext): SurfaceParts {
   const { maps, parameters: p, flags: f } = config;
@@ -37,6 +49,8 @@ export function standardShaderParts(config: SurfaceConfig, { sample, uv, number,
   const rawMask: string | undefined = masks[maskName];
   if (!rawMask) throw Error(`Unsupported source blend mask ${maskName}`);
   const maskedBlend = (control: string) => maskName === 'detailAlpha' ? `detail.a*${n(detail, control)}` : rawMask;
+  // A masked vertex colour reads the albedo alpha as its mask: the alpha is then neither opacity nor roughness.
+  const maskedColour = f.vertexColour === 'albedoMultiplyMasked' || f.vertexColour === 'albedoOverlayMasked';
   const baseAlbedoFallback = colourSquared(list(base, 'albedo'));
   const altAlbedoFallback = colourSquared(list(base, 'albedoAlt'));
   let albedo = `
@@ -50,7 +64,7 @@ export function standardShaderParts(config: SurfaceConfig, { sample, uv, number,
     vec3 surfaceAlbedo=mix(base.rgb,${functionBlend('base.rgb', 'alternate.rgb', f.albedoBlend, 'albedo')},surfaceStandardBlend);
     vec4 mr=${sample('metalRough', `vec4(${n(base, 'metalness')},${n(base, 'roughness')},0.0,1.0)`)};
     vec4 mrAlt=${sample('metalRoughAlt', `vec4(${n(base, 'metalnessAlt')},${n(base, 'roughnessAlt')},0.0,1.0)`)};
-    ${!maps.metalRough && maps.albedo && on('roughnessFromAlbedoAlpha') ? 'mr.g=base.a;' : ''}
+    ${!maps.metalRough && maps.albedo && on('roughnessFromAlbedoAlpha') && !maskedColour ? 'mr.g=base.a;' : ''}
     ${!maps.metalRoughAlt && on('roughnessFromAlbedoAltAlpha') ? 'mrAlt.g=alternate.a;' : ''}
     float sourceMetallic=mix(mr.r,${scalarBlend('mr.r', 'mrAlt.r', f.metalnessBlend)},${maskedBlend('maskMetalness')});
     float sourceRoughness=mix(mr.g,${scalarBlend('mr.g', 'mrAlt.g', f.roughnessBlend)},${maskedBlend('maskRoughness')});
@@ -79,13 +93,13 @@ export function standardShaderParts(config: SurfaceConfig, { sample, uv, number,
     albedo += `sourceMetallic=mix(sourceMetallic,${n(detail, 'metalness')},detail.a*${n(detail, 'metalnessBlend')});`;
   if (f.vertexAlpha === 'aoMultiply') albedo += 'surfaceAO*=vSurfaceColour.a;';
   if (f.vertexColour === 'aoMultiply') albedo += 'surfaceAO*=vSurfaceColour.r;';
+  albedo += vertexColourAlbedo(f.vertexColour);
   const tint = list(adjust, 'tint');
-  const sourceAlpha = (maps.albedo && !maps.metalRough && on('roughnessFromAlbedoAlpha')) || maskName === 'albedoAlpha' ? '1.0' : 'base.a';
+  const sourceAlpha = (maps.albedo && !maps.metalRough && on('roughnessFromAlbedoAlpha')) || maskName === 'albedoAlpha' || maskedColour ? '1.0' : 'base.a';
   albedo += `surfaceMetallic=surfaceAdjust(sourceMetallic,${num(value(adjust, 'metalness'), 'metalness')});
     surfaceRoughness=surfaceAdjust(sourceRoughness,${num(value(adjust, 'roughness'), 'roughness')});
     diffuseColor.rgb${uniforms ? '=' : '*='}${uniforms ? 'surfaceAlbedo*diffuse' : `surfaceAlbedo*${vec(tint)}*${vec(tint)}`};
-    diffuseColor.a*=${sourceAlpha};
-    ${f.vertexColour === 'albedoMultiply' ? 'diffuseColor.rgb*=vSurfaceColour.rgb;' : ''}`;
+    diffuseColor.a*=${sourceAlpha};`;
   const normalUV = maps.normal ? 'normal' : maps.normalAlt ? 'normalAlt' : 'detail';
   const baseEncoded = maps.normal ? `${sample('normal')}.rg` : 'vec2(0.5)';
   const altEncoded = maps.normalAlt ? `${sample('normalAlt')}.rg` : 'vec2(0.5)';
