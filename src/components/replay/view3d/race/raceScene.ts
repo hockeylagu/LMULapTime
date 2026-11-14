@@ -197,13 +197,6 @@ export async function createRaceScene(
       const sample = (at - samples.fromSec) * samples.hz, index = Math.max(0, Math.min(Math.floor(sample), samples.count - 2));
       const fraction = Math.max(0, Math.min(1, sample - index));
       if (shown) places.push({slot, x: pose[0], z: pose[2]});
-      if (shown && isFollowed) {
-        followedAt = {x: pose[0], z: pose[2]};
-        const placed = renderPose(pose, index, fraction, orientation, euler);
-        followedPoints(samples, carIndex);
-        const stationM = distances[index] + ((distances[index + 1] ?? distances[index]) - distances[index]) * fraction;
-        rig.follow({target: target.set(...nativeToScene(placed, origin)), yaw: placed.yaw ?? 0, timeSec, stationM, index, fraction});
-      }
       field.pose(slot, shown && !isFollowed ? renderPose(pose, index, fraction, orientation, euler) : null, samples, carIndex);
       if (model) {
         model.visible = shown;
@@ -212,6 +205,14 @@ export async function createRaceScene(
           motion?.setTrack(samples, () => ({points: windowPoints(samples, carIndex), handlingCalibration: handlingOf.get(slot)}));
           shell.placeCar(model, renderPose(pose, index, fraction, orientation, euler), motion);
         }
+      }
+      // After its model is placed: the driver cameras sit on the car's body as it is this frame, not as it was the last one.
+      if (shown && isFollowed) {
+        followedAt = {x: pose[0], z: pose[2]};
+        const placed = renderPose(pose, index, fraction, orientation, euler);
+        followedPoints(samples, carIndex);
+        const stationM = distances[index] + ((distances[index + 1] ?? distances[index]) - distances[index]) * fraction;
+        rig.follow({target: target.set(...nativeToScene(placed, origin)), yaw: placed.yaw ?? 0, timeSec, stationM, index, fraction});
       }
       if (!shown || model || (drawn && !isFollowed)) continue;
       renderPose(pose, 0, 0, orientation, euler);
