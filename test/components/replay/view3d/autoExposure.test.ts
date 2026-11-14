@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Color, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
-import { adaptExposure, createAutoExposure, inverseToneCurve, lawExposure, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { adaptExposure, createAutoExposure, inverseToneCurve, lawExposure, meteredLuminance, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
 /** A synthetic camera type (profiles at sun strengths 0 and 60). */
@@ -53,6 +53,17 @@ describe('autoExposure', () => {
     expect(meterUnit(4.4)).toBeCloseTo(unit / 2, 12); // The package's scale, not a constant of the app.
   });
 
+  it('meters the mean of the tone-mapped taps back through the curve: a uniform scene reads its own light, a sun glint barely counts', () => {
+    const curve = {a: 2.658, b: 0.665}, exposure = 0.5, taps = 128 * 72;
+    const reading = (lights: number[]) => {
+      const mean = lights.reduce((sum, light) => sum + toneCurve(curve, light * exposure), 0) / lights.length;
+      return meteredLuminance([mean, mean, mean], curve, exposure);
+    };
+    expect(reading([1.2])).toBeCloseTo(Math.log(1.2), 6);
+    const scene = Array<number>(taps).fill(0.15);
+    const glint = [...scene.slice(1), 6000]; // One tap on glass catching the sun: capped at 1 by the curve.
+    expect(Math.abs(reading(glint) - reading(scene))).toBeLessThan(0.01);
+  });
   it('leaves colours alone at 6500 K and warms them under a bluer profile white', () => {
     const grey = (kelvin: number) => new Vector3(0.5, 0.5, 0.5).applyMatrix3(whiteBalance(kelvin));
     expect(grey(6500).toArray().map(c => Number(c.toFixed(6)))).toEqual([0.5, 0.5, 0.5]);

@@ -15,7 +15,7 @@ const glslFloat = (n: number) => Number.isInteger(n) ? `${n}.0` : String(n);
 const NEUTRAL_KELVIN = 6500;
 /**
  * The exposure law, exposure = U · clamp(T · B^(1 - s) / (U · L)^s, min, max): T the profile's target, B its light/dark border,
- * min and max its limits, s the type's adaptation scale (all from the package), L the mean luminance of the type's metering window
+ * min and max its limits, s the type's adaptation scale (all from the package), L the metered luminance of the type's metering window
  * (everything in it, the cockpit included) and U what one unit of the scene's light measures on the camera's own scale. No constant
  * of the app's: twenty captured reference frames across the three camera types and a 150-fold range of L sit 9 % over this law
  * (9.5 % scatter, 2026-11-09).
@@ -41,8 +41,11 @@ export function inverseToneCurve(curve: SceneryToneCurve, y: number): number {
   return (low + high) / 2;
 }
 
-/** Metering grid: METER_PX² cells of SAMPLES² taps each, read back without stalling the frame. */
-const METER_PX = 16, SAMPLES = 4, METER_EVERY_FRAMES = 4;
+/**
+ * Metering grid: METER_W × METER_H cells of SAMPLES² taps each, 128 × 72 taps over the window as the reference meters, read back
+ * without stalling the frame.
+ */
+const METER_W = 32, METER_H = 18, SAMPLES = 4, METER_EVERY_FRAMES = 4;
 /** The gap (stops) under which exposure counts as settled, and the period the adaptation's sensitivity is a blend fraction of. */
 const SETTLED_STOPS = 0.01, ADAPT_PERIOD_S = 0.15;
 
@@ -170,21 +173,36 @@ function resolveType(profile: SceneryCameraTypeProfile, sun: ProfileSun, weather
   };
 }
 
+/** The metered luminance never reads below this, so a black frame keeps a finite log. */
+const METER_FLOOR = 1e-4;
+/**
+ * The meter, as the reference meters: each tap is exposed and put through the type's tone curve per channel (no white balance), so a
+ * tap counts at most 1 however bright (a sun glint on glass moves the mean by its share of the window); the pass writes each cell's
+ * mean, and meteredLuminance turns the window's mean back into scene light.
+ */
 const METER_SHADER = {
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
-    uniform sampler2D source; uniform vec4 window; varying vec2 vUv;
+    uniform sampler2D source; uniform vec4 window; uniform float exposure; uniform vec2 curve; varying vec2 vUv;
     void main() {
-      vec2 cell = window.zw / ${METER_PX}.0, corner = window.xy + floor(vUv * ${METER_PX}.0) * cell;
-      float sum = 0.0;
-      for (int i = 0; i < ${SAMPLES}; i++) for (int j = 0; j < ${SAMPLES}; j++)
-        sum += max(dot(texture2D(source, corner + (vec2(i, j) + 0.5) / ${SAMPLES}.0 * cell).rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0);
-      gl_FragColor = vec4(sum / ${SAMPLES * SAMPLES}.0, 0.0, 0.0, 1.0);
+      vec2 cell = window.zw / vec2(${METER_W}.0, ${METER_H}.0), corner = window.xy + floor(vUv * vec2(${METER_W}.0, ${METER_H}.0)) * cell;
+      vec3 sum = vec3(0.0);
+      for (int i = 0; i < ${SAMPLES}; i++) for (int j = 0; j < ${SAMPLES}; j++) {
+        vec3 z = exp(-curve.x * max(texture2D(source, corner + (vec2(i, j) + 0.5) / ${SAMPLES}.0 * cell).rgb * exposure, 0.0));
+        sum += clamp((1.0 - z) * (1.0 - curve.y * z) * (1.0 - curve.y * z), 0.0, 1.0);
+      }
+      gl_FragColor = vec4(sum / ${SAMPLES * SAMPLES}.0, 1.0);
     }`,
 };
-/** The metered mean never reads below this, so a black frame keeps a finite log. */
-const METER_FLOOR = 1e-4;
 
+/**
+ * The scene luminance (natural log) a meter reading stands for: each channel's mean displayed value back through the tone curve and
+ * over the exposure the taps were taken at, then weighted to a luminance.
+ */
+export function meteredLuminance(mean: readonly [number, number, number], curve: SceneryToneCurve, exposure: number): number {
+  const [r, g, b] = mean.map(y => inverseToneCurve(curve, y) / exposure);
+  return Math.log(Math.max(METER_FLOOR, 0.2126 * r + 0.7152 * g + 0.0722 * b));
+}
 /**
  * Metered auto-exposure: the frame renders to a half-float target, a small pass averages the luminance of the active camera
  * type's metering window, the GPU reads it back asynchronously every few frames, and the exposure adapts toward the law's value.
@@ -204,7 +222,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   const hdr = new WebGLRenderTarget(1, 1, {
     type: HalfFloatType, samples: 4, depthTexture: new DepthTexture(1, 1, FloatType), resolveDepthBuffer: false,
   });
-  const meter = new WebGLRenderTarget(METER_PX, METER_PX, {type: HalfFloatType, depthBuffer: false});
+  const meter = new WebGLRenderTarget(METER_W, METER_H, {type: HalfFloatType, depthBuffer: false});
   const quad = new PlaneGeometry(2, 2), quadCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const output = new Scene(), meterScene = new Scene();
   output.name = meterScene.name = EXPOSURE_PASS;
@@ -227,10 +245,10 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   });
   const meterMaterial = new ShaderMaterial({
     ...METER_SHADER, depthTest: false, depthWrite: false,
-    uniforms: {source: {value: hdr.texture}, window: {value: active.window}},
+    uniforms: {source: {value: hdr.texture}, window: {value: active.window}, exposure: {value: 1}, curve: {value: new Vector2()}},
   });
   output.add(new Mesh(quad, outputMaterial)); meterScene.add(new Mesh(quad, meterMaterial));
-  const readback = new Uint16Array(METER_PX * METER_PX * 4);
+  const readback = new Uint16Array(METER_W * METER_H * 4);
   let adapted: AdaptedExposure | null = null, metered: number | null = null, reading = false, frames = 0, last = 0, disposed = false, generation = 0;
   /** The law's exposure (stops) for the metered luminance under the active type. */
   const targetOf = (log: number) => Math.log2(lawExposure(active, active.adaptationScale, log, unit));
@@ -239,7 +257,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     active = next;
     const u = outputMaterial.uniforms;
     u.whiteBalance.value = next.balance; (u.curve.value as Vector2).set(next.toneCurve.a, next.toneCurve.b);
-    meterMaterial.uniforms.window.value = next.window;
+    meterMaterial.uniforms.window.value = next.window; (meterMaterial.uniforms.curve.value as Vector2).set(next.toneCurve.a, next.toneCurve.b);
   };
   apply(active);
 
@@ -252,7 +270,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
    * and the data is fetched once the fence has signalled, from a poll on the frame clock (no timers), so the round trip finds the
    * GPU idle and the next frame's commands not yet issued.
    */
-  const read = async () => {
+  const read = async (exposure: number, curve: SceneryToneCurve) => {
     reading = true;
     const started = generation, gl = renderer.getContext() as WebGL2RenderingContext;
     let sync: WebGLSync | null = null;
@@ -265,7 +283,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
         pack = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.bufferData(gl.PIXEL_PACK_BUFFER, readback.byteLength, gl.STREAM_READ);
       }
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
-      gl.readPixels(0, 0, METER_PX, METER_PX, gl.RGBA, gl.HALF_FLOAT, 0);
+      gl.readPixels(0, 0, METER_W, METER_H, gl.RGBA, gl.HALF_FLOAT, 0);
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
       const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
       if (!fence) throw Error('The metering fence could not be created');
@@ -284,9 +302,9 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       // A reading from before a type switch metered the old window.
       if (disposed || started !== generation) return;
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, readback); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-      let sum = 0;
-      for (let i = 0; i < METER_PX * METER_PX; i++) sum += DataUtils.fromHalfFloat(readback[i * 4]);
-      metered = Math.log(Math.max(METER_FLOOR, sum / (METER_PX * METER_PX)));
+      const mean: [number, number, number] = [0, 0, 0], cells = METER_W * METER_H;
+      for (let i = 0; i < cells; i++) for (let c = 0; c < 3; c++) mean[c] += DataUtils.fromHalfFloat(readback[i * 4 + c]) / cells;
+      metered = meteredLuminance(mean, curve, exposure);
       if (adapted === null || Math.abs(targetOf(metered) - adapted.log2) > SETTLED_STOPS) invalidate();
     } finally { reading = false; if (sync) gl.deleteSync(sync); }
   };
@@ -329,8 +347,9 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       renderer.setRenderTarget(null);
       renderer.render(output, quadCamera);
       if (!reading && frames++ % METER_EVERY_FRAMES === 0) {
+        meterMaterial.uniforms.exposure.value = renderer.toneMappingExposure;
         renderer.setRenderTarget(meter); renderer.render(meterScene, quadCamera);
-        read().catch(() => {}); // A lost context or a disposed target ends metering; the last exposure stays.
+        read(renderer.toneMappingExposure, {...active.toneCurve}).catch(() => {}); // A lost context or a disposed target ends metering; the last exposure stays.
         renderer.setRenderTarget(null);
       }
     },
