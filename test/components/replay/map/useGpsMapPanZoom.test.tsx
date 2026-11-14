@@ -15,6 +15,19 @@ describe('useGpsMapPanZoom', () => {
     rerender({ position: { sx: 600, sy: 150 } });
     expect(result.current.currentViewBox).toBe(view);
   });
+  it('shows a new home view while it shows the last, resets to it, and keeps a view the user moved', () => {
+    const { result, rerender } = renderHook(({ home }) => useGpsMapPanZoom({ viewBoxSize: 800, initialZoom: 0.7, initialFollowCar: false, homeView: home }),
+      { initialProps: { home: null as { zoom: number; x: number; y: number } | null } });
+    expect([result.current.zoomLevel, result.current.panOffset]).toEqual([0.7, { x: 0, y: 0 }]);
+    rerender({ home: { zoom: 0.8, x: 120, y: 0 } });
+    expect([result.current.zoomLevel, result.current.panOffset]).toEqual([0.8, { x: 120, y: 0 }]);
+    act(() => result.current.panBy(1, 0));
+    const moved = result.current.panOffset;
+    rerender({ home: { zoom: 0.9, x: 100, y: 10 } });
+    expect(result.current.panOffset).toEqual(moved);
+    act(() => result.current.resetPanZoom());
+    expect([result.current.zoomLevel, result.current.panOffset]).toEqual([0.9, { x: 100, y: 10 }]);
+  });
   it('centers once with C at the same zoom and toggles follow with F from the chart', () => {
     const surface = document.createElement('div'); surface.dataset.replaySurface = 'chart'; document.body.append(surface);
     const { result, rerender } = renderHook(({ position }) => useGpsMapPanZoom({ viewBoxSize: 800, currentPos: position }),

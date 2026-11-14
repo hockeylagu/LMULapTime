@@ -1,8 +1,9 @@
-import React, { useEffect, useEffectEvent, useMemo, useSyncExternalStore } from 'react';
+import React, { useEffect, useEffectEvent, useMemo, useState, useSyncExternalStore } from 'react';
 import type { RaceReplayCar, RaceReplayOverview } from '../../../../shared/types/index.js';
 import { RACE_POSE_CHANNEL_COUNT, racePitSlots, sampleRacePose, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
 import { useTrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';
-import { useGpsMapPanZoom } from '../map/useGpsMapPanZoom.js';
+import { BASE_ZOOM, useGpsMapPanZoom } from '../map/useGpsMapPanZoom.js';
+import { hudClearView, type MapView } from '../map/hudClearView.js';
 import { activeTrackBounds } from '../map/display/mapLayers.js';
 import { useMapLayers } from '../map/display/useMapLayers.js';
 import { GpsMapBackground } from '../map/display/GpsMapBackground.js';
@@ -27,6 +28,15 @@ const VIEWBOX_SIZE = 800;
 const PADDING = 60;
 /** Opens on the whole circuit (the camera zooms 1.5x at zoom 1). */
 const OVERVIEW_ZOOM = 0.7;
+/** Pixels between the circuit's home view and the map's edges or its HUD. */
+const HOME_MARGIN_PX = 24;
+
+/** The HUD over the map's top right: the map controls and the followed car's timing. */
+function hudElements(area: HTMLElement): Element[] {
+  const controls = area.querySelector('[data-map-control="navigation"]');
+  const timing = area.querySelector('[data-testid="race-lap-heading"]')?.closest('aside');
+  return [controls, timing].filter(element => element != null);
+}
 const NO_POINTS: Array<{ sx: number; sy: number }> = [];
 const EMPTY_BOUNDS: Bounds = { minX: 0, minZ: 0, maxX: 0, maxZ: 0, spanX: 0, spanZ: 0 };
 
@@ -96,7 +106,8 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
     pitted.has(position.slot) || isOutAt(index, position.slot, timeSec) ? { ...position, dimmed: true } : position);
   const followed = positions.find(position => position.slot === followSlot);
 
-  const camera = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos: followed, initialZoom: OVERVIEW_ZOOM, initialFollowCar: false });
+  const [homeView, setHomeView] = useState<MapView | null>(null);
+  const camera = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos: followed, initialZoom: OVERVIEW_ZOOM, initialFollowCar: false, homeView });
   useRaceMapKeys(camera, onToggleView);
   const { containerRef, viewportRef, currentViewBox, markerScale, zoomLevel, handlePointerDown, handlePointerMove, handlePointerUp, handleDoubleClick } = camera;
   const svg = useMemo(() => bounds && trackGeometry ? {
@@ -111,6 +122,32 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
   const furniture = useTrackMarkerPlacement({ layers, brakeMarkers: trackGeometry?.brakeMarkers, bounds: bounds ?? EMPTY_BOUNDS,
     viewBoxSize: VIEWBOX_SIZE, padding: PADDING, markerScale, zoomLevel, ribbon, svgPoints: NO_POINTS,
     gateLeftSvg: gates?.gateLeftSvg, gateRightSvg: gates?.gateRightSvg, sectorMarkers });
+  // The home view (first shown, reset, 0/R) frames the whole circuit, its road edges included, clear of the HUD.
+  const trackBox = useMemo(() => {
+    const points = [...svg.left, ...svg.right, ...svg.center];
+    if (!points.length) return null;
+    const xs = points.map(point => point.sx), ys = points.map(point => point.sy);
+    return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+  }, [svg]);
+  const measureHome = useEffectEvent(() => {
+    const area = viewportRef.current;
+    if (!area || !trackBox) return;
+    const rect = area.getBoundingClientRect(), hud = hudElements(area).map(element => element.getBoundingClientRect());
+    const next = hudClearView({ width: rect.width, height: rect.height },
+      { left: Math.min(rect.width, ...hud.map(box => box.left - rect.left)), bottom: Math.max(0, ...hud.map(box => box.bottom - rect.top)) },
+      trackBox, VIEWBOX_SIZE, BASE_ZOOM, HOME_MARGIN_PX);
+    // The same view again keeps the last object: the camera moves only on a new one.
+    setHomeView(last => (next && last && Math.abs(next.zoom - last.zoom) < 1e-3 && Math.abs(next.x - last.x) < 0.05 && Math.abs(next.y - last.y) < 0.05 ? last : next));
+  });
+  useEffect(() => {
+    const area = viewportRef.current;
+    if (!area || !trackBox) return;
+    measureHome();
+    const observer = new ResizeObserver(() => measureHome());
+    observer.observe(area);
+    hudElements(area).forEach(element => observer.observe(element));
+    return () => observer.disconnect();
+  }, [viewportRef, trackBox, followSlot]);
   const unitsPerMeter = bounds ? (VIEWBOX_SIZE - 2 * PADDING) / Math.max(bounds.spanX, bounds.spanZ, 1) : 0;
   // Only a new request moves the map (the camera's setter changes every render).
   const trackFollowed = useEffectEvent(() => camera.setFollowCar(true));

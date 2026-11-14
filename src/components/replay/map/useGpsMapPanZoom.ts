@@ -1,11 +1,17 @@
 import { useState, useRef, useEffect, useEffectEvent, useMemo } from 'react';
 import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import type { MapView } from './hudClearView.js';
 
 export interface UseGpsMapPanZoomOptions {
   viewBoxSize: number;
   currentPos?: { sx: number; sy: number };
   initialZoom?: number;
   initialFollowCar?: boolean;
+  /**
+   * The view a reset returns to, in place of `initialZoom` centred (the race map's circuit clear of its HUD). A new one moves the
+   * map only while it still shows the last.
+   */
+  homeView?: MapView | null;
 }
 
 const MAX_ZOOM = 100;
@@ -40,6 +46,7 @@ export function useGpsMapPanZoom({
   currentPos,
   initialZoom = DEFAULT_ZOOM,
   initialFollowCar = DEFAULT_FOLLOW_CAR,
+  homeView = null,
 }: UseGpsMapPanZoomOptions) {
   const [zoomLevel, setZoomLevel] = useState<number>(initialZoom);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -299,12 +306,25 @@ export function useGpsMapPanZoom({
   };
 
   const resetPanZoom = () => {
-    setZoomLevel(initialZoom);
-    setPanOffset({ x: 0, y: 0 });
+    const home = homeView ?? { zoom: initialZoom, x: 0, y: 0 };
+    zoomLevelRef.current = home.zoom; panOffsetRef.current = { x: home.x, y: home.y };
+    setZoomLevel(home.zoom);
+    setPanOffset({ x: home.x, y: home.y });
     setFollowCar(initialFollowCar);
     followCarRef.current = initialFollowCar;
     autoFollowOnScrubRef.current = true;
   };
+
+  // A new home view (the map resized, its HUD changed) moves a map still showing the last one; one the user moved stays.
+  const shownHome = useRef<MapView>({ zoom: initialZoom, x: 0, y: 0 });
+  useEffect(() => {
+    if (!homeView) return;
+    const last = shownHome.current, pan = panOffsetRef.current;
+    shownHome.current = homeView;
+    if (followCarRef.current || zoomLevelRef.current !== last.zoom || pan.x !== last.x || pan.y !== last.y) return;
+    zoomLevelRef.current = homeView.zoom; panOffsetRef.current = { x: homeView.x, y: homeView.y };
+    setZoomLevel(homeView.zoom); setPanOffset({ x: homeView.x, y: homeView.y });
+  }, [homeView]);
 
   const fitBounds = (bounds: { minX: number; minY: number; maxX: number; maxY: number }) => {
     const extent = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY, 1);
