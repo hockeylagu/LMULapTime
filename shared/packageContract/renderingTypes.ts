@@ -214,6 +214,19 @@ export interface SceneryShading {
   shadows: SceneryShadows;
   /** How the clouds toward the sun dim its light. */
   sunVisibility: ScenerySunVisibility;
+  /** The scene ambient level that switches the night-only emissives and blends dashboards between night and day emission. */
+  ambient: ScenerySceneAmbient;
+}
+
+/**
+ * The scene ambient level (the pipeline's docs/SCENE_PACKAGE.md "Ambient level"), in the engine units of the sun light. Night when
+ * ambient.r < `nightLevel`; day share saturate(ambient.r / `nightLevel`) (the game's shader constant). The ambient is ≈ the sun's green ×
+ * `perSunGreen`: a fit to captured frames, valid for a sun at `fit.minSunElevationDeg` or higher and cloud coverage up to `fit.maxCloudCoverage`.
+ */
+export interface ScenerySceneAmbient {
+  nightLevel: number;
+  perSunGreen: [number, number, number];
+  fit: { minSunElevationDeg: number; maxCloudCoverage: number };
 }
 
 /** The split planes and depth bias of one camera type (docs/SCENE_PACKAGE.md, Shadows). */

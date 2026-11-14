@@ -21,6 +21,11 @@ export interface CarMapRef {
   scale: [number, number];
   srgb?: boolean;
   constant?: number[];
+  /**
+   * The game fills this texture at run time (its material stage is a render target: dashboards, external monitors); `texture` is only the
+   * file's starting content. Absent otherwise. Data only: what to draw instead is the viewer's choice.
+   */
+  renderTarget?: true;
   [key: string]: unknown;
 }
 

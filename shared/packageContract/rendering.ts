@@ -97,7 +97,8 @@ function parseCamera(value: unknown, what: string): void {
 /** The catalog's shading (SceneryShading): positive scales, ordered limits, known LOD modes and non-empty unit-direction kernels. */
 function parseShading(value: unknown, what: string): void {
   const row = record(value, what);
-  exactKeys(row, ['sunGlint', 'smallEdge', 'carPaintReflection', 'convolution', 'sceneryReflection', 'integrationMap', 'shadows', 'sunVisibility'], what);
+  exactKeys(row, ['sunGlint', 'smallEdge', 'carPaintReflection', 'convolution', 'sceneryReflection', 'integrationMap', 'shadows', 'sunVisibility', 'ambient'], what);
+  parseSceneAmbient(row.ambient, `${what}.ambient`);
   numbers(row.sunGlint, ['cosineThreshold', 'roughnessCutoff', 'smoothSpecularScale'], `${what}.sunGlint`, true);
   if ((row.sunGlint as Record<string, number>).cosineThreshold > 1) throw Error(`${what}.sunGlint.cosineThreshold: above 1`);
   numbers(row.smallEdge, ['detectorScale', 'edgeScale', 'limitMin', 'limitMax'], `${what}.smallEdge`, true);
@@ -134,6 +135,19 @@ function parseShading(value: unknown, what: string): void {
   parseIntegrationMap(row.integrationMap, `${what}.integrationMap`);
   parseShadows(row.shadows, `${what}.shadows`);
   parseSunVisibility(row.sunVisibility, `${what}.sunVisibility`);
+}
+
+/** The scene ambient level (ScenerySceneAmbient): a positive night level, three positive per-sun-green shares and the fit's range. */
+function parseSceneAmbient(value: unknown, what: string): void {
+  const row = record(value, what);
+  exactKeys(row, ['nightLevel', 'perSunGreen', 'fit'], what);
+  if (!(finite(row.nightLevel, `${what}.nightLevel`) > 0)) throw Error(`${what}.nightLevel: must be positive`);
+  if (vec3(row.perSunGreen, `${what}.perSunGreen`).some(share => !(share > 0))) throw Error(`${what}.perSunGreen: must be positive`);
+  const fit = record(row.fit, `${what}.fit`);
+  exactKeys(fit, ['minSunElevationDeg', 'maxCloudCoverage'], `${what}.fit`);
+  const elevation = finite(fit.minSunElevationDeg, `${what}.fit.minSunElevationDeg`), coverage = finite(fit.maxCloudCoverage, `${what}.fit.maxCloudCoverage`);
+  if (elevation < -90 || elevation > 90) throw Error(`${what}.fit.minSunElevationDeg: outside -90 to 90`);
+  if (coverage < 0 || coverage > 1) throw Error(`${what}.fit.maxCloudCoverage: outside 0–1`);
 }
 
 /** The cascaded sun shadow (the pipeline's docs/SCENE_PACKAGE.md "Shadows"). */

@@ -57,6 +57,7 @@ export function testShading(): SceneryShading {
       },
     },
     sunVisibility: { occlusion: { bias: 0.01, curve: 'sqrt', dryMax: 1, wetMax: 0.5 }, view: { fovRad: 0.4, near: 1, far: 1000, resolution: 8, refreshFrames: 10, readFrame: 5 }, horizon: { limit: 0, gain: 5 } },
+    ambient: { nightLevel: 2.35, perSunGreen: [0.0565, 0.0712, 0.0859], fit: { minSunElevationDeg: 9.5, maxCloudCoverage: 0.19 } },
   };
 }
 
