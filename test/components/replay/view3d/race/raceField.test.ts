@@ -63,9 +63,9 @@ const windowOf = (count: number): RacePoseWindow => ({
 });
 
 function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | null> = async slot => body(slot), warm: (object: Object3D) => Promise<void> = async () => {}) {
-  const root = new Group(), changed = vi.fn(), report = vi.fn(), cars = makeCars(count), window = windowOf(count);
+  const root = new Group(), changed = vi.fn(), report = vi.fn(), shareReflection = vi.fn(), cars = makeCars(count), window = windowOf(count);
   const shell = {
-    origin: new Vector3(), carTextures: {}, report, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm,
+    origin: new Vector3(), carTextures: {}, report, carTemplates: {hold: vi.fn(), release: vi.fn()}, exposureDisplay: () => ({}), surfaceHeight: () => 0, warm, shareReflection,
     placeCar: (car: Object3D, pose: RenderPose) => { car.position.set(pose.x, pose.y, pose.z); car.updateMatrix(); },
   } as unknown as SceneShell;
   const sets = createCarSets(shell.carTemplates, shell.carTextures, {} as SceneryShading, shell.surfaceHeight);
@@ -82,7 +82,7 @@ function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | nul
     field.load(slots.map(slot => ({slot, metres: slot})));
     await vi.waitFor(() => expect(slots.every(slot => field.has(slot))).toBe(true));
   };
-  return {field, root, changed, camera, place, farCar, nearCar, ready, bodyOfSpy, report, farModel, templates: shell.carTemplates as unknown as {hold: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn>}};
+  return {field, root, changed, camera, place, farCar, nearCar, ready, bodyOfSpy, report, farModel, shareReflection, templates: shell.carTemplates as unknown as {hold: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn>}};
 }
 
 describe('createRaceField', () => {
@@ -124,7 +124,7 @@ describe('createRaceField', () => {
   });
 
   it('builds every full model of a body when its first car turns near, and draws the six nearest in view with theirs', async () => {
-    const {field, camera, place, farCar, nearCar, ready} = setup(8);
+    const {field, camera, place, farCar, nearCar, ready, shareReflection} = setup(8);
     await ready([...Array(8).keys()]);
     for (let slot = 0; slot < 8; slot++) place(slot, -10 - slot * 2);
     field.beforeDraw(camera);
@@ -132,6 +132,8 @@ describe('createRaceField', () => {
     // One build for the body: all eight full models at once.
     expect(models.nearCalls).toBe(8);
     expect(models.nearPeak).toBe(8);
+    // Each reflects the followed car's probe, as the followed car's own materials do.
+    for (let slot = 0; slot < 8; slot++) expect(shareReflection).toHaveBeenCalledWith(nearCar(slot));
     for (let slot = 0; slot < 6; slot++) expect(farCar(slot).visible).toBe(false);
     for (const slot of [6, 7]) {
       expect(nearCar(slot)!.visible).toBe(false);

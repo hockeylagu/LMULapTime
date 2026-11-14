@@ -2,7 +2,7 @@ import { Box3, CubeCamera, HalfFloatType, LinearMipmapLinearFilter, MeshStandard
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { convolveReflection, type ReflectionCubes } from '../reflectionCube.js';
 import { sceneryReflectionUniforms } from '../scenery/materials/sceneryReflection.js';
-import { setPaintReflection } from './carPaint.js';
+import { isCarPaint, setPaintReflection } from './carPaint.js';
 
 /**
  * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. One face a frame, so a probe renews every eight
@@ -33,6 +33,12 @@ export interface CarReflection {
   /** The car that takes the reflection: its materials sample the probe, which is empty until the first one is complete (the scene
    * completes it before the first frame). Hidden while faces render. */
   setCar(car: Object3D, hidden: Object3D): void;
+  /**
+   * Another car near the reflected one: its lit materials other than paint (glass, trim, mirrors) reflect the probe too, in place of
+   * the venue's view from one place of the circuit. Their programs are then the reflected car's: following a car of another body
+   * links nothing new. Its paint and its surface-program parts keep the venue's cube.
+   */
+  share(car: Object3D): void;
   /** The resident scenery changed: render a new probe even if the car has not moved. */
   stale(): void;
   /**
@@ -112,6 +118,14 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       car.updateWorldMatrix(true, true); box.setFromObject(car);
       eyeAbove = EYE_ABOVE_CENTRE_M + (box.isEmpty() ? 0 : box.getCenter(measure).y - car.getWorldPosition(measure).y);
       takeReflection();
+    },
+    share(car) {
+      car.traverse(object => {
+        const material: unknown = (object as Partial<Mesh>).material;
+        for (const entry of Array.isArray(material) ? material as unknown[] : [material]) {
+          if (entry instanceof MeshStandardMaterial && !isCarPaint(entry) && entry.envMap === null) entry.envMap = prefiltered.texture;
+        }
+      });
     },
     stale() { stale = true; },
     update(car) {

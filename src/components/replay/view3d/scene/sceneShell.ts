@@ -81,6 +81,8 @@ export interface SceneShell {
   warm(object: Object3D): Promise<void>;
   /** The reflection probe's car, before the content shows (warm-up draws the first car by its own reflection). */
   reflectCar(car: Object3D): void;
+  /** Another car near the reflected one, before it warms up: it reflects the same probe (`CarReflection.share`). */
+  shareReflection(car: Object3D): void;
   report(change?: Partial<SceneLoadProgress>): void;
   /** The display's tone curve and gamma now: colours baked for the screen follow it. */
   exposureDisplay(): DisplayTransform;
@@ -350,6 +352,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     underView: () => stream.whenUnderView(),
     warm: object => (loading ? warmup.queue(object, new AbortController().signal) : warmup.warm(object, new AbortController().signal)),
     reflectCar: car => reflection.setCar(car, car),
+    shareReflection: car => reflection.share(car),
     report,
     exposureDisplay: () => exposure.display(),
     station: undefined,

@@ -227,6 +227,7 @@ export function createRaceField(
       const contact = tyreContact(set.cars[0].car);
       if (contact !== null) for (const car of of.cars) { car.fit.bottomY = contact; car.fit.window = null; }
       const shared = set.shared;
+      for (const object of [...(shared ? [shared] : []), ...set.cars.map(car => car.car)]) shell.shareReflection(object);
       await Promise.all([...(shared ? [shell.warm(shared)] : []), ...set.cars.map(car => shell.warm(car.car))]);
       if (disposed) { set.dispose(); return; }
       nearSets.push(set);

@@ -35,6 +35,9 @@ const SUN_UNIT_LITERAL = Number.isInteger(SUN_UNIT) ? `${SUN_UNIT}.0` : String(S
 /** Each paint material's uniforms, for the reflection cubes a probe hands it later. */
 const paintUniforms = new WeakMap<Material, Record<string, IUniform>>();
 
+/** Whether a material is car paint, which reads the probe's cubes by its own rule. */
+export const isCarPaint = (material: Material): boolean => paintUniforms.has(material);
+
 /**
  * Gives a car paint material the car's reflection cubes (null: back to three's sky environment until the next probe). False for
  * a material that is not car paint.

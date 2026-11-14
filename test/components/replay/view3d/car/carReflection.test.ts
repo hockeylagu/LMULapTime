@@ -105,6 +105,19 @@ it('renders the probe one face a frame from the roof without the cars, then give
   sceneryReflectionUniforms.surface_reflection.value = null;
 });
 
+it('gives a near car the probe for its glass and trim, its paint and surface parts keeping the venue', () => {
+  const {renderer} = stubRenderer();
+  const reflection = createCarReflection(renderer, new Scene(), testShading());
+  const own = new MeshPhysicalMaterial(), nearGlass = new MeshPhysicalMaterial(), nearPaint = new MeshPhysicalMaterial({map: new Texture()}), unlit = new MeshBasicMaterial();
+  configureCarPaint(nearPaint, carPaint(), () => new Texture(), testShading());
+  reflection.setCar(new Mesh(new BoxGeometry(), own), new Group());
+  reflection.share(new Group().add(new Mesh(new BoxGeometry(), [nearGlass, nearPaint, unlit])));
+  // The followed car's prefiltered probe: the same program as the followed car's glass.
+  expect(nearGlass.envMap).toBe(own.envMap); expect(nearGlass.envMap).not.toBeNull();
+  expect(nearPaint.envMap).toBeNull(); expect(unlit.envMap).toBeNull();
+  reflection.dispose();
+});
+
 const region = {
   baseCoatRoughness: 0.3, baseCoatSpecStrength: 0.5, baseCoatRefractiveIndex: 2.25, clearCoatSpecStrength: 1, clearCoatRoughness: 0,
   clearCoatRefractiveIndex: 1.44, lacquerColour: [1, 1, 1, 1], metallicPaintStrength: 0.8, metallicFlakeStrength: 0, carbonFibreStrength: 0.6, orangePeelStrength: 1,
