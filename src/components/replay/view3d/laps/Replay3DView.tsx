@@ -18,7 +18,7 @@ import {
   type MapColorMode,
 } from '../../map/replayMapUtils.js';
 import { useReplayScene } from './useReplayScene.js';
-import { Scene3DFrame } from '../scene/Scene3DFrame.js';
+import { NARROW_SCENE_MINIMAP, Scene3DFrame } from '../scene/Scene3DFrame.js';
 import { carLockedCamera, followsCar, type CameraMode } from '../camera/cameraModes.js';
 import { useGpsMapShortcuts } from '../../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
@@ -141,7 +141,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
       )}>
       <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_24px_rgba(6,9,16,0.35)]" />
       <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
-        className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
+        className={`rounded-xl border border-lmu-border bg-lmu-strip/70 p-2 ${NARROW_SCENE_MINIMAP}`} />
     </Scene3DFrame>
   );
 }

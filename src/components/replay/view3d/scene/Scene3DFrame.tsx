@@ -3,6 +3,12 @@ import { MapViewSwitchButton } from '../../map/display/MapViewSwitchButton.js';
 import { MapControlsOverlay } from '../../map/MapControlsOverlay.js';
 import { CameraModeControl, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
 import { Replay3DLoading, Replay3DStreaming } from './Replay3DLoading.js';
+
+/**
+ * The minimap's place in a narrow scene (a container query on the scene area): under the camera controls, which would cover it
+ * there (their bar spans about 370 px from the right, the minimap about 190 px from the left).
+ */
+export const NARROW_SCENE_MINIMAP = '@max-[600px]:top-[58px]';
 import type { SceneHostState } from './useSceneHost.js';
 
 /** The camera moves the frame's buttons make on a scene (lap and race scenes both have them). */
@@ -61,7 +67,7 @@ export function Scene3DFrame({
     <div ref={surface} data-replay-surface="map" data-replay-view="3d" data-map-expanded={expanded ? '' : undefined} tabIndex={0} aria-label={ariaLabel}
       className={`relative flex flex-col overflow-hidden bg-lmu-deep outline-none ${className}`}>
       {top}
-      <div className="relative flex-1 min-h-0 overflow-hidden">
+      <div className="@container relative flex-1 min-h-0 overflow-hidden">
         <div ref={host} tabIndex={0} onPointerDown={event => event.currentTarget.focus({preventScroll: true})}
           aria-label={hostLabel} className="relative w-full h-full outline-none" />
         {children}
