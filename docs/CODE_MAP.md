@@ -326,7 +326,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   `scene/sceneShell.ts` is the 3D view without its content: renderer, scenery stream, ground, batches, sky and environment, auto
   exposure, the car reflection, cameras, warm-up, the draw loop and resize/hidden handling; content plugs in as a `SceneContent`
   (root, the car the reflection probe renders, a per-frame hook, re-drape, dispose); each frame updates only the shown, unfrozen
-  nodes' matrices (`scene/shownMatrices.ts`); `scene/dayLight.ts` holds the scene's day share, by which screens glow between their night and day strengths and night-only glows light. One shell serves both views on a circuit:
+  nodes' matrices (`scene/shownMatrices.ts`); `scene/dayLight.ts` holds the scene's day share (`dayShare`: the package's `shading.ambient` level from the sun's green, set by `sceneEnvironment.ts` with the sun), by which screens glow between their night and day strengths and night-only glows light. One shell serves both views on a circuit:
   `scene/sceneShells.ts` keeps it per layout, geometry and package revision (`acquire`; a broken shell is replaced, one whose first
   view failed before it started is dropped), the replay inspector page providing it (`SceneShellsContext`); a view attaches its
   element (`attach`: only the canvas and its resize observer move), starts the shell or shows its content in place of the last

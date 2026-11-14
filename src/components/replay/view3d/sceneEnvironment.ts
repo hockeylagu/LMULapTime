@@ -1,4 +1,5 @@
 import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, LinearMipmapLinearFilter, MathUtils, Mesh, MeshBasicMaterial, NoToneMapping, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
+import { dayShare, sceneDayLight } from './scene/dayLight.js';
 import { nativeToScene } from './scene/sceneFrame.js';
 import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
 import { holdCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
@@ -201,6 +202,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     // Ground radiance is a lambertian ground of GROUND_ALBEDO under the sun: albedo · sun · sin(elevation) / π.
     reflectedGround.material.color.copy(sunRgb).multiplyScalar(GROUND_ALBEDO * Math.max(0, toSun.y) / Math.PI);
     sun.color.copy(sunRgb); sun.position.copy(toSun);
+    sceneDayLight.value = dayShare(venue.shading.ambient, radiance.g);
     crownSun.value.copy(toSun); // Foliage cards tilt their lighting normal up less as they come to face the sun.
     if (lit) cascades.pass.setLight(toSun.clone().negate());
     // The clouds are lit by the sun before they dim it. The first environment and the venue capture are taken without them.
