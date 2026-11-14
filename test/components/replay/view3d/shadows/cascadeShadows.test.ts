@@ -1,6 +1,6 @@
 import { BoxGeometry, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Scene, Vector3, Vector4, type Box2, type DepthTexture, type Texture, type Vector2, type WebGLRenderer, type WebGLRenderTarget } from 'three';
 import { describe, expect, it } from 'vitest';
-import { createCascadeShadows, placeCascadeCamera } from '../../../../../src/components/replay/view3d/shadows/cascadeShadows.js';
+import { cascadeDepthRangeM, createCascadeShadows, placeCascadeCamera } from '../../../../../src/components/replay/view3d/shadows/cascadeShadows.js';
 import { shadowCascadeLayout, sunSquareAxes } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 
@@ -118,6 +118,28 @@ describe('cascade shadows', () => {
     expect(cascades.state.matrices[2].equals(before[2])).toBe(true);
     // The samplers' packed copy follows each redraw.
     expect(Array.from(cascades.state.packedMatrices.slice(0, 16))).toEqual(cascades.state.matrices[0].elements.map(Math.fround));
+  });
+
+  it('deepens a cascade under a low sun by 1 / sin(height), to a floor near sunset', () => {
+    const sun = (degrees: number) => new Vector3(Math.cos(degrees * Math.PI / 180), -Math.sin(degrees * Math.PI / 180), 0);
+    expect(cascadeDepthRangeM(40, sun(90))).toBeCloseTo(800, 6); // 400 m each way at least.
+    expect(cascadeDepthRangeM(1000, sun(90))).toBeCloseTo(2000, 6);
+    expect(cascadeDepthRangeM(1000, sun(30))).toBeCloseTo(4000, 6);
+    expect(cascadeDepthRangeM(1000, sun(1))).toBeCloseTo(40000, 6);
+    // A caster 50 m up shades the ground 235 m away under a 12 degree sun: the near cascade's range reaches back past it.
+    const camera = new OrthographicCamera(), low = sun(12);
+    placeCascadeCamera(camera, sunSquareAxes(low), low, [0, 0], 0, 22);
+    const toDepth = (point: Vector3) => point.clone().applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix).z * 0.5 + 0.5;
+    const ground = new Vector3(0, 0, 0), roof = new Vector3(-50 / Math.tan(12 * Math.PI / 180), 50, 0);
+    expect(toDepth(roof)).toBeGreaterThan(0); expect(toDepth(roof)).toBeLessThan(toDepth(ground));
+  });
+
+  it('lets a camera-facing card skip 1 m of its own depth, or 14 texels of a coarse cascade, over its depth range', () => {
+    const {cascades, view} = setUp();
+    cascades.update(view, []);
+    // The test cascades have 0.6875, 2.75 and 7.5625 m texels: 14 of them pass 1 m from the second on.
+    layout.cascades.forEach((cascade, i) => expect(cascades.state.cardDepth[i])
+      .toBeCloseTo(Math.fround(Math.max(1, 14 * cascade.texelM) / cascadeDepthRangeM(cascade.sideM, light)), 9));
   });
 
   it('maps a point at a cascade centre to the middle of its tile', () => {

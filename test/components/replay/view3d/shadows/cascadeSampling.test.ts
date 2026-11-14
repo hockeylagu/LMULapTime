@@ -2,7 +2,6 @@ import { DepthTexture, Matrix4, ShaderLib, Vector4 } from 'three';
 import { afterEach, describe, expect, it } from 'vitest';
 import { patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { readSurfaceConfig, type SurfaceConfig } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
-import { cascadeDepthRangeM } from '../../../../../src/components/replay/view3d/shadows/cascadeShadows.js';
 import { cascadeShadowUniforms, holdCascadeShadows, patchCascadeShadow, sampleCascadeShadows } from '../../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { shadowCascadeLayout } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
@@ -15,6 +14,7 @@ const state = () => ({
   atlas: new DepthTexture(64, 128),
   matrices: layout.cascades.map(() => new Matrix4()),
   packedMatrices: new Float32Array(layout.cascades.length * 16),
+  cardDepth: new Float32Array(layout.cascades.length),
   tiles: layout.cascades.map((_, i) => new Vector4(i, 0, 0, 0.5)),
 });
 
@@ -39,6 +39,7 @@ describe('cascade shadow sampling', () => {
     expect(u.surface_cascadeAtlas.value).toBe(set.atlas);
     // The same packed matrices the atlas pass rewrites each frame; the tiles packed in order.
     expect(u.surface_cascadeMatrices.value).toBe(set.packedMatrices);
+    expect(u.surface_cascadeCardDepth.value).toBe(set.cardDepth);
     expect(Array.from(u.surface_cascadeTiles.value.slice(0, 12))).toEqual(set.tiles.flatMap(tile => tile.toArray()));
     expect(u.surface_cascadeTapCount.value).toBe(2);
     expect(Array.from(u.surface_cascadeTaps.value.slice(0, 6))).toEqual([-0.5, 0.5, 2, 0.5, -0.5, 2]);
@@ -47,13 +48,6 @@ describe('cascade shadow sampling', () => {
     expect(u.surface_cascadeFilter.value.toArray()).toEqual([0.25, shadows.select.halfExtent]);
     expect(u.surface_cascadeFade.value.toArray()).toEqual([layout.fadeStartM, layout.farM]);
     expect(u.surface_cascadeNormalOffset.value).toBe(0.05);
-  });
-
-  it('lets a camera-facing card skip 1 m of its own depth, or 14 texels of a coarse cascade', () => {
-    sampleCascadeShadows(shadows, layout, state());
-    // The test cascades have 0.6875, 2.75 and 7.5625 m texels: 14 of them pass 1 m from the second on.
-    layout.cascades.forEach((cascade, i) => expect(cascadeShadowUniforms.surface_cascadeCardDepth.value[i])
-      .toBeCloseTo(Math.fround(Math.max(1, 14 * cascade.texelM) / cascadeDepthRangeM(cascade.sideM)), 12));
   });
 
   it('throws for more cascades than the surfaces sample, and holds the surfaces lit on a given atlas', () => {

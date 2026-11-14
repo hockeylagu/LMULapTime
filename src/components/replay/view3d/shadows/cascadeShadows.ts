@@ -17,8 +17,16 @@ const LIVE_CASCADE_SPLIT_M = 100;
 const CACHED_REDRAW_SIDE_FRACTION = 1 / 8;
 /** A cached cascade leaves out casters under this many of its texels across (they would draw to under ~3 texels). */
 const CACHED_MIN_CASTER_TEXELS = 3;
-/** The light camera sits this far back along the light from a cascade's slice midpoint, at least (twice that is its depth range). */
+/** The light camera sits this far back along the light from a cascade's slice midpoint, at least, over the sun's height (twice that is its depth range). */
 const MIN_LIGHT_DISTANCE_M = 400;
+/** The sine of the sun's height the depth range stops growing at (about 3 degrees): near sunset it would grow without bound. */
+const MIN_SUN_SINE = 0.05;
+/**
+ * Depth past a camera-facing card's own plane its cascade lookup skips: 1 m, or this many of the cascade's texels when that is more
+ * (a card and its shadow lie in one plane, so at a grazing sun a card shadows itself whole).
+ */
+const CARD_SELF_SHADOW_M = 1;
+const CARD_SELF_SHADOW_TEXELS = 14;
 
 /** What the shadow samplers read, per cascade i: `matrices[i]` maps a world position to its tile (u, v in 0..1, depth in 0..1). */
 export interface CascadeShadowState {
@@ -30,6 +38,8 @@ export interface CascadeShadowState {
   matrices: Matrix4[];
   /** `matrices` packed in order, as the samplers read them: a typed array is uploaded as is, an array of matrices is copied per draw. */
   packedMatrices: Float32Array<ArrayBuffer>;
+  /** Per cascade: the depth a camera-facing card skips past its own plane, as a fraction of the cascade's depth range. */
+  cardDepth: Float32Array<ArrayBuffer>;
   /** Per cascade: where its tile starts (u, v) and its size (u, v), as fractions of the stacked texture. */
   tiles: Vector4[];
 }
@@ -46,9 +56,14 @@ export interface CascadeShadows {
   dispose(): void;
 }
 
-/** The depth range of a cascade's light camera, metres: it sits half of it back along the light from the slice midpoint. */
-export function cascadeDepthRangeM(sideM: number): number {
-  return 2 * Math.max(MIN_LIGHT_DISTANCE_M, sideM);
+/**
+ * The depth range of a cascade's light camera, metres: it sits half of it back along the light from the slice midpoint. Under a low
+ * sun the ground a square covers stretches toward and away from the sun by 1 / sin(height), and the casters that shade it stand
+ * that much farther up the light: the range grows by the same factor, or the ends of the square lose their shadows, and which ends
+ * depends on where the square was last drawn.
+ */
+export function cascadeDepthRangeM(sideM: number, lightTravel: Vector3): number {
+  return 2 * Math.max(MIN_LIGHT_DISTANCE_M, sideM) / Math.max(MIN_SUN_SINE, -lightTravel.y);
 }
 
 const BIAS = new Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
@@ -56,7 +71,7 @@ const BIAS = new Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0
 /** The light camera of one cascade: an orthographic square of `sideM` on the sun's axes around `centre`, looking along the light. */
 export function placeCascadeCamera(camera: OrthographicCamera, axes: SunSquareAxes, lightTravel: Vector3, centre: readonly [number, number],
   alongLightM: number, sideM: number): void {
-  const half = sideM / 2, depthM = cascadeDepthRangeM(sideM), distance = depthM / 2;
+  const half = sideM / 2, depthM = cascadeDepthRangeM(sideM, lightTravel), distance = depthM / 2;
   Object.assign(camera, {left: -half, right: half, top: half, bottom: -half, near: 0, far: depthM});
   camera.updateProjectionMatrix();
   // Camera x = u, y = v, z = −L (it looks along +L): u × v = −L, a right-handed frame.
@@ -104,6 +119,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
     atlas: depth,
     matrices: cascades.map(() => new Matrix4()),
     packedMatrices: new Float32Array(cascades.length * 16),
+    cardDepth: new Float32Array(cascades.length),
     tiles: cascades.map(({viewport: {x, y}}) => new Vector4(x / sizePx, y / heightPx, tilePx / sizePx, tilePx / heightPx)),
   };
   const casters = createShadowCasterPass(renderer, scene), light = lightTravel.clone(), eye = new Vector3(), forward = new Vector3();
@@ -116,6 +132,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       const alongLightM = eye.clone().addScaledVector(forward, (sliceStartM(i) + cascade.splitM) / 2).dot(light);
       placeCascadeCamera(camera, axes, light, centres[i], alongLightM, cascade.sideM);
       state.matrices[i].multiplyMatrices(BIAS, camera.projectionMatrix).multiply(camera.matrixWorldInverse).toArray(state.packedMatrices, i * 16);
+      state.cardDepth[i] = Math.max(CARD_SELF_SHADOW_M, CARD_SELF_SHADOW_TEXELS * cascade.texelM) / cascadeDepthRangeM(cascade.sideM, light);
       cascades[i].drawnCentre = centres[i];
     }
   };

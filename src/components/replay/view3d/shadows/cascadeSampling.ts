@@ -1,18 +1,11 @@
 import { ShaderChunk, Vector2, type DepthTexture, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
 import type { SceneryShadows } from '../../../../../shared/types/scenes/scenery.js';
-import { cascadeDepthRangeM, type CascadeShadowState } from './cascadeShadows.js';
+import type { CascadeShadowState } from './cascadeShadows.js';
 import type { ShadowCascadeLayout } from './shadowCascades.js';
 
 /** What the surface shaders are compiled for: a package with more cascades or filter taps throws. */
 const MAX_SHADOW_CASCADES = 8;
 const MAX_SHADOW_TAPS = 16;
-
-/**
- * Depth past a camera-facing card's own plane its cascade lookup skips: 1 m, or this many of the cascade's texels when that is more
- * (a card and its shadow lie in one plane, so at a grazing sun a card shadows itself whole).
- */
-const CARD_SELF_SHADOW_M = 1;
-const CARD_SELF_SHADOW_TEXELS = 14;
 
 /**
  * The sun shadow inputs every lit program shares (scenery and cars); `surface_cascadeCount` 0 leaves everything lit. The atlas
@@ -48,11 +41,8 @@ export function sampleCascadeShadows(shadows: SceneryShadows, layout: ShadowCasc
   const u = cascadeShadowUniforms;
   u.surface_cascadeAtlas.value = state.atlas;
   u.surface_cascadeMatrices.value = state.packedMatrices;
-  cascades.forEach((cascade, i) => {
-    state.tiles[i].toArray(u.surface_cascadeTiles.value, i * 4);
-    const skipM = Math.max(CARD_SELF_SHADOW_M, CARD_SELF_SHADOW_TEXELS * cascade.texelM);
-    u.surface_cascadeCardDepth.value[i] = skipM / cascadeDepthRangeM(cascade.sideM);
-  });
+  u.surface_cascadeCardDepth.value = state.cardDepth;
+  cascades.forEach((_, i) => state.tiles[i].toArray(u.surface_cascadeTiles.value, i * 4));
   taps.forEach(({ offset, weight }, i) => u.surface_cascadeTaps.value.set([offset[0], offset[1], weight], i * 3));
   u.surface_cascadeTapCount.value = taps.length;
   // The atlases are stacked upward (cascadeShadows.ts): a texel up is 1 / count of one across.
