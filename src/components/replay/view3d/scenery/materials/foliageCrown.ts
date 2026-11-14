@@ -13,9 +13,12 @@ export const crownSun: IUniform<Vector3> = { value: new Vector3(0, 1, 0) };
 /** The uniform name a card's vertex program reads the sun direction from. */
 export const CROWN_SUN_UNIFORM = 'surface_crownSun';
 
-/** GLSL for `beginnormal_vertex`: the crown normal of a card facing `eye`, as a local normal (transpose(M) * world normal). */
+/**
+ * GLSL for `beginnormal_vertex`: the crown normal of a card facing `eye`, as a local normal (transpose(M) * world normal). Uses the
+ * card's `cardToEye` (patchSurfaceShader.ts).
+ */
 export function crownNormalGlsl(eye: string): string {
-  return `{ vec3 toEye = ${eye} - (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz; toEye.y = 0.0;
+  return `{ vec3 toEye = cardToEye(${eye}, (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz);
       if (length(toEye) > 0.0001) {
         vec3 facing = normalize(toEye), across = normalize(cross(vec3(0.0,1.0,0.0), toEye));
         float side = clamp(2.0 * clamp(_lmu_corner.x, 0.0, 1.0) - 1.0, -1.0, 1.0);

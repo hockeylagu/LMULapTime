@@ -5,7 +5,7 @@ import { patchAmbientLookup } from './ambientLookup.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
 import { glslNumber, list, surfaceAlphaCut, value } from './shaderContext.js';
 import { REFLECTING_KINDS, SCENERY_REFLECTION_GLSL, SCENERY_REFLECTION_INPUTS, sceneryReflectionUniforms } from './sceneryReflection.js';
-import { shadowEye } from './shadowEye.js';
+import { cardFacing, shadowEye } from './shadowEye.js';
 import { shaderParts } from './shaderParts.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
@@ -15,16 +15,22 @@ const hasTranslucency = (config: SurfaceConfig) => !!config.flags.translucency;
  * Turns a camera-facing card about its pivot toward `eye` (a world position in GLSL), and its normal with it: the authored normal
  * belongs to the rest plane and, kept, left whole crowds facing away from the sun. transpose(M) * d is the local normal whose world
  * normal is d. The shadow pass turns cards toward the viewing camera too (`billboardShadowMaterial`), so a card shades what is seen.
+ * Under the overhead camera every card turns the camera's own way instead (`cardFacing`).
  */
 function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms, eye: string, crown = false): void {
+  shader.uniforms.surface_cardFacing = cardFacing;
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
     attribute vec3 _lmu_pivot;
     attribute vec2 _lmu_corner;
+    uniform vec4 surface_cardFacing;
     ${crown ? `uniform vec3 ${CROWN_SUN_UNIFORM};` : ''}
+    vec3 cardToEye(vec3 eye, vec3 pivotWorld) {
+      vec3 toEye = surface_cardFacing.w > 0.5 ? surface_cardFacing.xyz : eye - pivotWorld;
+      return vec3(toEye.x, 0.0, toEye.z);
+    }
   `).replace('#include <begin_vertex>', `
     vec3 pivotWorld = (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz;
-    vec3 directionToCamera = ${eye} - pivotWorld;
-    directionToCamera.y = 0.0;
+    vec3 directionToCamera = cardToEye(${eye}, pivotWorld);
     bool facingCamera = length(directionToCamera) > 0.0001;
     vec3 rightWorld = facingCamera ? normalize(cross(vec3(0.0,1.0,0.0), directionToCamera)) : vec3(1.0,0.0,0.0);
     vec3 rightLocal = normalize(rightWorld * mat3(modelMatrix));
@@ -33,7 +39,7 @@ function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms, eye: s
   `);
   if (shader.vertexShader.includes('#include <beginnormal_vertex>')) shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
     #include <beginnormal_vertex>
-    { vec3 toEye = ${eye} - (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz; toEye.y = 0.0;
+    { vec3 toEye = cardToEye(${eye}, (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz);
       if (length(toEye) > 0.0001) objectNormal = normalize(normalize(toEye) * mat3(modelMatrix));
       #ifdef USE_TANGENT
         objectTangent = normalize(normalize(cross(vec3(0.0,1.0,0.0), toEye)) * mat3(modelMatrix));

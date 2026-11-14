@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { BufferGeometry, DoubleSide, Matrix4, Mesh, MeshStandardMaterial, PerspectiveCamera, Texture, Vector2, Vector3 } from 'three';
+import { BufferGeometry, DoubleSide, Matrix4, Mesh, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Texture, Vector2, Vector3 } from 'three';
 import { configureSurfaceMaterial, createSharedSurfaceMaterials } from '../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
 import { prepareSceneryMesh } from '../../../../../src/components/replay/view3d/scenery/chunkLoader.js';
 import { crownSun } from '../../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
-import { trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
+import { cardFacing, trackCardFacing, trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { ASSUMED_RUBBER } from '../../../../../src/components/replay/view3d/scenery/materials/roadSurface.js';
 import { surfaceAlphaCut } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
@@ -240,9 +240,24 @@ describe('patchSurfaceShader', () => {
     expect(billboardShadowMaterial()).toBe(material);
     const shader = { uniforms: {}, vertexShader: depthVertex, fragmentShader: '' } as unknown as Parameters<typeof patchSurfaceShader>[0];
     material.onBeforeCompile(shader, undefined as never);
-    expect(shader.vertexShader).toContain('vec3 directionToCamera = surface_shadowEye - pivotWorld;');
+    expect(shader.vertexShader).toContain('vec3 directionToCamera = cardToEye(surface_shadowEye, pivotWorld);');
     trackShadowEye(Object.assign(new PerspectiveCamera(), { matrixWorld: new Matrix4().makeTranslation(3, 4, 5) }));
     expect((shader.uniforms as Record<string, { value: Vector3 }>).surface_shadowEye.value.toArray()).toEqual([3, 4, 5]);
+    expect((shader.uniforms as Record<string, unknown>).surface_cardFacing).toBe(cardFacing);
+  });
+  it('turns every card the overhead camera\'s own way, so none turns as it moves, and each toward the eye under a perspective camera', () => {
+    const tree = patched({ ...surface('vegetation', { maps: { albedo: map('A', true) } }), billboard: true });
+    expect(tree.vertexShader).toContain('vec3 toEye = surface_cardFacing.w > 0.5 ? surface_cardFacing.xyz : eye - pivotWorld;');
+    expect(tree.uniforms.surface_cardFacing).toBe(cardFacing);
+    // Straight down, the screen's top towards -z: the cards face +z (the screen's bottom), wherever the camera is.
+    const overhead = new OrthographicCamera();
+    for (const x of [0, 250]) {
+      overhead.position.set(x, 180, 0.01); overhead.lookAt(x, 0, 0);
+      trackCardFacing(overhead);
+      expect(cardFacing.value.toArray().map(value => Math.round(value * 1e6) / 1e6)).toEqual([0, 0, 1, 1]);
+    }
+    trackCardFacing(new PerspectiveCamera());
+    expect(cardFacing.value.w).toBe(0);
   });
   it('declares only the extra UV attributes its maps need', () => {
     expect(patched(surface('standard', { maps: { albedo: map('A', true, 'uv1') } })).vertexShader).toContain('attribute vec2 uv1;');

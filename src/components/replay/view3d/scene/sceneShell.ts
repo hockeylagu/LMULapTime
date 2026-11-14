@@ -22,6 +22,7 @@ import type { StreamView } from '../scenery/residency.js';
 import { createSceneryStream } from '../scenery/sceneryStream.js';
 import { createSceneWarmup } from '../scenery/sceneWarmup.js';
 import { releaseOnUpload, startStreaming } from '../scenery/materials/mipStreaming.js';
+import { trackCardFacing } from '../scenery/materials/shadowEye.js';
 import { isDriverCamera } from '../camera/driverCameras.js';
 import { isFreeCameraMode, viewMoved } from '../scenery/streamView.js';
 import { placeCarFrame } from '../cars/carParts.js';
@@ -275,6 +276,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     try {
       content.beforeDraw(camera);
       scene.updateMatrixWorld();
+      trackCardFacing(camera);
       // Cached shadow cascades still due ask for the next frame.
       if (environment.update()) invalidate();
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
