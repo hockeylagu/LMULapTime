@@ -14,10 +14,10 @@ export interface SceneryBatches {
   /** Shows each chunk's instances while its root is in the scene and visible. */
   sync(): void;
   /**
-   * Draws each instance only within its node's distance range from `eye` (world space): the package's `lmuLod` {inM, outM}, the
-   * game's own draw distance, measured to the nearest point of the instance's box. Checked again once the eye has moved
-   * `CULL_STEP_M`; a batch with no instance in range leaves the scene, so it costs no draw. A null eye draws every instance: the
-   * views whose draw distances the game scales (its TV cameras zoom) and the free views.
+   * Draws each instance only within its node's distance range from `eye` (world space): the package's `lmuLod` {inM, outM},
+   * measured to the nearest point of the instance's box. Checked again once the eye has moved `CULL_STEP_M`; a batch with no
+   * instance in range leaves the scene, so it costs no draw. A null eye draws every instance: the zoomed trackside views, whose
+   * distance scale the package does not carry, and the free views.
    */
   cull(eye: Vector3 | null): void;
   dispose(): void;
@@ -66,7 +66,7 @@ function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, maxTexture
  * chunk. The package names each material by its content (`lmuMaterial`, kept on the mesh by the chunk loader) and gives its totals
  * over the layout, so a batch is sized once and its buffers never grow; a material split by shadow flags reserves its totals in each part.
  * `maxTextures` is the renderer's `capabilities.maxTextures`. Instances are neither frustum culled nor sorted one by one: that per-pass
- * work cost more than the draws it saved. They are culled by distance once per step of the eye (`cull`), the game's own draw distances.
+ * work cost more than the draws it saved. They are culled by distance once per step of the eye (`cull`), within the package's per-node draw distances.
  */
 export function createSceneryBatches(parent: Object3D, materials: readonly SceneryMaterialTotals[], maxTextures: number): SceneryBatches {
   const totals = new Map(materials.map(row => [row.key, row]));

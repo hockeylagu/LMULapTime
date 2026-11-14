@@ -257,7 +257,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     if (disposed || !content) return;
     if (frameTime !== undefined) frameHook?.(frameTime);
     updateStream();
-    // The game scales its draw distances for its TV cameras by a factor the package does not carry yet: trackside and free views
+    // Zoomed trackside views need the draw distances scaled by a factor the package does not carry yet: trackside and free views
     // draw everything resident.
     batches.cull(followsCar(rig.mode) ? rig.camera.position : null);
     if (texturesChanged()) report(); // Textures sharpen a band per frame, each frame asking for the next.
