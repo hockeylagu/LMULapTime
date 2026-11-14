@@ -39,6 +39,8 @@ export interface SceneContent {
   readonly reflected: Object3D;
   /** Runs each frame before the draw, with its camera. */
   beforeDraw(camera: PerspectiveCamera | OrthographicCamera): void;
+  /** Where the cars that cast the sun's shadow are this frame (world), after `beforeDraw`: the far cascades holding one draw the cars. */
+  casters(): readonly Vector3[];
   /** The resident road changed: drape what lies on it again. */
   refreshHeights(): void;
   dispose(): void;
@@ -288,7 +290,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);
       // Cached shadow cascades still due ask for the next frame.
-      if (environment.update()) invalidate();
+      if (environment.update(content.casters())) invalidate();
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
       const car = content.reflected;
       if (!probed && car.visible) {

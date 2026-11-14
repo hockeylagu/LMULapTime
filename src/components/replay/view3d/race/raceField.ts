@@ -76,6 +76,8 @@ export interface RaceField {
   load(distances: ReadonlyArray<{slot: number; metres: number}>): void;
   /** Places the cars in view for the frame: the nearest few with their full model, wheels and lamps, the others with their far model. */
   beforeDraw(camera: PerspectiveCamera | OrthographicCamera): void;
+  /** Where the cars the last `beforeDraw` drew with their full model are (world): a far model casts no shadow. */
+  casters(): readonly Vector3[];
   refreshHeights(): void;
   dispose(): void;
 }
@@ -245,6 +247,8 @@ export function createRaceField(
   const hide = (shape: {car: Group; parts: CarParts} | null) => { if (shape?.car.visible) { shape.car.visible = false; shape.parts.hide(); } };
   /** The cars in view this frame, nearest first. */
   const inView: Array<{car: FieldCar; metres: number}> = [];
+  /** The full models drawn this frame, and their places (`casters`), reused. */
+  const casting: Object3D[] = [], castingAt: Vector3[] = [];
   return {
     has: slot => typeof field.get(slot) === 'object' && field.get(slot) !== null,
     pose(slot, pose, window, carIndex) {
@@ -275,7 +279,7 @@ export function createRaceField(
       }
       inView.sort((a, b) => a.metres - b.metres);
       let near = 0;
-      glowing.length = 0;
+      glowing.length = 0; casting.length = 0;
       blobs.begin();
       for (const {car, metres} of inView) {
         const reach = car.body.resource.far.fromM * (car.tier === 'near' ? 1 : NEAR_ENTER);
@@ -291,6 +295,7 @@ export function createRaceField(
         motion?.setTrack(window, () => ({points: windowPoints(window, carIndex), handlingCalibration: handlingOf.get(slot)}));
         if (shown === car.far && car.fit.window !== window) fitFar(car);
         shell.placeCar(shown.car, car.pose!, motion);
+        if (shown === car.near) casting.push(shown.car);
         setCameraDistance(shown.car, metres);
         shown.parts.sync();
         if (shown === car.far && metres < FAR_GLOW_M && glowing.length < FAR_GLOW_MAX) glowing.push(glowOf(car));
@@ -301,6 +306,7 @@ export function createRaceField(
       glows.draw(glowing);
       for (const body of fieldBodies) if (body.held && !body.cars.some(car => car.tier === 'near')) { shell.carTemplates.release(body.cars[0].body); body.held = false; }
     },
+    casters: () => casting.map((car, i) => car.getWorldPosition(castingAt[i] ??= new Vector3())),
     refreshHeights() {
       for (const car of field.values()) if (car && car !== 'none') { car.near?.motion.refreshHeights(); car.fit.window = null; }
     },

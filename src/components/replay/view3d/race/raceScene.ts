@@ -90,6 +90,7 @@ export async function createRaceScene(
   const root = new Group();
   /** Stands in for the reflection probe's car while the followed car has no model: never visible, so the probe stays idle. */
   const noCar = new Group(); noCar.visible = false;
+  const followedCentre = new Vector3();
   let followed: FollowedCar | null = null;
   /** A car still loading draws as the grey far model of the first car of its class loaded (of any class until then), nothing before any. */
   const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
@@ -104,6 +105,10 @@ export async function createRaceScene(
     beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
       followed?.parts?.sync();
       field.beforeDraw(camera);
+    },
+    casters() {
+      const near = field.casters();
+      return followed?.car?.visible ? [...near, followed.car.getWorldPosition(followedCentre)] : near;
     },
     refreshHeights() { followed?.motion?.refreshHeights(); field.refreshHeights(); },
     dispose() { followed?.dispose(); field.dispose(); standIns.dispose(); disposeObjects(root); },

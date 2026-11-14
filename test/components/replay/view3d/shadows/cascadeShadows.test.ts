@@ -67,39 +67,66 @@ describe('cascade shadows', () => {
   // Test layout: live cascades of 22 m (texel 0.6875, holds 0.83 m of drift) and 88 m (holds 11 m), a cached one of 242 m (holds 30.25 m).
   const sceneRenders = (draws: ReturnType<typeof setUp>['draws'], scene: unknown) => draws.renders.filter(event => event.root === scene);
   const across = (view: PerspectiveCamera, metres: number) => view.position.set(0, 1, 0).addScaledVector(sunSquareAxes(light).u, metres);
+  // A car 150 m down the view line, in the cached cascade's 80 to 300 m slice.
+  const far = new Vector3(0, 1, -150);
 
-  it('draws every cascade into its tile first, then only redraws each from its static depth while the view stays put', () => {
+  it('draws every cascade into its tile first, then only redraws the held ones from their static depth while the view stays put', () => {
     const {cascades, draws, view, scene} = setUp();
-    expect(cascades.update(view, [])).toBe(false);
+    expect(cascades.update(view, [], [])).toBe(false);
     // The second atlas sits above the first in one 64 x 128 texture.
     expect(draws.renders.map(draw => [draw.viewport.x, draw.viewport.y, draw.viewport.z])).toEqual([[0, 0, 32], [32, 0, 32], [0, 64, 32]]);
     expect(draws.copies.map(copy => copy.viewport.toArray())).toEqual([[0, 0, 32, 32], [32, 0, 32, 32], [0, 64, 32, 32]]);
     expect(cascades.state.tiles.map(tile => tile.toArray())).toEqual([[0, 0, 0.5, 0.25], [0.5, 0, 0.5, 0.25], [0, 0.5, 0.5, 0.25]]);
     draws.clear();
-    cascades.update(view, []);
-    expect(draws.renders).toHaveLength(0); expect(draws.copies).toHaveLength(3);
+    cascades.update(view, [], []);
+    expect(draws.renders).toHaveLength(0); expect(draws.copies.map(copy => copy.viewport.x)).toEqual([0, 32]);
     expect(sceneRenders(draws, scene)).toHaveLength(0);
   });
 
-  it('draws the cars over every cascade each frame, a far one\'s included, and leaves them out of the static depth', () => {
+  it('draws the cars over every cascade each frame when a casting car is far, and leaves them out of the static depth', () => {
     const {cascades, draws, view, car, scene} = setUp();
-    cascades.update(view, [car]);
+    cascades.update(view, [car], [far]);
     // Static into the held depth, the cached cascade's too, then each tile's copy and the cars over it.
     expect(draws.renders.map(draw => [draw.root === car ? 'car' : 'scene', draw.car])).toEqual([['scene', false], ['scene', false], ['scene', false], ['car', true], ['car', true], ['car', true]]);
     expect(draws.events.slice(3, 9).map(event => [event.kind, event.viewport.x, event.viewport.y])).toEqual([['copy', 0, 0], ['render', 0, 0], ['copy', 32, 0], ['render', 32, 0], ['copy', 0, 64], ['render', 0, 64]]);
     draws.clear();
-    cascades.update(view, [car]);
+    cascades.update(view, [car], [far]);
     expect(draws.renders.map(draw => [draw.root === car, draw.viewport.x, draw.viewport.y])).toEqual([[true, 0, 0], [true, 32, 0], [true, 0, 64]]);
     expect(draws.copies).toHaveLength(3); expect(sceneRenders(draws, scene)).toHaveLength(0);
     expect(car.visible).toBe(true);
   });
 
+  it('draws the cars over a cached cascade only while its slice holds a casting car, and clears them from its tile once it does not', () => {
+    const {cascades, draws, view, car} = setUp();
+    const carTiles = () => draws.renders.filter(draw => draw.root === car).map(draw => draw.viewport.y);
+    const copiedTiles = () => draws.copies.map(copy => copy.viewport.y);
+    // A car 10 m ahead: the cached tile is copied bare after its first draw, and the cars go over the live ones only.
+    const near = new Vector3(0, 1, -10);
+    cascades.update(view, [car], [near]);
+    expect([carTiles(), copiedTiles()]).toEqual([[0, 0], [0, 0, 64]]);
+    draws.clear(); cascades.update(view, [car], [near]);
+    expect([carTiles(), copiedTiles()]).toEqual([[0, 0], [0, 0]]);
+    draws.clear(); cascades.update(view, [car], [far]);
+    expect([carTiles(), copiedTiles()]).toEqual([[0, 0, 64], [0, 0, 64]]);
+    // Back near: one bare copy clears the cars from the cached tile, then it is left alone.
+    for (const want of [[0, 0, 64], [0, 0]]) {
+      draws.clear(); cascades.update(view, [car], [near]);
+      expect([carTiles(), copiedTiles()]).toEqual([[0, 0], want]);
+    }
+    // A car at 75 m, short of the cached slice by less than a car's reach, still casts into it.
+    draws.clear(); cascades.update(view, [car], [new Vector3(0, 1, -75)]);
+    expect(carTiles()).toEqual([0, 0, 64]);
+    // No casting car draws them over the live ones only.
+    draws.clear(); cascades.update(view, [car], []);
+    expect(carTiles()).toEqual([0, 0]);
+  });
+
   it('redraws the static casters of a live cascade only once its centre has drifted past its hold, and of the cached one past an eighth of its side', () => {
     const {cascades, draws, view, car, scene} = setUp();
-    cascades.update(view, [car]);
+    cascades.update(view, [car], [far]);
     // 5 m across the sun: past the 22 m cascade's 0.83 m, under the 88 m one's 11 m.
     for (const [acrossM, redrawn] of [[5, [0]], [20, [0, 32]], [40, [0, 32, 0]]] as const) {
-      draws.clear(); across(view, acrossM); cascades.update(view, [car]);
+      draws.clear(); across(view, acrossM); cascades.update(view, [car], [far]);
       expect(sceneRenders(draws, scene).map(draw => draw.viewport.x)).toEqual(redrawn);
       expect(draws.copies).toHaveLength(3);
       expect(draws.renders.filter(draw => draw.root === car)).toHaveLength(3);
@@ -108,7 +135,7 @@ describe('cascade shadows', () => {
 
   it('copies each held tile from its static depth into the atlas, of the same depth type, by a depth-only draw at the same texels', () => {
     const {cascades, draws, view, scene} = setUp();
-    cascades.update(view, []);
+    cascades.update(view, [], []);
     const [copy] = draws.copies, from = copy.from as DepthTexture, to = copy.to as DepthTexture;
     expect(to).toBe(cascades.state.atlas); expect(from).not.toBe(to);
     expect([from.type, from.image.width, from.image.height]).toEqual([to.type, to.image.width, to.image.height]);
@@ -120,9 +147,9 @@ describe('cascade shadows', () => {
 
   it('keeps the matrix of a held cascade until it moves', () => {
     const {cascades, view} = setUp();
-    cascades.update(view, []);
+    cascades.update(view, [], []);
     const before = cascades.state.matrices.map(matrix => matrix.clone());
-    across(view, 5); cascades.update(view, []);
+    across(view, 5); cascades.update(view, [], []);
     expect(cascades.state.matrices[0].equals(before[0])).toBe(false);
     expect(cascades.state.matrices[1].equals(before[1])).toBe(true);
     expect(cascades.state.matrices[2].equals(before[2])).toBe(true);
@@ -146,7 +173,7 @@ describe('cascade shadows', () => {
 
   it('lets a camera-facing card skip 1 m of its own depth, or 14 texels of a coarse cascade, over its depth range', () => {
     const {cascades, view} = setUp();
-    cascades.update(view, []);
+    cascades.update(view, [], []);
     // The test cascades have 0.6875, 2.75 and 7.5625 m texels: 14 of them pass 1 m from the second on.
     layout.cascades.forEach((cascade, i) => expect(cascades.state.cardDepth[i])
       .toBeCloseTo(Math.fround(Math.max(1, 14 * cascade.texelM) / cascadeDepthRangeM(cascade.sideM, light)), 9));
@@ -154,7 +181,7 @@ describe('cascade shadows', () => {
 
   it('maps a point at a cascade centre to the middle of its tile', () => {
     const {cascades, view} = setUp();
-    cascades.update(view, []);
+    cascades.update(view, [], []);
     // The first slice midpoint on the view line: 1 m up, looking along −z, (0.1 + 20) / 2 m ahead.
     const point = new Vector3(0, 1, -(0.1 + 20) / 2).applyMatrix4(cascades.state.matrices[0]);
     // Off the middle by at most a texel's snap (0.6875 m texels over a 22 m square).
@@ -164,10 +191,10 @@ describe('cascade shadows', () => {
 
   it('redraws every cascade from a new sun direction', () => {
     const {cascades, draws, view, scene} = setUp();
-    cascades.update(view, []);
+    cascades.update(view, [], []);
     draws.clear();
     cascades.setLight(new Vector3(-1, -1, 0).normalize());
-    cascades.update(view, []);
+    cascades.update(view, [], []);
     expect(sceneRenders(draws, scene)).toHaveLength(3);
   });
 
@@ -177,10 +204,10 @@ describe('cascade shadows', () => {
     const scene = new Scene(), car = new Mesh(new BoxGeometry(), new MeshBasicMaterial()), {renderer, events} = recordingRenderer(car);
     car.castShadow = true; scene.add(car);
     const cascades = createCascadeShadows(renderer, scene, thin, layout, light), view = new PerspectiveCamera();
-    cascades.update(view, []); events.length = 0;
-    cascades.update(view, []);
+    cascades.update(view, [], []); events.length = 0;
+    cascades.update(view, [], []);
     expect(events.filter(event => event.kind === 'render' && event.root === scene)).toHaveLength(1);
-    // The held live cascade and the cached one.
-    expect(events.filter(event => event.kind === 'copy')).toHaveLength(2);
+    // The held live cascade; the cached one is copied only when redrawn.
+    expect(events.filter(event => event.kind === 'copy')).toHaveLength(1);
   });
 });

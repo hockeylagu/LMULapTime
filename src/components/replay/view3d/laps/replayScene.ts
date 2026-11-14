@@ -70,7 +70,7 @@ export async function createReplayScene(
     await Promise.all([built.primary, built.ghost].flatMap(drawn => drawn ? [shell.warm(drawn.car)] : []));
   });
   carsWarm.catch(() => {}); // A failure here surfaces from the load or the scene's warm-up below.
-  const ghostCentre = new Vector3();
+  const ghostCentre = new Vector3(), primaryCentre = new Vector3();
   /** The shell's content for a lap layer: the cars and lines, with the ghost's parts following the camera's distance. */
   const contentOf = (lap: LapLayer): SceneContent => ({
     root: lap.root, reflected: lap.primary,
@@ -80,6 +80,8 @@ export async function createReplayScene(
       // parts follow the camera's distance.
       if (lap.ghost.visible) setCameraDistance(lap.ghost, camera.position.distanceTo(lap.ghost.getWorldPosition(ghostCentre)) / shell.rig.lodMultiplier);
     },
+    // The compared car casts none (`drawnCar`).
+    casters: () => [lap.primary.getWorldPosition(primaryCentre)],
     refreshHeights: () => lap.refreshHeights(),
     dispose: () => lap.dispose(),
   });

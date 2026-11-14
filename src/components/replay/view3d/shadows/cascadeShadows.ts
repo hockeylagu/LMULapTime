@@ -10,14 +10,16 @@ import { cascadeCentres, sunSquareAxes, type ShadowCascadeLayout, type SunSquare
 /**
  * Cascades reaching this far are live: each frame the cars are drawn over their static depth, which is redrawn only when the cascade's
  * held centre has drifted (see `holdM`). Farther ones are cached: their static depth is redrawn once their centre has moved an eighth
- * of their side, at most one per frame (a redraw of a 1 km square is ~1,000 draws), and the cars are drawn over it each frame as over
- * a live one's (a far car, a trackside view's, still casts).
+ * of their side, at most one per frame (a redraw of a 1 km square is ~1,000 draws). One whose slice holds a casting car has the cars
+ * drawn over it each frame as a live one does (a trackside view's cars cast); the others leave the cars out.
  * Every shadow pass re-draws each caster it meets, the frame's main cost (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
  */
 const LIVE_CASCADE_SPLIT_M = 100;
 const CACHED_REDRAW_SIDE_FRACTION = 1 / 8;
 /** A cached cascade leaves out casters under this many of its texels across (they would draw to under ~3 texels). */
 const CACHED_MIN_CASTER_TEXELS = 3;
+/** How far past a cascade's slice a casting car still draws into it (metres of view depth): its half length and its shadow's reach. */
+const CASTER_REACH_M = 10;
 /** The light camera sits this far back along the light from a cascade's slice midpoint, at least, over the sun's height (twice that is its depth range). */
 const MIN_LIGHT_DISTANCE_M = 400;
 /** The sine of the sun's height the depth range stops growing at (about 3 degrees): near sunset it would grow without bound. */
@@ -51,9 +53,10 @@ export interface CascadeShadows {
   setLight(lightTravel: Vector3): void;
   /**
    * Before a frame: redraws the cascades whose held centre has drifted and the cached cascade most due, and draws `dynamic` (every
-   * moving caster: one left out freezes in the held depth) over every held and cached one. True while cached ones are still due.
+   * moving caster: one left out freezes in the held depth) over every held one and each cached one whose slice holds one of
+   * `castersAt` (where the cars that cast are, world). True while cached ones are still due.
    */
-  update(view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[]): boolean;
+  update(view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[], castersAt: readonly Vector3[]): boolean;
   dispose(): void;
 }
 
@@ -98,7 +101,8 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
     camera.layers.enable(SHADOW_ONLY_LAYER);
     return camera;
   };
-  const sliceStartM = (i: number) => i === 0 ? layout.nearM : layout.cascades[i - 1].splitM;  const cascades = layout.cascades.map((cascade, i) => {
+  const sliceStartM = (i: number) => i === 0 ? layout.nearM : layout.cascades[i - 1].splitM;
+  const cascades = layout.cascades.map((cascade, i) => {
     const live = cascade.splitM <= LIVE_CASCADE_SPLIT_M, redrawM = CACHED_REDRAW_SIDE_FRACTION * cascade.sideM;
     // A live cascade's held square must keep the view line of its slice inside the tile the surfaces select from (halfExtent of the side
     // around the centre), or the near end of the slice falls to the next, coarser cascade: the drift it may hold is what is left of
@@ -110,6 +114,8 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       cascade, camera: lightCamera(), live, holdM, held: live && holdM >= cascade.texelM,
       viewport: new Vector4(cascade.tile[1], cascade.tile[0] * sizePx + cascade.tile[2], tilePx, tilePx),
       drawnCentre: null as [number, number] | null,
+      /** A cached cascade's tile has the cars drawn over it. */
+      carried: false,
     };
   });
   // The static depth of the held and cached cascades, in the atlas' own tiles, of the atlas' depth type: the shadow pass copies it as stored.
@@ -144,7 +150,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       light.copy(lightTravel); axes = sunSquareAxes(light);
       for (const row of cascades) row.drawnCentre = null;
     },
-    update(view, dynamic) {
+    update(view, dynamic, castersAt) {
       view.updateMatrixWorld();
       view.getWorldPosition(eye); view.getWorldDirection(forward);
       const centres = cascadeCentres(layout, eye, forward, axes);
@@ -163,12 +169,20 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       // Until every cached cascade has been drawn once, all of them at once; afterwards the most due one, if one is due.
       const settled = cascades.every(row => row.live || row.drawnCentre);
       const order = due.map((value, i) => [value, i] as const).filter(([value, i]) => !cascades[i].live && value >= 1).sort((a, b) => b[0] - a[0]);
-      for (const [, i] of settled ? order.slice(0, 1) : order) {
+      const redrawn = (settled ? order.slice(0, 1) : order).map(([, i]) => i);
+      for (const i of redrawn) {
         place([i], centres);
         casters.draw(staticTarget!, layersOf([i]), view, dynamic, CACHED_MIN_CASTER_TEXELS * cascades[i].cascade.texelM);
       }
-      const overlaid = indicesOf(row => row.held || (!row.live && row.drawnCentre !== null));
-      if (overlaid.length) casters.drawRoots(target, layersOf(overlaid), view, dynamic, staticTarget!);
+      // The cars over the held cascades and the cached ones whose slice holds a casting car; another cached tile is copied bare when
+      // redrawn, or to clear the cars it carried.
+      const depthsM = castersAt.map(at => at.dot(forward) - eye.dot(forward));
+      const cached = indicesOf(row => !row.live && row.drawnCentre !== null);
+      const carried = cached.filter(i => depthsM.some(depthM => depthM >= sliceStartM(i) - CASTER_REACH_M && depthM < cascades[i].cascade.splitM + CASTER_REACH_M));
+      const bare = cached.filter(i => !carried.includes(i) && (redrawn.includes(i) || cascades[i].carried));
+      for (const i of cached) cascades[i].carried = carried.includes(i);
+      if (held.length || carried.length) casters.drawRoots(target, layersOf([...held, ...carried]), view, dynamic, staticTarget!);
+      if (bare.length) casters.drawRoots(target, layersOf(bare), view, [], staticTarget!);
       return settled && order.length > 1;
     },
     dispose() {

@@ -139,6 +139,8 @@ describe('createRaceField', () => {
       expect(nearCar(slot)!.visible).toBe(false);
       expect(farCar(slot).visible).toBe(true);
     }
+    // The six full models cast, where they stand; the far models do not.
+    expect(field.casters().map(at => at.clone())).toEqual([0, 1, 2, 3, 4, 5].map(slot => nearCar(slot)!.getWorldPosition(new Vector3())));
   });
 
   it('fits a far model to the road under its poses: its lowest point on the road', async () => {

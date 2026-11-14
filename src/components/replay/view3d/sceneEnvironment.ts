@@ -84,10 +84,11 @@ export interface SceneEnvironment {
   /** Writes this scene's haze terms into the uniforms hazed materials read; each of the scene's renders does it too. */
   applyHaze(): void;
   /**
-   * Before a frame renders: colours the haze toward the view and draws the shadow cascades that are due. True while cached
-   * cascades are still due: the caller renders another frame.
+   * Before a frame renders: colours the haze toward the view and draws the shadow cascades that are due, the cars into the far ones
+   * whose slice holds one of `casters` (where the cars that cast are, world). True while cached cascades are still due: the caller
+   * renders another frame.
    */
-  update(): boolean;
+  update(casters?: readonly Vector3[]): boolean;
   dispose(): void;
 }
 
@@ -262,10 +263,10 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       light(next);
       if (venueProbe) captureVenue();
     },
-    update() {
+    update(casters = []) {
       if (!view) return false;
       view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze());
-      const set = cascades, drawing = set.pass.update(view, dynamic);
+      const set = cascades, drawing = set.pass.update(view, dynamic, casters);
       if (!set.sampled) { sampleCascadeShadows(venue.shading.shadows, set.layout, set.pass.state); set.sampled = true; }
       return drawing;
     },
