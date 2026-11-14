@@ -4,7 +4,7 @@ export interface RaceClassTone {
   stroke: string;
   text: string;
   bar: string;
-  /** The same hue as a colour value, for the 3D view's class boxes. */
+  /** The same hue as a colour value, for the minimap's dots. */
   hex: string;
 }
 

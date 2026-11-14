@@ -132,7 +132,7 @@ export function useRaceScene({host, overview, clock, poses, followSlot, progress
     drawScene(scene.current, clock, poses, progress, followSlot);
     followDaylight();
   });
-  // A newly followed car loads its body; the scene shows its box until then.
+  // A newly followed car loads its body; the scene shows its stand-in until then.
   useEffect(() => {
     const handle = scene.current;
     if (!handle) return;

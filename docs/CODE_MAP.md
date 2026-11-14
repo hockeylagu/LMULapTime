@@ -339,7 +339,9 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   (`cars/farCars.ts`: one parse per far file, each livery's paint and retextured materials from the textures' start files, only the
   triangles of the option parts its appearance shows), batched with every other car of the body (glass and blended pieces too, sorted in their batch), still and without shadows, its brake and head lamps lit for the 16 nearest in view within 300 m (`cars/farGlows.ts`: the exterior model's lamp glow meshes, one instanced draw per lamp mesh and lit frame of a body, textures from their start files, never sharpened); out of
   view hidden; every car of a body loads its far model at once (two bodies at a time, nearest the followed car first); a
-  class-coloured box (one instanced draw) only while a body loads or for a car without one; the lap layer loader parses each body
+  car still loading draws as a grey stand-in (`race/standInCars.ts`: the far model of the first car of its class loaded, merged
+  to one geometry, one instanced draw per class; a class without one yet borrows the first loaded, nothing draws before any;
+  a car without a body stays a stand-in); the lap layer loader parses each body
   once per scene and loader (keyed by folder and file hashes) for all its liveries; `race/raceTrack.ts` gives a car's samples of a
   pose window as its wheels' and lamps' track; the scenery streams ahead of the followed car by its track station from the race progress grid (`trackStation`, around the camera without it); chase look-ahead and trackside spots run along the followed car's samples of the current pose window; a followed car still in its garage box places the camera on its nearest pose, else the first car on track) and `race/useRaceScene.ts` drives it from the race clock, the pose windows and the followed car.
   `cars/` is the car renderer both views share: `carParts.ts` a car's flat part table (anchors: the body, wheel, steer and spin

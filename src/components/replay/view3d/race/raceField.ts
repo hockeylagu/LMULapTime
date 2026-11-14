@@ -65,7 +65,7 @@ interface FieldCar {
 }
 
 export interface RaceField {
-  /** Whether the slot draws as a model (its far model is loaded): its class box hides. */
+  /** Whether the slot draws as a model (its far model is loaded): its stand-in hides. */
   has(slot: number): boolean;
   /** The car's pose at the drawn time, or null off the track or while followed (the followed car draws its own model). */
   pose(slot: number, pose: RenderPose | null, window: RacePoseWindow, carIndex: number): void;
@@ -82,15 +82,16 @@ export interface RaceField {
  * models with wheels, lamps and shadows; far as the body's far model, still and without shadows; out of view hidden. The cars of a
  * body share their batches in each tier. Every car of a body loads its far model at once, and its full model with the others of
  * the body the first time one of them turns near; both stay. The nearest far cars' headlights and brake lights glow (`farGlows`).
- * `sets` builds the full models, `root` is the cars' parent; `changed` asks for a redraw.
+ * `sets` builds the full models, `root` is the cars' parent; `changed` asks for a redraw. `farModel` sees each car's far model as it
+ * is built, before its batching releases the parsed vertices (the stand-ins take their shape from it).
  */
 export function createRaceField(
   shell: SceneShell, sets: CarSets, root: Group, cars: readonly RaceReplayCar[],
-  bodyOf: (slot: number) => Promise<LoadedBody | null>, changed: () => void,
+  bodyOf: (slot: number) => Promise<LoadedBody | null>, changed: () => void, farModel: (slot: number, car: Group) => void = () => {},
 ): RaceField {
   const {origin} = shell;
   const handlingOf = new Map(cars.map(car => [car.slot, car.handling]));
-  /** The field by slot: null while its body loads, 'none' for a car that cannot load (its box stays). */
+  /** The field by slot: null while its body loads, 'none' for a car that cannot load (its stand-in stays). */
   const field = new Map<number, FieldCar | null | 'none'>();
   const farSets: CarBatchSet[] = [], nearSets: DrawnCars[] = [], bodies = new Set<string>(), fieldBodies: FieldBody[] = [];
   let bodyLoads = 0, nearLoads = 0, disposed = false;
@@ -143,7 +144,7 @@ export function createRaceField(
     return Number.isFinite(bottom) ? bottom : 0;
   };
 
-  /** The scene's corner note counts the cars asked for and those settled (a model, or a box for good), while any load. */
+  /** The scene's corner note counts the cars asked for and those settled (a model, or a stand-in for good), while any load. */
   let reported = '';
   const reportLoads = () => {
     let loaded = 0;
@@ -171,6 +172,7 @@ export function createRaceField(
         const livery = await bodyOf(each);
         return livery ? {livery, car: makeCar(MAP_COLORS.carBody, false, await farLoader.model(livery))} : null;
       }));
+      built.forEach((entry, index) => { if (entry) farModel(slots[index], entry.car); });
       const present = built.filter(entry => entry !== null), bottoms = present.map(({car}) => bottomOf(car)), tables = present.map(({car}) => buildCarParts(car));
       const batches = batchCars(tables, {releaseParsed: true, transparent: true});
       farSets.push(batches);
@@ -191,7 +193,7 @@ export function createRaceField(
       });
       changed();
     } catch {
-      // The cars that cannot load stay boxes (below).
+      // The cars that cannot load stay stand-ins (below).
     } finally {
       bodyLoads--;
       for (const each of slots) if (field.get(each) === null) field.set(each, 'none');

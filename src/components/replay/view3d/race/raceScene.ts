@@ -1,10 +1,9 @@
-import { BoxGeometry, Color, Euler, Group, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Euler, Group, Matrix4, Quaternion, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { RaceReplayCar, ReplayDaylightClock, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import type { NextPose } from '../../race/racePoseCache.js';
-import { raceClassTone } from '../../race/raceClassTone.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
 import type { SceneLoadProgress } from '../scene/loadProgress.js';
 import type { CameraMode } from '../camera/cameraModes.js';
@@ -12,15 +11,12 @@ import { isDriverCamera } from '../camera/driverCameras.js';
 import type { RenderPose } from '../scene/replayPose.js';
 import { nativeToScene } from '../scene/sceneFrame.js';
 import type { SceneContent, SceneShell } from '../scene/sceneShell.js';
-import { hazeProgram } from '../atmosphere/haze.js';
 import type { CarParts } from '../cars/carParts.js';
 import type { CarMotion } from '../cars/carMotion.js';
 import { createCarSets } from '../cars/drawnCar.js';
 import { windowPoints } from './raceTrack.js';
 import { createRaceField } from './raceField.js';
-
-/** A class box's size in metres (width, height, length): about a prototype's, standing in while a car's model loads. */
-const BOX_SIZE: [number, number, number] = [2, 1.05, 4.9];
+import { createStandInCars } from './standInCars.js';
 
 export interface RaceSceneHandle {
   /**
@@ -28,7 +24,7 @@ export interface RaceSceneHandle {
    * is the followed car's track station, which the scenery streams ahead of (around the camera without it).
    */
   time(timeSec: number, window: RacePoseWindow | null, stationM?: number): void;
-  /** Follows a car: its body as a full model when given, else its box. */
+  /** Follows a car: its body as a full model when given, else a grey stand-in. */
   follow(slot: number | null, body: LoadedBody | null, signal?: AbortSignal): Promise<boolean>;
   mode(mode: CameraMode): void;
   reset(): void;
@@ -43,7 +39,7 @@ export interface RaceSceneHandle {
 /** A car drawn as its model: the followed car or another. */
 interface FollowedCar {
   slot: number;
-  /** The model; null for a car without a body (its box stays). */
+  /** The model; null for a car without a body (a grey stand-in draws it). */
   car: Group | null;
   /** Its wheels and lamps, and its part table; null without a model. */
   motion: CarMotion | null;
@@ -64,7 +60,7 @@ function renderPose(pose: Float32Array, index: number, fraction: number, orienta
 /**
  * The race replay's 3D scene: the scene shell with every car of the session on one clock, each its body model. The cameras ride on
  * the followed car, drawn at its full level; the others draw the body's level for their distance from the camera (`extras.lod`).
- * A car is a box in its class colour (one instanced draw) while its model loads, or for good without a body. `bodyOf` loads a
+ * A car is a grey stand-in while its model loads, or for good without a body (`standInCars.ts`). `bodyOf` loads a
  * car's body (null for a car the replay does not name). The followed car out of the replay (in its garage before it drives out)
  * waits where it next appears, facing its way out (`nextPose`), with the cameras on it. The scene is the shared shell's (`shell`, of
  * `layout`), its canvas in `host`; its `dispose` leaves the shell to the next view.
@@ -90,20 +86,15 @@ export async function createRaceScene(
   };
   const pending = buildFollowed(first.slot, first.body);
   pending.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
-  const boxMaterial = new MeshStandardMaterial({roughness: 0.55, metalness: 0.1});
-  hazeProgram(boxMaterial);
-  const boxes = new InstancedMesh(new BoxGeometry(...BOX_SIZE).translate(0, BOX_SIZE[1] / 2, 0), boxMaterial, cars.length);
-  boxes.name = 'race-cars'; boxes.frustumCulled = false; boxes.castShadow = true; boxes.receiveShadow = true;
-  const instanceOf = new Map(cars.map((car, index) => [car.slot, index]));
-  cars.forEach((car, index) => boxes.setColorAt(index, new Color(raceClassTone(car.carClass).hex)));
-  const hiddenMatrix = new Matrix4().makeScale(0, 0, 0);
-  for (let index = 0; index < cars.length; index++) boxes.setMatrixAt(index, hiddenMatrix);
-  const root = new Group(); root.add(boxes);
+  const root = new Group();
   /** Stands in for the reflection probe's car while the followed car has no model: never visible, so the probe stays idle. */
   const noCar = new Group(); noCar.visible = false;
   let followed: FollowedCar | null = null;
+  /** A car still loading draws as the grey far model of the first car of its class loaded (of any class until then), nothing before any. */
+  const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
+  const standIns = createStandInCars(root, cars.length, object => shell.warm(object));
   /** The other cars, the followed car's included (hidden while followed); `draw` gives them their poses. */
-  const field = createRaceField(shell, sets, root, cars, bodyOf, () => draw());
+  const field = createRaceField(shell, sets, root, cars, bodyOf, () => draw(), (slot, car) => standIns.offer(classOf.get(slot) ?? '', car));
   // The chase camera looks ahead along the followed car's own samples of the window, and the trackside spots stand along them.
   let points: ReplayTrajectoryPoint[] = [], distances: number[] = [], pointsOf: {window: RacePoseWindow; slot: number} | null = null;
   const rigCar = () => ({primary: followed?.car ?? noCar, cameras: followed?.cameras ?? [], trajectory: {points}, primaryDistances: distances});
@@ -114,7 +105,7 @@ export async function createRaceScene(
       field.beforeDraw(camera);
     },
     refreshHeights() { followed?.motion?.refreshHeights(); field.refreshHeights(); },
-    dispose() { followed?.dispose(); field.dispose(); disposeObjects(root); },
+    dispose() { followed?.dispose(); field.dispose(); standIns.dispose(); disposeObjects(root); },
   });
   const setFollowed = (next: FollowedCar | null) => {
     followed?.dispose(); followed = next;
@@ -192,9 +183,9 @@ export async function createRaceScene(
     if (!window || disposed) return;
     const current = window, places: Array<{slot: number; x: number; z: number}> = [];
     let followedAt: {x: number; z: number} | null = null;
+    standIns.begin();
     for (const [ownIndex, slot] of current.slots.entries()) {
-      const instance = instanceOf.get(slot);
-      if (instance === undefined) continue;
+      if (!classOf.has(slot)) continue;
       const isFollowed = slot === followed?.slot, model = isFollowed ? followed?.car : null, drawn = isFollowed || field.has(slot);
       let shown = sampleRacePose(current, ownIndex, timeSec, pose), samples = current, carIndex = ownIndex, at = timeSec;
       if (!shown && isFollowed) {
@@ -222,11 +213,11 @@ export async function createRaceScene(
           shell.placeCar(model, renderPose(pose, index, fraction, orientation, euler), motion);
         }
       }
-      if (!shown || model || (drawn && !isFollowed)) { boxes.setMatrixAt(instance, hiddenMatrix); continue; }
+      if (!shown || model || (drawn && !isFollowed)) continue;
       renderPose(pose, 0, 0, orientation, euler);
-      boxes.setMatrixAt(instance, matrix.compose(position.set(pose[0] - origin.x, pose[1] - origin.y, pose[2] - origin.z), orientation, scale));
+      standIns.place(classOf.get(slot) ?? '', matrix.compose(position.set(pose[0] - origin.x, pose[1] - origin.y, pose[2] - origin.z), orientation, scale));
     }
-    boxes.instanceMatrix.needsUpdate = true;
+    standIns.end();
     if (!followedAt) placeAside(current);
     const from = followedAt ?? places[0];
     field.load(from ? places.filter(car => car.slot !== followed?.slot).map(car => ({slot: car.slot, metres: Math.hypot(car.x - from.x, car.z - from.z)})) : []);
@@ -244,7 +235,7 @@ export async function createRaceScene(
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
       if (next?.car) await shell.warm(next.car);
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
-      // A driver camera needs the car's own cameras: without a model, the chase camera follows the box.
+      // A driver camera needs the car's own cameras: without a model, the chase camera follows its stand-in.
       if (!next?.car && isDriverCamera(rig.mode)) shell.setMode('chase');
       next?.ready(); setFollowed(next); shell.show(content()); draw();
       return true;
