@@ -1,24 +1,28 @@
 import { NormalBlending, RepeatWrapping, ShaderMaterial, type Texture } from 'three';
 import type { CarLamp, CarMaterialRecipe } from '../../../../../shared/types/scenes/car.js';
 import { SUN_UNIT } from '../atmosphere/sunSamples.js';
+import { sceneDayLight, screenStrength } from '../scene/dayLight.js';
 import { lampStateFrames, litByEvent, switches, type LampSwitch } from './lampStates.js';
 
-/** How a drawn lamp glows: its lamp emission, or the day strength of the dashboard screen material it is drawn with (`lampGlow`). */
-export type LampGlow = NonNullable<CarLamp['emission']> | {displayIntensity: number};
+/** How a drawn lamp glows: its lamp emission, or the night and day strengths of the dashboard screen material it is drawn with (`lampGlow`). */
+export type LampGlow = NonNullable<CarLamp['emission']> | {displayIntensity: number; displayNight: number};
 
 /**
  * How a lamp glows, or null when it is not drawn. A lamp with a lamp emission glows by it. A lamp without one is drawn with a lit
- * shader: when that is a dashboard screen material, it glows with the screen's day strength (`dashboard.emissiveStrength`) over its
- * texture and vertex colour (the lit light the screen also takes is left out: the glow is far brighter). App assumption: replays
- * are daytime only for now (the sun stays above the horizon), so the night strength is not used. Other lit lamps are not drawn.
+ * shader: when that is a dashboard screen material, it glows as the screen does, between its night and day strengths
+ * (`dashboard.emissiveNight`, `emissiveStrength`) by the scene's day share, over its texture and vertex colour (the lit light the
+ * screen also takes is left out: the glow is far brighter). Other lit lamps are not drawn.
  */
 export function lampGlow(lamp: CarLamp, recipes: readonly CarMaterialRecipe[]): LampGlow | null {
   if (lamp.emission) return lamp.emission;
   const surface = recipes.find(recipe => recipe.name === lamp.material)?.surface;
   if (surface?.kind !== 'dashboard') return null;
-  const screen = surface.parameters?.dashboard as {emissiveStrength?: unknown} | undefined, day = screen?.emissiveStrength;
-  if (typeof day !== 'number' || !Number.isFinite(day) || day < 0) throw Error(`Lamp ${lamp.material}: the screen material has no day strength`);
-  return {displayIntensity: day};
+  const screen = surface.parameters?.dashboard as {emissiveStrength?: unknown; emissiveNight?: unknown} | undefined;
+  const strength = (value: unknown, which: string) => {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw Error(`Lamp ${lamp.material}: the screen material has no ${which} strength`);
+    return value;
+  };
+  return {displayIntensity: strength(screen?.emissiveStrength, 'day'), displayNight: strength(screen?.emissiveNight, 'night')};
 }
 
 /**
@@ -66,7 +70,8 @@ export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Textu
   const material = new ShaderMaterial({
     name: `lamp-${lamp.material}`,
     uniforms: {
-      map: {value: texture}, scale: {value: scale * SUN_UNIT},
+      // A display glow follows the scene's day share as its screen does.
+      map: {value: texture}, scale: display ? {get value() { return screenStrength(glow.displayNight, glow.displayIntensity, sceneDayLight.value) * SUN_UNIT; }} : {value: scale * SUN_UNIT},
       boostGain: {value: viewBoost?.gain ?? 0}, boostPower: {value: viewBoost?.power ?? 1},
       // The material's own opacity (a ghost car fades its lamps with its body).
       opacity: {get value() { return material.opacity; }},

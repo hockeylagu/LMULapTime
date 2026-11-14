@@ -2,6 +2,7 @@ import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type W
 import { tyreReadsAxle } from '../../car/tyreSurface.js';
 import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
 import { sceneryClock } from './sceneryClock.js';
+import { readsDayLight, sceneDayLight } from '../../scene/dayLight.js';
 import { uvShiftUniform } from './surfaceAnimation.js';
 import { patchAmbientLookup } from './ambientLookup.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
@@ -127,7 +128,8 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   Object.assign(shader.uniforms, tunables, {
     surface_alphaCut: surfaceAlphaCut,
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
-  }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_time: sceneryClock } : {}, uniforms);
+  }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_time: sceneryClock } : {},
+    readsDayLight(config) ? { surface_dayLight: sceneDayLight } : {}, uniforms);
 
   const neededUvs = new Set<string>();
   for (const map of Object.values(config.maps)) if (map?.uv) neededUvs.add(map.uv);

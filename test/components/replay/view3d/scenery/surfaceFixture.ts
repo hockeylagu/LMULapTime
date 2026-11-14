@@ -31,8 +31,8 @@ const SHAPES: Record<SurfaceKind, Shape> = {
   flag: { adjust: ADJUST, base: { albedo: 4, metalness: 1, roughness: 1, specular: 1 }, emissive: { colour: 3, strength: 1 } },
   digitalFlag: { adjust: ADJUST, blink: { period: 1 } },
   roadDecal: { adjust: { ...ADJUST, overlayStrength: 1 }, blending: { range: 1, darkening: 1 } },
-  dashboard: { adjust: ADJUST, dashboard: { roughness: 1, emissiveStrength: 1 } },
-  externalMonitor: { adjust: ADJUST, dashboard: { roughness: 1, emissiveStrength: 1 } },
+  dashboard: { adjust: ADJUST, dashboard: { roughness: 1, emissiveStrength: 1, emissiveNight: 1 } },
+  externalMonitor: { adjust: ADJUST, dashboard: { roughness: 1, emissiveStrength: 1, emissiveNight: 1 } },
   lowLumEmissive: { adjust: ADJUST }, highLumTrackside: { adjust: ADJUST }, highLumSun: { adjust: ADJUST }, diffuse: { adjust: ADJUST }, water: { adjust: ADJUST },
   tyre: { adjust: { ...ADJUST, farLight: 1 }, wear: { albedoMultiply: 1, roughnessAdjust: 1 } },
 };

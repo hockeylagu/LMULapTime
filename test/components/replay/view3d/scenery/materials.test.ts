@@ -87,7 +87,7 @@ describe('shaderParts', () => {
   });
   it('lays a dashboard decal over the screen with its own roughness, and multiplies a monitor by its decal', () => {
     const maps = { albedo: map('A', true), decal: map('D', true) };
-    const decal = shaderParts(surface('dashboard', { maps, flags: { decal: 'alphaBlend' }, parameters: { dashboard: { roughness: 0.2, decalRoughness: 0.7, emissiveStrength: 9 } } }), { uniforms: false });
+    const decal = shaderParts(surface('dashboard', { maps, flags: { decal: 'alphaBlend' }, parameters: { dashboard: { roughness: 0.2, decalRoughness: 0.7, emissiveStrength: 9, emissiveNight: 1 } } }), { uniforms: false });
     expect(decal.albedo).toContain('diffuseColor.rgb=mix(diffuseColor.rgb,dashDecal.rgb,dashDecal.a)');
     expect(decal.albedo).toContain('surfaceRoughness=mix(surfaceRoughness,0.70000000,dashDecal.a)');
     expect(shaderParts(surface('dashboard', { maps }), { uniforms: false }).albedo).not.toContain('dashDecal');
@@ -96,18 +96,30 @@ describe('shaderParts', () => {
     expect(monitor.albedo).not.toContain('vSurfaceColour');
   });
   it('reads the dashboard controls and ignores vertex colour only for the diffuse shader without it', () => {
-    const config = surface('dashboard', { maps: { albedo: map('A', true) }, parameters: { dashboard: { roughness: 0.4, emissiveStrength: 9 } } });
+    const config = surface('dashboard', { maps: { albedo: map('A', true) }, parameters: { dashboard: { roughness: 0.4, emissiveStrength: 9, emissiveNight: 1.5 } } });
     const dash = shaderParts(config, { uniforms: false });
-    // The screen's light is a constant light in the diffuse sum: albedo times its strength over pi, less the specular share.
-    const emission = 9 / Math.PI * (1 - 0.5 * (0.4 / 2.4) ** 2);
-    expect(dash.albedo).toContain('surfaceRoughness=0.40000000'); expect(dash.emissive).toBe(`diffuseColor.rgb*${emission.toFixed(8)}`);
+    // The screen's light is a constant light in the diffuse sum: albedo times its strength over pi, less the specular share; the
+    // strength runs from the night one to the day one with the scene's day share.
+    const share = (1 - 0.5 * (0.4 / 2.4) ** 2) / Math.PI;
+    expect(dash.albedo).toContain('surfaceRoughness=0.40000000');
+    expect(dash.emissive).toBe(`diffuseColor.rgb*mix(1.50000000,9.00000000,surface_dayLight)*${share.toFixed(8)}`);
+    expect(dash.declarations).toContain('uniform float surface_dayLight;');
     expect(dash.albedo).toContain('surfaceSpecular=0.5;');
     // With uniforms, the values leave the source for `surface_constants`.
     const shared = shaderParts(config);
-    expect([shared.albedo, shared.emissive, shared.constants]).toEqual([expect.stringContaining('surfaceRoughness=surface_constants[0].x'), 'diffuseColor.rgb*surface_constants[0].y', [0.4, emission]]);
+    expect([shared.albedo, shared.emissive, shared.constants]).toEqual([expect.stringContaining('surfaceRoughness=surface_constants[0].x'),
+      'diffuseColor.rgb*mix(surface_constants[0].y,surface_constants[0].z,surface_dayLight)*surface_constants[0].w', [0.4, 1.5, 9, share]]);
     expect(shared.declarations).toContain('uniform vec4 surface_constants[1];');
     expect(shaderParts(surface('diffuse', { vertexColour: false, maps: { albedo: map('A', true) } })).albedo).not.toContain('*vSurfaceColour');
     expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true) } })).albedo).toContain('*vSurfaceColour');
+  });
+  it('glows a standard surface always, at night only (under full day), or not at all, by its emissive flag', () => {
+    const glow = (emissive: string | undefined) => shaderParts(surface('standard', { flags: { emissive } }), { uniforms: false });
+    expect(glow('always').emissive).not.toContain('surface_dayLight');
+    expect(glow('always').declarations).not.toContain('surface_dayLight');
+    expect(glow('night').emissive).toMatch(/\*\(1\.0-step\(1\.0,surface_dayLight\)\)$/);
+    expect(glow('night').declarations).toContain('uniform float surface_dayLight;');
+    expect(glow(undefined).emissive).toBe('vec3(0.0)');
   });
   it('lays the vertex colour on a standard albedo by its mode, a masked one faded by the albedo alpha', () => {
     const parts = (vertexColour: string) => shaderParts(surface('standard', { maps: { albedo: map('A', true) }, flags: { vertexColour, roughnessFromAlbedoAlpha: 'on' } })).albedo;
@@ -387,7 +399,7 @@ it('shares one configured material among meshes of the same surface, textures an
 describe('shared surface programs', () => {
   it('gives materials that differ only in values one program, and a different shape its own', () => {
     const at = (roughness: number, maps: Record<string, ReturnType<typeof map>> = { albedo: map('A', true) }) =>
-      surface('dashboard', { maps, parameters: { dashboard: { roughness, emissiveStrength: 9 } } });
+      surface('dashboard', { maps, parameters: { dashboard: { roughness, emissiveStrength: 9, emissiveNight: 1 } } });
     expect(computeCustomProgramCacheKey(at(0.4))).toBe(computeCustomProgramCacheKey(at(0.7)));
     expect(computeCustomProgramCacheKey(at(0.4))).not.toBe(computeCustomProgramCacheKey(at(0.4, {})));
   });

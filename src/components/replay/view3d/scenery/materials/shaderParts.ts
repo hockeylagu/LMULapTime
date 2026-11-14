@@ -1,3 +1,4 @@
+import { readsDayLight } from '../../scene/dayLight.js';
 import { tyreReadsAxle, tyreShaderParts } from '../../car/tyreSurface.js';
 import { clearcoatShaderParts } from './clearcoatSurface.js';
 import { digitalFlagShaderParts, flagShaderParts } from './flagSurface.js';
@@ -110,7 +111,7 @@ function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): Extend
  * Screens: a dashboard (the screen texture times the vertex colour, a decal laid over it by its alpha, with its own roughness) or
  * an external monitor (screen times decal). The screen lights itself as a constant light inside the diffuse sum, so it shows
  * albedo times its strength over pi, in the sun's units, with the usual environment lighting on top at half the specular level.
- * The day strength stands until the scene carries a night level.
+ * Its strength runs from its night strength to its day strength with the scene's day share (`sceneDayLight`).
  */
 function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): ExtendedParts {
   const screen = config.parameters.dashboard, monitor = config.kind === 'externalMonitor';
@@ -124,7 +125,7 @@ function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): 
     albedo: `${albedo} surfaceMetallic=0.0; surfaceSpecular=0.5;`,
     normals: '', occlusion: '',
     physical: `material.specularColor=vec3(${glslNumber(f0)}); material.specularColorBlended=vec3(${glslNumber(f0)});`,
-    emissive: `diffuseColor.rgb*${number(value(screen, 'emissiveStrength') / Math.PI * (1 - 0.5 * f0))}`,
+    emissive: `diffuseColor.rgb*mix(${number(value(screen, 'emissiveNight'))},${number(value(screen, 'emissiveStrength'))},surface_dayLight)*${number((1 - 0.5 * f0) / Math.PI)}`,
   };
 }
 
@@ -203,7 +204,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`
     + (maps[key]!.uvAnimation ? `\nuniform vec2 surface_shift_${key};` : '')).join('\n');
   return {
-    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
+    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '') + (readsDayLight(config) ? '\nuniform float surface_dayLight;' : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
       + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);
