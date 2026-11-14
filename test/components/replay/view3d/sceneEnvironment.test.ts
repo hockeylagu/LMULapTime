@@ -30,7 +30,7 @@ it('uses the analytic sky, PMREM and a sun light without three shadow maps, keep
   const scene = new Scene(), renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
   const lightChunk = ShaderChunk.lights_fragment_begin, lightPars = ShaderChunk.lights_pars_begin;
   const material = new MeshStandardMaterial(), receiver = new Mesh(new BoxGeometry(), material); receiver.receiveShadow = true; scene.add(receiver);
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase');
+  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase', null);
   expect(scene.getObjectByName('default-terrain')).toBeUndefined(); expect(scene.children.filter(child => child instanceof Mesh && child.name !== 'sky')).toEqual([receiver]);
   expect(scene.getObjectByName('sky')).toBeDefined();
   // Without daylight there is no haze to thicken the fog; the fog is exponential in the distance along the ray.
@@ -119,7 +119,7 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
   const daylight = {date: '2023-06-10', sessions: [{id: 'qualify' as const, localTime: '20:45', sunElevationDeg: 12, sunBearingDeg: 290}], airPollution: 0.6, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
   // The replay's cloud cover sets the weather, dims the sun and thickens the haze.
   const clock = {session: 'qualify' as const, startMinute: null, sessionTimeSec: 0, cloudCover: 0.62};
-  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', sceneSun(venue(daylight), 0, clock)), fog = scene.fog as FogExp2;
+  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', null, sceneSun(venue(daylight), 0, clock)), fog = scene.fog as FogExp2;
   try {
     const sun = sceneLighting(daylight, clock).sunDirection, sunElevationDeg = Math.asin(sun.y) * 180 / Math.PI, weather = skyConditions(daylight, 0.62);
     expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, weather, sunElevationDeg), 12);
@@ -148,7 +148,7 @@ it("captures the venue at the package's probe without the cars, twice, and light
   render.mockImplementation((_scene, camera) => {
     if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environmentIntensity > 0, environment: scene.environment});
   });
-  const environment = addSceneEnvironment(scene, renderer, venue(undefined, [110, 7, -40]), new Vector3(100, 5, 20), 'chase');
+  const environment = addSceneEnvironment(scene, renderer, venue(undefined, [110, 7, -40]), new Vector3(100, 5, 20), 'chase', null);
   environment.setDynamic([car]);
   try {
     const first = scene.environment, cubemaps = probe.cubemaps;
@@ -167,7 +167,7 @@ it("captures the venue at the package's probe without the cars, twice, and light
 it("samples the package's cascade set from its first draw, for any camera, and holds the surfaces lit on the next set's atlas", () => {
   const scene = new Scene(), render = vi.fn<(scene: Scene, camera: OrthographicCamera) => void>();
   const renderer = {...fakeRenderer(), render} as unknown as WebGLRenderer;
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase');
+  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase', null);
   // From the start the surfaces sample an allocated depth texture, unread: WebGL drops draws whose shadow sampler has none.
   const chaseAtlas = cascadeShadowUniforms.surface_cascadeAtlas.value;
   expect(chaseAtlas?.isDepthTexture).toBe(true); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
@@ -179,11 +179,11 @@ it("samples the package's cascade set from its first draw, for any camera, and h
     const sceneRenders = () => render.mock.calls.filter(([root]) => root === scene).length;
     environment.update(); expect(sceneRenders()).toBe(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
     // The cockpit set (two cascades) replaces it: lit on its own atlas until its first draw.
-    environment.setShadowCascades('cockpit'); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
+    environment.setShadowCascades('cockpit', null); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
     expect(cascadeShadowUniforms.surface_cascadeAtlas.value).not.toBe(chaseAtlas);
     environment.update(); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(2);
     // The overhead camera is orthographic: the cascades follow it as well.
-    render.mockClear(); environment.setShadowCascades('chase'); environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
+    render.mockClear(); environment.setShadowCascades('chase', null); environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
     environment.update(); expect(sceneRenders()).toBe(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
   } finally { environment.dispose(); }
   expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0); expect(cascadeShadowUniforms.surface_cascadeAtlas.value).toBeNull();
@@ -194,7 +194,7 @@ it("lights the scene by another moment's sun: sky, haze, light, foliage and shad
   const renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
   const daylight = {date: '2023-06-10', sessions: [{id: 'race' as const, localTime: '15:00', sunElevationDeg: 50, sunBearingDeg: 200}], airPollution: 0.6, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
   const at = (sessionTimeSec: number, cloudCover: number) => sceneSun(venue(daylight), 0, {session: 'race', startMinute: null, sessionTimeSec, cloudCover});
-  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', at(0, 0));
+  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', null, at(0, 0));
   const sunLight = scene.getObjectByName('sun') as DirectionalLight, fog = scene.fog as FogExp2;
   try {
     // Before the venue is captured, a new sun makes a new first environment from the new sky.

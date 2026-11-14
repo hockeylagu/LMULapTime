@@ -2,6 +2,8 @@ import { BackSide, BatchedMesh, BoxGeometry, DoubleSide, Mesh, MeshDepthMaterial
 import { expect, it, vi } from 'vitest';
 import { createShadowCasterPass } from '../../../../../src/components/replay/view3d/shadows/shadowCasterPass.js';
 
+const noBias = {slope: 0, units: 0};
+
 it('draws opaque surfaces and cut-outs into the shadow, but not blended glass, then restores every material', () => {
   const scene = new Scene();
   const body = new Mesh(new BoxGeometry(), new MeshStandardMaterial());
@@ -15,7 +17,7 @@ it('draws opaque surfaces and cut-outs into the shadow, but not blended glass, t
     render() { Object.assign(seen, {body: body.material, glass: glass.material, grille: grille.material}); },
   } as unknown as WebGLRenderer;
   const originals = [body.material, glass.material, grille.material];
-  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}], new PerspectiveCamera(), [], 0);
+  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}], new PerspectiveCamera(), [], 0);
   // The windscreen lets the sun into the cockpit; a grille's alpha-tested bars still cast.
   expect([seen.body, seen.grille].every(material => material instanceof MeshDepthMaterial && material.visible)).toBe(true);
   expect(seen.glass.visible).toBe(false);
@@ -34,7 +36,7 @@ it('shares one depth material among casters that draw alike: same side, and for 
     autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
     render() { seen.push([a, b, twoSided, grille, grille2, hedge].map(({material}) => material as Material)); },
   } as unknown as WebGLRenderer;
-  const pass = createShadowCasterPass(renderer, scene), draw = () => pass.draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}], new PerspectiveCamera(), [], 0);
+  const pass = createShadowCasterPass(renderer, scene), draw = () => pass.draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}], new PerspectiveCamera(), [], 0);
   draw(); draw();
   const [first, again] = seen, [da, db, dTwo, dGrille, dGrille2, dHedge] = first as MeshDepthMaterial[];
   expect(da).toBe(db); expect(da.side).toBe(BackSide); expect(dTwo).not.toBe(da); expect(dTwo.side).toBe(DoubleSide);
@@ -56,9 +58,11 @@ it('gives a batch its own depth material beside a plain mesh of the same materia
     autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
     render() { seen = [batch, plain, other].map(mesh => mesh.material as Material); },
   } as unknown as WebGLRenderer;
-  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}], new PerspectiveCamera(), [], 0);
+  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: {slope: 1, units: 419}}], new PerspectiveCamera(), [], 0);
   expect(seen[1]).toBe(seen[2]); expect(seen[0]).not.toBe(seen[1]);
   expect(seen.every(depth => depth instanceof MeshDepthMaterial && depth.side === BackSide)).toBe(true);
+  // Each caster draws with its layer's depth offset.
+  expect(seen.map(depth => [depth.polygonOffset, depth.polygonOffsetFactor, depth.polygonOffsetUnits])).toEqual(Array(3).fill([true, 1, 419]));
 });
 
 it('draws the shadow in plain depth while the scene uses a reversed depth range, then goes back to it', () => {
@@ -67,7 +71,7 @@ it('draws the shadow in plain depth while the scene uses a reversed depth range,
     autoClear: true, state: {buffers: {depth: {getReversed: () => true, setReversed(value: boolean) { calls.push(value); }}}},
     clear() { calls.push('clear'); }, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {}, render() { calls.push('render'); },
   } as unknown as WebGLRenderer;
-  createShadowCasterPass(renderer, new Scene()).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}], new PerspectiveCamera(), [], 0);
+  createShadowCasterPass(renderer, new Scene()).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}], new PerspectiveCamera(), [], 0);
   expect(calls).toEqual([false, 'clear', 'render', true]);
 });
 
@@ -81,7 +85,7 @@ it("sizes a batch by its instances' bounds, not by its reserved buffer", () => {
     autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
     render() { drawn = batch.visible; },
   } as unknown as WebGLRenderer;
-  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}], new PerspectiveCamera(), [], 1);
+  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}], new PerspectiveCamera(), [], 1);
   expect([drawn, batch.geometry.boundingSphere]).toEqual([false, null]);
 });
 
@@ -100,7 +104,7 @@ it('walks the scene and swaps materials once for several layers, each rendered w
     render(_scene: Scene, camera: unknown) { calls.push({camera, viewport: target.viewport.clone(), depth: body.material instanceof MeshDepthMaterial, blind: !(glass.material as Material).visible}); },
   } as unknown as WebGLRenderer;
   const original = body.material;
-  createShadowCasterPass(renderer, scene).draw(target, lights.map((light, i) => ({viewport: new Vector4(i * 2, 0, 2, 2), light})), new PerspectiveCamera(), [], 0);
+  createShadowCasterPass(renderer, scene).draw(target, lights.map((light, i) => ({viewport: new Vector4(i * 2, 0, 2, 2), light, depthBias: noBias})), new PerspectiveCamera(), [], 0);
   expect(walk).toHaveBeenCalledTimes(1);
   expect(assigned).toBe(2); // One swap to the depth material, one restore.
   expect(body.material).toBe(original);
@@ -117,7 +121,7 @@ it('frees its depth materials and depth-copy quad on dispose, and lets go of the
     autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
     render(root: Scene) { drawn.push((root.children[0] as Mesh).material); },
   } as unknown as WebGLRenderer;
-  const pass = createShadowCasterPass(renderer, scene), layers = [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera()}];
+  const pass = createShadowCasterPass(renderer, scene), layers = [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}];
   pass.drawRoots(new WebGLRenderTarget(4, 4), layers, new PerspectiveCamera(), [scene], new WebGLRenderTarget(4, 4));
   // The tile takes its base depth first (the copy quad), then the grille draws with its depth material.
   const [copy, depth] = drawn as [Material, MeshDepthMaterial];

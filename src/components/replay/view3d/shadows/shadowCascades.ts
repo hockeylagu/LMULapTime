@@ -1,4 +1,6 @@
 import { Vector3 } from 'three';
+import { resolveShadowSplits } from '../../../../../shared/packageContract/index.js';
+import type { CarCamera } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShadowCamera, SceneryShadows } from '../../../../../shared/types/scenes/scenery.js';
 
 /** One cascade of the sun shadow: its far split, the side of its square in the sun's frame and its tile in the atlases. */
@@ -11,10 +13,12 @@ export interface ShadowCascade {
   texelM: number;
   /** [atlas, x, y] of its tile, in texels. */
   tile: [number, number, number];
+  /** The constant depth offset its casters draw with, in units of the 24-bit shadow depth (`depthBias` · 2^23, as the reference applies it). */
+  depthBiasUnits: number;
 }
 
 /** The camera types the package publishes a cascade set for. */
-export type ShadowCascadeSet = 'chase' | 'cockpit';
+export type ShadowCascadeSet = 'chase' | 'cockpit' | 'tv';
 
 export interface ShadowCascadeLayout {
   cascades: ShadowCascade[];
@@ -23,23 +27,42 @@ export interface ShadowCascadeLayout {
   /** The view depth where the shadow starts fading out, and where it is gone (`farM`). */
   fadeStartM: number;
   farM: number;
+  /** The depth offset per unit of the casters' depth slope (`slopeBias`). */
+  slopeBias: number;
 }
 
 /**
- * The cascades of one camera type from the package's shadow profile (docs/PLUGINS.md): cascade i is a square of side
- * widthPerSplit · split_i, the last one widthPerSplit · (far − split_N−2), each in its own atlas tile; the shadow fades out over
- * lengthOfLastSpan · (far − split_N−2) before far. Throws for a camera type the package publishes no set for.
+ * A camera set with a car camera's own shadow keys over it (`CarCamera.shadow`): each one the camera sets replaces the set's, as the
+ * reference takes the active camera record's. New planes drop the set's published splits, so the layout resolves them again.
+ */
+export function shadowCameraOf(set: SceneryShadowCamera, own: CarCamera['shadow']): SceneryShadowCamera {
+  if (!own) return set;
+  const nearM = own.nearM ?? set.nearM, farM = own.farM ?? set.farM, splitRatio = own.splitRatio ?? set.splitRatio;
+  const planes = nearM !== set.nearM || farM !== set.farM || splitRatio !== set.splitRatio;
+  const ownBias = own.depthBias;
+  return {...set, nearM, farM, splitRatio, splitsM: planes ? null : set.splitsM, slopeBias: own.slopeBias ?? set.slopeBias,
+    depthBias: ownBias ? set.depthBias.map((bias, i) => ownBias[i] ?? bias) : set.depthBias};
+}
+
+/**
+ * The cascades of a camera set from the package's shadow profile (docs/PLUGINS.md): the shadow reaches far = farScale · farM, split
+ * as published or, where the set leaves them to the viewer, by the split scheme (`resolveShadowSplits`). Cascade i is a square of
+ * side widthPerSplit · split_i, the last one widthPerSplit · (far − split_N−2), each in its own atlas tile; the shadow fades out over
+ * lengthOfLastSpan · (far − split_N−2) before far. Its casters draw with the set's depth bias: WebGL's polygon offset has no clamp,
+ * so a set with one throws.
  */
 export function shadowCascadeLayout(shadows: SceneryShadows, camera: SceneryShadowCamera): ShadowCascadeLayout {
-  const splits = camera.splitsM;
-  if (!splits) throw Error('The package has no shadow cascades for this camera type');
+  const farM = camera.farM * camera.farScale;
+  const splits = camera.splitsM ?? resolveShadowSplits(camera.nearM, farM, camera.splitRatio, camera.count);
   const {fit: {widthPerSplit}, atlas: {tilePx, cascadeTiles}, fade: {lengthOfLastSpan}} = shadows;
-  const lastSpanM = camera.farM - (splits.length > 1 ? splits[splits.length - 2] : 0);
+  if (splits.length > cascadeTiles.length) throw Error(`${splits.length} shadow cascades for ${cascadeTiles.length} atlas tiles`);
+  if (camera.biasClamp !== 0) throw Error('A clamped shadow depth bias has no WebGL equivalent');
+  const lastSpanM = farM - (splits.length > 1 ? splits[splits.length - 2] : 0);
   const cascades = splits.map((splitM, i): ShadowCascade => {
     const sideM = widthPerSplit * (i === splits.length - 1 ? lastSpanM : splitM);
-    return {splitM, sideM, texelM: sideM / tilePx, tile: cascadeTiles[i]};
+    return {splitM, sideM, texelM: sideM / tilePx, tile: cascadeTiles[i], depthBiasUnits: Math.trunc(camera.depthBias[i] * 2 ** 23 + 0.5)};
   });
-  return {cascades, nearM: camera.nearM, fadeStartM: camera.farM - lengthOfLastSpan * lastSpanM, farM: camera.farM};
+  return {cascades, nearM: camera.nearM, fadeStartM: farM - lengthOfLastSpan * lastSpanM, farM, slopeBias: camera.slopeBias};
 }
 
 /** The axes of every cascade's square: u horizontal across the sun, v in the sun's vertical plane. They do not turn with the view. */

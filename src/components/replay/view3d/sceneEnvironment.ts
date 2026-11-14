@@ -2,7 +2,8 @@ import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, 
 import { nativeToScene } from './scene/sceneFrame.js';
 import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
 import { holdCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
-import { shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';
+import { shadowCameraOf, shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';
+import type { CarCamera } from '../../../../shared/types/scenes/car.js';
 import type { SceneryDaylight, SceneryLayout } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
 import { solarPosition } from './solarPosition.js';
@@ -65,8 +66,11 @@ export interface SceneEnvironment {
   setCamera(camera: PerspectiveCamera | OrthographicCamera): void;
   /** Objects that move (the cars): the cached cascades and the venue capture are drawn without them. */
   setDynamic(objects: readonly Object3D[]): void;
-  /** The package cascade set the sun's shadow comes from (shadows/). */
-  setShadowCascades(set: ShadowCascadeSet): void;
+  /**
+   * The package cascade set the sun's shadow comes from (shadows/), with a car camera's own shadow keys over it (`shadowCameraOf`).
+   * Cheap when neither changed: the shell sets it every frame.
+   */
+  setShadowCascades(set: ShadowCascadeSet, own: CarCamera['shadow']): void;
   /**
    * Captures the loaded scenery at the venue's probe (cars hidden) as the scene's environment: a first capture lit by the sun,
    * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
@@ -133,7 +137,7 @@ export function sceneSun(venue: Pick<SceneVenue, 'daylight' | 'sky' | 'shading'>
  * origin in LMU local metres.
  */
 export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, shadowSet: ShadowCascadeSet,
-  initial: SceneSun = sceneSun(venue, origin.y)): SceneEnvironment {
+  ownShadow: CarCamera['shadow'], initial: SceneSun = sceneSun(venue, origin.y)): SceneEnvironment {
   const sky = new Mesh(new BoxGeometry(1, 1, 1), createSkyDomeMaterial(initial.lighting.sunDirection, venue.sky, venue.daylight, initial.weather));
   sky.scale.setScalar(SKY_RADIUS_M);
   sky.name = 'sky'; sky.frustumCulled = false;
@@ -161,13 +165,14 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   scene.add(sun, sun.target);
   let view: PerspectiveCamera | OrthographicCamera | null = null, dynamic: readonly Object3D[] = [];
   // The surfaces sample a set only after its first draw; until then they are held lit on its atlas.
-  const startCascades = (set: ShadowCascadeSet) => {
-    const {shadows} = venue.shading, layout = shadowCascadeLayout(shadows, shadows.cameras[set]);
+  const startCascades = (set: ShadowCascadeSet, own: CarCamera['shadow']) => {
+    const {shadows} = venue.shading, layout = shadowCascadeLayout(shadows, shadowCameraOf(shadows.cameras[set], own));
     const pass = createCascadeShadows(renderer, scene, shadows, layout, toSun.clone().negate());
     holdCascadeShadows(pass.state.atlas);
-    return {set, layout, pass, sampled: false};
+    return {set, own, layout, pass, sampled: false};
   };
-  let cascades: {set: ShadowCascadeSet; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} = startCascades(shadowSet), lit = false;
+  let cascades: {set: ShadowCascadeSet; own: CarCamera['shadow']; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} =
+    startCascades(shadowSet, ownShadow), lit = false;
   scene.add(sky);
   /** The haze colour toward a view heading (and the sky's, just above the horizon), and the haze terms hazed materials read. */
   let haze: ReturnType<typeof hazeColour> = () => fog.color, applyHaze: () => void = () => {}, cloudLayer: ReturnType<typeof createCloudLayer> | null = null;
@@ -246,10 +251,10 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   return {
     setCamera(camera) { view = camera; },
     setDynamic(objects) { dynamic = objects; },
-    setShadowCascades(set) {
-      if (cascades.set === set) return;
+    setShadowCascades(set, own) {
+      if (cascades.set === set && cascades.own === own) return;
       const previous = cascades.pass;
-      cascades = startCascades(set); previous.dispose();
+      cascades = startCascades(set, own); previous.dispose();
     },
     applyHaze: () => applyHaze(),
     captureVenue,

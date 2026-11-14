@@ -55,6 +55,8 @@ export interface CameraRig {
   unplace(): void;
   /** Free views (not on a car) keep the eye above the ground and out of walls; car-mounted and overhead views do not. */
   readonly checksGround: boolean;
+  /** The primary car's game camera of a car-mounted view, null in the other views or before the first layer. */
+  readonly gameCamera: LoadedBody['descriptor']['cameras']['list'][number] | null;
   /** The lap's cars: trackside spots along its line, and the game cameras and cockpit mesh of its primary car. */
   setLayer(layer: RigCar): void;
   /** Moves the camera with the primary car's pose by the mode's rule (the first pose places it). */
@@ -126,6 +128,7 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
     get timeSec() { return currentTime; },
     unplace() { placed = false; },
     get checksGround() { return camera === perspective && !isDriverCamera(mode); },
+    get gameCamera() { return layer && isDriverCamera(mode) ? driverCamera(layer.cameras, mode) : null; },
     setLayer(next) {
       layer = next;
       trackside = createTracksideCameras(next.trajectory.points, next.primaryDistances, origin);

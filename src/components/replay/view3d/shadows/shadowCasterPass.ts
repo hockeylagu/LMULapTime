@@ -6,7 +6,8 @@ import {
 import { trackShadowEye } from '../scenery/materials/shadowEye.js';
 
 /** One rectangle (texels) of a depth target and the sun camera that fills it. */
-export interface ShadowLayer { viewport: Vector4; light: OrthographicCamera }
+/** A tile to draw: its viewport, its sun camera and the depth offset its casters draw with (polygon offset factor and units). */
+export interface ShadowLayer { viewport: Vector4; light: OrthographicCamera; depthBias: {slope: number; units: number} }
 
 /** Draws the shadow casters of a scene into rectangles of a depth target, from sun cameras. */
 export interface ShadowCasterPass {
@@ -138,8 +139,11 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
       renderer.autoClear = false;
       // The shadow lookups compare plain depth (near 0, far 1), so this pass leaves the scene's reversed depth range.
       depth.setReversed(false);
-      for (const {viewport, light} of layers) {
+      for (const {viewport, light, depthBias} of layers) {
         target.viewport.copy(viewport); target.scissor.copy(viewport);
+        for (const caster of depthMaterials.values()) {
+          caster.polygonOffset = true; caster.polygonOffsetFactor = depthBias.slope; caster.polygonOffsetUnits = depthBias.units;
+        }
         renderer.setRenderTarget(target);
         if (clear) renderer.clear(false, true, false);
         // Each tile first takes its base depth, as stored, at the same texels.

@@ -124,7 +124,8 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   };
   const casters = createShadowCasterPass(renderer, scene), light = lightTravel.clone(), eye = new Vector3(), forward = new Vector3();
   let axes = sunSquareAxes(light);
-  const layersOf = (indices: readonly number[]) => indices.map(i => ({viewport: cascades[i].viewport, light: cascades[i].camera}));
+  const layersOf = (indices: readonly number[]) => indices.map(i => ({viewport: cascades[i].viewport, light: cascades[i].camera,
+    depthBias: {slope: layout.slopeBias, units: cascades[i].cascade.depthBiasUnits}}));
   // Puts the cascades' cameras at their new centres; what is drawn from them follows (`moved`).
   const place = (indices: readonly number[], centres: Array<[number, number]>) => {
     for (const i of indices) {

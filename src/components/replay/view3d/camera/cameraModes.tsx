@@ -30,11 +30,15 @@ export function exposureType(mode: CameraMode): SceneryCameraType {
 }
 
 /**
- * The package's sun shadow cascade set a view samples: the cockpit set onboard, the chase set for every other view (the package
- * publishes no splits for the TV cameras, and the free views are not game cameras).
+ * The package's sun shadow cascade set a view samples: the cockpit set onboard, the TV set trackside, the chase set for every other
+ * view (the free views are not game cameras). A car-mounted view's own game camera may set keys over it (`shadowCameraOf`).
  */
 export function shadowCascadeSet(mode: CameraMode): ShadowCascadeSet {
-  return mode === 'cockpit' ? 'cockpit' : 'chase';
+  switch (mode) {
+    case 'cockpit': return 'cockpit';
+    case 'trackside': return 'tv';
+    case 'follow': case 'chase': case 'hood': case 'roof': case 'orbit': case 'top': return 'chase';
+  }
 }
 
 /** Mode keys belong to the active 3D map, with the same typing/dialog guards as replay keys. */

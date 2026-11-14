@@ -206,9 +206,12 @@ randoms are the package's averages. The venue capture is taken without them.
 `shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside
 their atlas, one per cascade), `select`, `filter` (taps whose weights times `scale` sum to 1), `normalOffset`, `texelSnap`, `fit`, `fade`,
 `centre` and `orientation` (each exactly the one rule the viewer accepts: squares centred at the middle of their view slice, axes
-fixed to the sun) and `cameras` with exactly `chase`, `cockpit` and `tv`. Each camera set has `nearM` < `farM` and either a `splitRatio` in 0..1, a `count`
-no larger than the tile count and that many ascending `splitsM` ending at `farM`, or all three null (no published set). The viewer does
-not use it yet.
+fixed to the sun) and `cameras` with exactly `chase`, `cockpit` and `tv`. Each camera set has `nearM` < `farScale` · `farM` (the shadow's
+reach), a `splitRatio` in 0..1, a `count` no larger than the tile count, one `depthBias` per cascade, `slopeBias` and `biasClamp`, and
+either `splitsM` (the split scheme `resolveShadowSplits` gives, ending at the reach) or null, where the viewer resolves them itself
+(`shadows/shadowCascades.ts`). A car-mounted view samples its game camera's own `shadow` keys over the set (`shadowCameraOf`; new planes
+resolve new splits). Casters draw with WebGL's polygon offset: factor `slopeBias`, units `depthBias` · 2^23 rounded, a unit of the 24-bit
+shadow depth; a set with a non-zero `biasClamp` has no WebGL equivalent and is refused.
 
 Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Only the small cloud
 map files are hashed, once at load. Package files

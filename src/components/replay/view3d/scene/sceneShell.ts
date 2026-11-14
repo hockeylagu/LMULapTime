@@ -243,7 +243,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   let environment!: ReturnType<typeof addSceneEnvironment>, reflection!: ReturnType<typeof createCarReflection>;
   const convolution = linkConvolution(renderer, layout.shading.convolution.kernels);
   lit = Promise.resolve().then(() => {
-    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), sun);
+    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null, sun);
     reflection = createCarReflection(renderer, scene, layout.shading);
   });
   lit.then(() => report({lighting: 1}), () => {}); // Awaited by the content.
@@ -282,6 +282,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     }
     try {
       sceneryClock.value = rig.timeSec;
+      // A new primary car brings its own game cameras, whose shadow keys may differ.
+      environment.setShadowCascades(shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null);
       underCarBaker.flush(renderer); // Bakes at most one car body's under-car shade per frame; every car of that body then shows it.
       content.beforeDraw(camera);
       updateShownMatrices(scene, isFrozen);
@@ -405,7 +407,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     setMode(next) {
       if (!rig.setMode(next)) return false;
       if (isDriverCamera(next) && !driverCameraUsed) { driverCameraUsed = true; warmup.sharpenHeld(); }
-      environment.setCamera(rig.camera); environment.setShadowCascades(shadowCascadeSet(next));
+      environment.setCamera(rig.camera); environment.setShadowCascades(shadowCascadeSet(next), rig.gameCamera?.shadow ?? null);
       exposure.setType(exposureType(next));
       return true;
     },

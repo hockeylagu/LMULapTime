@@ -7,7 +7,8 @@ it('exposes the cockpit as onboard, trackside as TV and every other view as exte
   expect((['follow', 'chase', 'hood', 'roof', 'orbit', 'top'] as const).map(exposureType)).toEqual(Array(6).fill('external'));
 });
 
-it('samples the cockpit cascade set onboard and the chase set in every other view', () => {
+it('samples the cockpit cascade set onboard, the TV set trackside and the chase set in every other view', () => {
   expect(shadowCascadeSet('cockpit')).toBe('cockpit');
-  expect((['follow', 'chase', 'hood', 'roof', 'orbit', 'trackside', 'top'] as const).map(shadowCascadeSet)).toEqual(Array(7).fill('chase'));
+  expect(shadowCascadeSet('trackside')).toBe('tv');
+  expect((['follow', 'chase', 'hood', 'roof', 'orbit', 'top'] as const).map(shadowCascadeSet)).toEqual(Array(6).fill('chase'));
 });

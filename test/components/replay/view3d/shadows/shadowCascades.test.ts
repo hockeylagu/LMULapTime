@@ -1,6 +1,7 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { cascadeCentres, shadowCascadeLayout, snapCascadeCentre, sunSquareAxes } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
+import { resolveShadowSplits } from '../../../../../shared/packageContract/index.js';
+import { cascadeCentres, shadowCameraOf, shadowCascadeLayout, snapCascadeCentre, sunSquareAxes } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const {shadows} = testShading();
@@ -45,7 +46,31 @@ describe('shadow cascades', () => {
     chase.cascades.forEach((cascade, i) => expect(across[i][0]).toBeCloseTo(snapCascadeCentre(0, cascade), 9));
   });
 
-  it('has no cascades for a camera type the package publishes no set for', () => {
-    expect(() => shadowCascadeLayout(shadows, shadows.cameras.tv)).toThrow(/no shadow cascades/);
+  it('splits a set the package leaves to the viewer by the split scheme, out to its scaled far', () => {
+    // TV: far 200 · farScale 3, ratio 0.68 over 2 cascades.
+    const tv = shadowCascadeLayout(shadows, shadows.cameras.tv);
+    expect(tv.farM).toBe(600);
+    expect(tv.cascades.map(cascade => cascade.splitM)).toEqual(resolveShadowSplits(1, 600, 0.68, 2));
+    expect(tv.fadeStartM).toBeLessThan(600);
+  });
+
+  it("draws each cascade with its depth bias in 24-bit depth units (bias · 2^23, rounded) and the set's slope bias", () => {
+    // 5e-5 · 2^23 = 419.4 and 6e-5 · 2^23 = 503.3.
+    expect(chase.cascades.map(cascade => cascade.depthBiasUnits)).toEqual([419, 419, 503]);
+    expect(chase.slopeBias).toBe(1);
+    expect(() => shadowCascadeLayout(shadows, {...shadows.cameras.chase, biasClamp: 0.01})).toThrow(/clamped/);
+    expect(() => shadowCascadeLayout(shadows, {...shadows.cameras.chase, splitsM: [1, 2, 3, 4, 5]})).toThrow(/atlas tiles/);
+  });
+
+  it("takes a car camera's own shadow keys over the set's", () => {
+    const set = shadows.cameras.chase;
+    expect(shadowCameraOf(set, null)).toBe(set);
+    // Bias alone keeps the published splits; a missing per-cascade value keeps the set's.
+    const biased = shadowCameraOf(set, {nearM: null, farM: null, splitRatio: null, depthBias: [7e-5], slopeBias: 2});
+    expect([biased.splitsM, biased.depthBias, biased.slopeBias]).toEqual([set.splitsM, [7e-5, 5e-5, 6e-5], 2]);
+    // New planes drop the published splits, so the layout resolves them from the camera's planes.
+    const near = shadowCameraOf(set, {nearM: 0.5, farM: 150, splitRatio: null, depthBias: null, slopeBias: null});
+    expect([near.nearM, near.farM, near.splitRatio, near.splitsM, near.depthBias]).toEqual([0.5, 150, 0.9, null, set.depthBias]);
+    expect(shadowCascadeLayout(shadows, near).cascades.map(cascade => cascade.splitM)).toEqual(resolveShadowSplits(0.5, 150, 0.9, 3));
   });
 });
