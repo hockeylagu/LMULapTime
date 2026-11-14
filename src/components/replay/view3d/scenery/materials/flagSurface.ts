@@ -1,9 +1,6 @@
 import { glslNumber, list, value, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
-/** Seconds since the viewer started; shared by every digital flag uniform and advanced by `configureSurfaceMaterial`'s render hook. */
-export const digitalFlagClock = { value: 0 };
-
 /** Digital flag: the blink period switches two images. */
 export function digitalFlagShaderParts(config: SurfaceConfig, { sample, number }: ShaderContext): SurfaceParts {
   const period = value(config.parameters.blink, 'period');
@@ -11,7 +8,7 @@ export function digitalFlagShaderParts(config: SurfaceConfig, { sample, number }
     albedo: `
       vec4 flagOn=${sample('on')};
       vec3 flagOff=${sample('off')}.rgb;
-      float flagBlink=float(cos(surface_flag_elapsed*3.141592653589793/${number(period)})>0.0);
+      float flagBlink=float(cos(surface_time*3.141592653589793/${number(period)})>0.0);
       diffuseColor.rgb=mix(flagOff,flagOn.rgb,flagBlink);
       diffuseColor.a=1.0;
       surfaceRoughness=0.75;

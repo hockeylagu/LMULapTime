@@ -109,7 +109,7 @@ describe('shaderParts', () => {
   });
   it('adds the blink clock for digital flags and keeps the authored period', () => {
     const parts = shaderParts(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) }, parameters: { blink: { period: 0.5 } } }), { uniforms: false });
-    expect(parts.declarations).toContain('uniform float surface_flag_elapsed;'); expect(parts.albedo).toContain('3.141592653589793/0.50000000');
+    expect(parts.declarations).toContain('uniform float surface_time;'); expect(parts.albedo).toContain('3.141592653589793/0.50000000');
   });
   it('widens the water roughness by the screen-space spread of the wave normal', () => {
     const water = shaderParts(surface('water', { maps: { albedo: map('A', true), normalA: map('N', false) } }));
@@ -301,7 +301,7 @@ describe('patchSurfaceShader', () => {
   });
   it('shares the digital flag clock uniform object', () => {
     const shader = patched(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) } }));
-    expect(shader.uniforms).toHaveProperty('surface_flag_elapsed');
+    expect(shader.uniforms).toHaveProperty('surface_time');
   });
 });
 

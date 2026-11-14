@@ -1,6 +1,6 @@
 import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
 import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
-import { digitalFlagClock } from './flagSurface.js';
+import { sceneryClock } from './sceneryClock.js';
 import { patchAmbientLookup } from './ambientLookup.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
 import { glslNumber, list, surfaceAlphaCut, value } from './shaderContext.js';
@@ -122,7 +122,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   Object.assign(shader.uniforms, tunables, {
     surface_alphaCut: surfaceAlphaCut,
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
-  }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_flag_elapsed: digitalFlagClock } : {}, uniforms);
+  }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_time: sceneryClock } : {}, uniforms);
 
   const neededUvs = new Set<string>();
   for (const map of Object.values(config.maps)) if (map?.uv) neededUvs.add(map.uv);

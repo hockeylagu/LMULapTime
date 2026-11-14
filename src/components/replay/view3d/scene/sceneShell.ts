@@ -27,6 +27,7 @@ import { trackCardFacing } from '../scenery/materials/shadowEye.js';
 import { isDriverCamera } from '../camera/driverCameras.js';
 import { isFreeCameraMode, viewMoved } from '../scenery/streamView.js';
 import { placeCarFrame } from '../cars/carParts.js';
+import { sceneryClock } from '../scenery/materials/sceneryClock.js';
 import type { CarMotion } from '../cars/carMotion.js';
 
 /** What a scene shows on the circuit: the lap view's cars and lines, or the race replay's cars. */
@@ -279,6 +280,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       camera.lookAt(rig.focus);
     }
     try {
+      sceneryClock.value = rig.timeSec;
       content.beforeDraw(camera);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);

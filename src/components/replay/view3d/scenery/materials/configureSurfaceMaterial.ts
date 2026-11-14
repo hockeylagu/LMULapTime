@@ -1,13 +1,11 @@
 import { Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Vector2, type IUniform, type Material, type Texture } from 'three';
 import { hazeProgram } from '../../atmosphere/haze.js';
-import { digitalFlagClock } from './flagSurface.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from './patchSurfaceShader.js';
 import { list, value } from './shaderContext.js';
 import { surfaceTextureUnits } from './shaderParts.js';
 import { readSurfaceConfig, type SurfaceConfig } from './surfaceConfig.js';
 import type { SurfaceTextureSource } from './textureSource.js';
 
-const START_MS = performance.now();
 
 /** The textures a configured surface material samples through its own uniforms (not glTF slots), for GPU warm-up. */
 export const surfaceTextureMaps = new WeakMap<Material, Texture[]>();
@@ -158,6 +156,4 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
     geometry.boundingSphere.radius += extent;
     mesh.customDepthMaterial = billboardShadowMaterial();
   }
-  // Digital flags blink on one shared clock, advanced as they draw.
-  if (config.kind === 'digitalFlag') mesh.onBeforeRender = () => { digitalFlagClock.value = (performance.now() - START_MS) / 1000; };
 }

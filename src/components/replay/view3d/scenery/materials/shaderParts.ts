@@ -181,7 +181,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   const parts = familyParts(config, context, tint);
   const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`).join('\n');
   return {
-    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_flag_elapsed;' : '')
+    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '')
       + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);

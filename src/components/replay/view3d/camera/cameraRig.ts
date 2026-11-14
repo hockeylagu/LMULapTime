@@ -49,6 +49,8 @@ export interface CameraRig {
   readonly focus: Vector3;
   /** Whether the first pose has placed the camera. */
   readonly placed: boolean;
+  /** The replay time of the pose the camera last followed, in seconds. */
+  readonly timeSec: number;
   /** The next pose places the camera again, as the first did: new content (lap or race) takes over the scene. */
   unplace(): void;
   /** Free views (not on a car) keep the eye above the ground and out of walls; car-mounted and overhead views do not. */
@@ -121,6 +123,7 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
     get mode() { return mode; },
     focus: controls.target,
     get placed() { return placed; },
+    get timeSec() { return currentTime; },
     unplace() { placed = false; },
     get checksGround() { return camera === perspective && !isDriverCamera(mode); },
     setLayer(next) {
