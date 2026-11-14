@@ -238,7 +238,7 @@ describe('patchSurfaceShader', () => {
   });
   it("takes ambient light with the normal's height halved, and reflects by the package's rule except on glass and clear coat", () => {
     const shader = patched(surface('standard', { maps: { albedo: map('A', true) } }));
-    expect(shader.fragmentShader).toContain('getIBLIrradiance( normalize( geometryNormal * vec3( 1.0, 0.5, 1.0 ) ) )');
+    expect(shader.fragmentShader).toContain('getIBLIrradiance( transformDirection( inverseTransformDirection( geometryNormal, viewMatrix ) * vec3( 1.0, 0.5, 1.0 ), viewMatrix ) )');
     expect(shader.fragmentShader).not.toContain('getIBLIrradiance( geometryNormal )');
     // The venue's convolved cube at lodScale × roughness, the split-sum table at (N·V, roughness), the family's inputs set before the lights.
     expect(shader.fragmentShader).toContain('#define RE_IndirectSpecular surfaceIndirectSpecular');
