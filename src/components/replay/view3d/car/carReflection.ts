@@ -34,9 +34,10 @@ export interface CarReflection {
    * completes it before the first frame). Hidden while faces render. */
   setCar(car: Object3D, hidden: Object3D): void;
   /**
-   * Another car near the reflected one: its lit materials other than paint (glass, trim, mirrors) reflect the probe too, in place of
-   * the venue's view from one place of the circuit. Their programs are then the reflected car's: following a car of another body
-   * links nothing new. Its paint and its surface-program parts keep the venue's cube.
+   * Another car near the reflected one reflects its probe too, as the reference's other cars reflect the player's car cube: its paint
+   * reads the probe's cubes, its other lit materials (glass, trim, mirrors) the prefiltered one, in place of the venue's view from
+   * one place of the circuit. Their programs are then the reflected car's: following a car of another body links nothing new. Its
+   * surface-program parts keep the venue's cube.
    */
   share(car: Object3D): void;
   /** The resident scenery changed: render a new probe even if the car has not moved. */
@@ -95,6 +96,9 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
   const prefiltered: WebGLCubeRenderTarget = generator.fromCubemap(target.texture);
   let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, rested = 0;
+  /** The paint of the cars sharing the probe (`share`), until each material is disposed. */
+  const sharedPaint = new Set<Material>();
+  const forget = (event: {target: Material}) => { sharedPaint.delete(event.target); };
   /** What the next update does once the faces are drawn: prefilter them for three's materials, then convolve them for the paint. */
   let pending: 'prefilter' | 'convolve' | null = null;
   let cubes: ReflectionCubes | null = null, eyeAbove = EYE_ABOVE_CENTRE_M;
@@ -104,6 +108,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       setSurfaceReflection(material, cubes);
       if (!setPaintReflection(material, cubes) && material.envMap === null) material.envMap = prefiltered.texture;
     }
+    for (const paint of sharedPaint) setPaintReflection(paint, cubes);
   };
   return {
     setCar(car, nextHidden) {
@@ -123,7 +128,11 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       car.traverse(object => {
         const material: unknown = (object as Partial<Mesh>).material;
         for (const entry of Array.isArray(material) ? material as unknown[] : [material]) {
-          if (entry instanceof MeshStandardMaterial && !isCarPaint(entry) && entry.envMap === null) entry.envMap = prefiltered.texture;
+          if (!(entry instanceof MeshStandardMaterial)) continue;
+          if (isCarPaint(entry)) {
+            if (!sharedPaint.has(entry)) { sharedPaint.add(entry); entry.addEventListener('dispose', forget); }
+            setPaintReflection(entry, cubes);
+          } else if (entry.envMap === null) entry.envMap = prefiltered.texture;
         }
       });
     },
@@ -171,6 +180,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         setSurfaceReflection(material, null);
         if (!setPaintReflection(material, null) && material.envMap === prefiltered.texture) material.envMap = null;
       }
+      for (const paint of sharedPaint) { setPaintReflection(paint, null); paint.removeEventListener('dispose', forget); }
+      sharedPaint.clear();
       for (const each of targets) each.dispose();
       prefiltered.dispose(); cubes?.dispose(); generator.dispose();
     },

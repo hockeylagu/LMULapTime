@@ -105,17 +105,25 @@ it('renders the probe one face a frame from the roof without the cars, then give
   sceneryReflectionUniforms.surface_reflection.value = null;
 });
 
-it('gives a near car the probe for its glass and trim, its paint and surface parts keeping the venue', () => {
+it('gives a near car the probe: its glass and trim the prefiltered cube, its paint the probe cubes from the first one on', () => {
   const {renderer} = stubRenderer();
   const reflection = createCarReflection(renderer, new Scene(), testShading());
   const own = new MeshPhysicalMaterial(), nearGlass = new MeshPhysicalMaterial(), nearPaint = new MeshPhysicalMaterial({map: new Texture()}), unlit = new MeshBasicMaterial();
   configureCarPaint(nearPaint, carPaint(), () => new Texture(), testShading());
+  const probe = () => { const shader = {uniforms: {}, vertexShader: '', fragmentShader: ''}; nearPaint.onBeforeCompile(shader as never, null as never); return (shader.uniforms as Record<string, {value: unknown}>).paint_probe.value; };
   reflection.setCar(new Mesh(new BoxGeometry(), own), new Group());
   reflection.share(new Group().add(new Mesh(new BoxGeometry(), [nearGlass, nearPaint, unlit])));
   // The followed car's prefiltered probe: the same program as the followed car's glass.
   expect(nearGlass.envMap).toBe(own.envMap); expect(nearGlass.envMap).not.toBeNull();
   expect(nearPaint.envMap).toBeNull(); expect(unlit.envMap).toBeNull();
+  // The paint waits for the first complete probe, as the followed car's does.
+  expect(probe()).toBe(0);
+  for (let i = 0; i < CAR_REFLECTION_STEPS; i++) reflection.update(new Vector3());
+  expect(probe()).toBe(1);
+  // A disposed car leaves the probe; the rest go back to the venue's environment with it.
+  nearPaint.dispose(); reflection.update(new Vector3(5, 0, 0));
   reflection.dispose();
+  expect(probe()).toBe(1);
 });
 
 const region = {
