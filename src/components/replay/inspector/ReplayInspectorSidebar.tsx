@@ -173,14 +173,15 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
         }}
       />
 
-      {isDoublePanel ? (
-        <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-          {/* LEFT SUB-PANEL: GPS Map (Always Visible) */}
-          <div className="flex-1 md:w-1/2 min-w-0 flex flex-col min-h-0 p-0 gap-0 overflow-hidden border-b md:border-b-0 md:border-r border-lmu-border">
-            {mapContainer}
-          </div>
+      {/* One tree for every tab: the map keeps its place, so opening Corners or the AI report never reloads its 3D view. */}
+      <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${isDoublePanel ? 'md:flex-row' : ''}`}>
+        {/* LEFT SUB-PANEL: GPS Map (Always Visible) */}
+        <div className={`flex-1 min-w-0 flex flex-col min-h-0 p-0 gap-0 overflow-hidden ${isDoublePanel ? 'md:w-1/2 border-b md:border-b-0 md:border-r border-lmu-border' : ''}`}>
+          {mapContainer}
+        </div>
 
-          {/* RIGHT SUB-PANEL: Corners or AI Report */}
+        {/* RIGHT SUB-PANEL: Corners or AI Report */}
+        {isDoublePanel && (
           <div className="flex-1 md:w-1/2 min-w-0 flex flex-col min-h-0 overflow-hidden">
             {activeTab === 'corners' && (
               <div className="px-3 py-1.5 border-b border-lmu-border/60 flex items-center justify-between gap-2 shrink-0">
@@ -275,12 +276,8 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
               />
             )}
           </div>
-        </div>
-      ) : (
-        <div className="flex-1 flex flex-col min-h-0 h-full p-0 gap-0 overflow-hidden">
-          {mapContainer}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

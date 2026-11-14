@@ -165,6 +165,17 @@ describe('ReplayInspectorSidebar', () => {
     expect(screen.queryByText(/vs Baseline/i)).not.toBeInTheDocument();
   });
 
+  it('keeps the same map (and its 3D view) through the Corners and AI report tabs', () => {
+    const { rerender } = render(<ReplayInspectorSidebar {...baseProps} activeTab="map" />);
+    const map = screen.getByTitle('Zoom In (+)');
+    rerender(<ReplayInspectorSidebar {...baseProps} activeTab="corners" />);
+    expect(screen.getByTitle('Zoom In (+)')).toBe(map);
+    rerender(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" />);
+    expect(screen.getByTitle('Zoom In (+)')).toBe(map);
+    rerender(<ReplayInspectorSidebar {...baseProps} activeTab="map" />);
+    expect(screen.getByTitle('Zoom In (+)')).toBe(map);
+  });
+
   it('renders AI Report alongside the GPS map when activeTab is ai-report and allows closing with X on tabs row', async () => {
     const setActiveTab = vi.fn();
     render(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" setActiveTab={setActiveTab} />);
