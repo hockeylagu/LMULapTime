@@ -43,8 +43,8 @@ export function inverseToneCurve(curve: SceneryToneCurve, y: number): number {
 
 /** Metering grid: METER_PX² cells of SAMPLES² taps each, read back without stalling the frame. */
 const METER_PX = 16, SAMPLES = 4, METER_EVERY_FRAMES = 4;
-/** Adaptation rate (1/s) in log luminance, and the gap under which exposure counts as settled. */
-const ADAPT_PER_S = 2.0, SETTLED_LOG = 0.01;
+/** The gap (stops) under which exposure counts as settled, and the period the adaptation's sensitivity is a blend fraction of. */
+const SETTLED_STOPS = 0.01, ADAPT_PERIOD_S = 0.15;
 
 /**
  * A camera type's time-of-day profile for the direct sun: the two profiles around the sun's position along their knots
@@ -106,9 +106,25 @@ export function whiteBalance(kelvin: number): Matrix3 {
   return fromCone.multiply(scale).multiply(toCone);
 }
 
-/** One adaptation step toward the log of the metered luminance, in log space (Pattanaik); the first reading is taken as is. */
-export function adaptLogLuminance(current: number | null, metered: number, seconds: number): number {
-  return current === null ? metered : current + (metered - current) * (1 - Math.exp(-seconds * ADAPT_PER_S));
+/** The adapting exposure: its log2 (stops) and the smoothed step it is moving by. */
+export interface AdaptedExposure { log2: number; step: number }
+
+/**
+ * One frame of the eye adaptation, in stops of exposure after the law, as the reference adapts: with k = 1 − (1 − sensitivity)^(dt / 0.15),
+ * the step toward the law's target is (target − current) · k capped at speedLimit stops a second, then smoothed again by k and kept
+ * between 0 and that step; reaching or passing the target lands on it. A rising exposure (the scene darkening) takes the dark set,
+ * whose negative values stand for the light ones. The delay is 0 in every published type and is not applied.
+ */
+export function adaptExposure(current: AdaptedExposure, target: number, seconds: number, adaptation: SceneryCameraTypeProfile['adaptation']): AdaptedExposure {
+  const dark = target > current.log2 ? adaptation.darkAdaptation : null;
+  const sensitivity = dark && dark.sensitivity >= 0 ? dark.sensitivity : adaptation.sensitivity;
+  const speedLimit = dark && dark.speedLimit >= 0 ? dark.speedLimit : adaptation.speedLimit;
+  const k = 1 - (1 - Math.min(1, Math.max(0, sensitivity))) ** (seconds / ADAPT_PERIOD_S), cap = speedLimit * seconds;
+  const step = Math.min(cap, Math.max(-cap, (target - current.log2) * k));
+  const smoothed = current.step + (step - current.step) * k;
+  const kept = step >= 0 ? Math.min(step, Math.max(0, smoothed)) : Math.max(step, Math.min(0, smoothed));
+  const log2 = current.log2 + kept;
+  return (target - log2) * (target - current.log2) <= 0 ? {log2: target, step: 0} : {log2, step: kept};
 }
 
 /** The name of the full-screen exposure and metering scenes, which are not the replay scene. */
@@ -141,6 +157,7 @@ interface ResolvedType extends CameraTimeOfDay {
   /** Metering window as [x, y, width, height] in texture space (y up). */
   window: [number, number, number, number];
   adaptationScale: number;
+  adaptation: SceneryCameraTypeProfile['adaptation'];
   balance: Matrix3;
   display: DisplayTransform;
 }
@@ -148,7 +165,7 @@ interface ResolvedType extends CameraTimeOfDay {
 function resolveType(profile: SceneryCameraTypeProfile, sun: ProfileSun, weather: {cloudCover: number; sunVisibility?: number}, outputGamma: number): ResolvedType {
   const time = profileAt(profile, sun, weather.cloudCover, weather.sunVisibility), w = profile.meteringWindow;
   return {
-    ...time, window: [w.x, 1 - w.y - w.height, w.width, w.height], adaptationScale: profile.adaptationScale,
+    ...time, window: [w.x, 1 - w.y - w.height, w.width, w.height], adaptationScale: profile.adaptationScale, adaptation: profile.adaptation,
     balance: whiteBalance(time.whiteBalanceK), display: {toneCurve: time.toneCurve, outputGamma},
   };
 }
@@ -214,7 +231,9 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   });
   output.add(new Mesh(quad, outputMaterial)); meterScene.add(new Mesh(quad, meterMaterial));
   const readback = new Uint16Array(METER_PX * METER_PX * 4);
-  let adapted: number | null = null, metered: number | null = null, reading = false, frames = 0, last = 0, disposed = false, generation = 0;
+  let adapted: AdaptedExposure | null = null, metered: number | null = null, reading = false, frames = 0, last = 0, disposed = false, generation = 0;
+  /** The law's exposure (stops) for the metered luminance under the active type. */
+  const targetOf = (log: number) => Math.log2(lawExposure(active, active.adaptationScale, log, unit));
 
   const apply = (next: ResolvedType) => {
     active = next;
@@ -268,7 +287,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       let sum = 0;
       for (let i = 0; i < METER_PX * METER_PX; i++) sum += DataUtils.fromHalfFloat(readback[i * 4]);
       metered = Math.log(Math.max(METER_FLOOR, sum / (METER_PX * METER_PX)));
-      if (metered !== null && (adapted === null || Math.abs(metered - adapted) > SETTLED_LOG)) invalidate();
+      if (adapted === null || Math.abs(targetOf(metered) - adapted.log2) > SETTLED_STOPS) invalidate();
     } finally { reading = false; if (sync) gl.deleteSync(sync); }
   };
 
@@ -277,7 +296,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     setType(requested) {
       const next = requested;
       if (next === activeType) return;
-      // The adapted level carries over, so the new type's law starts from it instead of an unexposed frame; the next reading moves it.
+      // The adapted exposure carries over, so the new type starts from it instead of an unexposed frame; the next reading moves it.
       activeType = next; apply(types[next]); generation++; metered = null; invalidate();
     },
     setSun(at, cover, visibility) {
@@ -294,14 +313,16 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     render(scene, camera) {
       renderer.getDrawingBufferSize(size);
       if (size.x !== hdr.width || size.y !== hdr.height) { hdr.setSize(size.x, size.y); }
+      // Adaptation runs on the wall clock, as the reference's does: on while the replay is paused, at one rate whatever its speed.
       const now = performance.now();
       if (metered !== null) {
-        adapted = adaptLogLuminance(adapted, metered, last ? Math.min(0.25, (now - last) / 1000) : 0);
-        if (Math.abs(metered - adapted) > SETTLED_LOG) invalidate();
+        const target = targetOf(metered), seconds = last ? Math.min(0.25, (now - last) / 1000) : 0;
+        adapted = adapted === null ? {log2: target, step: 0} : adaptExposure(adapted, target, seconds, active.adaptation);
+        if (Math.abs(target - adapted.log2) > SETTLED_STOPS) invalidate();
       }
       last = now;
       // Set on the renderer before the scene pass, so overlays that must not follow exposure (the racing line) can divide it out as they draw.
-      renderer.toneMappingExposure = adapted === null ? 1 : lawExposure(active, active.adaptationScale, adapted, unit);
+      renderer.toneMappingExposure = adapted === null ? 1 : 2 ** adapted.log2;
       outputMaterial.uniforms.exposure.value = renderer.toneMappingExposure;
       renderer.setRenderTarget(hdr);
       surfaceAlphaCut.value = 0; renderer.render(scene, camera); surfaceAlphaCut.value = 1;

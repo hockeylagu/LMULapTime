@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Color, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
-import { adaptLogLuminance, createAutoExposure, inverseToneCurve, lawExposure, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { adaptExposure, createAutoExposure, inverseToneCurve, lawExposure, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
 /** A synthetic camera type (profiles at sun strengths 0 and 60). */
@@ -61,11 +61,21 @@ describe('autoExposure', () => {
     expect(low.z / low.x).toBeCloseTo(0.89, 2); // 500 K warmer: blue about 11 % under red.
   });
 
-  it('takes the first reading as is, then moves part of the way toward each new one', () => {
-    expect(adaptLogLuminance(null, -1, 0)).toBe(-1);
-    const next = adaptLogLuminance(0, 1, 0.5);
-    expect(next).toBeGreaterThan(0); expect(next).toBeLessThan(1);
-    expect(adaptLogLuminance(0, 1, 0)).toBe(0);
+  it('adapts the exposure in stops: a blend fraction per 0.15 s, capped in stops a second, smoothed twice, landing on the target', () => {
+    const external = { sensitivity: 0.25, speedLimit: 1, delayS: 0, darkAdaptation: { scale: -1, sensitivity: -1, speedLimit: -1 } };
+    // One 0.15 s frame toward a target 0.1 stop up: k = 0.25, the step 0.025, smoothed from rest to 0.25 of it.
+    const first = adaptExposure({ log2: 0, step: 0 }, 0.1, 0.15, external);
+    expect(first.log2).toBeCloseTo(0.025 * 0.25, 12); expect(first.step).toBeCloseTo(0.00625, 12);
+    // Far off, the cap holds: at most one stop a second, here 0.15 stop for the frame, whichever way.
+    expect(adaptExposure({ log2: 0, step: 0 }, -10, 0.15, external).log2).toBeGreaterThanOrEqual(-0.15);
+    expect(adaptExposure({ log2: 0, step: 0 }, -10, 0.15, external).log2).toBeLessThan(0);
+    // A step that would pass the target lands on it and stops.
+    expect(adaptExposure({ log2: 0, step: 0 }, 1e-4, 0.15, { ...external, sensitivity: 1, speedLimit: 10000 })).toEqual({ log2: 1e-4, step: 0 });
+    expect(adaptExposure({ log2: 0, step: 0 }, 1, 0, external)).toEqual({ log2: 0, step: 0 });
+    // A darkening scene takes the dark set when it has its own values.
+    const dark = { ...external, darkAdaptation: { scale: 1, sensitivity: 1, speedLimit: 10000 } };
+    expect(adaptExposure({ log2: 0, step: 0 }, 2, 0.15, dark)).toEqual({ log2: 2, step: 0 });
+    expect(adaptExposure({ log2: 0, step: 0 }, -2, 0.15, dark).log2).toBeGreaterThan(-0.15 - 1e-12);
   });
 
   it('links the canvas pass for the canvas and the metering pass for its own target, and leaves the renderer as it was', async () => {
