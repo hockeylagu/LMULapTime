@@ -118,7 +118,7 @@ export async function createRaceScene(
       // The shell already shows the circuit (the lap view left it): the race's cars take its place, the camera placed afresh.
       const firstCar = await pending;
       rig.unplace(); setFollowed(firstCar);
-      if (firstCar?.car) await shell.warm(firstCar.car);
+      if (firstCar?.car) { shell.reflectCar(firstCar.car); await shell.warm(firstCar.car); }
       shell.report({shaders: 1});
       if (!shell.isAttached(host)) throw new DOMException('The race view left', 'AbortError');
       shell.show(content());
@@ -128,7 +128,8 @@ export async function createRaceScene(
       await shell.underView();
       const firstCar = await pending;
       setFollowed(firstCar);
-      if (firstCar?.car) await shell.warm(firstCar.car);
+      // Warmed as it will be drawn, by its own reflection (as the lap's car): its programs then link once.
+      if (firstCar?.car) { shell.reflectCar(firstCar.car); await shell.warm(firstCar.car); }
       await shell.start(content());
       firstCar?.ready();
     }
@@ -232,7 +233,11 @@ export async function createRaceScene(
     },
     async follow(slot, body, signal) {
       if (disposed || signal?.aborted) return false;
-      const ticket = ++request, next = await buildFollowed(slot, body);
+      const ticket = ++request;
+      // The car the scene already follows (the view asks again once the scene is ready): rebuilding it would parse, upload and
+      // link its whole model again, and drop the programs it holds.
+      if (slot === followed?.slot) return true;
+      const next = await buildFollowed(slot, body);
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
       if (next?.car) await shell.warm(next.car);
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
