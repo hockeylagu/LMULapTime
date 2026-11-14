@@ -24,7 +24,7 @@ const standardSurface = {
 const standard: CarMaterialRecipe = { id: 's', name: 'DASH', paint: false, surface: standardSurface, reflectionOcclusion: box };
 const display: CarMaterialRecipe = {
   id: 'd', name: 'SCREEN', paint: false, reflectionOcclusion: box,
-  surface: { version: 4, kind: 'display', normalShadowInfluence: 0, finish: { roughness: 0.2, metalness: 0 }, maps: { albedo: { texture: 'textures/screen', uv: 'uv0', scale: [1, 1] } } },
+  surface: { version: 4, kind: 'staticEffect', normalShadowInfluence: 0, finish: { roughness: 0.2, metalness: 0 }, maps: { albedo: { texture: 'textures/screen', uv: 'uv0', scale: [1, 1] } } },
 };
 const volume = () => cockpitVolumeTexture(new ArrayBuffer(24), row);
 const compile = (recipe: CarMaterialRecipe) => {
@@ -60,6 +60,15 @@ it('occludes the cube reflection of the surface program, marching from the verte
 
 it('occludes the prefiltered environment of a material on the standard program of three', () => {
   const {shader} = compile(display);
+  expect(shader.fragmentShader).toMatch(/radiance \*= cockpitReflectionScale\(.*cockpitOcclusion\(material\.roughness\)\)/);
+});
+
+it('occludes the environment radiance of a surface program kind without the cube reflection (a screen)', () => {
+  const screen: CarMaterialRecipe = { id: 'h', name: 'HUD', paint: false, reflectionOcclusion: box, surface: {
+    ...standardSurface, kind: 'dashboard', flags: {},
+    parameters: { adjust: standardSurface.parameters!.adjust, dashboard: { roughness: 0.2, emissiveStrength: 15, emissiveNight: 1.5 } },
+  } };
+  const {shader} = compile(screen);
   expect(shader.fragmentShader).toMatch(/radiance \*= cockpitReflectionScale\(.*cockpitOcclusion\(material\.roughness\)\)/);
 });
 

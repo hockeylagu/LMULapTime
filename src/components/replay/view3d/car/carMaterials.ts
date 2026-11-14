@@ -4,7 +4,9 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import { hazeProgram } from '../atmosphere/haze.js';
 import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
 import { bindSurfaceProgram } from '../scenery/materials/configureSurfaceMaterial.js';
+import { REFLECTING_KINDS } from '../scenery/materials/sceneryReflection.js';
 import { surfaceTextureUnits } from '../scenery/materials/shaderParts.js';
+import { isUvAnimation } from '../scenery/materials/surfaceAnimation.js';
 import type { SurfaceConfig, SurfaceMap } from '../scenery/materials/surfaceConfig.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
 import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
@@ -27,12 +29,12 @@ function albedoPath(recipe: CarMaterialRecipe, appearance: CarAppearance): strin
 }
 
 /** Car kinds whose package description reads as a scenery surface, drawn with the scenery's program. */
-const SURFACE_KINDS = ['standard', 'standardBlend', 'glass'] as const;
+const SURFACE_KINDS = ['standard', 'standardBlend', 'glass', 'tyre', 'dashboard', 'externalMonitor', 'windscreen', 'windscreenInside'] as const;
 const isSurfaceKind = (kind: string): kind is typeof SURFACE_KINDS[number] => (SURFACE_KINDS as readonly string[]).includes(kind);
 
 /**
- * The scenery surface description of a car's standard or glass material, with each map's texture path (the livery's albedo when
- * it has one); null for the other kinds, which keep three's standard material with the albedo map.
+ * The scenery surface description of a car material the surface program draws (`SURFACE_KINDS`), with each map's texture path
+ * (the livery's albedo when it has one); null for the other kinds, which keep three's standard material with the albedo map.
  */
 function nativeSurface(recipe: CarMaterialRecipe, appearance: CarAppearance): SurfaceConfig | null {
   const surface = recipe.surface;
@@ -42,7 +44,9 @@ function nativeSurface(recipe: CarMaterialRecipe, appearance: CarAppearance): Su
   const maps: Record<string, SurfaceMap> = {};
   for (const [key, map] of Object.entries(surface.maps)) {
     const texture = key === 'albedo' ? albedoPath(recipe, appearance) : map.texture;
-    if (texture) maps[key] = { texture, uv: map.uv, scale: map.scale, srgb: !!map.srgb };
+    const animation = map.uvAnimation;
+    if (animation !== undefined && !isUvAnimation(animation)) throw Error(`Car material ${recipe.name}: unsupported UV animation of ${key}`);
+    if (texture) maps[key] = { texture, uv: map.uv, scale: map.scale, srgb: !!map.srgb, ...(animation ? { uvAnimation: animation } : {}) };
   }
   return {
     version: 4, kind, name: recipe.name, flags: surface.flags, maps, normalYSign: surface.normalYSign!,
@@ -78,7 +82,7 @@ function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Textur
 
 /**
  * A three.js material for one native material of a textured car, read from the car descriptor (docs/VEHICLE_PIPELINE.md).
- * Standard materials draw with the scenery's surface program (albedo, metal/roughness, AO/specular, normal and detail maps).
+ * Standard, tyre, screen, glass and windscreen materials draw with the scenery's surface program (`SURFACE_KINDS`).
  * The albedo is the appearance's paint texture for paint materials, the livery file of the same-named material when the
  * appearance has one, else the recipe's own map. Car paint is layered paint (carPaint.ts); the other shader kinds
  * map to a standard or physical material with the albedo map.
@@ -97,17 +101,21 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
       // The paint program sets roughness, metalness and the coat per pixel (carPaint.ts).
       material = new MeshPhysicalMaterial();
       break;
-    case 'standard': case 'standardBlend': case 'tyre': case 'diffuse':
+    case 'standard': case 'standardBlend': case 'tyre': case 'diffuse': case 'externalMonitor':
       material = new MeshStandardMaterial(finish(config));
       break;
-    case 'glass':
+    case 'dashboard':
+      // A screen's layers (a data layer over its backdrop) blend by their alpha: an opaque layer would hide the one under it.
+      material = new MeshStandardMaterial({ ...finish(config), transparent: true });
+      break;
+    case 'glass': case 'windscreen':
       // The scenery's glass program, on the physical model as the scenery's glass (configureSurfaceMaterial.ts).
       material = surface ? new MeshPhysicalMaterial({ ior: 1.5, transparent: true, depthWrite: false }) : new MeshStandardMaterial({ ...finish(config), transparent: true, depthWrite: false });
       break;
-    case 'windscreen': case 'windscreenInside':
+    case 'windscreenInside':
       material = new MeshStandardMaterial({ ...finish(config), transparent: true, depthWrite: false });
       break;
-    case 'numberPlate': case 'display': case 'staticEffect':
+    case 'numberPlate': case 'staticEffect':
       material = new MeshStandardMaterial({ ...finish(config), transparent: true });
       break;
     default:
@@ -166,7 +174,8 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   if (occlusion) {
     if (!volume) throw Error(`Car material ${recipe.name}: no cabin volume for its reflection occlusion`);
     const loaded = volume(occlusion.volume);
-    bindCockpitOcclusion(material, {volume: loaded, box: occlusion}, surface ? 'surface' : 'standard');
+    // The surface program's own cube reflection for the kinds that take it (`REFLECTING_KINDS`), else three's environment radiance.
+    bindCockpitOcclusion(material, {volume: loaded, box: occlusion}, surface && REFLECTING_KINDS.has(surface.kind) ? 'surface' : 'standard');
     material.addEventListener('dispose', () => { loaded.dispose(); });
   }
   return material;

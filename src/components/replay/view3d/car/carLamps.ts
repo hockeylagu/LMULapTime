@@ -3,21 +3,21 @@ import type { CarLamp, CarMaterialRecipe } from '../../../../../shared/types/sce
 import { SUN_UNIT } from '../atmosphere/sunSamples.js';
 import { lampStateFrames, litByEvent, switches, type LampSwitch } from './lampStates.js';
 
-/** How a drawn lamp glows: its lamp emission, or the day intensity of the display material it is drawn with (`lampGlow`). */
+/** How a drawn lamp glows: its lamp emission, or the day strength of the dashboard screen material it is drawn with (`lampGlow`). */
 export type LampGlow = NonNullable<CarLamp['emission']> | {displayIntensity: number};
 
 /**
  * How a lamp glows, or null when it is not drawn. A lamp with a lamp emission glows by it. A lamp without one is drawn with a lit
- * shader: when that is the display material, it glows with the material's day intensity over its texture and vertex colour (the
- * lit light the display also takes is left out: the glow is far brighter). App assumption: replays are daytime only for now (the
- * sun stays above the horizon), so the night intensity is not used. Other lit lamps are not drawn.
+ * shader: when that is a dashboard screen material, it glows with the screen's day strength (`dashboard.emissiveStrength`) over its
+ * texture and vertex colour (the lit light the screen also takes is left out: the glow is far brighter). App assumption: replays
+ * are daytime only for now (the sun stays above the horizon), so the night strength is not used. Other lit lamps are not drawn.
  */
 export function lampGlow(lamp: CarLamp, recipes: readonly CarMaterialRecipe[]): LampGlow | null {
   if (lamp.emission) return lamp.emission;
   const surface = recipes.find(recipe => recipe.name === lamp.material)?.surface;
-  if (surface?.kind !== 'display') return null;
-  const day = surface.parameters?.EmissiveDayIntensity;
-  if (typeof day !== 'number' || !Number.isFinite(day) || day < 0) throw Error(`Lamp ${lamp.material}: the display material has no day intensity`);
+  if (surface?.kind !== 'dashboard') return null;
+  const screen = surface.parameters?.dashboard as {emissiveStrength?: unknown} | undefined, day = screen?.emissiveStrength;
+  if (typeof day !== 'number' || !Number.isFinite(day) || day < 0) throw Error(`Lamp ${lamp.material}: the screen material has no day strength`);
   return {displayIntensity: day};
 }
 

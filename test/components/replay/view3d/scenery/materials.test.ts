@@ -87,7 +87,7 @@ describe('shaderParts', () => {
   });
   it('lays a dashboard decal over the screen with its own roughness, and multiplies a monitor by its decal', () => {
     const maps = { albedo: map('A', true), decal: map('D', true) };
-    const decal = shaderParts(surface('dashboard', { maps, flags: { decal: 'on' }, parameters: { dashboard: { roughness: 0.2, decalRoughness: 0.7, emissiveStrength: 9 } } }), { uniforms: false });
+    const decal = shaderParts(surface('dashboard', { maps, flags: { decal: 'alphaBlend' }, parameters: { dashboard: { roughness: 0.2, decalRoughness: 0.7, emissiveStrength: 9 } } }), { uniforms: false });
     expect(decal.albedo).toContain('diffuseColor.rgb=mix(diffuseColor.rgb,dashDecal.rgb,dashDecal.a)');
     expect(decal.albedo).toContain('surfaceRoughness=mix(surfaceRoughness,0.70000000,dashDecal.a)');
     expect(shaderParts(surface('dashboard', { maps }), { uniforms: false }).albedo).not.toContain('dashDecal');

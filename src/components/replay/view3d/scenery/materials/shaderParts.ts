@@ -114,7 +114,7 @@ function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): Extend
  */
 function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): ExtendedParts {
   const screen = config.parameters.dashboard, monitor = config.kind === 'externalMonitor';
-  const decal = config.maps.decal && (monitor || config.flags.decal === 'on');
+  const decal = config.maps.decal && (monitor || config.flags.decal === 'alphaBlend');
   const f0 = ((1.4 - 1) / (1.4 + 1)) ** 2;
   const albedo = monitor
     ? `diffuseColor*=${sample('albedo')}*${sample('decal')}; surfaceRoughness=${number(value(screen, 'roughness'))};`

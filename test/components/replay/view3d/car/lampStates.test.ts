@@ -98,13 +98,13 @@ it('flashes a pit lamp at 4 Hz while the pit limiter is on, hidden in the dark h
   at(2); expect(material.visible).toBe(false); // Limiter off.
 });
 
-it('draws a lamp without a lamp emission only when its material is a display, glowing by its day intensity and vertex colour', () => {
+it('draws a lamp without a lamp emission only when its material is a dashboard screen, glowing by its day strength and vertex colour', () => {
   const lit = {...lamp({off: 0, on: 1, brake: null}), emission: null};
-  const display = (parameters: Record<string, unknown>) => [{name: 'BLGLO', surface: {kind: 'display', parameters}}] as unknown as CarMaterialRecipe[];
-  expect(lampGlow(lit, display({EmissiveDayIntensity: 10000, EmissiveNightIntensity: 6000}))).toEqual({displayIntensity: 10000});
+  const display = (dashboard: Record<string, unknown>) => [{name: 'BLGLO', surface: {kind: 'dashboard', parameters: {dashboard}}}] as unknown as CarMaterialRecipe[];
+  expect(lampGlow(lit, display({roughness: 0.2, emissiveStrength: 10000, emissiveNight: 6000}))).toEqual({displayIntensity: 10000});
   expect(lampGlow(lit, [{name: 'BLGLO', surface: {kind: 'standard', parameters: {}}}] as unknown as CarMaterialRecipe[])).toBeNull();
   expect(lampGlow(lamp({off: 0, on: 1, brake: null}), [])).toBe(EMISSION);
-  expect(() => lampGlow(lit, display({}))).toThrow('no day intensity');
+  expect(() => lampGlow(lit, display({}))).toThrow('no day strength');
   const material = createLampMaterial(lit, {displayIntensity: 10000}, new Texture());
   expect(material.vertexShader).toContain('_lmu_colour');
   expect(material.fragmentShader).toContain('tex.rgb * vColour.rgb * scale');
@@ -115,7 +115,7 @@ it('draws a lamp without a lamp emission as its own surface when its standard ma
   const recipe = (kind: string, emissive?: string) => [{name: 'BLGLO', surface: {kind, flags: {emissive}, parameters: {}}}] as unknown as CarMaterialRecipe[];
   expect(surfaceLamp(lit, recipe('standard', 'always'))).toBe(true);
   expect(surfaceLamp(lit, recipe('standard', 'night'))).toBe(false);
-  expect(surfaceLamp(lit, recipe('display'))).toBe(false);
+  expect(surfaceLamp(lit, recipe('dashboard'))).toBe(false);
   expect(surfaceLamp(lamp({off: 0, on: null, brake: null}), recipe('standard', 'always'))).toBe(false); // A lamp emission draws as a lamp.
   expect(lampGlow(lit, recipe('standard', 'always'))).toBeNull();
 });

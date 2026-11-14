@@ -77,6 +77,22 @@ it('draws car glass with the scenery glass program, its reflection kept whole th
   expect(shader.fragmentShader).toContain('totalSpecular/clamp(diffuseColor.a+0.001,0.001,1.0)');
 });
 
+it('draws tyres, screens and windscreens with the surface program: screen layers and the inside of a windscreen blended, its outside as glass', () => {
+  const adjust = { tint: [1, 1, 1], normalStrength: 1, roughness: 0.5, metalness: 0, specular: 0.5 };
+  const of = (kind: string, parameters: Record<string, unknown> = {}): CarMaterialRecipe => ({ id: kind, name: kind.toUpperCase(), paint: false, surface: {
+    version: 4, kind, flags: {}, normalYSign: -1, normalShadowInfluence: 0.5, finish: { roughness: 0.5, metalness: 0 },
+    parameters: { adjust, ...parameters }, maps: { albedo: { texture: `textures/${kind}`, uv: 'uv0', scale: [1, 1], srgb: true } },
+  } });
+  const screen = { dashboard: { roughness: 0.2, emissiveStrength: 15, emissiveNight: 1.5 } };
+  const built = [of('tyre', { wear: { albedoMultiply: 0.6, roughnessAdjust: 0.3 } }), of('dashboard', screen), of('externalMonitor', screen), of('windscreen', { windscreen: {} }), of('windscreenInside')]
+    .map(recipe => createCarMaterial(recipe, appearance, () => new Texture(), testShading()));
+  // The surface program names its textures; three's own program would not.
+  expect(built.map(material => material.userData.surfaceTextures as unknown)).toEqual(Array(5).fill(['albedo']));
+  expect(built.map(material => [material.type, material.transparent])).toEqual([
+    ['MeshStandardMaterial', false], ['MeshStandardMaterial', true], ['MeshStandardMaterial', false], ['MeshPhysicalMaterial', true], ['MeshStandardMaterial', true],
+  ]);
+});
+
 it('draws an alpha-masked part one side, as every car part, its edges by alpha to coverage', () => {
   const masked: CarMaterialRecipe = { ...recipe(), surface: { ...recipe().surface, renderState: { alphaMask: true } } as CarSurface };
   const material = createCarMaterial(masked, appearance, () => new Texture(), testShading());
