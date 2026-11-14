@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { RaceReplayCar, RaceReplayOverview, RaceReplayProgress } from '../../../../shared/types/index.js';
 import { carLockedCamera, followsCar, type CameraMode } from '../view3d/camera/cameraModes.js';
-import { Scene3DFrame } from '../view3d/scene/Scene3DFrame.js';
+import { NARROW_SCENE_BESIDE_CONTROLS, Scene3DFrame } from '../view3d/scene/Scene3DFrame.js';
 import { useRaceScene } from '../view3d/race/useRaceScene.js';
 import { RaceLapTiming } from './RaceLapTiming.js';
 import { RaceMinimap } from './RaceMinimap.js';
@@ -41,10 +41,11 @@ export default function Race3DView({ overview, clock, poses, followSlot, progres
     <Scene3DFrame surface={map} host={host} scene={scene} state={state} mode={mode} onModeChange={setMode} followMode="chase"
       onRetry={() => setRetry(value => value + 1)} onToggleView={onToggleView} active={active} ariaLabel="Race 3D view" hostLabel="3D track. Drag to orbit, scroll to zoom." className={className}
       controlsBefore={<ReplayShortcutHelp view="race3d" enabled={active} />}>
-      {/* As the lap view's 3D page: the minimap top left, the camera controls top right with the timing under them, 14 px apart. */}
+      {/* As the lap view's 3D page: the minimap top left, the camera controls top right with the timing under them, 14 px apart
+          (beside them once they stand in a column). */}
       <RaceMinimap overview={overview} clock={clock} poses={poses} followSlot={followSlot} />
       <RaceLapTiming clock={clock} car={followSlot === null ? undefined : cars.get(followSlot)} laps={overview.laps}
-        totalLaps={totalLaps} className="absolute right-3 top-16 z-10" />
+        totalLaps={totalLaps} className={`absolute right-3 top-16 z-10 ${NARROW_SCENE_BESIDE_CONTROLS}`} />
     </Scene3DFrame>
   );
 }

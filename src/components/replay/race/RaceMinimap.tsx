@@ -2,7 +2,6 @@ import React, { useMemo, useSyncExternalStore } from 'react';
 import type { RaceReplayOverview } from '../../../../shared/types/index.js';
 import { racePitSlots } from '../../../../shared/domain/raceReplay/poseWindow.js';
 import { GpsCircuitMinimap } from '../map/GpsCircuitMinimap.js';
-import { NARROW_SCENE_MINIMAP } from '../view3d/scene/Scene3DFrame.js';
 import { useTrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';
 import { activeTrackBounds } from '../map/display/mapLayers.js';
 import { computeTrackBoundaryPathD, projectBoundaryPoints } from '../map/replayMapUtils.js';
@@ -40,5 +39,5 @@ export const RaceMinimap: React.FC<Props> = ({ overview, clock, poses, followSlo
     key: position.slot, sx: position.sx, sy: position.sy, color: raceClassTone(classes.get(position.slot)).hex, dimmed: pitted.has(position.slot),
   }));
   return <GpsCircuitMinimap trackBoundaryPathD={pathD} currentPos={followed} cars={cars}
-    className={`rounded-xl border border-lmu-border bg-lmu-strip/70 p-2 ${NARROW_SCENE_MINIMAP}`} />;
+    className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />;
 };

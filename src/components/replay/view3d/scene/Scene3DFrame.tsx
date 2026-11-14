@@ -3,13 +3,15 @@ import { MapViewSwitchButton } from '../../map/display/MapViewSwitchButton.js';
 import { MapControlsOverlay } from '../../map/MapControlsOverlay.js';
 import { CameraModeControl, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
 import { Replay3DLoading, Replay3DStreaming } from './Replay3DLoading.js';
+import type { SceneHostState } from './useSceneHost.js';
 
 /**
- * The minimap's place in a narrow scene (a container query on the scene area): under the camera controls, which would cover it
- * there (their bar spans about 370 px from the right, the minimap about 190 px from the left).
+ * In a narrow scene (a container query on the scene area) the camera controls stand in a column down the right edge, as the 2D
+ * map's do: their row (about 370 px from the right) would cover the minimap (about 190 px from the left).
  */
-export const NARROW_SCENE_MINIMAP = '@max-[600px]:top-[58px]';
-import type { SceneHostState } from './useSceneHost.js';
+const NARROW_SCENE_CONTROLS = '@max-[600px]:flex-col @max-[600px]:gap-1 @max-[600px]:p-1';
+/** A panel under the controls' row (the race timing) moves beside their column in a narrow scene. */
+export const NARROW_SCENE_BESIDE_CONTROLS = '@max-[600px]:top-2 @max-[600px]:right-[58px]';
 
 /** The camera moves the frame's buttons make on a scene (lap and race scenes both have them). */
 interface CameraControls {
@@ -74,7 +76,7 @@ export function Scene3DFrame({
         <MapControlsOverlay onZoomIn={() => scene.current?.zoom(1)} onZoomOut={() => scene.current?.zoom(-1)} onReset={() => scene.current?.reset()}
           followCar={followsCar(mode)} onToggleFollowCar={() => onModeChange(value => (followsCar(value) ? 'orbit' : followMode))}
           onCenterCar={() => scene.current?.center()} isPlaying={isPlaying} onTogglePlay={onTogglePlay}
-          orientation="horizontal" className="top-2 right-3 bottom-auto">
+          orientation="horizontal" className={`top-2 right-3 bottom-auto ${NARROW_SCENE_CONTROLS}`}>
           <CameraModeControl mode={mode} onChange={onModeChange} />
           {controlsBefore}
           <MapViewSwitchButton view="3d" onToggleView={onToggleView} />
