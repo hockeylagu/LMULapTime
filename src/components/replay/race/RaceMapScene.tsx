@@ -145,8 +145,9 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
         ) : (
           <div role="status" className="absolute inset-0 flex items-center justify-center text-sm text-lmu-muted">Loading the cars…</div>
         )}
+        {/* As the lap map's fullscreen page: the timing under the map controls, 14 px apart. */}
         {bounds && <RaceLapTiming clock={clock} car={followSlot === null ? undefined : cars.get(followSlot)} laps={overview.laps}
-          totalLaps={totalLaps} className="absolute left-3 top-3 z-10" />}
+          totalLaps={totalLaps} className="absolute right-3 top-16 z-10" />}
         {bounds && !window && (
           <div role={poseError ? 'alert' : 'status'} className="absolute bottom-3 left-3 flex items-center gap-2 rounded-md border border-lmu-border bg-lmu-card px-3 py-1.5 text-xs text-lmu-text-soft">
             {poseError ? <>Cars unavailable here: {poseError}

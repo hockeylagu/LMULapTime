@@ -41,10 +41,10 @@ export default function Race3DView({ overview, clock, poses, followSlot, progres
     <Scene3DFrame surface={map} host={host} scene={scene} state={state} mode={mode} onModeChange={setMode} followMode="chase"
       onRetry={() => setRetry(value => value + 1)} onToggleView={onToggleView} active={active} ariaLabel="Race 3D view" hostLabel="3D track. Drag to orbit, scroll to zoom." className={className}
       controlsBefore={<ReplayShortcutHelp view="race3d" enabled={active} />}>
-      {/* As the lap view's 3D page: the minimap top left, the camera controls top right with the timing under them. */}
+      {/* As the lap view's 3D page: the minimap top left, the camera controls top right with the timing under them, 14 px apart. */}
       <RaceMinimap overview={overview} clock={clock} poses={poses} followSlot={followSlot} />
       <RaceLapTiming clock={clock} car={followSlot === null ? undefined : cars.get(followSlot)} laps={overview.laps}
-        totalLaps={totalLaps} className="absolute right-3 top-14 z-10" />
+        totalLaps={totalLaps} className="absolute right-3 top-16 z-10" />
     </Scene3DFrame>
   );
 }
