@@ -1,4 +1,4 @@
-import { BatchedMesh, BoxGeometry, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, type BufferAttribute, type BufferGeometry, type Material } from 'three';
+import { BatchedMesh, BoxGeometry, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, Vector3, type BufferAttribute, type BufferGeometry, type Material } from 'three';
 import { expect, it } from 'vitest';
 import type { SceneryMaterialTotals } from '../../../../../shared/packageContract/index.js';
 import { surfaceTextureUnits } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
@@ -139,4 +139,38 @@ it("keeps a material whose program needs more texture units than three allows (w
 it('throws for a configured material without its unit count', () => {
   const bare = material('a'); delete bare.userData.surfaceTextureUnits;
   expect(() => createSceneryBatches(new Group(), [totals('a', 1, 1)], 16).add(chunk([new BoxGeometry(), bare]))).toThrow('texture unit count');
+});
+
+it("draws each instance within its node's distance range from a car's eye, and every instance from no eye", () => {
+  const scenery = new Group(), asphalt = material('a'), kerb = material('k');
+  scenery.position.set(5, 0, 0); scenery.updateMatrixWorld(); // The batches draw in the scenery's space; the eye is in world space.
+  const batches = createSceneryBatches(scenery, [totals('a', 3, 3), totals('k', 1, 1)], 16);
+  const root = chunk([new BoxGeometry(), asphalt], [new BoxGeometry(), asphalt], [new BoxGeometry(), asphalt], [new BoxGeometry(), kerb]);
+  const [near, far, unlimited, kerbMesh] = root.children;
+  near.userData.lmuLod = {inM: 0, outM: 100};
+  far.position.x = 300; far.userData.lmuLod = {inM: 0, outM: 250};
+  unlimited.position.x = 5000; unlimited.userData.lmuLod = {inM: 0, outM: null};
+  kerbMesh.position.x = 400; kerbMesh.userData.lmuLod = {inM: 0, outM: 200};
+  const [batch, kerbs] = batches.add(root);
+  scenery.add(root); batches.sync();
+  expect(shown(batch, 3)).toEqual([true, true, true]); // Until the first eye, everything resident draws.
+  batches.cull(new Vector3(5, 0, 0));
+  // 299.5 m to the far box's nearest face is past its 250 m; the kerb batch draws nothing and leaves the scene.
+  expect([shown(batch, 3), kerbs.parent]).toEqual([[true, false, true], null]);
+  batches.cull(new Vector3(14, 0, 0)); // Under the step: not checked again.
+  expect(shown(batch, 3)).toEqual([true, false, true]);
+  batches.cull(new Vector3(205, 0, 0));
+  // 199.5 m to the near box now, 99.5 m to the far one, 199.5 m to the kerb's.
+  expect([shown(batch, 3), kerbs.parent]).toEqual([[false, true, true], scenery]);
+  batches.cull(null);
+  expect(shown(batch, 3)).toEqual([true, true, true]);
+  // A chunk added while a car's eye culls takes its ranges from that eye.
+  batches.cull(new Vector3(5, 0, 0));
+  const late = chunk([new BoxGeometry(), material('b')]); late.children[0].position.x = 600; late.children[0].userData.lmuLod = {inM: 0, outM: 500};
+  const lateBatches = createSceneryBatches(scenery, [totals('b', 1, 1)], 16);
+  lateBatches.cull(new Vector3(5, 0, 0));
+  const [lateBatch] = lateBatches.add(late);
+  scenery.add(late); lateBatches.sync();
+  expect([shown(lateBatch, 1), lateBatch.parent]).toEqual([[false], null]);
+  batches.dispose(); lateBatches.dispose();
 });

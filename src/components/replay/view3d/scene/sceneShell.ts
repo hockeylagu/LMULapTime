@@ -6,7 +6,7 @@ import type { RenderPose } from './replayPose.js';
 import type { CarTextures } from '../cars/carModels.js';
 import { createCarTemplates, type CarTemplates } from '../cars/carTemplates.js';
 import { disposeObjects } from './disposeObjects.js';
-import { exposureType, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
+import { exposureType, followsCar, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
 import { createCameraRig, type CameraRig } from '../camera/cameraRig.js';
 import { addSceneEnvironment, sceneSun } from '../sceneEnvironment.js';
 import { assertHazed } from '../atmosphere/haze.js';
@@ -257,6 +257,9 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     if (disposed || !content) return;
     if (frameTime !== undefined) frameHook?.(frameTime);
     updateStream();
+    // The game scales its draw distances for its TV cameras by a factor the package does not carry yet: trackside and free views
+    // draw everything resident.
+    batches.cull(followsCar(rig.mode) ? rig.camera.position : null);
     if (texturesChanged()) report(); // Textures sharpen a band per frame, each frame asking for the next.
     const camera = rig.camera;
     desiredEye.copy(camera.position);

@@ -1,4 +1,4 @@
-import { BufferGeometry, Mesh, Object3D, type BatchedMesh, type Material } from 'three';
+import { Box3, BufferGeometry, Mesh, Object3D, Vector3, type BatchedMesh, type Material } from 'three';
 import type { SceneryMaterialTotals } from '../../../../../shared/packageContract/index.js';
 import { BATCH_VERTEX_TEXTURES } from './materials/shaderParts.js';
 import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, layoutOf, releaseBatchOnUpload } from '../batching/batchedParts.js';
@@ -13,15 +13,38 @@ export interface SceneryBatches {
   remove(root: Object3D): void;
   /** Shows each chunk's instances while its root is in the scene and visible. */
   sync(): void;
+  /**
+   * Draws each instance only within its node's distance range from `eye` (world space): the package's `lmuLod` {inM, outM}, the
+   * game's own draw distance, measured to the nearest point of the instance's box. Checked again once the eye has moved
+   * `CULL_STEP_M`; a batch with no instance in range leaves the scene, so it costs no draw. A null eye draws every instance: the
+   * views whose draw distances the game scales (its TV cameras zoom) and the free views.
+   */
+  cull(eye: Vector3 | null): void;
   dispose(): void;
 }
 
-interface Placed { batch: BatchedMesh; instances: number[]; geometries: number[] }
+/** An instance and its node's distance range (squared, metres), against its box in the batch's space. */
+interface Ranged { instance: number; box: Box3; inSq: number; outSq: number; inRange: boolean; drawn: boolean }
+interface Placed { batch: BatchedMesh; instances: Ranged[]; geometries: number[] }
 interface Batch { mesh: BatchedMesh; layout: string }
 interface Used { primitives: number; draws: number }
 
 /** Stands in for a batched mesh's own geometry: its data lives in the batch. */
 const MOVED = new BufferGeometry();
+
+/** The eye moves this far before the distance ranges are checked again. */
+export const CULL_STEP_M = 10;
+
+/**
+ * The node's distance range (`extras.lmuLod`, on the mesh or, for a node of several primitives, on its group): drawn from inM to
+ * outM metres, to any distance when outM is null. A node without one draws at every distance.
+ */
+function rangeOf(mesh: Mesh): {inSq: number; outSq: number} {
+  const lod: unknown = mesh.userData.lmuLod ?? mesh.parent?.userData.lmuLod;
+  if (!lod || typeof lod !== 'object') return {inSq: 0, outSq: Infinity};
+  const {inM, outM} = lod as {inM?: unknown; outM?: unknown};
+  return {inSq: typeof inM === 'number' ? inM * inM : 0, outSq: typeof outM === 'number' ? outM * outM : Infinity};
+}
 
 /**
  * Whether a mesh can draw from a batch. Only configured surfaces share one material across chunks (a mesh without a surface
@@ -42,8 +65,8 @@ function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, maxTexture
  * chunk: a draw costs the main thread about the same whatever its size, and a venue has about one primitive per material per
  * chunk. The package names each material by its content (`lmuMaterial`, kept on the mesh by the chunk loader) and gives its totals
  * over the layout, so a batch is sized once and its buffers never grow; a material split by shadow flags reserves its totals in each part.
- * `maxTextures` is the renderer's `capabilities.maxTextures`. Instances are neither culled nor sorted one by one: that per-pass work cost more than the draws it saved, and the hidden-chunk
- * rule already leaves out what is far away.
+ * `maxTextures` is the renderer's `capabilities.maxTextures`. Instances are neither frustum culled nor sorted one by one: that per-pass
+ * work cost more than the draws it saved. They are culled by distance once per step of the eye (`cull`), the game's own draw distances.
  */
 export function createSceneryBatches(parent: Object3D, materials: readonly SceneryMaterialTotals[], maxTextures: number): SceneryBatches {
   const totals = new Map(materials.map(row => [row.key, row]));
@@ -67,13 +90,34 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
     byKey.set(key, [...byKey.get(key) ?? [], batch]);
     return batch;
   };
-  /** A batch is in the scene while any shown chunk draws from it. */
+  /** A batch is in the scene while it draws any instance: one of a shown chunk, within its distance range. */
   const counts = createShownCounts((mesh, visible) => { if (!visible) mesh.removeFromParent(); else if (!mesh.parent) parent.add(mesh); });
-  /** Shows or hides a chunk's instances; a batch joins the scene with its first shown chunk and leaves with its last. */
+  const draw = (mesh: BatchedMesh, ranged: Ranged, drawn: boolean) => {
+    if (ranged.drawn === drawn) return;
+    ranged.drawn = drawn;
+    mesh.setVisibleAt(ranged.instance, drawn);
+    counts.change(mesh, drawn ? 1 : -1);
+  };
+  /** Shows or hides a chunk's instances (those in range). */
   const show = (placed: readonly Placed[], shown: boolean) => {
-    for (const {batch: mesh, instances} of placed) {
-      for (const instance of instances) mesh.setVisibleAt(instance, shown);
-      counts.change(mesh, shown ? 1 : -1);
+    for (const {batch: mesh, instances} of placed) for (const ranged of instances) draw(mesh, ranged, shown && ranged.inRange);
+  };
+  const local = new Vector3();
+  /** Where the ranges were last checked (batch space); null while every instance draws. */
+  let culledAt: Vector3 | null = null;
+  /** Sets an instance's range flag against the eye (batch space), or in range with none; a new chunk's instances are set before it is shown. */
+  const place = (ranged: Ranged, eye: Vector3 | null) => {
+    const distanceSq = eye ? ranged.box.distanceToPoint(eye) ** 2 : 0;
+    ranged.inRange = !eye || (distanceSq >= ranged.inSq && distanceSq < ranged.outSq);
+  };
+  const placeAll = (eye: Vector3 | null) => {
+    for (const chunk of chunks.values()) {
+      for (const {batch: mesh, instances} of chunk.placed) {
+        for (const ranged of instances) {
+          place(ranged, eye);
+          if (chunk.shown) draw(mesh, ranged, ranged.inRange);
+        }
+      }
     }
   };
   return {
@@ -103,7 +147,11 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
           stored.set(mesh.geometry, geometryId); placed.geometries.push(geometryId);
         }
         if (++count.draws > total.draws) throw Error(`Scenery material ${key} draws more than the layout gives`);
-        placed.instances.push(addHiddenInstance(batch.mesh, geometryId, mesh.matrixWorld));
+        mesh.geometry.computeBoundingBox();
+        const ranged: Ranged = {instance: addHiddenInstance(batch.mesh, geometryId, mesh.matrixWorld), box: mesh.geometry.boundingBox!.clone().applyMatrix4(mesh.matrixWorld),
+          ...rangeOf(mesh), inRange: true, drawn: false};
+        place(ranged, culledAt);
+        placed.instances.push(ranged);
         moved.push(mesh);
       });
       // The originals stay in the chunk (their materials are released with it) but draw nothing and hold no geometry.
@@ -121,7 +169,7 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
       chunks.delete(root);
       if (chunk.shown) show(chunk.placed, false);
       for (const {batch, instances, geometries} of chunk.placed) {
-        for (const instance of instances) batch.deleteInstance(instance);
+        for (const {instance} of instances) batch.deleteInstance(instance);
         for (const geometry of geometries) batch.deleteGeometry(geometry);
       }
     },
@@ -132,6 +180,17 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
         chunk.shown = shown;
         show(chunk.placed, shown);
       }
+    },
+    cull(eye) {
+      if (!eye) {
+        if (culledAt) { culledAt = null; placeAll(null); }
+        return;
+      }
+      parent.updateWorldMatrix(true, false);
+      parent.worldToLocal(local.copy(eye));
+      if (culledAt && local.distanceToSquared(culledAt) < CULL_STEP_M * CULL_STEP_M) return;
+      culledAt = (culledAt ?? new Vector3()).copy(local);
+      placeAll(culledAt);
     },
     dispose() {
       for (const {mesh} of batches.values()) { mesh.removeFromParent(); mesh.dispose(); }
