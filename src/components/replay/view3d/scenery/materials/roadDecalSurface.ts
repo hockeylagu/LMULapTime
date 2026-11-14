@@ -1,4 +1,4 @@
-import { list, value, type ShaderContext, type SurfaceParts } from './shaderContext.js';
+import { glslNumber, list, value, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
 /** Static dry road decals (painted lines and logos). Dynamic road state, wetness and particles are excluded. */
@@ -57,7 +57,7 @@ export function roadDecalShaderParts(config: SurfaceConfig, { sample, uv, number
   const normals = normal
     ? `normal=surfaceNormal(normal,${uv('normal')},${overlay ? `mix(vec2(0.5),${sample('normal')}.rg,roadOverlayBlend)` : `${sample('normal')}.rg`},${n(adjust, 'normalStrength')},${number(config.normalYSign)});`
     : '';
-  const f0 = number(((1.4 - 1) / (1.4 + 1)) ** 2);
+  const f0 = glslNumber(((1.4 - 1) / (1.4 + 1)) ** 2);
   return {
     albedo, normals, emissive: 'vec3(0.0)',
     physical: `material.specularColor=vec3(${f0}); material.specularColorBlended=vec3(${f0});`,

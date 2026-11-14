@@ -118,6 +118,8 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   const mapScaleUniforms: Record<string, IUniform> = {};
   for (const [key, map] of Object.entries(config.maps)) mapScaleUniforms[`surface_scale_${key}`] = { value: new Vector2(...map!.scale) };
 
+  // The family's values, four to a vec4 (the last one padded).
+  if (code.constants.length) tunables.surface_constants = { value: Float32Array.from({ length: Math.ceil(code.constants.length / 4) * 4 }, (_, i) => code.constants[i] ?? 0) };
   Object.assign(shader.uniforms, tunables, {
     surface_alphaCut: surfaceAlphaCut,
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
@@ -200,7 +202,8 @@ export function computeCustomProgramCacheKey(config: SurfaceConfig): string {
     billboard: !!config.billboard,
     translucency: hasTranslucency(config) ? config.parameters.translucency : null,
   };
-  const code = JSON.stringify({ parts, hooks });
+  // The values are uniforms, not source: only how many there are shapes the program.
+  const code = JSON.stringify({ parts: { ...parts, constants: parts.constants.length }, hooks });
   let hash = 0x811c9dc5;
   for (let i = 0; i < code.length; i++) {
     hash ^= code.charCodeAt(i);

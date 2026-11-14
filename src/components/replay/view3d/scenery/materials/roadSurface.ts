@@ -1,4 +1,4 @@
-import { value, list, type ShaderContext, type SurfaceParts } from './shaderContext.js';
+import { glslNumber, value, list, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { SurfaceConfig } from './surfaceConfig.js';
 
 /**
@@ -123,7 +123,7 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
   if (kind === 'road' && enabled('grooveMap') && maps.groove) {
     const groove = p.groove;
     albedo += `vec2 grooveMask=${sample('groove')}.rg;
-      float grooveLaid=mix(roadDetails.g,1.0,${number(ASSUMED_RUBBER)});
+      float grooveLaid=mix(roadDetails.g,1.0,${glslNumber(ASSUMED_RUBBER)});
       float surfaceGroove=max(2.0*max(grooveLaid-0.5,0.0)*grooveMask.g,grooveMask.r*min(1.5*grooveLaid,1.0));
       vec3 grooveAlbedo=${uniforms ? 'surface_grooveAlbedo' : vec(list(groove, 'albedo'))};
       diffuseColor.rgb=mix(diffuseColor.rgb,grooveAlbedo*grooveAlbedo,surfaceGroove);
@@ -156,7 +156,7 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
 
   const ior = kind === 'road' ? 1.635 : 1.4;
   const f0 = ((ior - 1) / (ior + 1)) ** 2;
-  const physical = `material.specularColor=vec3(${number(f0)}); material.specularColorBlended=vec3(${number(f0)});`;
+  const physical = `material.specularColor=vec3(${glslNumber(f0)}); material.specularColorBlended=vec3(${glslNumber(f0)});`;
   const occlusion = maps.aoSpec ? `reflectedLight.indirectSpecular*=mix(1.0,aoSpec.r,${specOcclusionCoverage});` : '';
   return { albedo, normals, emissive: 'vec3(0.0)', physical, occlusion };
 }

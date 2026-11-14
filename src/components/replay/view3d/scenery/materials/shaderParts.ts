@@ -21,6 +21,8 @@ export interface ShaderParts {
   finish: string;
   absorption: string;
   occlusion: string;
+  /** The values of `surface_constants`, four to a vec4 (with `uniforms`; empty otherwise): not part of the program's source. */
+  constants: number[];
 }
 
 const LAYER_KEYS = ['A', 'B', 'C', 'D'];
@@ -143,24 +145,37 @@ export function surfaceTextureUnits(config: SurfaceConfig): number {
   return surfaceMapKeys(config).length + (REFLECTING_KINDS.has(config.kind) ? REFLECTION_SAMPLERS : 0) + CASCADE_SAMPLERS + THREE_SAMPLERS;
 }
 
-/** GLSL for a surface config. `uniforms: false` bakes every tunable into the source (used to compare programs). */
+/**
+ * GLSL for a surface config. `uniforms: false` bakes every tunable into the source (used to compare programs). With `uniforms`, a
+ * family's values (`number`, `vec`) read from a uniform array instead of literals: the source then depends only on the surface's
+ * shape (family, maps, modes), so the materials of one shape share a program, each with its own `constants`.
+ */
 export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean } = { uniforms: true }): ShaderParts {
   const { maps } = config;
   const useUniforms = options.uniforms;
+  const constants: number[] = [];
+  const constant = (n: number) => {
+    glslNumber(n); // Rejects a non-finite value, as a literal would.
+    const index = constants.push(n) - 1;
+    return `surface_constants[${index >> 2}].${'xyzw'[index & 3]}`;
+  };
+  const number = useUniforms ? constant : glslNumber;
+  const vec = useUniforms ? (a: readonly number[]) => `vec${a.length}(${a.map(constant).join(',')})` : glslVec;
   const uv = (key: string, alternateScale?: readonly number[]) => {
     const map = maps[key];
     if (!map) throw Error(`Unsupported shader UV: ${config.name ?? '?'}/${key}`);
     const source = SAMPLER_UVS[map.uv];
     if (useUniforms && !alternateScale) return `(${source} * surface_scale_${key})`;
-    return `(${source} * ${glslVec(alternateScale ?? map.scale)})`;
+    return `(${source} * ${vec(alternateScale ?? map.scale)})`;
   };
   const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => maps[key] ? `texture2D(surface_${key}, ${uv(key, scale)})` : fallback;
-  const context: ShaderContext = { sample, uv, number: glslNumber, vec: glslVec, uniforms: useUniforms };
+  const context: ShaderContext = { sample, uv, number, vec, uniforms: useUniforms };
   const tint = useUniforms ? 'diffuse' : glslVec(list(config.parameters.adjust, 'tint'));
   const parts = familyParts(config, context, tint);
   const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`).join('\n');
   return {
-    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_flag_elapsed;' : '') + mapDeclarations,
+    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_flag_elapsed;' : '')
+      + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);
       ${parts.albedo}`,
@@ -171,5 +186,6 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
     finish: parts.finish ?? '',
     absorption: parts.absorption ?? '',
     occlusion: parts.occlusion,
+    constants,
   };
 }

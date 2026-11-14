@@ -86,13 +86,18 @@ describe('shaderParts', () => {
     expect(shaderParts(surface('highLumSun', { maps })).albedo).toContain('diffuseColor.rgb=vec3(0.0)');
   });
   it('reads the dashboard controls and ignores vertex colour only for the diffuse shader without it', () => {
-    const dash = shaderParts(surface('dashboard', { maps: { albedo: map('A', true) }, parameters: { dashboard: { roughness: 0.4, emissiveStrength: 9 } } }));
+    const config = surface('dashboard', { maps: { albedo: map('A', true) }, parameters: { dashboard: { roughness: 0.4, emissiveStrength: 9 } } });
+    const dash = shaderParts(config, { uniforms: false });
     expect(dash.albedo).toContain('surfaceRoughness=0.40000000'); expect(dash.emissive).toBe('diffuseColor.rgb*9.00000000');
+    // With uniforms, the values leave the source for `surface_constants`.
+    const shared = shaderParts(config);
+    expect([shared.albedo, shared.emissive, shared.constants]).toEqual([expect.stringContaining('surfaceRoughness=surface_constants[0].x'), 'diffuseColor.rgb*surface_constants[0].y', [0.4, 9]]);
+    expect(shared.declarations).toContain('uniform vec4 surface_constants[1];');
     expect(shaderParts(surface('diffuse', { vertexColour: false, maps: { albedo: map('A', true) } })).albedo).not.toContain('*vSurfaceColour');
     expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true) } })).albedo).toContain('*vSurfaceColour');
   });
   it('adds the blink clock for digital flags and keeps the authored period', () => {
-    const parts = shaderParts(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) }, parameters: { blink: { period: 0.5 } } }));
+    const parts = shaderParts(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) }, parameters: { blink: { period: 0.5 } } }), { uniforms: false });
     expect(parts.declarations).toContain('uniform float surface_flag_elapsed;'); expect(parts.albedo).toContain('3.141592653589793/0.50000000');
   });
   it('widens the water roughness by the screen-space spread of the wave normal', () => {
@@ -322,4 +327,13 @@ it('shares one configured material among meshes of the same surface, textures an
   expect(shared.release(b)).toBe(true); expect(disposed).toBe(1);
   // The textures belong to the pool, not the shared material.
   expect(texturesFreed).toBe(0);
+});
+
+describe('shared surface programs', () => {
+  it('gives materials that differ only in values one program, and a different shape its own', () => {
+    const at = (roughness: number, maps: Record<string, ReturnType<typeof map>> = { albedo: map('A', true) }) =>
+      surface('dashboard', { maps, parameters: { dashboard: { roughness, emissiveStrength: 9 } } });
+    expect(computeCustomProgramCacheKey(at(0.4))).toBe(computeCustomProgramCacheKey(at(0.7)));
+    expect(computeCustomProgramCacheKey(at(0.4))).not.toBe(computeCustomProgramCacheKey(at(0.4, {})));
+  });
 });

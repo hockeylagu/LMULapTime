@@ -1,4 +1,4 @@
-import { list, value, type ShaderContext, type SurfaceParts } from './shaderContext.js';
+import { glslNumber, list, value, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
 /** Seconds since the viewer started; shared by every digital flag uniform and advanced by `configureSurfaceMaterial`'s render hook. */
@@ -60,7 +60,7 @@ export function flagShaderParts(config: SurfaceConfig, { sample, uv, number, vec
 
   return {
     albedo, normals, emissive,
-    physical: `material.specularColor=vec3(${number(1 / 36)}); material.specularColorBlended=vec3(${number(1 / 36)});`,
+    physical: `material.specularColor=vec3(${glslNumber(1 / 36)}); material.specularColorBlended=vec3(${glslNumber(1 / 36)});`,
     occlusion: hasAo ? 'reflectedLight.indirectSpecular*=flagAoSpec.r;' : '',
   };
 }
