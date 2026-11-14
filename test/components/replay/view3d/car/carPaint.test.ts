@@ -92,7 +92,7 @@ it('treats a paint without a region map as all black region and without carbon',
 it('loads the paint maps with the albedo for paint materials only', () => {
   const appearance = {alias: 'x', albedo: 'albedo', paint: paint({albedo: map('a'), region: map('r'), aoSpec: map('s'), carbon: map('c')})} as CarAppearance;
   expect(materialTexturePaths({id: 'p', name: 'BODY', paint: true}, appearance)).toEqual(['albedo', 'r', 's', 'c']);
-  expect(materialTexturePaths({id: 'g', name: 'GLASS', paint: false, surface: {version: 4, kind: 'glass', maps: {albedo: map('g')}}}, appearance)).toEqual(['g']);
+  expect(materialTexturePaths({id: 'g', name: 'SCREEN', paint: false, surface: {version: 4, kind: 'windscreen', maps: {albedo: map('g')}}}, appearance)).toEqual(['g']);
 });
 
 it('refuses a paint value the package does not fill', () => {

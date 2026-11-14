@@ -25,13 +25,18 @@ function albedoPath(recipe: CarMaterialRecipe, appearance: CarAppearance): strin
   return recipe.paint ? appearance.albedo : appearance.materialTextures?.[recipe.name] ?? recipe.surface?.maps.albedo?.texture;
 }
 
+/** Car kinds whose package description reads as a scenery surface, drawn with the scenery's program. */
+const SURFACE_KINDS = ['standard', 'standardBlend', 'glass'] as const;
+const isSurfaceKind = (kind: string): kind is typeof SURFACE_KINDS[number] => (SURFACE_KINDS as readonly string[]).includes(kind);
+
 /**
- * The scenery surface description of a car's standard material, with each map's texture path (the livery's albedo when it has
- * one); null for the other kinds, which keep three's standard material with the albedo map.
+ * The scenery surface description of a car's standard or glass material, with each map's texture path (the livery's albedo when
+ * it has one); null for the other kinds, which keep three's standard material with the albedo map.
  */
 function nativeSurface(recipe: CarMaterialRecipe, appearance: CarAppearance): SurfaceConfig | null {
   const surface = recipe.surface;
-  if (recipe.paint || !surface || (surface.kind !== 'standard' && surface.kind !== 'standardBlend')) return null;
+  const kind = surface?.kind ?? '';
+  if (recipe.paint || !surface || !isSurfaceKind(kind)) return null;
   if (!surface.flags || !surface.parameters || !Number.isFinite(surface.normalYSign) || typeof surface.normalShadowInfluence !== 'number' || surface.normalShadowInfluence < 0) throw Error(`Car material ${recipe.name} has no surface description`);
   const maps: Record<string, SurfaceMap> = {};
   for (const [key, map] of Object.entries(surface.maps)) {
@@ -39,7 +44,7 @@ function nativeSurface(recipe: CarMaterialRecipe, appearance: CarAppearance): Su
     if (texture) maps[key] = { texture, uv: map.uv, scale: map.scale, srgb: !!map.srgb };
   }
   return {
-    version: 4, kind: surface.kind, name: recipe.name, flags: surface.flags, maps, normalYSign: surface.normalYSign!,
+    version: 4, kind, name: recipe.name, flags: surface.flags, maps, normalYSign: surface.normalYSign!,
     normalShadowInfluence: surface.normalShadowInfluence,
     parameters: surface.parameters as SurfaceConfig['parameters'],
   };
@@ -94,7 +99,11 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     case 'standard': case 'standardBlend': case 'tyre': case 'diffuse':
       material = new MeshStandardMaterial(finish(config));
       break;
-    case 'glass': case 'windscreen': case 'windscreenInside':
+    case 'glass':
+      // The scenery's glass program, on the physical model as the scenery's glass (configureSurfaceMaterial.ts).
+      material = surface ? new MeshPhysicalMaterial({ ior: 1.5, transparent: true, depthWrite: false }) : new MeshStandardMaterial({ ...finish(config), transparent: true, depthWrite: false });
+      break;
+    case 'windscreen': case 'windscreenInside':
       material = new MeshStandardMaterial({ ...finish(config), transparent: true, depthWrite: false });
       break;
     case 'numberPlate': case 'display': case 'staticEffect':

@@ -64,6 +64,19 @@ it('draws a standard material with its metal/roughness, AO/specular and normal m
   expect(material.metalness).toBe(0.6);
 });
 
+it('draws car glass with the scenery glass program, its reflection kept whole through its opacity', () => {
+  const glass: CarMaterialRecipe = { id: 'g', name: 'GLASS', paint: false, surface: {
+    version: 4, kind: 'glass', flags: {}, normalYSign: -1, normalShadowInfluence: 0.5, finish: { roughness: 0.05, metalness: 0 }, renderState: { alphaBlend: true },
+    parameters: { adjust: { tint: [1, 1, 1], normalStrength: 1, roughness: 0.5, metalness: 0, specular: 0.5 } },
+    maps: { albedo: { texture: 'textures/glass', uv: 'uv0', scale: [1, 1], srgb: true } },
+  } };
+  const material = createCarMaterial(glass, appearance, () => new Texture(), testShading());
+  expect(material.type).toBe('MeshPhysicalMaterial'); expect(material.transparent).toBe(true); expect(material.depthWrite).toBe(false);
+  const shader = { uniforms: {} as Record<string, IUniform>, vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>\n#include <fog_pars_vertex>\n#include <fog_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <aomap_fragment>\n#include <shadowmap_pars_fragment>\n#include <lights_physical_pars_fragment>\n#include <lights_fragment_begin>\n#include <fog_pars_fragment>\n#include <fog_fragment>\n#include <opaque_fragment>' };
+  material.onBeforeCompile(shader as never, undefined as never);
+  expect(shader.fragmentShader).toContain('totalSpecular/clamp(diffuseColor.a+0.001,0.001,1.0)');
+});
+
 it('draws an alpha-masked part one side, as every car part, its edges by alpha to coverage', () => {
   const masked: CarMaterialRecipe = { ...recipe(), surface: { ...recipe().surface, renderState: { alphaMask: true } } as CarSurface };
   const material = createCarMaterial(masked, appearance, () => new Texture(), testShading());
