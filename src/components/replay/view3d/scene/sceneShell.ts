@@ -6,6 +6,7 @@ import type { RenderPose } from './replayPose.js';
 import type { CarTextures } from '../cars/carModels.js';
 import { createCarTemplates, type CarTemplates } from '../cars/carTemplates.js';
 import { disposeObjects } from './disposeObjects.js';
+import { updateShownMatrices } from './shownMatrices.js';
 import { exposureType, followsCar, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
 import { createCameraRig, type CameraRig } from '../camera/cameraRig.js';
 import { addSceneEnvironment, sceneSun } from '../sceneEnvironment.js';
@@ -159,6 +160,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   let lit: Promise<void> = Promise.resolve();
   // Content is draped on the road: when the resident chunks change, drape it again (coalesced).
   let freezeScenery = () => {};
+  /** The scenery's chunk roots and batches, frozen once they join: the frame's matrix update skips them. */
+  const frozen = new WeakSet<Object3D>(), isFrozen = (object: Object3D) => frozen.has(object);
   const scheduleRefresh = () => {
     if (refreshTimer || !content) return;
     refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; content?.refreshHeights(); invalidate(); }, 250);
@@ -275,7 +278,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     }
     try {
       content.beforeDraw(camera);
-      scene.updateMatrixWorld();
+      updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);
       // Cached shadow cascades still due ask for the next frame.
       if (environment.update()) invalidate();
@@ -354,7 +357,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       scene.add(world);
       // Nothing under the scenery moves: a chunk's root or a batch freezes once, when it first joins (a batch that leaves and
       // returns keeps its matrices).
-      const frozen = new WeakSet<Object3D>(), freeze = (object: Object3D) => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; };
+      const freeze = (object: Object3D) => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; };
       sceneryRoot.updateWorldMatrix(true, false); freeze(sceneryRoot);
       freezeScenery = () => {
         for (const joined of sceneryRoot.children) {
