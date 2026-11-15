@@ -344,5 +344,7 @@ dark band and skid arcs they lack (Daytona and Silverstone chase views); the bas
 groove now develops by a quarter of the rubber (`GROOVE_PER_RUBBER` in `roadSurface.ts`), which also feeds the dust clearing and the
 kerb's alternate blend. Over 7 reference views the road error after exposure went 0.57 → 0.48 stops and the brightness ratio
 1.17 → 1.03 (surface off: 0.47, 0.99); loose material made no measurable difference. The quarter is a fit, not a read value: the
-road program takes the groove's development as given, and the step from the state's rubber to it lies outside the shaders. (U) The
-fit rests on about 5 views whose cameras match the game well. Not carried still: the groove's shift of the index of refraction.
+road program takes the groove's development as given, and the step from the state's rubber to it lies outside the shaders. The
+reference frames were taken in continuous playback, then paused (no seek), so the fit holds for playback; a frozen post-seek refill
+is ruled out, and the game's local surface model between the replay's 50 s resends is the likelier cause (U). (U) The fit rests on
+about 5 views whose cameras match the game well. Not carried still: the groove's shift of the index of refraction.
