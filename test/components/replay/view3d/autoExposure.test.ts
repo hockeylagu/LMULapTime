@@ -125,7 +125,7 @@ describe('autoExposure', () => {
     exposure.dispose();
   });
 
-  it('reads the metering target into one reused pack buffer, once its fence has signalled, and adapts to the reading', async () => {
+  it('reads the metering target into a pack buffer of its own, once its fence has signalled, and adapts to the reading', async () => {
     const frames: Array<() => void> = [], flush = () => frames.splice(0).forEach(callback => callback());
     vi.stubGlobal('requestAnimationFrame', (callback: () => void) => frames.push(callback));
     const half = 0x3c00; // 1.0 as a half float: every metered cell reads 1.
@@ -152,7 +152,7 @@ describe('autoExposure', () => {
       flush(); // The fence has not signalled: no data is fetched yet.
       expect(calls).not.toContain('getBufferSubData');
       flush();
-      expect(calls.slice(-3)).toEqual(['wait', 'getBufferSubData', 'deleteSync']);
+      expect(calls.slice(-4)).toEqual(['wait', 'getBufferSubData', 'deleteSync', 'deleteBuffer']);
       expect(invalidated).toHaveBeenCalled(); // The first reading is unadapted.
       // The next reading, a period on (four frames at 60 Hz): none before it.
       let now = performance.now();
@@ -160,16 +160,19 @@ describe('autoExposure', () => {
       for (let frame = 0; frame < 3; frame++) { now += 17; exposure.render({} as never, {} as never); }
       expect(calls.filter(call => call === 'readPixels')).toHaveLength(1);
       now += 17; exposure.render({} as never, {} as never);
-      expect(calls.filter(call => call === 'createBuffer')).toHaveLength(1);
+      expect(calls.filter(call => call === 'createBuffer')).toHaveLength(2); // Written once each: the browser's copy of it stays.
       expect(calls.filter(call => call === 'readPixels')).toHaveLength(2);
       // A frame's top fetches it before the frame poll does; the poll then finds nothing to fetch.
       signals.push('signalled');
       exposure.collect();
-      expect(calls.slice(-3)).toEqual(['wait', 'getBufferSubData', 'deleteSync']);
+      expect(calls.slice(-4)).toEqual(['wait', 'getBufferSubData', 'deleteSync', 'deleteBuffer']);
       const fetched = calls.length;
       flush(); exposure.collect();
       expect(calls).toHaveLength(fetched);
-    } finally { exposure.dispose(); vi.unstubAllGlobals(); vi.restoreAllMocks(); }
-    expect(calls.at(-1)).toBe('deleteBuffer');
+      // A reading pending at dispose lets its buffer and fence go.
+      now += 300; exposure.render({} as never, {} as never);
+      exposure.dispose();
+      expect(calls.slice(-2)).toEqual(['deleteSync', 'deleteBuffer']);
+    } finally { vi.unstubAllGlobals(); vi.restoreAllMocks(); }
   });
 });

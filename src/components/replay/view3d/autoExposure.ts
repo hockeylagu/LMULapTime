@@ -276,27 +276,29 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   };
   apply(active);
 
-  let pack: WebGLBuffer | null = null;
+  let formatChecked = false;
   /** The pending reading's fetch, while one waits on its fence. */
   let collect: (() => void) | null = null;
   /**
    * Reads the metering target back without stalling the frame, called right after its pass while its framebuffer is still bound.
    * three's `readRenderTargetPixelsAsync` does the same, but each call creates and deletes a pixel-pack buffer and a fence, polls the
-   * fence on a 4 ms timer and calls `getBufferSubData`, which is a synchronous round trip to the GPU process that waits for every
-   * command issued before it: that wait was the whole cost (2.8 % of the main thread). Here one pack buffer serves every reading,
-   * and the data is fetched once the fence has signalled, with no timers: at the top of the next frame (`collect`), so the round
-   * trip finds the frame's commands not yet issued, else from a frame poll.
+   * fence on a 4 ms timer. Here the data is fetched once the fence has signalled, with no timers: at the top of the next frame
+   * (`collect`), else from a frame poll. Each reading has a pack buffer of its own, written once: a pack buffer written again for
+   * the next reading makes the browser discard the readback copy it keeps of it, with a performance warning each time. The fetch
+   * is still a round trip to the GPU process that waits for the commands issued before it (a median 2-4 ms while a race grid's
+   * cars upload), which reading at the top of the frame keeps short.
    */
   const read = (exposure: number) => {
     const started = generation, gl = renderer.getContext() as WebGL2RenderingContext;
-    if (!pack) {
+    if (!formatChecked) {
       // Checked once: the query is itself a round trip in some browsers, and the target's format never changes.
       if (gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT) !== gl.RGBA || gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) !== gl.HALF_FLOAT) {
         throw Error('The metering target is not readable as half-float RGBA');
       }
-      pack = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.bufferData(gl.PIXEL_PACK_BUFFER, readback.byteLength, gl.STREAM_READ);
+      formatChecked = true;
     }
-    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
+    const pack = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.bufferData(gl.PIXEL_PACK_BUFFER, readback.byteLength, gl.STREAM_READ);
     gl.readPixels(0, 0, METER_W, METER_H, gl.RGBA, gl.HALF_FLOAT, 0);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -317,7 +319,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
         for (let i = 0; i < cells; i++) for (let c = 0; c < 3; c++) mean[c] += DataUtils.fromHalfFloat(readback[i * 4 + c]) / cells;
         metered = meteredLuminance(mean, exposure);
         if (adapted === null || Math.abs(targetOf(metered) - adapted.log2) > SETTLED_STOPS) invalidate();
-      } finally { gl.deleteSync(fence); }
+      } finally { gl.deleteSync(fence); gl.deleteBuffer(pack); }
     };
     collect = fetch;
     const poll = () => { fetch(); if (collect === fetch) requestAnimationFrame(poll); };
@@ -373,7 +375,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     },
     dispose() {
       disposed = true;
-      if (pack) renderer.getContext().deleteBuffer(pack);
+      collect?.();
       hdr.dispose(); meter.dispose(); quad.dispose(); outputMaterial.dispose(); meterMaterial.dispose();
     },
   };
