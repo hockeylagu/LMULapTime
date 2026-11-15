@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Color, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
-import { adaptExposure, createAutoExposure, inverseToneCurve, lawExposure, meteredLuminance, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { adaptExposure, createAutoExposure, inverseToneCurve, lawExposure, meteredLuminance, meterGrey, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
 /** A synthetic camera type (profiles at sun strengths 0 and 60). */
@@ -42,10 +42,13 @@ describe('autoExposure', () => {
     expect(profileAt(TYPE, sun(30, 30), 1).targetExposure).toBeCloseTo(0.45, 12);
   });
 
-  it('exposes by the law U · T · B^(1 - s) / (U · L)^s inside the look limits: brighter scenes get less exposure, by the adaptation scale', () => {
+  it('exposes by the law U · (B · T)^(1 - s) · (G / (U · L))^s inside the look limits: brighter scenes get less exposure, by the adaptation scale', () => {
     const unit = meterUnit(2.2), look = {...profileAt(TYPE, sun(30, 0)), targetExposure: 0.3, lightDarkBorder: 1.5, minExposure: 0.05, maxExposure: 2};
-    expect(lawExposure(look, 0.4, Math.log(1 / unit), unit)).toBeCloseTo(unit * 0.3 * 1.5 ** 0.6, 9);
-    expect(lawExposure(look, 0.4, Math.log(4 / unit), unit)).toBeCloseTo(unit * 0.3 * 1.5 ** 0.6 / 4 ** 0.4, 9);
+    // G is the target on the meter's scale: −ln(1 − 0.3).
+    const grey = -Math.log(0.7), at = (light: number) => unit * (1.5 * 0.3) ** 0.6 * (grey / light) ** 0.4;
+    expect(meterGrey(0.3)).toBeCloseTo(grey, 12);
+    expect(lawExposure(look, 0.4, Math.log(1 / unit), unit)).toBeCloseTo(at(1), 9);
+    expect(lawExposure(look, 0.4, Math.log(4 / unit), unit)).toBeCloseTo(at(4), 9);
     expect(lawExposure(look, 0.6, Math.log(4), unit)).toBeLessThan(lawExposure(look, 0.4, Math.log(4), unit));
     // A very dark scene stops at the maximum, a very bright one at the minimum (both on the camera's scale, so times U).
     expect(lawExposure(look, 0.4, Math.log(1e-9 / unit), unit)).toBeCloseTo(unit * 2, 12);
@@ -53,13 +56,17 @@ describe('autoExposure', () => {
     expect(meterUnit(4.4)).toBeCloseTo(unit / 2, 12); // The package's scale, not a constant of the app.
   });
 
-  it('meters the mean of the tone-mapped taps back through the curve: a uniform scene reads its own light, a sun glint barely counts', () => {
+  it('meters the luminance of the tone-mapped taps\' mean through the curve\'s exponential alone; a sun glint barely counts', () => {
     const curve = {a: 2.658, b: 0.665}, exposure = 0.5, taps = 128 * 72;
     const reading = (lights: number[]) => {
       const mean = lights.reduce((sum, light) => sum + toneCurve(curve, light * exposure), 0) / lights.length;
-      return meteredLuminance([mean, mean, mean], curve, exposure);
+      return meteredLuminance([mean, mean, mean], exposure);
     };
-    expect(reading([1.2])).toBeCloseTo(Math.log(1.2), 6);
+    // A reference frame's reading: mean displayed luminance 0.1658 reads as 0.1813 exposed (the curve's exact inverse would be 0.2112).
+    expect(Math.exp(meteredLuminance([0.1658, 0.1658, 0.1658], 1))).toBeCloseTo(0.1813, 4);
+    expect(inverseToneCurve(curve, 0.1658)).toBeCloseTo(0.2112, 3);
+    // Rec. 709 weights over the channels' means.
+    expect(meteredLuminance([0.5, 0.1, 0.2], 1)).toBeCloseTo(Math.log(-Math.log(1 - (0.2126 * 0.5 + 0.7152 * 0.1 + 0.0722 * 0.2))), 12);
     const scene = Array<number>(taps).fill(0.15);
     const glint = [...scene.slice(1), 6000]; // One tap on glass catching the sun: capped at 1 by the curve.
     expect(Math.abs(reading(glint) - reading(scene))).toBeLessThan(0.01);

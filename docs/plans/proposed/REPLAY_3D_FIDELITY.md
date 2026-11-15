@@ -235,7 +235,9 @@ scored by `inputs/score.py` against the frozen game frames):
    `U · clamp(T · B^(1 − s) / (U · L)^s, min, max)`, U from the package's `sceneLuminanceScale`. The fitted G = 1.24 is gone:
    it was mostly B^(1 − s), about 1.15 by day. The 20 reference frames sit 9 % over this law (9.5 % scatter), so the app
    now exposes about 8 % lower than under item 11b. Not carried: the reference's dark-scene adaptation set, its glare
-   influence on the target and its adaptation speed limit. Not yet scored on the 62 shots.
+   influence on the target and its adaptation speed limit. Not yet scored on the 62 shots. Later (2026-11-14): the meter reads
+   the window's mean tone-mapped luminance y as −ln(1 − y) and the target T as −ln(1 − T), as the reference does, which takes up
+   about that 9 % (`(B · T)^(1 − s) · (G / (U · L))^s`, G = −ln(1 − T)).
 11c. **Road rubber groove at an assumed level** (`scenery/materials/roadSurface.ts`, 2026-11-09 night, uncommitted; needs a
    package that carries the groove). The sunlit road at 1.2× was the rubber laid on the racing line, which the app did not
    draw. The package now gives each rubbered road its groove map (`flags.grooveMap`, `maps.groove`) and the groove's albedo,

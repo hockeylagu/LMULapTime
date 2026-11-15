@@ -166,7 +166,9 @@ and `sky.hosek.altitudeM`.
 What `rendering/index.json` holds:
 `camera` holds a positive `outputGamma` (the display encode), a positive `sceneLuminanceScale` and `types` with exactly `external`, `onboard` and `tv`; each type has a
 `meteringWindow` inside the frame (fractions from the top left), a positive `adaptationScale` (s of the exposure law
-`T · B^(1 - s) / L^s` kept inside the look's limits, L the metered mean luminance over `sceneLuminanceScale`), `adaptation`
+`(B · T)^(1 - s) · (G / L)^s` kept inside the look's limits, L the metered luminance over `sceneLuminanceScale`: the Rec. 709
+luminance y of the window's mean tone-mapped colour read as −ln(1 − y) over the exposure, and G = −ln(1 − T) the target read the
+same way), `adaptation`
 {`sensitivity`, `speedLimit`, `delayS`, `darkAdaptation`} (the exposure moves toward the law's in stops: a blend fraction `sensitivity` per
 0.15 s, capped at `speedLimit` stops a second and smoothed twice; a darkening scene takes `darkAdaptation`'s non-negative values;
 `autoExposure.ts` `adaptExposure`; on the wall clock, so it runs on while the replay is paused; it starts at the target when the
