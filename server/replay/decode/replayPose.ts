@@ -51,8 +51,8 @@ function poseMotion(payload: Buffer, offset: number, rotY: number, velocity: [nu
 }
 
 /**
- * The four wheels of a pose (bytes 16..33, docs/VCR_FORMAT.md §4.1): angular speed in rad/s, negative when the wheel turns
- * backwards, and suspension deflection in metres.
+ * The four wheels of a pose (bytes 16..33, docs/VCR_FORMAT.md §4.1): angular speed in rad/s, negative while the wheel rolls
+ * forward, and suspension deflection in metres.
  */
 function poseWheels(payload: Buffer, offset: number): { speeds: [number, number, number, number]; deflections: [number, number, number, number] } {
   const nibbles = payload.readUInt16LE(offset + 32);

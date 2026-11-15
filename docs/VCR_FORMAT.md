@@ -249,7 +249,7 @@ suspension field:
 
 | Bits | Field |
 | :--- | :--- |
-| `v` bit `21` | wheel turning backwards |
+| `v` bit `21` | **Sign** of the wheel speed: set (negative) while the wheel rolls forward |
 | `v` bits `13..20` = `255` | **fast form**: `v` bits `0..12` = wheel speed, rad/s = `n / 16` (to 512 rad/s) |
 | `v` bits `13..20` < `255` | **slow form** (under 15.9 rad/s): bits `13..20` = wheel speed `n / 16` rad/s, bits `0..12` = **wheel rotation angle**, rad = `n / 1303.638` (0..2π) |
 | word bits `18..31` | **Suspension deflection**: signed 14-bit, metres = `n / 2048` (clamped ±2 m) |

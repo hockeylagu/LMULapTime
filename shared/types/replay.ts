@@ -128,7 +128,7 @@ export interface ReplayTrajectoryPoint {
   wheelSpeeds?: [number, number, number, number];
   /** FL/FR/RL/RR brake temperatures, °C. */
   brakeTemps?: [number, number, number, number];
-  /** Replay FL/FR/RL/RR wheel angular speed in rad/s, negative when the wheel turns backwards. */
+  /** Replay FL/FR/RL/RR wheel angular speed in rad/s as the replay signs it: negative while the wheel rolls forward. */
   wheelAngularSpeeds?: [number, number, number, number];
   /** Replay FL/FR/RL/RR suspension deflection in metres. */
   suspensionDeflections?: [number, number, number, number];
