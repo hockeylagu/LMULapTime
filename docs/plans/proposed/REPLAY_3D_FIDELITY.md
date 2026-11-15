@@ -238,7 +238,7 @@ scored by `inputs/score.py` against the frozen game frames):
    influence on the target and its adaptation speed limit. Not yet scored on the 62 shots. Later (2026-11-14): the meter reads
    the window's mean tone-mapped luminance y as −ln(1 − y) and the target T as −ln(1 − T), as the reference does, which takes up
    about that 9 % (`(B · T)^(1 − s) · (G / (U · L))^s`, G = −ln(1 − T)).
-11c. **Road rubber groove at an assumed level** (`scenery/materials/roadSurface.ts`, 2026-11-09 night, uncommitted; needs a
+11c. **Road rubber groove at an assumed level** (superseded 2026-11-15 by the replay's own surface state, v17 item 1; `ASSUMED_RUBBER` now 51/255 is drawn only without one) (`scenery/materials/roadSurface.ts`, 2026-11-09 night, uncommitted; needs a
    package that carries the groove). The sunlit road at 1.2× was the rubber laid on the racing line, which the app did not
    draw. The package now gives each rubbered road its groove map (`flags.grooveMap`, `maps.groove`) and the groove's albedo,
    roughness and specular level (`parameters.groove`); the road mixes toward them after its tint by
@@ -314,7 +314,7 @@ the 3D view, most useful first. "Every car" means the race grid gets it too.
 
 | # | Data (VCR_FORMAT) | Shows | Decoded | Needs |
 |---|---|---|---|---|
-| 1 | Track surface: rubber, loose material, water, temperature per surface element (§4.21, opcodes 137/139/194, 32 Hz) | The racing line rubbering in through the session, marbles off line, wetness per spot; the road now assumes one rubber level everywhere | No | Package: a per-vertex element index on the race surface's road and kerb primitives, plus the element count (schema bump). App: decode into a per-element array with snapshots for seeking, a data texture the road and kerb shaders read |
+| 1 | Track surface: rubber, loose material, water, temperature per surface element (§4.21, opcodes 137/139/194, 32 Hz) | The racing line rubbering in through the session, marbles off line, wetness per spot | Yes (read from the .Vcr on request, not cached) | **Done 2026-11-15 (water not drawn):** package v17 (schema 15) gives road and kerb vertices a venue point (`_lmu_realroad`) and each layout a point → element table; `GET /api/session/:id/surface` serves the state at a session time; the scene follows the session clock (`scene/sceneSurface.ts`, every 5 s of session time) and writes each vertex its rubber and loose material (`scenery/realRoad.ts`, a two-byte attribute: a state texture took a texture unit and pushed the nine-map roads out of their batches, Le Mans race p95 15 → 25 ms). Groove, dust, marbles and the kerb alternate blend as the reference road and kerb programs mix them. Race start 21.8–22.0 s, 748 draws, p95 14.8–16.0 ms, heap 725 MB (+12); lap p99 9.7–10.8 ms; 8 freeze views mean dE 8.33 → 8.24, f median 1.026 → 1.01, mostly on kerbs |
 | 2 | Wheel angular speed (§4.1, pose wheels) | Lockups, wheelspin and reverse as recorded, on every car; lap mode now rolls by slip ratios on a fitted radius, the race grid at road speed | Yes (cache v9) | **Done 2026-11-15:** each wheel turns by its recorded speed, else travel over radius (`cars/wheelMotion.ts` `createWheelRoll`); race windows 15 → 19 channels (VERSION 4). Race start load 21.9–22.7 s and heap 713 MB as before; race p95 15.2–16.0 ms, lap p99 9.7–9.8 ms; the 8 freeze views differ only on wheels and cockpit reflections |
 | 3 | Tyre effect levels per wheel: skid, slide, smoke (§4.11) | Tyre smoke on lockups, spins and off-track moments | No | Decoder field; a particle effect |
 | 4 | Dents, detached parts, loose objects (§4.5, §4.1 bits 0..17, §4.22) | Damaged cars, lost bodywork and wheels, cones and debris on track | No | Package: body extents and deformation scale, the detachable parts by bit, debris models |
@@ -332,3 +332,9 @@ dust, water → wetness); how the elements map to the race surface's vertices is
 validated against the package's vertices before the schema change.
 
 Each step is judged by eye against the game and re-runs `npm run benchmark:replay3d:suite` (p99 must stay < 16 ms).
+
+Open on item 1: (U) the track-average groove (`flags.groove: 'trackAverage'`) reads the median rubber over all elements, an
+approximation: the source of the reference's median grip is not traced. (U) A session whose .Vcr was deleted has no surface state
+(its endpoint answers 404 and the scene draws `ASSUMED_RUBBER`); keeping the states in the replay cache needs a cache version bump
+and an offline migration, proposed to batch with the rain light bump (v11). The kerb's alternate blend now moves with the groove and
+marbles: the visible change on the freeze views, to be judged by eye.
