@@ -1,5 +1,6 @@
 import { cloudMapFiles, loadClouds } from '../../shared/domain/scenery/cloudMaps.js';
 import { readRoadHeight } from '../../shared/domain/scenery/roadHeight.js';
+import { realRoadBytes } from '../../shared/packageContract/scenery.js';
 import type { SceneryChunk, SceneryLayoutPayload, SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
 import { fetchBinary, fetchJson } from './apiClient.js';
 
@@ -10,22 +11,36 @@ export const SCENERY_FILES = '/api/data-plugin/scenery/files/';
 export const RENDERING_FILES = '/api/data-plugin/rendering/files/';
 
 /**
- * The layout with its sky's cloud maps and its road height grid read: the layout JSON names each file. The grid is read before the
- * scene starts, so a height a car or line takes from it is final (no refit as the scenery streams in).
+ * The layout with its sky's cloud maps, its road height grid and its RealRoad point table read: the layout JSON names each file. The
+ * grid is read before the scene starts, so a height a car or line takes from it is final (no refit as the scenery streams in).
  */
 export async function fetchSceneryLayout(layoutKey: string, signal: AbortSignal): Promise<SceneryLayoutResource> {
   const layout = await fetchJson<SceneryLayoutPayload>(`/api/data-plugin/scenery/${encodeURIComponent(layoutKey)}`, { signal });
   if (layout.layoutKey !== layoutKey) throw Error('3D scenery layout mismatch');
   const files = cloudMapFiles(layout.sky.clouds);
-  const [maps, heights] = await Promise.all([
+  const [maps, heights, realRoad] = await Promise.all([
     Promise.all([...files].map(async ([path, map]) => {
       const file = await fetchBinary(`${RENDERING_FILES}${map.sha256}.bin`, { signal, cache: 'default' });
       if (file.byteLength !== map.byteLength) throw Error(`Incomplete cloud map ${path}`);
       return [path, new Uint8Array(file)] as const;
     })),
     fetchBinary(`${SCENERY_FILES}heights/${layout.roadHeight.sha256}.bin`, { signal, cache: 'default' }),
+    fetchBinary(`${SCENERY_FILES}realroad/${layout.realRoad.sha256}.bin`, { signal, cache: 'default' }),
   ]);
-  return { ...layout, sky: { ...layout.sky, clouds: loadClouds(layout.sky.clouds, new Map(maps)) }, roadHeightAt: readRoadHeight(layout.roadHeight, heights) };
+  if (realRoad.byteLength !== realRoadBytes(layout.realRoad)) throw Error(`RealRoad table: ${realRoad.byteLength} bytes, the layout states ${layout.realRoad.byteLength}`);
+  return {
+    ...layout, sky: { ...layout.sky, clouds: loadClouds(layout.sky.clouds, new Map(maps)) }, roadHeightAt: readRoadHeight(layout.roadHeight, heights),
+    // Little-endian, as every browser's typed arrays are.
+    realRoadTable: new Uint32Array(realRoad),
+  };
+}
+
+/** The session's track surface state at `timeSec` (`elements` x 4 bytes, docs/VCR_FORMAT.md §4.21); rejects when its replay is gone. */
+export async function fetchSurfaceState(sessionId: string, elements: number, timeSec: number, signal: AbortSignal): Promise<Uint8Array> {
+  const query = new URLSearchParams({ elements: String(elements), time: timeSec.toFixed(1) });
+  const bytes = await fetchBinary(`/api/session/${encodeURIComponent(sessionId)}/surface?${query}`, { signal });
+  if (bytes.byteLength !== elements * 4) throw Error(`Track surface state: ${bytes.byteLength} bytes for ${elements} elements`);
+  return new Uint8Array(bytes);
 }
 
 /** One chunk's GLB bytes. Files never change under their hash, so the browser may cache them. */

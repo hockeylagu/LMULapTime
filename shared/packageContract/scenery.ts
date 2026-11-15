@@ -124,6 +124,27 @@ export interface SceneryRoadHeight {
 export const roadHeightBytes = (grid: Pick<SceneryRoadHeight, 'tileCells' | 'tilesX' | 'tilesZ' | 'tiles'>): number =>
   4 * grid.tilesX * grid.tilesZ + grid.tiles * grid.tileCells * grid.tileCells * (2 + 1 / 8);
 
+/**
+ * The layout's RealRoad point table, file `scenery/realroad/<sha256>.bin` (docs/SCENE_PACKAGE.md#realroad-elements): raw little-endian uint32 [points],
+ * entry p = the RealRoad element index (0 .. elements - 1) of venue point p in this layout, or `REALROAD_NONE` where the point is not part of this
+ * layout's RealRoad. `points` is the venue's point count (the same in every layout of the venue); `elements` is the layout's element count, the
+ * size of the game's per-element state (the replay's surface element index runs over it). Every element appears at least once.
+ */
+export interface SceneryRealRoad {sha256: string; byteLength: number; points: number; elements: number}
+/** Table entry of a point that is not part of the layout's RealRoad. */
+export const REALROAD_NONE = 0xffffffff;
+/**
+ * The chunk vertex attribute carrying a vertex's venue point id: SCALAR float32, an exact integer from 0 to points - 1, or `REALROAD_NO_POINT` for a
+ * vertex without one. Every primitive whose material's `lmuSurface.kind` is one of `REALROAD_KINDS` has it; no other primitive does.
+ */
+export const REALROAD_ATTRIBUTE = '_LMU_REALROAD';
+export const REALROAD_NO_POINT = -1;
+export const REALROAD_KINDS = ['road', 'kerb'] as const;
+/** Upper bounds: point ids stay exact in float32 (2^24); element indices fit the replay's 21-bit start index. */
+export const REALROAD_MAX_POINTS = 1 << 24, REALROAD_MAX_ELEMENTS = 1 << 21;
+/** The file size a RealRoad row implies. */
+export const realRoadBytes = (table: Pick<SceneryRealRoad, 'points'>): number => 4 * table.points;
+
 /** One local irradiance probe (see CompactLayoutRow.irradianceProbes). */
 export interface SceneryIrradianceProbe {
   name: string;
@@ -147,6 +168,8 @@ export interface CompactLayoutRow {
   irradianceProbes: SceneryIrradianceProbe[];
   /** Road height grid of the drivable corridor. */
   roadHeight: SceneryRoadHeight;
+  /** RealRoad point table: venue point id -> the layout's RealRoad element index. */
+  realRoad: SceneryRealRoad;
   daylight: SceneryDaylight;
   horizon: CompactHorizonChunk;
   sectors: CompactSectorChunk[];
@@ -175,7 +198,7 @@ export const STREAMING_KEYS = ['residentBehindM', 'residentAheadM', 'freeCameraR
 const SESSIONS = ['race', 'qualify', 'practice1', 'practice2'];
 const TEXTURE_KEYS = ['sha256', 'byteLength', 'width', 'height', 'levels', 'format', 'srgb', 'gpuBytes'];
 const CHUNK_COMMON = ['id', 'kind', 'bounds', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'shadowDrawCalls', 'shadowTriangles', 'geometryBytes', 'meshes', 'materials', 'textures'];
-const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'irradianceProbes', 'roadHeight', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
+const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'irradianceProbes', 'roadHeight', 'realRoad', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
 const MATERIAL_KEYS = ['key', 'vertices', 'indices', 'primitives', 'draws'];
 export const MATERIAL_KEY = /^[0-9a-f]{16}$/;
 const MAX_IRRADIANCE_PROBES = 64, MAX_LAYOUTS = 100, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192, MAX_MATERIALS = 8192;
@@ -357,6 +380,18 @@ function parseRoadHeight(value: unknown, what: string): SceneryRoadHeight {
   return value as SceneryRoadHeight;
 }
 
+/** A RealRoad row: its shape and that `byteLength` is the size the table implies. Whether the file matches is package validation's. */
+export function parseRealRoad(value: unknown, what: string): SceneryRealRoad {
+  const table = record(value, what);
+  exactKeys(table, ['sha256', 'byteLength', 'points', 'elements'], what);
+  sha256(table.sha256, `${what}.sha256`);
+  const points = positiveCount(table.points, `${what}.points`, REALROAD_MAX_POINTS);
+  const elements = positiveCount(table.elements, `${what}.elements`, REALROAD_MAX_ELEMENTS);
+  if (elements > points) throw Error(`${what}: ${elements} elements from ${points} points`);
+  if (table.byteLength !== realRoadBytes({points})) throw Error(`${what}.byteLength: ${JSON.stringify(table.byteLength)} is not the ${realRoadBytes({points})} bytes the table implies`);
+  return value as SceneryRealRoad;
+}
+
 /** Local irradiance probes: unique names, a position, a non-negative range, and volumes that are closed triangle meshes over their own positions. */
 function parseIrradianceProbes(value: unknown, what: string): void {
   const names = new Set<string>();
@@ -395,6 +430,7 @@ function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[
   vec3(probe.position, `${what}.environmentProbe.position`);
   parseIrradianceProbes(row.irradianceProbes, `${what}.irradianceProbes`);
   parseRoadHeight(row.roadHeight, `${what}.roadHeight`);
+  parseRealRoad(row.realRoad, `${what}.realRoad`);
   parseDaylight(row.daylight, `${what}.daylight`);
   const refs = array(row.textures, `${what}.textures`, MAX_TEXTURES), seen = new Set<number>();
   refs.forEach((item, i) => {
@@ -444,6 +480,13 @@ export function parseSceneryCatalog(value: unknown): SceneryCatalog {
   rows.forEach((row, i) => { if (i > 0 && !(rows[i - 1].layoutKey < row.layoutKey)) throw Error(`scenery catalog.layouts: not sorted by layoutKey without duplicates at ${row.layoutKey}`); });
   const unused = table.findIndex((_entry, i) => !used.has(i));
   if (unused >= 0) throw Error(`scenery catalog.textures: entry ${unused} (${table[unused].sha256}) is used by no layout`);
+  // Layouts sharing a chunk are one venue: their chunks carry the same point ids, so their RealRoad tables have the same point count.
+  const pointsOfChunk = new Map<string, {points: number; layoutKey: string}>();
+  for (const row of rows) for (const chunk of [row.horizon, ...row.sectors]) {
+    const seen = pointsOfChunk.get(chunk.sha256);
+    if (!seen) pointsOfChunk.set(chunk.sha256, {points: row.realRoad.points, layoutKey: row.layoutKey});
+    else if (seen.points !== row.realRoad.points) throw Error(`scenery catalog.layouts: ${seen.layoutKey} and ${row.layoutKey} share chunk ${chunk.sha256} but have ${seen.points} and ${row.realRoad.points} RealRoad points`);
+  }
   return value as SceneryCatalog;
 }
 

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { syntheticTrack } from '../syntheticTrack.js';
 import { catalogSky, packageClouds, packageShadows, TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from './sceneryProfiles.js';
-import { bodyDescriptorPath, bodyGlbPath, bodyTexturePath, descriptorTexturePath, PACKAGE_SCHEMA, renderingBinPath, sceneryChunkPath, sceneryHeightPath, sceneryTexturePath, TRACK_LAYOUT_KEYS } from '../../../shared/packageContract/index.js';
+import { bodyDescriptorPath, bodyGlbPath, bodyTexturePath, descriptorTexturePath, PACKAGE_SCHEMA, renderingBinPath, sceneryChunkPath, sceneryHeightPath, sceneryRealRoadPath, sceneryTexturePath, TRACK_LAYOUT_KEYS } from '../../../shared/packageContract/index.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -79,9 +79,11 @@ export function syntheticPackage() {
   const heights = Buffer.alloc(4 + 8 * 8 * 2 + 8);
   for (let cell = 0; cell < 64; cell++) heights.writeUInt16LE(1, 4 + cell * 2);
   const roadHeight = { ...rowOf(store(sceneryHeightPath, heights)), cellM: 0.25, tileCells: 8, originM: [0, 0], tilesX: 1, tilesZ: 1, tiles: 1, heightOffsetM: 0, heightStepM: 0.001, corridorM: 5 };
+  /** A RealRoad table of two points, one element each. */
+  const realRoad = { ...rowOf(store(sceneryRealRoadPath, Buffer.from(Uint32Array.of(0, 1).buffer))), points: 2, elements: 2 };
   /** The layout row as the compact catalog states it. */
   const scenery = {
-    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750, environmentProbe: { position: [10, 2, -20] }, irradianceProbes: [], roadHeight,
+    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750, environmentProbe: { position: [10, 2, -20] }, irradianceProbes: [], roadHeight, realRoad,
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
     horizon: chunk('horizon', 'horizon', { kind: 'horizon' }),
     sectors: [

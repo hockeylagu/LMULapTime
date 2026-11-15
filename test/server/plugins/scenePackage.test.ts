@@ -61,7 +61,7 @@ describe('schema 10 manifest and files', () => {
     expect(plugin.body('TEST_CAR')?.sha256).toBe(built.car.sha256);
   });
 
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, '14', undefined, 15])('rejects manifest schema %s: only schema 14 is supported', schemaVersion => {
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, '15', undefined, 16])('rejects manifest schema %s: only schema 15 is supported', schemaVersion => {
     const built = build();
     built.manifest.schemaVersion = schemaVersion; built.commit();
     expect(state(built)).toBe('invalid');

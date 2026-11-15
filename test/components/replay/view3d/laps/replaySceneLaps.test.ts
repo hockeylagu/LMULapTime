@@ -154,7 +154,7 @@ const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`
 const layout = {
   layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
-  camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]}, roadHeightAt: () => null,
+  camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]}, roadHeightAt: () => null, realRoad: {sha256: 'r', byteLength: 8, points: 2, elements: 2}, realRoadTable: Uint32Array.of(0, 1),
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
   // A box has 24 vertices and 36 indices: the horizon's ground, and a road and an obstacle in each sector (up to eight).
