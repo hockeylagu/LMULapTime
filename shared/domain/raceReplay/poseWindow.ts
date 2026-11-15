@@ -6,10 +6,10 @@
 /**
  * `inPit` is 1 in the pit lane or the garage, else 0; it is set even where the car has no pose (stopped in its box). `steerYaw`
  * and `brake` are the replay's normalized steering and brake; `lamps` the lit lamp flags (`RACE_LAMP`); `deflFL`..`deflRR` each
- * corner's suspension deflection as the replay records it.
+ * corner's suspension deflection and `spinFL`..`spinRR` each wheel's angular speed, as the replay records them.
  */
 export const RACE_POSE_CHANNELS = ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'speedKmh', 'inPit', 'steerYaw', 'brake', 'lamps',
-  'deflFL', 'deflFR', 'deflRL', 'deflRR'] as const;
+  'deflFL', 'deflFR', 'deflRL', 'deflRR', 'spinFL', 'spinFR', 'spinRL', 'spinRR'] as const;
 export type RacePoseChannel = typeof RACE_POSE_CHANNELS[number];
 export const RACE_POSE_CHANNEL_COUNT = RACE_POSE_CHANNELS.length;
 /** The `lamps` channel's flags. */
@@ -30,7 +30,7 @@ export interface RacePoseWindow {
 }
 
 const MAGIC = 0x50524d4c; // "LMRP" little endian
-const VERSION = 3;
+const VERSION = 4;
 const HEADER_BYTES = 28;
 
 export function encodeRacePoseWindow(window: RacePoseWindow): Uint8Array {

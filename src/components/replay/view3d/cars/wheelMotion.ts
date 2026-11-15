@@ -19,18 +19,37 @@ function wheelTravel(a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint, corner:
   return Math.hypot(dx, dz) * (forward < 0 ? -1 : 1) * (ka * fraction + (kb - ka) * fraction * fraction / 2);
 }
 
-/** Absolute cursor-based wheel travel: pause, seek, lap loops and playback rates cannot accumulate drift. */
-export function createWheelTravel(points: ReplayTrajectoryPoint[]): (index: number, fraction: number, corner: number) => number {
-  const travel = Array.from({length: 4}, () => new Float64Array(points.length));
+/** A corner's recorded angular speed at a sample, rad/s, positive rolling forward: the replay stores it negative rolling forward. */
+function recordedSpin(point: ReplayTrajectoryPoint, corner: number): number | undefined {
+  const omega = point.wheelAngularSpeeds?.[corner];
+  return omega === undefined || !Number.isFinite(omega) ? undefined : -omega;
+}
+
+/**
+ * Radians a wheel rolls forward from `a` over `fraction` of the way to `b`: the recorded angular speed where both samples hold
+ * it (the wheel as the replay turns it: lockups, wheelspin and reverse included), else the travel over the wheel's radius.
+ */
+function wheelRoll(a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint, corner: number, fraction: number, radiusM: number): number {
+  const start = recordedSpin(a, corner), end = recordedSpin(b, corner);
+  if (start === undefined || end === undefined) return wheelTravel(a, b, corner, fraction) / radiusM;
+  return (start * fraction + (end - start) * fraction * fraction / 2) * (b.timeSec! - a.timeSec!);
+}
+
+/**
+ * Absolute cursor-based wheel rotation in radians, positive rolling forward, for wheels of `radiiM` (by corner): pause, seek,
+ * lap loops and playback rates cannot accumulate drift.
+ */
+export function createWheelRoll(points: ReplayTrajectoryPoint[], radiiM: readonly number[]): (index: number, fraction: number, corner: number) => number {
+  const roll = Array.from({length: 4}, () => new Float64Array(points.length));
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1], b = points[i], continuous = isContinuousPose(a, b);
-    for (let corner = 0; corner < 4; corner++) travel[corner][i] = travel[corner][i - 1] + (continuous ? wheelTravel(a, b, corner, 1) : 0);
+    for (let corner = 0; corner < 4; corner++) roll[corner][i] = roll[corner][i - 1] + (continuous ? wheelRoll(a, b, corner, 1, radiiM[corner]) : 0);
   }
   return (index, fraction, corner) => {
     const i = Math.max(0, Math.min(points.length - 1, index)), a = points[i], b = points[i + 1];
     if (!a) return 0;
     const t = Number.isFinite(fraction) ? Math.max(0, Math.min(1, fraction)) : 0;
-    return travel[corner][i] + (isContinuousPose(a, b) ? wheelTravel(a, b, corner, t) : 0);
+    return roll[corner][i] + (isContinuousPose(a, b) ? wheelRoll(a, b, corner, t, radiiM[corner]) : 0);
   };
 }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { assembleRacePoseWindow, racePoseWindowIndex, resampleLapPoses, type LapPoses } from '../../../server/traffic/racePoses.js';
 import { compressTrajectory } from '../../../server/core/replay/replayTrajectoryCodec.js';
-import { RACE_POSE_CHANNEL_COUNT } from '../../../shared/domain/raceReplay/poseWindow.js';
+import { RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT } from '../../../shared/domain/raceReplay/poseWindow.js';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 /** A stored 50 Hz lap driving +X at 50 m/s from `startSec`, yaw wrapping across pi half way. */
@@ -31,6 +31,18 @@ describe('resampleLapPoses', () => {
     expect(value(lap, 0, 1)).toBeCloseTo(2);
     expect(value(lap, 0, 6)).toBeCloseTo(180);
     expect(Math.abs(Math.cos(value(lap, 10, 4)))).toBeGreaterThan(0.99);
+  });
+
+  it('carries each corner\'s suspension deflection and wheel angular speed, interpolated', () => {
+    const lap = resampleLapPoses(compressTrajectory(storedLap(0, 2, (point, time) => {
+      point.suspensionDeflections = [0.01, 0.02, 0.03, 0.04];
+      point.wheelAngularSpeeds = [-150, -150 * (1 - time / 2), -160, -160];
+    })));
+    const channel = (name: typeof RACE_POSE_CHANNELS[number]) => RACE_POSE_CHANNELS.indexOf(name);
+    expect(value(lap, 10, channel('deflRR'))).toBeCloseTo(0.04);
+    expect(value(lap, 10, channel('spinFL'))).toBeCloseTo(-150);
+    expect(value(lap, 10, channel('spinFR'))).toBeCloseTo(-75, 1); // a front wheel locking over the lap
+    expect(value(lap, 10, channel('spinRR'))).toBeCloseTo(-160);
   });
 
   it('flags the samples in the pit lane', () => {

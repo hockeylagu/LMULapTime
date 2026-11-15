@@ -20,11 +20,14 @@ interface StoredLap extends StoredLapColumns {
   constants?: Record<string, LapValue>;
 }
 
-/** The stored lap columns the channels read: most by their own name, the lamp flags and the four deflections from theirs. */
+/** The stored lap columns the channels read: most by their own name, the lamp flags and the per-corner channels from theirs. */
 const LAMP_KEYS = ['headlights', 'pitLimiter', 'rainLight'] as const;
-const DEFLECTIONS = ['deflFL', 'deflFR', 'deflRL', 'deflRR'];
-const KEYS = ['timeSec', ...RACE_POSE_CHANNELS.filter(key => key !== 'lamps' && !DEFLECTIONS.includes(key)), ...LAMP_KEYS,
-  'suspensionDeflections', 'inGarage', 'isTeleport'];
+/** Per-corner channels: the stored four-value column each reads, and its corner. */
+const CORNERS: Partial<Record<string, [column: string, corner: number]>> = Object.fromEntries((['FL', 'FR', 'RL', 'RR'] as const).flatMap((name, corner) => [
+  [`defl${name}`, ['suspensionDeflections', corner]], [`spin${name}`, ['wheelAngularSpeeds', corner]],
+]));
+const KEYS = ['timeSec', ...RACE_POSE_CHANNELS.filter(key => key !== 'lamps' && !CORNERS[key]), ...LAMP_KEYS,
+  'suspensionDeflections', 'wheelAngularSpeeds', 'inGarage', 'isTeleport'];
 const ANGLE = new Set(['rotX', 'rotY', 'rotZ']);
 const IN_PIT = RACE_POSE_CHANNELS.indexOf('inPit');
 
@@ -39,10 +42,10 @@ export function resampleLapPoses(blob: Uint8Array, hz = RACE_POSE_HZ): LapPoses 
   const stored = decodeLapColumns<StoredLap>(blob, KEYS);
   const time = channel(stored, 'timeSec');
   // Each channel as a column of numbers (or flags) over the stored samples.
-  const deflections = channel(stored, 'suspensionDeflections'), lampColumns = LAMP_KEYS.map(key => channel(stored, key));
+  const lampColumns = LAMP_KEYS.map(key => channel(stored, key));
   const values: LapColumn[] = RACE_POSE_CHANNELS.map(key => {
-    const corner = DEFLECTIONS.indexOf(key);
-    if (corner >= 0) return deflections.map(value => (Array.isArray(value) ? value[corner] : null));
+    const corner = CORNERS[key];
+    if (corner) return channel(stored, corner[0]).map(value => (Array.isArray(value) ? value[corner[1]] : null));
     if (key === 'lamps') return lampColumns[0].map((_, i) => LAMP_KEYS.reduce((bits, name, k) => bits | (lampColumns[k][i] === true ? RACE_LAMP[name] : 0), 0));
     return channel(stored, key);
   });

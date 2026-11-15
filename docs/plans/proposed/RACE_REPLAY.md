@@ -27,7 +27,8 @@ architecture items). The
 scenery streams ahead of the followed car by its station from the progress grid; trackside spots stand along the followed
 car's samples of the pose window; a followed car still in its garage box puts the camera on its nearest pose or the first car
 on track. The full models roll, steer and travel their suspension and light their lamps from the window (2026-11-13: the
-windows carry steering, brake, a lamp bitmask and the four deflections, 15 channels, about 1.6 MB for 45 cars). Not yet: the
+windows carry steering, brake, a lamp bitmask and the four deflections, 15 channels, about 1.6 MB for 45 cars; 2026-11-15:
+plus the four wheel angular speeds, 19 channels, about 2.0 MB, so the wheels lock and spin as recorded). Not yet: the
 game clock's daylight, labels.
 
 ## Goal

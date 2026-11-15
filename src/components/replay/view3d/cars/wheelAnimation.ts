@@ -1,7 +1,7 @@
 import { Quaternion, Vector3, type Group, type Object3D } from 'three';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { attachWheelRigs, type WheelRig } from './wheelGeometry.js';
-import { createSteerAngle, createSteeringWheelAngle, createWheelTravel, type WheelLap } from './wheelMotion.js';
+import { createSteerAngle, createSteeringWheelAngle, createWheelRoll, type WheelLap } from './wheelMotion.js';
 import { isContinuousPose, sampleRenderPose, type RenderPose } from '../scene/replayPose.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 
@@ -54,7 +54,8 @@ export function createWheelAnimation(car: Group, lap: WheelLap, surfaceHeight: S
   const envelope = car.getObjectByName('body-envelope');
   if (!envelope || !('isGroup' in envelope)) throw Error('Car has no body envelope');
   const rigs = attachWheelRigs(envelope as Group);
-  const travel = createWheelTravel(lap.points), steer = createSteerAngle(lap), steeringWheel = steeringWheelRig(envelope);
+  const radii = [0, 1, 2, 3].map(corner => rigs.find(rig => rig.corner === corner)?.radiusM ?? 1);
+  const roll = createWheelRoll(lap.points, radii), steer = createSteerAngle(lap), steeringWheel = steeringWheelRig(envelope);
   const wheelAngle = createSteeringWheelAngle(lap);
   const hub = new Vector3(), body = new Vector3(), inverse = new Quaternion();
   /** Body-frame hub movement that puts this tyre on the road at the pose; null without road coverage. */
@@ -158,7 +159,7 @@ export function createWheelAnimation(car: Group, lap: WheelLap, surfaceHeight: S
         // The road-contact estimate is a bounded visual proxy, not a suspension solver or an airborne ground constraint.
         if (displacement !== null) rig.pivot.position.y += measured ? displacement : Math.max(-MAX_ESTIMATED_TRAVEL_M, Math.min(MAX_ESTIMATED_TRAVEL_M, displacement));
         // Spin about the axle, then steer the fronts; vehicle-local +X is left, so a left (ISO +) steer is -Y.
-        rig.spin.rotation.x = -(travel(pose.index, pose.fraction, corner) / rig.radiusM) % (Math.PI * 2);
+        rig.spin.rotation.x = -roll(pose.index, pose.fraction, corner) % (Math.PI * 2);
         rig.steer.rotation.y = corner < 2 ? -steerAngle : 0;
       }
     },
