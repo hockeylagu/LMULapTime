@@ -121,7 +121,7 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
   const view3d = (is3d || kept3d) && (
     <div className="contents" hidden={!is3d}>
       <Suspense fallback={<div className="relative min-w-0 flex-1 bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
-        <Race3DView className="min-w-0 flex-1" overview={overview} clock={clock} poses={poses} followSlot={followSlot} progress={progress}
+        <Race3DView className="min-w-0 flex-1" sessionId={sessionId} overview={overview} clock={clock} poses={poses} followSlot={followSlot} progress={progress}
           active={is3d} onToggleView={() => setView('2d')} />
       </Suspense>
     </div>

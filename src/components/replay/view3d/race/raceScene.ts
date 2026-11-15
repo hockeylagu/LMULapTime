@@ -33,6 +33,8 @@ export interface RaceSceneHandle {
   pan(horizontal: number, vertical: number): void;
   /** Lights the scene by the in-game clock (`SceneShell.setDaylight`: a small move of the sun changes nothing). */
   daylight(clock: ReplayDaylightClock | undefined): void;
+  /** Draws the track surface of the session at `timeSec` (`SceneShell.setSurface`). */
+  surface(sessionId: string, timeSec: number): void;
   dispose(): void;
 }
 
@@ -261,6 +263,7 @@ export async function createRaceScene(
     zoom: direction => rig.zoom(direction),
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
     daylight: clock => shell.setDaylight(clock),
+    surface: (sessionId, timeSec) => shell.setSurface(sessionId, timeSec),
     dispose() {
       disposed = true;
       shell.detach(host); content().dispose();

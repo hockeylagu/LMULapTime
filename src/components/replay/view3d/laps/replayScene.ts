@@ -35,6 +35,11 @@ export interface ReplaySceneHandle {
   dispose(): void;
 }
 
+/** The track surface of the lap's session at its start (none for a lap without its session or clock). */
+function surfaceAtLap(shell: SceneShell, lap: ReplayTrajectoryData): void {
+  if (lap.sessionId && lap.daylightClock) shell.setSurface(lap.sessionId, lap.daylightClock.sessionTimeSec);
+}
+
 /** Where the lap view's scenery streams first: around the lap's first pose. */
 export function lapFirstStation(trajectory: ReplayTrajectoryData, layout: SceneryLayoutResource): number {
   const station = stationAt(trajectory.points, 0, 0, layout.routeLengthM);
@@ -57,8 +62,8 @@ export async function createReplayScene(
   const route = layout.routeLengthM;
   const firstStation = lapFirstStation(trajectory, layout);
   shell.attach(host, {onFailure, onProgress});
-  // A shell the race view left keeps the race's sun: the lap's own moment lights it (nothing changes on the shell it made).
-  shell.setDaylight(trajectory.daylightClock);
+  // A shell the race view left keeps the race's sun and track surface: the lap's own moment lights it (nothing changes on the shell it made).
+  shell.setDaylight(trajectory.daylightClock); surfaceAtLap(shell, trajectory);
   const {rig, origin} = shell;
   shell.station = firstStation;
   const loadLaps = createLapLayerLoader(origin, shell.surfaceHeight, createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight), () => shell.exposureDisplay());
@@ -124,7 +129,7 @@ export async function createReplayScene(
         if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
         replacement.ready(); replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
         layer.dispose(); layer = replacement; shell.show(contentOf(layer)); rig.setLayer(layer);
-        shell.setDaylight(next.daylightClock);
+        shell.setDaylight(next.daylightClock); surfaceAtLap(shell, next);
         return true;
       } finally {
         // A newer request counts its own cars.
