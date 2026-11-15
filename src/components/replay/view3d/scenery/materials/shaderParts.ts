@@ -5,7 +5,6 @@ import { digitalFlagShaderParts, flagShaderParts } from './flagSurface.js';
 import { glassShaderParts, windscreenInsideShaderParts } from './glassSurface.js';
 import { roadDecalShaderParts } from './roadDecalSurface.js';
 import { readsRealRoad, readsTrackRubber, roadShaderParts } from './roadSurface.js';
-import { REALROAD_SAMPLERS } from '../realRoad.js';
 import { REFLECTING_KINDS } from './sceneryReflection.js';
 import { glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type ExtendedParts, type ShaderContext } from './shaderContext.js';
 import { standardShaderParts } from './standardSurface.js';
@@ -167,14 +166,13 @@ export const BATCH_VERTEX_TEXTURES = 2;
 /**
  * Texture units a surface's program samples: its maps (`mapDeclarations`), the reflection cube and integration table of the
  * reflecting kinds (sceneryReflection.ts), the cascade atlas (patchCascadeShadow, every surface), and three's own two for a scene
- * with an environment, no area lights, light probes or glTF maps: `envMap` (scene.environment) and `dfgLUT` (the physical program);
- * in the vertex stage, the surface state of a road or kerb that reads its own (`realRoad.ts`). The glTF `map` is declared but unread
+ * with an environment, no area lights, light probes or glTF maps: `envMap` (scene.environment) and `dfgLUT` (the physical program).
+ * The road surface state is a vertex attribute (`realRoad.ts`), no texture. The glTF `map` is declared but unread
  * once `map_fragment` is replaced, so the link drops it. A batch adds `BATCH_VERTEX_TEXTURES` in the vertex stage; three counts both
  * stages against `capabilities.maxTextures`.
  */
 export function surfaceTextureUnits(config: SurfaceConfig): number {
-  return surfaceMapKeys(config).length + (REFLECTING_KINDS.has(config.kind) ? REFLECTION_SAMPLERS : 0) + CASCADE_SAMPLERS + THREE_SAMPLERS
-    + (readsRealRoad(config) ? REALROAD_SAMPLERS : 0);
+  return surfaceMapKeys(config).length + (REFLECTING_KINDS.has(config.kind) ? REFLECTION_SAMPLERS : 0) + CASCADE_SAMPLERS + THREE_SAMPLERS;
 }
 
 /**

@@ -66,14 +66,16 @@ export function computeBatchBounds(batch: BatchedMesh): void {
  * element size it cached at upload, and `BatchedMesh.onBeforeRender` reads only `index.array.BYTES_PER_ELEMENT` (for the multi-draw
  * byte offsets). The copy therefore becomes an empty array of the same type. Raycasting, `optimize` and `setGeometryAt` would read the
  * data, and nothing calls them on these batches. A restored WebGL context would re-upload from these arrays: the caller treats a
- * lost context as a failure and rebuilds the scene from the files instead.
+ * lost context as a failure and rebuilds the scene from the files instead. The attributes named in `keep` stay: their owner writes
+ * them again (a version bump uploads the whole array).
  */
-export function releaseBatchOnUpload(batch: BatchedMesh): void {
+export function releaseBatchOnUpload(batch: BatchedMesh, keep: ReadonlySet<string> = new Set()): void {
   // The renderer sorts (and the warm-up draws) by the geometry's own bounds, computed from its arrays when missing: they take the
   // batch's, which cover every instance it holds (`computeBatchBounds` first).
   batch.geometry.boundingBox = batch.boundingBox!.clone();
   batch.geometry.boundingSphere = batch.boundingSphere!.clone();
-  const buffers = [batch.geometry.index, ...Object.values(batch.geometry.attributes)].filter((buffer): buffer is BufferAttribute => !!buffer);
+  const kept = Object.entries(batch.geometry.attributes).filter(([name]) => !keep.has(name)).map(([, buffer]) => buffer);
+  const buffers = [batch.geometry.index, ...kept].filter((buffer): buffer is BufferAttribute => !!buffer);
   for (const buffer of buffers) {
     buffer.onUpload(() => {
       buffer.array = new (buffer.array.constructor as new (length: number) => typeof buffer.array)(0);

@@ -132,7 +132,6 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
   }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_time: sceneryClock } : {},
     readsDayLight(config) ? { surface_dayLight: sceneDayLight } : {},
-    readsRealRoad(config) ? { surface_realRoad: realRoadUniforms.surface_realRoad } : {},
     readsTrackRubber(config) ? { surface_realRoadMedian: realRoadUniforms.surface_realRoadMedian } : {}, uniforms);
 
   const neededUvs = new Set<string>();

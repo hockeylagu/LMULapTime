@@ -1,10 +1,12 @@
+import { BufferAttribute, BufferGeometry, Group, Mesh } from 'three';
 import { describe, expect, it } from 'vitest';
 import { REALROAD_NONE } from '../../../../../shared/packageContract/scenery.js';
 import { patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { shaderParts, surfaceTextureUnits } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
 import type { SurfaceConfig, SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 import {
-  ASSUMED_RUBBER, assumedSurfaceState, createRealRoadSurface, gatherPointStates, medianRubber, REALROAD_TEXTURE_WIDTH, realRoadUniforms,
+  ASSUMED_RUBBER, assumedSurfaceState, createRealRoadSurface, fillVertexStates, gatherPointStates, medianRubber, REALROAD_POINT_ATTRIBUTE,
+  REALROAD_STATE_ATTRIBUTE, realRoadUniforms,
 } from '../../../../../src/components/replay/view3d/scenery/realRoad.js';
 import { surface } from './surfaceFixture.js';
 
@@ -21,27 +23,41 @@ function kerb(flags: Record<string, string>, maps: Record<string, SurfaceMap> = 
 }
 const literal = (config: SurfaceConfig) => shaderParts(config, { uniforms: false }).albedo.replace(/\s+/g, '');
 
-describe('surface state texture', () => {
+describe('surface state attribute', () => {
   it('gathers each point the rubber and loose material of its element, none for a point without one', () => {
     const state = Uint8Array.from([10, 20, 30, 40, 50, 60, 70, 80]), out = new Uint8Array(6).fill(9);
     gatherPointStates(Uint32Array.from([1, REALROAD_NONE, 0]), state, out);
     expect([...out]).toEqual([50, 60, 0, 0, 10, 20]);
   });
+  it('writes each vertex its point, none for a vertex without one or past the table', () => {
+    const out = new Uint8Array(8).fill(9);
+    fillVertexStates(Float32Array.from([1, -1, 0, 2]), Uint8Array.from([1, 2, 3, 4]), out);
+    expect([...out]).toEqual([3, 4, 0, 0, 1, 2, 0, 0]);
+  });
   it('takes the median rubber of the elements', () => {
     expect(medianRubber(Uint8Array.from([0, 9, 9, 9, 51, 0, 0, 0, 255, 0, 0, 0]))).toBe(51 / 255);
     expect(medianRubber(assumedSurfaceState(5))).toBe(ASSUMED_RUBBER / 255);
   });
-  it('draws the assumed state until a state is set, and gives the shared uniforms back on dispose', () => {
-    const table = Uint32Array.from([0, REALROAD_NONE, 1]), surfaceState = createRealRoadSurface(table, 2);
-    const texture = realRoadUniforms.surface_realRoad.value;
-    expect([texture.image.width, texture.image.height]).toEqual([REALROAD_TEXTURE_WIDTH, 1]);
-    expect([...(texture.image.data as Uint8Array).subarray(0, 6)]).toEqual([ASSUMED_RUBBER, 0, 0, 0, ASSUMED_RUBBER, 0]);
+  it('gives new vertices the state drawn now, writes the followed ones again on each state and forgets them once disposed', () => {
+    const surfaceState = createRealRoadSurface(Uint32Array.from([0, REALROAD_NONE, 1]), 2);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(REALROAD_POINT_ATTRIBUTE, new BufferAttribute(Float32Array.from([2, 0, 1]), 1));
+    const plain = new BufferGeometry(), root = new Group().add(new Mesh(geometry), new Mesh(plain));
+    surfaceState.prepare(root);
+    const written = geometry.getAttribute(REALROAD_STATE_ATTRIBUTE) as BufferAttribute;
+    expect([written.itemSize, written.normalized, [...written.array]]).toEqual([2, true, [ASSUMED_RUBBER, 0, ASSUMED_RUBBER, 0, 0, 0]]);
+    expect(plain.getAttribute(REALROAD_STATE_ATTRIBUTE)).toBeUndefined();
+    surfaceState.follow([root]);
+    const version = written.version;
     surfaceState.setState(Uint8Array.from([200, 30, 0, 0, 100, 0, 0, 0]));
-    expect([...(texture.image.data as Uint8Array).subarray(0, 6)]).toEqual([200, 30, 0, 0, 100, 0]);
+    expect([...written.array]).toEqual([100, 0, 200, 30, 0, 0]);
+    expect(written.version).toBeGreaterThan(version);
     expect(realRoadUniforms.surface_realRoadMedian.value).toBe(100 / 255);
     expect(() => surfaceState.setState(new Uint8Array(4))).toThrow(/2 elements/);
+    geometry.dispose();
+    surfaceState.setState(null);
+    expect([...written.array]).toEqual([100, 0, 200, 30, 0, 0]);
     surfaceState.dispose();
-    expect(realRoadUniforms.surface_realRoad.value).not.toBe(texture);
     expect(realRoadUniforms.surface_realRoadMedian.value).toBe(0);
   });
   it('refuses a table naming an element past the count', () => {
@@ -85,7 +101,7 @@ describe('road and kerb surface state terms', () => {
     expect(glsl).toContain('diffuseColor.rgb=mix(diffuseColor.rgb,grooveAlbedo*grooveAlbedo,sqrt(surfaceGroove));');
     expect(shaderParts(config, { uniforms: false }).normals).toContain('blendWet.r*realRoadKeep*0.5');
   });
-  it('fetches the vertex state in the vertex stage and counts its texture', () => {
+  it('reads the vertex state in the vertex stage, with no texture', () => {
     const vertex = '#include <common>\n#include <beginnormal_vertex>\n#include <begin_vertex>\n#include <worldpos_vertex>';
     const fragment = ['common', 'map_fragment', 'roughnessmap_fragment', 'metalnessmap_fragment', 'normal_fragment_maps', 'lights_physical_fragment', 'aomap_fragment',
       'emissivemap_fragment', 'normal_fragment_begin', 'lights_physical_pars_fragment', 'shadowmap_pars_fragment', 'lights_fragment_begin', 'lights_fragment_maps',
@@ -96,13 +112,13 @@ describe('road and kerb surface state terms', () => {
       return shader;
     };
     const perVertex = patched(road({ groove: 'perVertex' }));
-    expect(perVertex.vertexShader).toContain('attribute float _lmu_realroad;');
-    expect(perVertex.vertexShader).toContain('texelFetch(surface_realRoad');
+    expect(perVertex.vertexShader).toContain(`attribute vec2 ${REALROAD_STATE_ATTRIBUTE};`);
+    expect(perVertex.vertexShader).toContain(`vSurfaceRealRoad = ${REALROAD_STATE_ATTRIBUTE};`);
     expect(perVertex.fragmentShader).toContain('varying vec2 vSurfaceRealRoad;');
-    expect(perVertex.uniforms.surface_realRoad).toBe(realRoadUniforms.surface_realRoad);
     const average = patched(road({ groove: 'trackAverage' }));
-    expect(average.vertexShader).not.toContain('_lmu_realroad');
+    expect(average.vertexShader).not.toContain(REALROAD_STATE_ATTRIBUTE);
     expect(average.uniforms.surface_realRoadMedian).toBe(realRoadUniforms.surface_realRoadMedian);
-    expect(surfaceTextureUnits(road({ marbles: 'on' }))).toBe(surfaceTextureUnits(road({})) + 1);
+    // An attribute, not a texture: the state takes no texture unit, so a road keeps its batch.
+    expect(surfaceTextureUnits(road({ marbles: 'on' }))).toBe(surfaceTextureUnits(road({})));
   });
 });

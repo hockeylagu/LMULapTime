@@ -167,7 +167,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     sun.weather.cloudCover, sun.weather.sunVisibility);
   // Wheel and line contact heights read the package's road height grid; off it, and for the camera checks, one ray tree per resident chunk.
   const ground = createSceneryGround(layout.roadHeightAt);
-  const surface = createSceneSurface(createRealRoadSurface(layout.realRoadTable, layout.realRoad.elements), fetchSurfaceState, () => invalidate());
+  const realRoad = createRealRoadSurface(layout.realRoadTable, layout.realRoad.elements);
+  const surface = createSceneSurface(realRoad, fetchSurfaceState, () => invalidate());
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
   const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
   /** A chunk's box in the scene: native coordinates less the origin, z mirrored as the world group draws them. */
@@ -231,7 +232,9 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
           built.parsed = parsed; built.grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
           built.grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
         });
+        realRoad.prepare(root);
         const created = batches.add(root);
+        realRoad.follow([root, ...created]);
         await lit; // A chunk's programs depend on the scene's environment.
         await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), built.grounded]); signal.throwIfAborted(); return root;
       } catch (error) {

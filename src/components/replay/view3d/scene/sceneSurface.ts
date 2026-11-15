@@ -21,7 +21,7 @@ interface Moment { sessionId: string; timeSec: number }
  * Keeps the scene's road surface on the session clock: the state of the time asked last, fetched again once the time moved
  * `SURFACE_STEP_S` or the session changed. A session whose state fails (its replay is gone) draws the assumed state and is not asked again.
  */
-export function createSceneSurface(surface: RealRoadSurface, fetchState: SurfaceStateFetch, redraw: () => void): SceneSurface {
+export function createSceneSurface(surface: Pick<RealRoadSurface, 'elements' | 'setState' | 'dispose'>, fetchState: SurfaceStateFetch, redraw: () => void): SceneSurface {
   let shown: Moment | null = null, wanted: Moment | null = null;
   let loading: AbortController | null = null, disposed = false;
   const failed = new Set<string>(), waiting: Array<() => void> = [];

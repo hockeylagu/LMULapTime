@@ -5,7 +5,7 @@ import type { RealRoadSurface } from '../../../../../src/components/replay/view3
 /** A surface that records what it draws, and fetches the test resolves by hand. */
 function harness() {
   const drawn: Array<number | null> = [], dispose = vi.fn();
-  const surface: RealRoadSurface = { elements: 1, setState: state => { drawn.push(state ? state[0] : null); }, dispose };
+  const surface: Pick<RealRoadSurface, 'elements' | 'setState' | 'dispose'> = { elements: 1, setState: state => { drawn.push(state ? state[0] : null); }, dispose };
   const asked: Array<{sessionId: string; timeSec: number; resolve: (state: Uint8Array) => void; reject: (error: Error) => void}> = [];
   const fetchState: SurfaceStateFetch = (sessionId, _elements, timeSec) => new Promise((resolve, reject) => { asked.push({sessionId, timeSec, resolve, reject}); });
   const redraw = vi.fn();
