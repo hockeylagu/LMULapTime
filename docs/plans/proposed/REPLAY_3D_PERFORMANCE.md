@@ -283,6 +283,18 @@ Le Mans race start, production builds, 190 s, four interleaved runs each (ms):
 The remaining large frames are single uploads that go whole: a 2048² texture's swap (5.3 MiB) and a car model's batch
 geometry on its first warm (one of 11 MiB). p95 spreads with the machine's load more than with the change.
 
+**The probe face off the shadow redraw frames.** A race start's frame CPU follows its draws (steady frames 9–14 ms), and many of
+its slow frames stacked a probe face (~200 draws) on a frame whose shadows redrew static depth (300–400 draws). On such a frame
+the probe now leaves its due step to the next one, never two frames in a row (`car/carReflection.ts`, `redrewStatic` of the
+cascade pass). Same builds otherwise, four interleaved race runs and two lap runs each (ms):
+
+| Build | Race p95 | Race frames over 16.7 ms | Race max | Lap p99 |
+|---|---|---|---|---|
+| Probe on any frame | 15.4–18.5 | 206 | 113–130 | 9.6–9.9 |
+| Probe off the shadow redraws | 15.2–16.8 | 190 | 85–130 | 9.2–9.5 |
+
+The probe renders about a quarter fewer faces at the race start, so it renews a few frames later.
+
 ## The scene (from the package index)
 
 | | Typical | Worst |

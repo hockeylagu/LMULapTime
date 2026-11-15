@@ -45,8 +45,9 @@ export interface CarReflection {
   /**
    * Renders the next cube face from the car's roof, given the car's position in scene coordinates, one face a frame so no
    * frame pays for all six; the two frames after the last face convert the cube. True until the frame that shows a finished probe: the caller renders another frame.
+   * On a `busy` frame (one already carrying heavy work) a probe that has one leaves its step to the next frame, never two in a row.
    */
-  update(car: Vector3): boolean;
+  update(car: Vector3, busy?: boolean): boolean;
   dispose(): void;
 }
 
@@ -95,7 +96,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
   const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
   const prefiltered: WebGLCubeRenderTarget = generator.fromCubemap(target.texture);
-  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, rested = 0;
+  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, rested = 0, deferred = false;
   /** The paint of the cars sharing the probe (`share`), until each material is disposed. */
   const sharedPaint = new Set<Material>();
   const forget = (event: {target: Material}) => { sharedPaint.delete(event.target); };
@@ -137,7 +138,11 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       });
     },
     stale() { stale = true; },
-    update(car) {
+    update(car, busy = false) {
+      // A step stacked on a busy frame made it one of the slowest of a race start (a face and a shadow redraw, 2026-11-15).
+      const faceDue = (face > 0 || stale || probed.distanceToSquared(car) >= MOVED_M * MOVED_M) && (rested + 1) % FRAMES_PER_FACE === 0;
+      if (busy && cubes && !deferred && (pending !== null || faceDue)) { deferred = true; return true; }
+      deferred = false;
       if (pending === 'prefilter') {
         generator.fromCubemap(target.texture, prefiltered);
         pending = 'convolve';

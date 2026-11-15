@@ -95,6 +95,8 @@ export interface SceneEnvironment {
    * renders another frame.
    */
   update(casters?: readonly Vector3[]): boolean;
+  /** Whether the last update redrew static shadow depth: other heavy passes can take the next frame instead. */
+  readonly shadowsRedrawn: boolean;
   dispose(): void;
 }
 
@@ -285,6 +287,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       if (venueProbe) captureVenue();
     },
     setSunVisibility(next) { light(next, false); },
+    get shadowsRedrawn() { return cascades.pass.redrewStatic; },
     update(casters = []) {
       if (!view) return false;
       cloudLayer?.order(view.getWorldPosition(heading));

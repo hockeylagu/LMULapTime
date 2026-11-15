@@ -319,7 +319,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       }
       exposure.render(scene, camera);
       // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
-      if (car.visible && reflection.update(car.getWorldPosition(probeCentre))) invalidate();
+      if (car.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);

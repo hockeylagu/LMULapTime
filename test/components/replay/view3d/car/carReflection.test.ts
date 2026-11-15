@@ -105,6 +105,20 @@ it('renders the probe one face a frame from the roof without the cars, then give
   sceneryReflectionUniforms.surface_reflection.value = null;
 });
 
+it('leaves a due step to the next frame when the frame is busy, never two frames in a row, and never the first probe', () => {
+  const {renderer, faces} = stubRenderer();
+  const reflection = createCarReflection(renderer, new Scene(), testShading()), centre = new Vector3();
+  reflection.setCar(new Mesh(new BoxGeometry(), new MeshPhysicalMaterial()), new Group());
+  for (let i = 0; i < CAR_REFLECTION_STEPS; i++) reflection.update(centre, true);
+  expect(faces).toHaveLength(6);
+  reflection.stale();
+  reflection.update(centre, true); // a frame between faces: nothing to leave
+  reflection.update(centre, true); expect(faces).toHaveLength(6); // the face is due: left to the next frame
+  reflection.update(centre, true); expect(faces).toHaveLength(7); // busy again, but it waited once already
+  reflection.update(centre); reflection.update(centre); expect(faces).toHaveLength(8);
+  reflection.dispose();
+});
+
 it('gives a near car the probe: its glass and trim the prefiltered cube, its paint the probe cubes from the first one on', () => {
   const {renderer} = stubRenderer();
   const reflection = createCarReflection(renderer, new Scene(), testShading());

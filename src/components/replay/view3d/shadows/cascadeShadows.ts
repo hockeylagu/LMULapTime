@@ -57,6 +57,8 @@ export interface CascadeShadows {
    * `castersAt` (where the cars that cast are, world). True while cached ones are still due.
    */
   update(view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[], castersAt: readonly Vector3[]): boolean;
+  /** Whether the last update redrew static depth (a held cascade that drifted, or a cached one): a frame's heaviest shadow work. */
+  readonly redrewStatic: boolean;
   dispose(): void;
 }
 
@@ -130,7 +132,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
     tiles: cascades.map(({viewport: {x, y}}) => new Vector4(x / sizePx, y / heightPx, tilePx / sizePx, tilePx / heightPx)),
   };
   const casters = createShadowCasterPass(renderer, scene), light = lightTravel.clone(), eye = new Vector3(), forward = new Vector3();
-  let axes = sunSquareAxes(light);
+  let axes = sunSquareAxes(light), redrewStatic = false;
   const layersOf = (indices: readonly number[]) => indices.map(i => ({viewport: cascades[i].viewport, light: cascades[i].camera,
     depthBias: {slope: layout.slopeBias, units: cascades[i].cascade.depthBiasUnits}}));
   // Puts the cascades' cameras at their new centres; what is drawn from them follows (`moved`).
@@ -146,6 +148,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   };
   return {
     state,
+    get redrewStatic() { return redrewStatic; },
     setLight(lightTravel) {
       light.copy(lightTravel); axes = sunSquareAxes(light);
       for (const row of cascades) row.drawnCentre = null;
@@ -170,6 +173,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       const settled = cascades.every(row => row.live || row.drawnCentre);
       const order = due.map((value, i) => [value, i] as const).filter(([value, i]) => !cascades[i].live && value >= 1).sort((a, b) => b[0] - a[0]);
       const redrawn = (settled ? order.slice(0, 1) : order).map(([, i]) => i);
+      redrewStatic = moved.length > 0 || redrawn.length > 0;
       for (const i of redrawn) {
         place([i], centres);
         casters.draw(staticTarget!, layersOf([i]), view, dynamic, CACHED_MIN_CASTER_TEXELS * cascades[i].cascade.texelM);
