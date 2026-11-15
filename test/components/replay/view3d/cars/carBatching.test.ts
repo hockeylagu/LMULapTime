@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BatchedMesh, BoxGeometry, DataTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, SphereGeometry, Vector3, type BufferGeometry } from 'three';
+import { BatchedMesh, Box3, BoxGeometry, DataTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Sphere, SphereGeometry, Vector3, type BufferGeometry } from 'three';
 import { layoutOf } from '../../../../../src/components/replay/view3d/batching/batchedParts.js';
 import { batchable, batchCars, SHADOW_ONLY_LAYER } from '../../../../../src/components/replay/view3d/cars/carBatching.js';
 import { buildCarParts, type CarParts } from '../../../../../src/components/replay/view3d/cars/carParts.js';
@@ -155,6 +155,18 @@ describe('batchCars, several cars', () => {
     expectClose(shadow.getMatrixAt(hull.shadow!.instance, at), hull.batch!.getMatrixAt(hull.instance, new Matrix4()));
     a.table.hide();
     expect(shadow.getVisibleAt(hull.shadow!.instance)).toBe(false);
+  });
+
+  it('gives the shadow-only batch the bounds its geometries carry, so it measures no vertices', async () => {
+    const shared = body(), a = car(shared);
+    shared.solid.computeBoundingBox(); shared.solid.computeBoundingSphere();
+    // Bounds no vertex walk would give: the batch took them as they are.
+    shared.solid.boundingSphere!.radius = 7; shared.solid.boundingBox!.max.set(3, 3, 3);
+    const set = await batchCars([a.table], { releaseParsed: false, transparent: true, shadows: true });
+    const shadow = set.batches.find(batch => batch.name === 'car shadow batch')!;
+    const id = shadow.getGeometryIdAt(a.table.parts.find(part => part.mesh === a.hull)!.shadow!.instance);
+    expect(shadow.getBoundingSphereAt(id, new Sphere())!.radius).toBe(7);
+    expect(shadow.getBoundingBoxAt(id, new Box3())!.max).toEqual(new Vector3(3, 3, 3));
   });
 
   it('draws a livery material from one batch carrying each instance\'s layer, even a lone part', async () => {

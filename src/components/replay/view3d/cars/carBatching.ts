@@ -56,6 +56,8 @@ function shadowGeometry(geometry: BufferGeometry): BufferGeometry {
   }
   const shadow = new BufferGeometry();
   shadow.setAttribute('position', new BufferAttribute(positions, 3)); shadow.setIndex(geometry.index);
+  // The batch takes the bounds a geometry carries: without them it walks every vertex to measure them (`computeBatchBounds`).
+  shadow.boundingBox = geometry.boundingBox?.clone() ?? null; shadow.boundingSphere = geometry.boundingSphere?.clone() ?? null;
   return shadow;
 }
 
