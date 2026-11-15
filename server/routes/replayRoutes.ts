@@ -10,6 +10,7 @@ import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { RaceReplayService } from '../traffic/raceReplayService.js';
+import { ReplaySurfaceService } from '../replay/surface/replaySurfaceService.js';
 import { getReplayLapBlobs } from '../core/replay/dbRacePositionStore.js';
 import { getReplayStoredSignature } from '../core/replay/dbReplayIngestStore.js';
 import { getDriverEvents, getReplayLaps, getReplayRunningOrder } from '../core/replay/dbReplayLapStore.js';
@@ -32,6 +33,7 @@ export function createReplayRouter(context: ServerContext): Router {
     telemetryService
   );
   const trafficService = new RaceTrafficService(context.sessionDb);
+  const surfaceService = new ReplaySurfaceService();
   const db = () => context.sessionDb.getDb();
   const raceService = new RaceReplayService({
     getReplaySignature: filename => getReplayStoredSignature(db(), filename),
@@ -224,6 +226,29 @@ export function createReplayRouter(context: ServerContext): Router {
       res.type('application/octet-stream').send(Buffer.from(body.buffer, body.byteOffset, body.byteLength));
     } catch (error: unknown) {
       res.status(404).json({ error: error instanceof Error ? error.message : 'Race poses unavailable' });
+    }
+  });
+
+  // The track surface state at a session time (docs/VCR_FORMAT.md §4.21): `elements` (the layout's surface element count, from the
+  // package) x 4 bytes, rubber laid, loose material, surface water, surface temperature.
+  router.get('/session/:sessionId/surface', async (req, res) => {
+    let elements: number, time: number;
+    try {
+      const parsed = parseBoundedInteger(req.query.elements, 'elements', 1, 1 << 21);
+      time = Number(queryString(req.query.time));
+      if (parsed === undefined || !Number.isFinite(time) || time < 0) return res.status(400).json({ error: 'elements and a session time are required' });
+      elements = parsed;
+    } catch (error: unknown) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid surface request' });
+    }
+    try {
+      const session = readReplaySessionContext(context.sessionDb.getDb(), req.params.sessionId, 'none');
+      const replayName = session?.matchingReplayFile?.name;
+      if (!replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
+      const state = await surfaceService.stateAt(path.join(context.replaysDir, replayName), elements, time);
+      res.type('application/octet-stream').send(Buffer.from(state.buffer, state.byteOffset, state.byteLength));
+    } catch (error: unknown) {
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Track surface unavailable' });
     }
   });
 

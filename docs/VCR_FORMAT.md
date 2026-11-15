@@ -617,11 +617,14 @@ Runs, with `remaining` = samples left in the block:
 1. If `remaining > 1`, read a repeat flag: `1` repeats one value, `0` reads one literal per sample.
 2. If `remaining ≤ 4` at 4-bit precision or `≤ 3` at 8-bit, the run fills the block. Otherwise the length starts at 1
    with a count limit of `remaining − 1`: read a count in 2 bits for limits up to 3, 3 bits up to 7, else 4 bits, and
-   add it; a count of 15 continues with the limit reduced by 15.
+   add it; a count of 15 continues with the limit reduced by 15, also when that leaves a limit of 0 (the next count is
+   then read in 2 bits).
 3. Read the value or literals at the block precision; 4-bit values × 17 give bytes. After 160 values, another block
    follows only if a whole payload byte remains after rounding the bit position up to a byte.
 
-Blocks apply to consecutive surface elements, wrapping at the end of the surface array. The four channels:
+Blocks apply to consecutive surface elements, wrapping at the end of the surface array. A 4-bit sample `v` (× 17) is not
+written where the stored byte `b` already holds that level, `⌊(b + 8) / 17⌋ × 17 = v`, so finer 8-bit values stay. Playback
+blends an opcode 137 update in over 18 steps at 6 steps a second (3.0 s); 139 and 194 apply at once. The four channels:
 
 | Channel | Value |
 | ---: | :--- |
