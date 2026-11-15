@@ -10,6 +10,8 @@ import { glslNumber, list, surfaceAlphaCut, value } from './shaderContext.js';
 import { REFLECTING_KINDS, SCENERY_REFLECTION_GLSL, SCENERY_REFLECTION_INPUTS, sceneryReflectionUniforms } from './sceneryReflection.js';
 import { cardFacing, shadowEye } from './shadowEye.js';
 import { shaderParts } from './shaderParts.js';
+import { readsRealRoad, readsTrackRubber } from './roadSurface.js';
+import { REALROAD_VERTEX_DECLARATIONS, REALROAD_VERTEX_MAIN, realRoadUniforms } from '../realRoad.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
 const hasTranslucency = (config: SurfaceConfig) => !!config.flags.translucency;
@@ -129,13 +131,15 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     surface_alphaCut: surfaceAlphaCut,
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
   }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_time: sceneryClock } : {},
-    readsDayLight(config) ? { surface_dayLight: sceneDayLight } : {}, uniforms);
+    readsDayLight(config) ? { surface_dayLight: sceneDayLight } : {},
+    readsRealRoad(config) ? { surface_realRoad: realRoadUniforms.surface_realRoad } : {},
+    readsTrackRubber(config) ? { surface_realRoadMedian: realRoadUniforms.surface_realRoadMedian } : {}, uniforms);
 
   const neededUvs = new Set<string>();
   for (const map of Object.values(config.maps)) if (map?.uv) neededUvs.add(map.uv);
   const hasUv1 = neededUvs.has('uv1'), hasUv2 = neededUvs.has('uv2'), hasUv3 = neededUvs.has('uv3');
-  const axle = tyreReadsAxle(config);
-  shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
+  const axle = tyreReadsAxle(config), realRoad = readsRealRoad(config);
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>${realRoad ? REALROAD_VERTEX_DECLARATIONS : ''}
     ${hasUv1 ? '#ifndef USE_UV1\n    attribute vec2 uv1;\n    #endif' : 'vec2 uv1 = vec2(0.0);'}
     ${hasUv2 ? '#ifndef USE_UV2\n    attribute vec2 uv2;\n    #endif' : 'vec2 uv2 = vec2(0.0);'}
     ${hasUv3 ? '#ifndef USE_UV3\n    attribute vec2 uv3;\n    #endif' : 'vec2 uv3 = vec2(0.0);'}
@@ -143,7 +147,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     varying vec2 vSurfaceXZ;
     varying float vSurfaceRandom;
     varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;${axle ? '\n    varying float vSurfaceAxle;' : ''}
-  `).replace('#include <begin_vertex>', `#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;${axle ? ' vSurfaceAxle = objectNormal.x;' : ''}`);
+  `).replace('#include <begin_vertex>', `#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;${axle ? ' vSurfaceAxle = objectNormal.x;' : ''}${realRoad ? REALROAD_VERTEX_MAIN : ''}`);
   if (config.billboard) {
     const crown = config.kind === 'vegetation';
     if (crown) shader.uniforms[CROWN_SUN_UNIFORM] = crownSun;

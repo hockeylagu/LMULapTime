@@ -1,15 +1,68 @@
 import { glslNumber, value, list, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { SurfaceConfig } from './surfaceConfig.js';
 
-/**
- * How much rubber is taken as laid on the racing line, 0 (a green track, the road-details map alone) to 1 (fully rubbered). The
- * real level grows through a session and is in neither the package nor the replay; this is an assumed base level, near what two
- * points of one captured practice frame held (0.18 and 0.24).
- */
-export const ASSUMED_RUBBER = 0.2;
+/** Whether a road or kerb surface reads its own vertices' surface state (rubber or loose material; `scenery/realRoad.ts`). */
+export function readsRealRoad(config: SurfaceConfig): boolean {
+  return (config.kind === 'road' || config.kind === 'kerb') && (config.flags.groove === 'perVertex' || !!config.flags.marbles);
+}
 
-/** Dry road and kerb surfaces, the road with an assumed base level of rubber. Wetness and marbles stay disabled. */
-export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec, uniforms }: ShaderContext): SurfaceParts {
+/** Whether it reads the track's median rubber instead of its vertices' (`surface_realRoadMedian`). */
+export const readsTrackRubber = (config: SurfaceConfig): boolean =>
+  (config.kind === 'road' || config.kind === 'kerb') && config.flags.groove === 'trackAverage';
+
+/**
+ * The surface state terms of a road or kerb: the rubber groove, then dust, then marbles, each mixing the finished surface toward its
+ * own colour (squared, as the tint is), roughness and specular level and lifting its occlusion. The groove's mask (red and green weights)
+ * scales the rubber below and above half; dust clears with a quarter of the groove and gathers with marbles; a mask flag without its map
+ * reads 0, as an unbound stage does. Dust and marbles also scale `realRoadKeep`, the share of the blend-wet mask they leave.
+ */
+function realRoadTerms(config: SurfaceConfig, { sample, number, vec, uniforms }: ShaderContext): string {
+  const { maps, parameters: p, flags: f, kind } = config;
+  let code = '';
+  if (f.groove) {
+    const groove = p.groove;
+    const mask = f.grooveMap ? (maps.groove ? `${sample('groove')}.rg` : 'vec2(0.0)') : 'vec2(1.0)';
+    code += `vec2 grooveMask=${mask};
+      float groovePerc=${f.roadDetailsMap ? 'mix(roadDetails.g,1.0,realRoadGroove)' : 'realRoadGroove'};
+      float surfaceGroove=max(2.0*max(groovePerc-0.5,0.0)*grooveMask.g,grooveMask.r*min(1.5*groovePerc,1.0));
+      vec3 grooveAlbedo=${uniforms ? 'surface_grooveAlbedo' : vec(list(groove, 'albedo'))};
+      diffuseColor.rgb=mix(diffuseColor.rgb,grooveAlbedo*grooveAlbedo,${kind === 'kerb' ? 'sqrt(surfaceGroove)' : 'surfaceGroove'});
+      surfaceRoughness=mix(surfaceRoughness,${uniforms ? 'surface_grooveRoughness' : number(value(groove, 'roughness'))},surfaceGroove);
+      surfaceSpecular=mix(surfaceSpecular,${uniforms ? 'surface_grooveSpecular' : number(value(groove, 'specular'))},surfaceGroove);
+      surfaceAO=mix(surfaceAO,1.0,surfaceGroove);
+    `;
+  }
+  const marbleDust = f.marbleDustMap ? (maps.marbleDust ? `${sample('marbleDust')}.rg` : 'vec2(0.0)') : 'vec2(1.0)';
+  if (f.dust || f.marbles) code += `vec2 marbleDustMask=${marbleDust};
+`;
+  const mixToward = (name: string, group: typeof p[string], blend: string) => `
+      diffuseColor.rgb=mix(diffuseColor.rgb,${name}Albedo*${name}Albedo,${blend});
+      surfaceRoughness=mix(surfaceRoughness,${number(value(group, 'roughness'))},${blend});
+      surfaceSpecular=mix(surfaceSpecular,${number(value(group, 'specular'))},${blend});
+      surfaceAO=mix(surfaceAO,1.0,${blend});
+      realRoadKeep*=1.0-${blend};
+    `;
+  if (f.dust) {
+    const dust = p.dust;
+    code += `vec3 dustAlbedo=${vec(list(dust, 'albedo'))};
+      float dustBlend=clamp(0.5-4.0*realRoadGroove,0.0,1.0)*${number(value(dust, 'overallScale'))}
+        *clamp((max(realRoadMarbles*${number(value(dust, 'marbleScale'))},${f.roadDetailsMap ? 'roadDetails.r' : '0.0'})-marbleDustMask.g)/0.5,0.0,1.0);
+      ${mixToward('dust', dust, 'dustBlend')}`;
+  }
+  if (f.marbles) {
+    code += `vec3 marblesAlbedo=${vec(list(p.marbles, 'albedo'))};
+      float marblesBlend=realRoadMarbles*marbleDustMask.r;
+      ${mixToward('marbles', p.marbles, 'marblesBlend')}`;
+  }
+  return code;
+}
+
+/**
+ * Dry road and kerb surfaces with the track surface state of the scene's time: rubber and loose material per vertex (`vSurfaceRealRoad`)
+ * or the track's median rubber. Wetness stays disabled.
+ */
+export function roadShaderParts(config: SurfaceConfig, context: ShaderContext): SurfaceParts {
+  const { sample, uv, number, vec, uniforms } = context;
   const { maps, parameters: p, flags: f, kind } = config;
   const adjust = p.adjust, noOverlay = p.bare, decalGroup = p.decal, blendGroup = p.kerbBlend;
   const enabled = (key: string) => !!f[key];
@@ -26,7 +79,9 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
   const roughFromAlpha = enabled('roughnessFromAlbedoAlpha');
   const blendWet = sample('blendWet', 'vec4(0.5)');
   const roadDetails = sample('roadDetails', 'vec4(0.0)');
+  const groove = f.groove === 'trackAverage' ? 'surface_realRoadMedian' : f.groove ? 'vSurfaceRealRoad.x' : '0.0';
   let albedo = `
+    float realRoadGroove=${groove}, realRoadMarbles=${f.marbles ? 'vSurfaceRealRoad.y' : '0.0'}, realRoadKeep=1.0;
     vec4 base=${sample('albedo', 'vec4(1.0)')};
     vec4 aoSpec=${sample('aoSpec', 'vec4(1.0)')};
     float sourceRoughness=${roughFromAlpha ? 'base.a' : '0.5'};
@@ -91,11 +146,16 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
       albedo += `sourceSpecular=${specAdjust};`;
     }
   } else {
-    // Dry kerb: groove and marbles terms are intentionally omitted.
+    // The alternate albedo shows where the blend-wet mask is under the road details' default share plus the groove's and marbles'.
     const mixBias = num(value(blendGroup, 'mixBias'), 'surface_kerbMixBias');
     const defaultBlend = num(value(blendGroup, 'default'), 'surface_kerbDefaultBlend');
     const mixBlend = enabled('blendWetMask') ? 'blendWet.r' : '0.5';
-    const defaultControl = enabled('roadDetailsMap') ? `clamp(roadDetails.b*${defaultBlend},0.0,1.0)` : '0.0';
+    const shares = [
+      ...enabled('roadDetailsMap') ? [`roadDetails.b*${defaultBlend}`] : [],
+      ...f.groove ? [`realRoadGroove*${number(value(blendGroup, 'groove'))}`] : [],
+      ...f.marbles ? [`realRoadMarbles*${number(value(blendGroup, 'marbles'))}`] : [],
+    ];
+    const defaultControl = shares.length ? `clamp(${shares.join('+')},0.0,1.0)` : '0.0';
     albedo += `vec4 blendWet=${blendWet};
       vec4 roadDetails=${roadDetails};
       float sourceBlend=clamp((${mixBlend}-${defaultControl})/max(${mixBias},0.00001),0.0,1.0);
@@ -118,20 +178,7 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
     surfaceAO=mix(1.0,aoSpec.g,${aoCoverage});
   `;
 
-  // The rubber groove: the mask's two weights against the laid level mix the finished road toward the groove's own colour
-  // (squared, as the tint is), roughness and specular level, and lift its occlusion.
-  if (kind === 'road' && enabled('grooveMap') && maps.groove) {
-    const groove = p.groove;
-    albedo += `vec2 grooveMask=${sample('groove')}.rg;
-      float grooveLaid=mix(roadDetails.g,1.0,${glslNumber(ASSUMED_RUBBER)});
-      float surfaceGroove=max(2.0*max(grooveLaid-0.5,0.0)*grooveMask.g,grooveMask.r*min(1.5*grooveLaid,1.0));
-      vec3 grooveAlbedo=${uniforms ? 'surface_grooveAlbedo' : vec(list(groove, 'albedo'))};
-      diffuseColor.rgb=mix(diffuseColor.rgb,grooveAlbedo*grooveAlbedo,surfaceGroove);
-      surfaceRoughness=mix(surfaceRoughness,${num(value(groove, 'roughness'), 'surface_grooveRoughness')},surfaceGroove);
-      surfaceSpecular=mix(surfaceSpecular,${num(value(groove, 'specular'), 'surface_grooveSpecular')},surfaceGroove);
-      surfaceAO=mix(surfaceAO,1.0,surfaceGroove);
-    `;
-  }
+  albedo += realRoadTerms(config, context);
 
   let normals = '';
   if (maps.normal) {
@@ -149,7 +196,8 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
       normals = `normal=surfaceNormalVector(normal,${uv('normal')},${combined});`;
     } else {
       let encoded = `${sample('normal')}.rg`;
-      if (enabled('blendWetMask')) encoded = `mix(vec2(0.5),${encoded},blendWet.r*0.5)`;
+      // Dust and marbles flatten the kerb as they cover the blend-wet mask.
+      if (enabled('blendWetMask')) encoded = `mix(vec2(0.5),${encoded},blendWet.r*realRoadKeep*0.5)`;
       normals = `normal=surfaceNormalVector(normal,${uv('normal')},surfaceDecodeNormal(${encoded},${intensity},${ySign}));`;
     }
   }
