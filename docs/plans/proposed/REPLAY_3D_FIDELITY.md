@@ -338,3 +338,11 @@ approximation: the source of the reference's median grip is not traced. (U) A se
 (its endpoint answers 404 and the scene draws `ASSUMED_RUBBER`); keeping the states in the replay cache needs a cache version bump
 and an offline migration, proposed to batch with the rain light bump (v11). The kerb's alternate blend now moves with the groove and
 marbles: the visible change on the freeze views, to be judged by eye.
+
+Groove strength (2026-11-15, fitted): the rubber taken whole drew the road 17 % darker than the game frames after exposure, with a
+dark band and skid arcs they lack (Daytona and Silverstone chase views); the base road with the surface off matched (0.99). The
+groove now develops by a quarter of the rubber (`GROOVE_PER_RUBBER` in `roadSurface.ts`), which also feeds the dust clearing and the
+kerb's alternate blend. Over 7 reference views the road error after exposure went 0.57 → 0.48 stops and the brightness ratio
+1.17 → 1.03 (surface off: 0.47, 0.99); loose material made no measurable difference. The quarter is a fit, not a read value: the
+road program takes the groove's development as given, and the step from the state's rubber to it lies outside the shaders. (U) The
+fit rests on about 5 views whose cameras match the game well. Not carried still: the groove's shift of the index of refraction.
