@@ -9,7 +9,9 @@ import { disposeObjects } from './disposeObjects.js';
 import { updateShownMatrices } from './shownMatrices.js';
 import { exposureType, followsCar, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
 import { createCameraRig, type CameraRig } from '../camera/cameraRig.js';
-import { addSceneEnvironment, sceneSun } from '../sceneEnvironment.js';
+import { addSceneEnvironment, cloudSun, sceneSun, sunSeenFrom, type SceneSun } from '../sceneEnvironment.js';
+import type { CloudEye } from '../atmosphere/clouds.js';
+import { createSunMeter } from '../atmosphere/sunMeter.js';
 import { assertHazed } from '../atmosphere/haze.js';
 import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
@@ -116,7 +118,9 @@ export interface SceneShell {
   /**
    * Lights the scene by the sun and weather of `clock`'s moment (the session's published sun without one): the sky, haze, sun light
    * and shadow, clouds, venue capture and exposure. A sun within SUN_STEP_DEG of the shown one, under the same cloud, changes
-   * nothing: each change redraws every shadow cascade and captures the venue again (a frame of a few tens of milliseconds).
+   * nothing: each change redraws every shadow cascade and captures the venue again (a frame of a few tens of milliseconds). As the
+   * camera moves under the clouds, the sun's visibility through them is measured again over a few frames (atmosphere/sunMeter.ts):
+   * the sky, haze, sun light and exposure follow it, the shadows and the venue capture stay.
    */
   setDaylight(clock: ReplayDaylightClock | undefined): void;
   beforeFrame(hook: ((frameTime: number) => void) | null): void;
@@ -148,7 +152,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // Car textures load at the package's size (it stores outside-only parts small and the liveries larger). The interior's own
   // textures stay on their start files until a driver camera is used.
   const carTextureLoader = new CachedKtx2Loader(renderer, {start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
-  let sun = sceneSun(layout, origin.y, daylightClock);
+  // Until the camera is placed, the clouds are seen from the scene origin.
+  let sun = sceneSun(layout, origin.y, daylightClock, [origin.x, 0, origin.z]);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);
   // Wheel and line contact heights read the package's road height grid; off it, and for the camera checks, one ray tree per resident chunk.
@@ -174,6 +179,18 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   };
   // The scene and its cameras exist from the start, so the first view's chunks warm up as each arrives, while the others still load.
   const scene = new Scene(), rig = createCameraRig(renderer.domElement, origin, () => invalidate());
+  /** The camera in the cloud field's frame: LMU local x and z, the height above the scene origin's. */
+  const cloudEye = (): CloudEye => { const {x, y, z} = rig.camera.position; return [x + origin.x, y, origin.z - z]; };
+  const sunMeter = (at: SceneSun, eye: CloudEye) => at.clouds.sheets
+    ? createSunMeter(layout.shading.sunVisibility, layout.sky.clouds, at.clouds.sheets, cloudSun(at.lighting), eye) : null;
+  let meter = sunMeter(sun, [origin.x, 0, origin.z]);
+  /** The sun's visibility measured from where the camera is now: shown once it moved WEATHER_STEP. Before the frame renders. */
+  const seeSun = (visibility: number) => {
+    if (Math.abs(visibility - (sun.clouds.sunVisibility ?? 1)) < WEATHER_STEP) return;
+    sun = sunSeenFrom(layout, sun, visibility);
+    exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
+    environment.setSunVisibility(sun);
+  };
   // Each `render` call (main, shadow layers, probe, environment) would walk the whole graph: `draw` updates it once per frame.
   scene.matrixWorldAutoUpdate = false;
   const warmup = createSceneWarmup(renderer, scene, rig.perspective,
@@ -289,7 +306,10 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       content.beforeDraw(camera);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);
-      // Cached shadow cascades still due ask for the next frame.
+      // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.
+      const seen = meter?.step(cloudEye()) ?? null;
+      if (seen !== null) seeSun(seen);
+      if (meter?.running) invalidate();
       if (environment.update(content.casters())) invalidate();
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
       const car = content.reflected;
@@ -413,11 +433,11 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       return true;
     },
     setDaylight(clock) {
-      const next = sceneSun(layout, origin.y, clock), weather = (at: typeof sun) => [at.weather.cloudCover, at.clouds.sunVisibility ?? 1];
+      const eye = cloudEye(), next = sceneSun(layout, origin.y, clock, eye), weather = (at: typeof sun) => [at.weather.cloudCover, at.clouds.sunVisibility ?? 1];
       const turnedDeg = MathUtils.radToDeg(next.lighting.sunDirection.angleTo(sun.lighting.sunDirection));
       const [cover, seen] = weather(next), [shownCover, shownSeen] = weather(sun);
       if (turnedDeg < SUN_STEP_DEG && Math.abs(cover - shownCover) < WEATHER_STEP && Math.abs(seen - shownSeen) < WEATHER_STEP) return;
-      sun = next;
+      sun = next; meter = sunMeter(sun, eye);
       exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
       // Before the environment exists, it is made from this sun.
       if (environment) { environment.setSun(sun); invalidate(); }

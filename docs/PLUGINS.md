@@ -198,13 +198,15 @@ frame (`normals`, `tangents`, `binormals`, one vector per vertex). A material ca
 `endMap` with 3; every level has width × height × channels bytes). `shading.sunVisibility` is how the
 clouds hide the sun: `occlusion` (`bias`, `curve` exactly `sqrt`, `dryMax`, `wetMax`), a square `view` toward the sun (`fovRad`,
 `near` < `far`, `resolution`) and the `horizon` ramp. The replay gives each cell's code and both layer drifts
-(docs/VCR_FORMAT.md, Type 10). `atmosphere/clouds.ts` places the sheets around the scene origin, takes the cloud coverage from the
-cells and computes the sun visibility once per lap moment: it sums the sheets' opacity over the view's rays on the processor, adding
-overlapping sheets, reads the first map level and ignores the view's far limit. The visibility scales the sun's
-light and feeds the weather weight and the exposure; a replay without a cloud field keeps the plain cloud cover and an undimmed sun.
+(docs/VCR_FORMAT.md, Type 10). `atmosphere/clouds.ts` places the sheets around the LMU local origin, fixed in the world, takes the
+cloud coverage from the cells and computes the sun visibility from the camera: it sums the sheets' opacity over the view's rays on
+the processor, adding overlapping sheets, reads the first map level and ignores the view's far limit. Each lap moment measures it
+once; as the camera moves `SUN_METER_STEP_M` under the clouds, `atmosphere/sunMeter.ts` measures it again, `SUN_METER_ROWS` view
+rows a frame. The visibility scales the sun's light and feeds the weather weight and the exposure (the shadows and the venue
+capture keep the lap moment's); a replay without a cloud field keeps the plain cloud cover and an undimmed sun.
 `atmosphere/cloudLayer.ts` draws the same sheets: one mesh per sheet with the first of its materials, lit by the package's formula
 (the sun before the clouds dim it, the scene's environment as ambient light, half the haze distance), behind everything, far to
-near, following the camera like the sky. The sheets are placed once per lap moment and do not drift during it; a cloud's two
+near from the camera, fixed in the world like the field. The sheets are placed once per lap moment and do not drift during it; a cloud's two
 randoms are the package's averages. The venue capture is taken without them.
 
 `shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside

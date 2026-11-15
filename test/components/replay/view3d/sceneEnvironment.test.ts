@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
-import { addSceneEnvironment, sceneLighting, sceneSun, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { addSceneEnvironment, sceneLighting, sceneSun, sunSeenFrom, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { hazeProgram } from '../../../../src/components/replay/view3d/atmosphere/haze.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { SUN_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
@@ -218,5 +218,26 @@ it("lights the scene by another moment's sun: sky, haze, light, foliage and shad
     expect(probe.cubemaps - cubemaps).toBe(2); expect(probe.render.mock.calls.length).toBe(firstEnvironments);
     render.mockClear(); environment.update();
     expect(settled).toBe(0); expect(render.mock.calls.filter(([root, camera]) => root === scene && camera instanceof OrthographicCamera)).toHaveLength(3);
+  } finally { environment.dispose(); }
+});
+
+it("follows the sun's visibility from elsewhere: sky, haze and light, without capturing the venue again or drawing the shadows again", () => {
+  const scene = new Scene(), render = vi.fn<(scene: Scene, camera: Camera) => void>();
+  const renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
+  const daylight = {date: '2023-06-10', sessions: [{id: 'race' as const, localTime: '15:00', sunElevationDeg: 50, sunBearingDeg: 200}], airPollution: 0.6, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
+  const sun = sceneSun(venue(daylight), 0, {session: 'race', startMinute: null, sessionTimeSec: 0, cloudCover: 0.4});
+  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', null, sun);
+  const sunLight = scene.getObjectByName('sun') as DirectionalLight, fog = scene.fog as FogExp2;
+  try {
+    environment.setCamera(new PerspectiveCamera(48, 1.5, 0.5, 15000));
+    environment.captureVenue(); environment.update();
+    const cubemaps = probe.cubemaps, firstEnvironments = probe.render.mock.calls.length, sky = skyMaterial(scene), seen = sunSeenFrom(venue(daylight), sun, 0.5);
+    environment.setSunVisibility(seen);
+    expect(sunLight.color.toArray()).toEqual(sunColour(testSun(), sun.sunElevationDeg, 0.4).multiplyScalar(0.5).toArray());
+    expect(seen.weather.sunVisibility).toBe(0.5); expect(skyMaterial(scene)).not.toBe(sky);
+    expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, seen.weather, sun.sunElevationDeg), 12);
+    expect(probe.cubemaps).toBe(cubemaps); expect(probe.render.mock.calls.length).toBe(firstEnvironments);
+    render.mockClear(); environment.update();
+    expect(render.mock.calls.filter(([root]) => root === scene)).toHaveLength(0);
   } finally { environment.dispose(); }
 });

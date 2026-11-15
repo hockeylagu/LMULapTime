@@ -1,4 +1,4 @@
-import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshStandardMaterial, RedFormat, RepeatWrapping, RGBAFormat, ShaderChunk, Vector2, Vector3, type Camera, type Texture } from 'three';
+import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshStandardMaterial, RedFormat, RepeatWrapping, RGBAFormat, ShaderChunk, Vector2, Vector3, type Texture } from 'three';
 import type { CloudMapLevels, SceneryClouds, SceneryCloudMaterial } from '../../../../../shared/types/scenes/clouds.js';
 import type { CloudSheet } from './clouds.js';
 import { hazeProgram } from './haze.js';
@@ -6,8 +6,8 @@ import { hazeProgram } from './haze.js';
 /**
  * The replay's clouds, drawn: one mesh per placed sheet (clouds.ts) with the first of its materials, lit by the package's cloud
  * lighting (SceneryCloudLight; the pipeline's docs/SCENE_PACKAGE.md "Clouds" states the formula). The sheets stand where the replay
- * moment puts them around the eye and travel with the camera like the sky, so they stay at their distance at every zoom level.
- * They are drawn behind everything (at the far limit, hidden by the scenery), far to near, each blended over the sky by its alpha.
+ * moment puts them, fixed in the world around the LMU local origin: the camera moves under them. They are drawn behind everything
+ * (at the far limit, hidden by the scenery), far to near from the camera, each blended over the sky by its alpha.
  *
  * The lighting is worked in LMU local axes, the axes the sheets and their vertex frames are laid out in: the scene's z is the
  * opposite one. The ambient light is the scene's environment in the direction the light maps give.
@@ -23,6 +23,8 @@ export interface CloudLayerLight {
 
 export interface CloudLayer {
   group: Group;
+  /** Orders the sheets far to near from the camera (scene space): before the other transparent objects, each over the ones behind it. */
+  order(camera: Vector3): void;
   dispose(): void;
 }
 
@@ -40,10 +42,11 @@ varying vec3 vCloudNormal;
 varying vec3 vCloudRay;
 varying float vCloudFade;
 `;
-/** The sheet's vertices are relative to the eye: the ray to a point is its position, with z turned to LMU local axes. */
+/** The ray from the camera to the point, with z turned to LMU local axes. */
 const CLOUD_VERTEX = `
 vCloudUv = uv; vCloudTangent = cloudTangent; vCloudBinormal = cloudBinormal; vCloudNormal = cloudNormal; vCloudFade = cloudFade;
-vCloudRay = vec3( position.x, position.y, - position.z );
+vec3 cloudRay = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz - cameraPosition;
+vCloudRay = vec3( cloudRay.x, cloudRay.y, - cloudRay.z );
 #ifdef USE_REVERSED_DEPTH_BUFFER
 gl_Position.z = 0.0;
 #else
@@ -145,11 +148,12 @@ function patchCloudShader(shader: { vertexShader: string; fragmentShader: string
     .replace('#include <opaque_fragment>', `${CLOUD_FRAGMENT}#include <opaque_fragment>`);
 }
 
-/** A sheet's geometry in scene axes around the eye, with its vertex frame (LMU local axes) and fade. */
+/** A sheet's geometry in scene axes around its centre, with its vertex frame (LMU local axes) and fade. */
 function sheetGeometry(sheet: CloudSheet): BufferGeometry {
   const count = sheet.vertices.length / 3, position = new Float32Array(count * 3), axes = [0, 1, 2].map(() => new Float32Array(count * 3));
+  const [cx, cy, cz] = sheet.centre;
   for (let v = 0; v < count; v++) {
-    position.set([sheet.vertices[v * 3], sheet.vertices[v * 3 + 1], -sheet.vertices[v * 3 + 2]], v * 3);
+    position.set([sheet.vertices[v * 3] - cx, sheet.vertices[v * 3 + 1] - cy, cz - sheet.vertices[v * 3 + 2]], v * 3);
     axes.forEach((axis, k) => axis.set(sheet.frame.subarray(v * 9 + k * 3, v * 9 + k * 3 + 3), v * 3));
   }
   const geometry = new BufferGeometry();
@@ -161,10 +165,13 @@ function sheetGeometry(sheet: CloudSheet): BufferGeometry {
   return geometry;
 }
 
-/** The cloud layer of a moment: the placed sheets as meshes in a group that follows the rendering camera. */
-export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], light: CloudLayerLight): CloudLayer {
+/**
+ * The cloud layer of a moment: the placed sheets as meshes, each at its centre, in a group at `fieldOrigin` (where the cloud
+ * field's origin is in the scene: the LMU local origin at the height the sheets were placed for). Nothing in it moves.
+ */
+export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], light: CloudLayerLight, fieldOrigin: Vector3): CloudLayer {
   const group = new Group(), textures = new Map<string, DataTexture>(), materials = new Map<string, MeshStandardMaterial>();
-  group.name = 'clouds';
+  group.name = 'clouds'; group.position.copy(fieldOrigin);
   const texture = (key: string, alpha = false) => {
     const id = `${alpha ? 'alpha' : 'light'}:${key}`;
     let made = textures.get(id);
@@ -183,17 +190,24 @@ export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], li
     materials.set(cloud.name, made);
     return made;
   };
-  // Far to near: each sheet blends over the ones behind it.
-  const order = [...sheets].sort((a, b) => Math.hypot(...b.centre) - Math.hypot(...a.centre));
-  order.forEach((sheet, i) => {
+  // Each sheet's mesh at its centre, in the scene.
+  const placed = sheets.map(sheet => {
     const mesh = new Mesh(sheetGeometry(sheet), materialOf(sheet.materials[0]));
-    mesh.frustumCulled = false; mesh.renderOrder = i - order.length;
-    // The first sheet drawn moves the group to the eye for all of them.
-    if (i === 0) mesh.onBeforeRender = (_renderer, _scene, camera: Camera) => { group.position.setFromMatrixPosition(camera.matrixWorld); group.updateMatrixWorld(true); };
+    mesh.frustumCulled = false; mesh.position.set(sheet.centre[0], sheet.centre[1], -sheet.centre[2]);
     group.add(mesh);
+    return {mesh, at: mesh.position.clone().add(fieldOrigin), distance: 0};
   });
+  group.traverse(object => { object.updateMatrix(); object.matrixAutoUpdate = false; });
+  group.updateMatrixWorld(true);
+  // Three's own sort would draw them near to far under the reversed depth buffer: the clip depth falls with distance there.
+  const order = (camera: Vector3) => {
+    for (const sheet of placed) sheet.distance = sheet.at.distanceToSquared(camera);
+    [...placed].sort((a, b) => b.distance - a.distance).forEach((sheet, i) => { sheet.mesh.renderOrder = i - placed.length; });
+  };
+  order(new Vector3()); // From the scene origin until a camera orders them.
   return {
     group,
+    order,
     dispose() {
       group.children.forEach(child => { (child as Mesh).geometry.dispose(); });
       materials.forEach(material => { material.dispose(); }); textures.forEach(made => { made.dispose(); });

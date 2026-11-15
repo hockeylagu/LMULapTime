@@ -10,7 +10,7 @@ import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
 import { solarPosition } from './solarPosition.js';
 import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze, type SkyConditions } from './atmosphere/skyDome.js';
 import { createHaze } from './atmosphere/haze.js';
-import { cloudCoverage, cloudSheets, sunVisibility, type CloudSheet } from './atmosphere/clouds.js';
+import { cloudCoverage, cloudSheets, sunVisibility, type CloudEye, type CloudSheet } from './atmosphere/clouds.js';
 import { createCloudLayer } from './atmosphere/cloudLayer.js';
 import { SUN_UNIT, sunRadiance } from './atmosphere/sunSamples.js';
 import { crownSun } from './scenery/materials/foliageCrown.js';
@@ -82,6 +82,11 @@ export interface SceneEnvironment {
    * again), the foliage and the clouds; the venue is captured again when it was captured already. Not during a render.
    */
   setSun(sun: SceneSun): void;
+  /**
+   * The same moment seen from elsewhere (`sunSeenFrom`): the sky, the haze and the sun's light follow the sun's new visibility
+   * through the clouds; the shadows, the clouds and the environment captures stay. Not during a render.
+   */
+  setSunVisibility(sun: SceneSun): void;
   /** Writes this scene's haze terms into the uniforms hazed materials read; each of the scene's renders does it too. */
   applyHaze(): void;
   /**
@@ -97,17 +102,19 @@ export interface SceneEnvironment {
 export type SceneVenue = Pick<SceneryLayout, 'daylight' | 'sky' | 'environmentProbe' | 'shading'>;
 
 /**
- * The weather of a replay moment: the cloud coverage and how much of the sun's light passes the clouds, from the replay's cloud
- * field placed around an eye at the scene origin's height, with the placed sheets. A replay without a cloud field keeps its cloud
- * cover figure and has no sun visibility or sheets of its own.
+ * The weather of a replay moment: the cloud coverage and how much of the sun's light passes the clouds seen from `eye`, from the
+ * replay's cloud field placed for an eye at the scene origin's height, with the placed sheets. A replay without a cloud field keeps
+ * its cloud cover figure and has no sun visibility or sheets of its own.
  */
-export function sceneClouds(venue: Pick<SceneVenue, 'sky' | 'shading'>, lighting: SceneLighting, originY: number, clock?: ReplayDaylightClock): {cloudCover: number; sunVisibility?: number; sheets?: CloudSheet[]} {
+export function sceneClouds(venue: Pick<SceneVenue, 'sky' | 'shading'>, lighting: SceneLighting, originY: number, clock?: ReplayDaylightClock, eye: CloudEye = [0, 0, 0]): {cloudCover: number; sunVisibility?: number; sheets?: CloudSheet[]} {
   const field = clock?.cloudField;
   if (!field) return {cloudCover: clock?.cloudCover ?? 0};
-  // The cloud field is laid out in LMU local axes: the scene's z is the opposite one.
-  const {x, y, z} = lighting.sunDirection, sheets = cloudSheets(venue.sky.clouds, field, originY);
-  return {cloudCover: cloudCoverage(venue.sky.clouds, field), sunVisibility: sunVisibility(venue.shading.sunVisibility, venue.sky.clouds, sheets, [x, y, -z]), sheets};
+  const sheets = cloudSheets(venue.sky.clouds, field, originY);
+  return {cloudCover: cloudCoverage(venue.sky.clouds, field), sunVisibility: sunVisibility(venue.shading.sunVisibility, venue.sky.clouds, sheets, cloudSun(lighting), eye), sheets};
 }
+
+/** Toward the sun in the cloud field's axes (LMU local): the scene's z is the opposite one. */
+export const cloudSun = ({sunDirection: {x, y, z}}: SceneLighting): [number, number, number] => [x, y, -z];
 
 /** The replay moment's sun and weather, worked out once for the environment and the exposure. */
 export interface SceneSun {
@@ -124,13 +131,18 @@ export interface SceneSun {
 }
 
 /**
- * The sun from the replay's clock (sceneLighting) and the weather at the lap (sceneClouds): the replay's cloud cover sets the
- * weather and dims the sun. `originY` is the scene origin's height in LMU local metres.
+ * The sun from the replay's clock (sceneLighting) and the weather at the lap (sceneClouds), the clouds seen from `eye`: the replay's
+ * cloud cover sets the weather and dims the sun. `originY` is the scene origin's height in LMU local metres.
  */
-export function sceneSun(venue: Pick<SceneVenue, 'daylight' | 'sky' | 'shading'>, originY: number, clock?: ReplayDaylightClock): SceneSun {
+export function sceneSun(venue: Pick<SceneVenue, 'daylight' | 'sky' | 'shading'>, originY: number, clock?: ReplayDaylightClock, eye?: CloudEye): SceneSun {
   const lighting = sceneLighting(venue.daylight, clock), sunElevationDeg = MathUtils.radToDeg(Math.asin(MathUtils.clamp(lighting.sunDirection.y, -1, 1)));
-  const clouds = sceneClouds(venue, lighting, originY, clock), weather = skyConditions(venue.daylight, clouds.cloudCover, clouds.sunVisibility);
+  const clouds = sceneClouds(venue, lighting, originY, clock, eye), weather = skyConditions(venue.daylight, clouds.cloudCover, clouds.sunVisibility);
   return {lighting, sunElevationDeg, clouds, weather, radiance: sunRadiance(venue.sky.sun, sunElevationDeg, weather.cloudCover)};
+}
+
+/** The same moment with the sun's visibility through the clouds seen from elsewhere. */
+export function sunSeenFrom(venue: Pick<SceneVenue, 'daylight'>, sun: SceneSun, sunVisibility: number): SceneSun {
+  return {...sun, clouds: {...sun.clouds, sunVisibility}, weather: skyConditions(venue.daylight, sun.clouds.cloudCover, sunVisibility)};
 }
 
 /**
@@ -178,12 +190,16 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   scene.add(sky);
   /** The haze colour toward a view heading (and the sky's, just above the horizon), and the haze terms hazed materials read. */
   let haze: ReturnType<typeof hazeColour> = () => fog.color, applyHaze: () => void = () => {}, cloudLayer: ReturnType<typeof createCloudLayer> | null = null;
+  /** The sheets the cloud layer draws, and where the cloud field's origin is in the scene (the LMU local origin, at the scene origin's height). */
+  let shownSheets: CloudSheet[] | undefined;
+  const fieldOrigin = new Vector3(-origin.x, 0, origin.z);
   const heading = new Vector3();
   const skyHaze = () => sky.material.uniforms.hazeColour.value as Color;
-  /** Everything the sun and the weather set. */
-  const light = ({lighting, sunElevationDeg, clouds, weather, radiance}: SceneSun) => {
+  /** Everything the sun and the weather set; the first environment is made again when `environments` (until the venue is captured). */
+  const light = ({lighting, sunElevationDeg, clouds, weather, radiance}: SceneSun, environments = true) => {
     // The weather thickens the haze; the clouds toward the sun dim the sun's light further.
     const clearSun = radiance.clone().multiplyScalar(SUN_UNIT), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
+    const turned = !toSun.equals(heading.copy(lighting.sunDirection).normalize());
     toSun.copy(lighting.sunDirection).normalize();
     if (lit) {
       // The same program: only its uniforms change.
@@ -204,12 +220,15 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     sun.color.copy(sunRgb); sun.position.copy(toSun);
     sceneDayLight.value = dayShare(venue.shading.ambient, radiance.g);
     crownSun.value.copy(toSun); // Foliage cards tilt their lighting normal up less as they come to face the sun.
-    if (lit) cascades.pass.setLight(toSun.clone().negate());
+    if (lit && turned) cascades.pass.setLight(toSun.clone().negate());
     // The clouds are lit by the sun before they dim it. The first environment and the venue capture are taken without them.
-    if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }
-    cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toSun.clone(), sunGreen: clearSun.g, cloudCover: weather.cloudCover}) : null;
-    if (cloudLayer) scene.add(cloudLayer.group);
-    if (!venueProbe) {
+    if (!lit || clouds.sheets !== shownSheets) {
+      if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }
+      shownSheets = clouds.sheets;
+      cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toSun.clone(), sunGreen: clearSun.g, cloudCover: weather.cloudCover}, fieldOrigin) : null;
+      if (cloudLayer) scene.add(cloudLayer.group);
+    }
+    if (!venueProbe && environments) {
       firstEnvironment?.dispose();
       firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: VENUE_PROBE_PX});
       scene.environment = firstEnvironment.texture;
@@ -265,8 +284,10 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       light(next);
       if (venueProbe) captureVenue();
     },
+    setSunVisibility(next) { light(next, false); },
     update(casters = []) {
       if (!view) return false;
+      cloudLayer?.order(view.getWorldPosition(heading));
       view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze());
       const set = cascades, drawing = set.pass.update(view, dynamic, casters);
       if (!set.sampled) { sampleCascadeShadows(venue.shading.shadows, set.layout, set.pass.state); set.sampled = true; }

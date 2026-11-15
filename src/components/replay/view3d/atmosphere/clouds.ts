@@ -28,8 +28,11 @@ export function cloudCoverage(clouds: SceneryClouds, moment: CloudMoment): numbe
   return Math.min(1, Math.max(sums.lower[0] / sums.lower[1], sums.upper[0] / sums.upper[1]));
 }
 
+/** Where the eye is in the cloud field's frame: LMU local x and z (m), and its height above the height the sheets were placed for (m). */
+export type CloudEye = [number, number, number];
+
 /**
- * One placed cloud sheet: its vertices relative to the eye (m), the mesh's UVs and triangles, its fade and its type's materials.
+ * One placed cloud sheet: its vertices in the cloud field's frame (m: LMU local x and z, the height above the placing eye's), the mesh's UVs and triangles, its fade and its type's materials.
  * `frame` is each vertex's tangent, binormal and normal turned with the sheet (nine values per vertex), which its light maps are read in.
  */
 export interface CloudSheet {
@@ -39,7 +42,8 @@ export interface CloudSheet {
 }
 
 /**
- * The cloud sheets of a moment, placed around an eye at height `eyeY` (m). A cell's grid position follows its layer's drift; the
+ * The cloud sheets of a moment, placed for an eye at height `eyeY` (m). The grid stands around the LMU local origin, fixed in the
+ * world: the eye moves under it. A cell's grid position follows its layer's drift; the
  * sheet sinks toward the field's edge and while it is young (age = drift since the replay's first weather sample plus the start
  * age), fades in and out at the ends of its run, and turns to face the centre (side cells) or along the drift (centre-line cells).
  * A sheet has its code's material when the moment names the variant (the material whose name ends with the id), else all of the type's.
@@ -105,16 +109,25 @@ function mapSampler(map: CloudMapLevels): MapSampler {
  * toward the sun, one ray per texel. A sheet's materials count equally (all of its type's when the replay names no variant). The
  * sheets' alphas add up where they overlap. The view's far limit is not applied: the sheets lie beyond it and still count.
  */
-export function sunVisibility(rule: ScenerySunVisibility, clouds: SceneryClouds, sheets: CloudSheet[], sunDirection: [number, number, number], rain = 0): number {
+export function sunVisibility(rule: ScenerySunVisibility, clouds: SceneryClouds, sheets: CloudSheet[], sunDirection: [number, number, number], eye: CloudEye = [0, 0, 0], rain = 0): number {
+  return meterSunVisibility(rule, clouds, sheets, sunDirection, eye, rain)(Infinity) ?? 0;
+}
+
+/**
+ * `sunVisibility` measured a few rows of its view at a time: each call adds the next `rows` rows and returns the visibility once
+ * the view is done, else null.
+ */
+export function meterSunVisibility(rule: ScenerySunVisibility, clouds: SceneryClouds, sheets: CloudSheet[], sunDirection: [number, number, number], eye: CloudEye, rain = 0): (rows: number) => number | null {
   const length = Math.hypot(...sunDirection), f = sunDirection.map(c => c / length), { limit, gain } = rule.horizon;
-  if (f[1] <= limit) return 0;
+  if (f[1] <= limit) return () => 0;
   const horizon = Math.min(1, Math.max(0, (f[1] - limit) * gain)), size = rule.view.resolution, tan = Math.tan(rule.view.fovRad / 2);
   // A view frame around the sun direction; its roll does not change the sum.
   const side = Math.abs(f[1]) < 0.99 ? [f[2], 0, -f[0]] : [1, 0, 0], sideLength = Math.hypot(...side), right = side.map(c => c / sideLength);
   const up = [f[1] * right[2] - f[2] * right[1], f[2] * right[0] - f[0] * right[2], f[0] * right[1] - f[1] * right[0]];
   const coneCos = Math.cos(Math.atan(tan * Math.SQRT2)), coneSin = Math.sqrt(1 - coneCos * coneCos);
   const inView = sheets.filter(sheet => {
-    const distance = Math.hypot(...sheet.centre), along = (sheet.centre[0] * f[0] + sheet.centre[1] * f[1] + sheet.centre[2] * f[2]);
+    const cx = sheet.centre[0] - eye[0], cy = sheet.centre[1] - eye[1], cz = sheet.centre[2] - eye[2];
+    const distance = Math.hypot(cx, cy, cz), along = cx * f[0] + cy * f[1] + cz * f[2];
     const across = Math.sqrt(Math.max(0, distance * distance - along * along));
     // Outside the cone widened by the sheet's radius: no ray can reach it.
     return along * coneSin - across * coneCos > -sheet.radius;
@@ -125,39 +138,43 @@ export function sunVisibility(rule: ScenerySunVisibility, clouds: SceneryClouds,
     if (!sampler) { sampler = mapSampler(clouds.maps[material.cloudMap]); samplers.set(material.cloudMap, sampler); }
     return sampler(u, v);
   };
-  let sum = 0;
-  for (let j = 0; j < size && inView.length; j++) for (let i = 0; i < size; i++) {
-    const a = ((i + 0.5) / size * 2 - 1) * tan, b = ((j + 0.5) / size * 2 - 1) * tan;
-    const dx = f[0] + right[0] * a + up[0] * b, dy = f[1] + right[1] * a + up[1] * b, dz = f[2] + right[2] * a + up[2] * b;
-    let alpha = 0;
-    for (const sheet of inView) {
-      const hit = sheetHit(sheet, dx, dy, dz);
-      if (!hit) continue;
-      let mean = 0;
-      for (const material of sheet.materials) {
-        const s = material.opacity.visibility * sheet.fade * (1 - material.opacity.randomRange * clouds.averagedInputs.red);
-        const power = clouds.alpha.powerFrom + (clouds.alpha.powerTo - clouds.alpha.powerFrom) * s;
-        mean += Math.min(1, Math.max(0, clouds.alpha.gain * s)) * sample(material, hit[0], hit[1]) ** power * material.opacity.scalar / sheet.materials.length;
+  /** The alpha summed along one row of the view. */
+  const rowAlpha = (j: number) => {
+    let total = 0;
+    for (let i = 0; i < size; i++) {
+      const a = ((i + 0.5) / size * 2 - 1) * tan, b = ((j + 0.5) / size * 2 - 1) * tan;
+      const dx = f[0] + right[0] * a + up[0] * b, dy = f[1] + right[1] * a + up[1] * b, dz = f[2] + right[2] * a + up[2] * b;
+      for (const sheet of inView) {
+        const hit = sheetHit(sheet, eye, dx, dy, dz);
+        if (!hit) continue;
+        for (const material of sheet.materials) {
+          const s = material.opacity.visibility * sheet.fade * (1 - material.opacity.randomRange * clouds.averagedInputs.red);
+          const power = clouds.alpha.powerFrom + (clouds.alpha.powerTo - clouds.alpha.powerFrom) * s;
+          total += Math.min(1, Math.max(0, clouds.alpha.gain * s)) * sample(material, hit[0], hit[1]) ** power * material.opacity.scalar / sheet.materials.length;
+        }
       }
-      alpha += mean;
     }
-    sum += alpha;
-  }
+    return total;
+  };
   const { bias, dryMax, wetMax } = rule.occlusion;
-  const occlusion = Math.sqrt(Math.min(1, Math.max(0, (bias + sum) / (size * size)))) * (dryMax + (wetMax - dryMax) * rain);
-  return (1 - occlusion) * horizon;
+  let sum = 0, row = inView.length ? 0 : size;
+  return rows => {
+    for (const end = Math.min(size, row + rows); row < end; row++) sum += rowAlpha(row);
+    if (row < size) return null;
+    const occlusion = Math.sqrt(Math.min(1, Math.max(0, (bias + sum) / (size * size)))) * (dryMax + (wetMax - dryMax) * rain);
+    return (1 - occlusion) * horizon;
+  };
 }
 
 /** Where a ray from the eye along (dx, dy, dz) meets a sheet: the UV there, or null. A sheet is one surface, so the first triangle hit is it. */
-function sheetHit(sheet: CloudSheet, dx: number, dy: number, dz: number): [number, number] | null {
+function sheetHit(sheet: CloudSheet, eye: CloudEye, dx: number, dy: number, dz: number): [number, number] | null {
   const { vertices: p, triangles, uvs } = sheet;
   for (let t = 0; t < triangles.length; t += 3) {
     const i0 = triangles[t], i1 = triangles[t + 1], i2 = triangles[t + 2], a = i0 * 3, b = i1 * 3, c = i2 * 3;
     const e1x = p[b] - p[a], e1y = p[b + 1] - p[a + 1], e1z = p[b + 2] - p[a + 2], e2x = p[c] - p[a], e2y = p[c + 1] - p[a + 1], e2z = p[c + 2] - p[a + 2];
     const hx = dy * e2z - dz * e2y, hy = dz * e2x - dx * e2z, hz = dx * e2y - dy * e2x, det = e1x * hx + e1y * hy + e1z * hz;
     if (Math.abs(det) < 1e-9) continue;
-    // The ray starts at the eye (the origin), so the offset to the first vertex is minus that vertex.
-    const sx = -p[a], sy = -p[a + 1], sz = -p[a + 2], u = (sx * hx + sy * hy + sz * hz) / det;
+    const sx = eye[0] - p[a], sy = eye[1] - p[a + 1], sz = eye[2] - p[a + 2], u = (sx * hx + sy * hy + sz * hz) / det;
     if (u < 0 || u > 1) continue;
     const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x, v = (dx * qx + dy * qy + dz * qz) / det;
     if (v < 0 || u + v > 1 || (e2x * qx + e2y * qy + e2z * qz) / det <= 0) continue;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cloudCoverage, cloudSheets, sunVisibility, type CloudMoment } from '../../../../../src/components/replay/view3d/atmosphere/clouds.js';
+import { cloudCoverage, cloudSheets, meterSunVisibility, sunVisibility, type CloudMoment } from '../../../../../src/components/replay/view3d/atmosphere/clouds.js';
 import { testClouds, testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const moment = (cells: string, drift = 0, start = -10): CloudMoment => ({cells, upperDrift: drift, lowerDrift: drift, startUpperDrift: start, startLowerDrift: start});
@@ -60,7 +60,7 @@ describe('sun visibility', () => {
     const clouds = testClouds(), overhead = (cells: string) => cloudSheets(clouds, moment(cells), 0);
     // Cells 0 and 2 (2 km sheets centred 707 m from the eye at 2000 m) cover the whole view straight up.
     expect(sunVisibility(rule, clouds, overhead('0f0ff'), UP)).toBe(0);
-    expect(sunVisibility(rule, clouds, overhead('0f0ff'), UP, 1)).toBeCloseTo(0.5, 12);
+    expect(sunVisibility(rule, clouds, overhead('0f0ff'), UP, [0, 0, 0], 1)).toBeCloseTo(0.5, 12);
     // The thin type: the mean of its materials' alphas (1 and 0.5) is 0.75, which each ray adds.
     const thin = sunVisibility(rule, clouds, overhead('8ffff'), [-0.25, 1, -0.25]);
     expect(thin).toBeCloseTo(1 - Math.sqrt((0.01 + 64 * 0.75) / 64), 9);
@@ -68,5 +68,19 @@ describe('sun visibility', () => {
     const variants = [...new Array<string>(8).fill('x'), 'B'], named = cloudSheets(clouds, { ...moment('8ffff'), variants }, 0);
     expect(sunVisibility(rule, clouds, named, [-0.25, 1, -0.25])).toBeCloseTo(1 - Math.sqrt((0.01 + 64 * 0.5) / 64), 9);
     expect(sunVisibility(rule, clouds, cloudSheets(clouds, { ...moment('8ffff'), variants: new Array<string>(15).fill('x') }, 0), [-0.25, 1, -0.25])).toBeCloseTo(thin, 12);
+  });
+
+  it('looks from the eye: the field stays where it is as the eye moves under it', () => {
+    const clouds = testClouds(), sheets = cloudSheets(clouds, moment('0ffff'), 0);
+    // Cell 0's opaque 2 km sheet is centred over (-500, -500): right under it the sun is hidden, 5 km away it is clear.
+    expect(sunVisibility(rule, clouds, sheets, UP, [-500, 0, -500])).toBe(0);
+    expect(sunVisibility(rule, clouds, sheets, UP, [5000, 0, 5000])).toBeCloseTo(clear, 12);
+  });
+
+  it('measures a few rows at a time, to the same visibility', () => {
+    const clouds = testClouds(), sheets = cloudSheets(clouds, moment('8ffff'), 0), sun: [number, number, number] = [-0.25, 1, -0.25];
+    const measure = meterSunVisibility(rule, clouds, sheets, sun, [100, 0, 50]);
+    expect([measure(3), measure(3)]).toEqual([null, null]);
+    expect(measure(3)).toBeCloseTo(sunVisibility(rule, clouds, sheets, sun, [100, 0, 50]), 12);
   });
 });
