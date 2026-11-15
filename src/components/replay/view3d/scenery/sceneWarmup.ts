@@ -9,7 +9,8 @@ const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
  * Bytes a frame uploads once the first frame is out, the sharpening and the warm-ups together: an upload call returns before the
  * GPU has copied the data, so time alone does not bound its cost (a millisecond slice let a near car send 7-15 MiB a frame, and a
  * race's cars warming at once, each with a budget of its own, up to 17 MiB). A texture or geometry goes whole, so a frame's first
- * upload goes even if it is bigger.
+ * upload goes even if it is bigger, and the frames after it pay for the excess: a near car's batches of 3-12 MiB, one a frame,
+ * kept the GPU process behind for a second and a half of 20-50 ms frames.
  */
 const UPLOAD_BYTES_PER_FRAME = 2 * 1024 * 1024;
 
@@ -74,7 +75,10 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
   const held = new Set<Texture>(), cars = new WeakSet<Texture>(), places = new WeakMap<Texture, Box3[]>(), eye = new Vector3();
   const blurry = new Set<Texture>();
   let shown = false, disposed = false, sharpening = false, warming = Promise.resolve(), sharp = 0;
-  /** The bytes uploaded since the last budget frame began, that frame's wait while one is asked for, and whether a warm-up waits on it. */
+  /**
+   * The bytes uploaded and not yet paid for by a budget frame (more than a frame's budget after an upload bigger than it), the next
+   * budget frame's wait while one is asked for, and whether a warm-up waits on it.
+   */
   let frameBytes = 0, budgetFrame: Promise<void> | null = null, warmsWait = false;
   /** Car textures first (-1), then by the camera's distance to the nearest chunk using the texture; unplaced ones last. */
   const distance = (texture: Texture) => cars.has(texture) ? -1
@@ -89,21 +93,21 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     const order = [...blurry].map(texture => ({texture, distance: distance(texture), pixels: fullPixels(texture)}))
       .sort((a, b) => a.distance - b.distance || b.pixels - a.pixels);
     for (const {texture} of order) {
+      if (frameBytes >= budget) break;
       const bytes = streamTexture(texture, renderer);
       uploaded += bytes; frameBytes += bytes;
       if (!isStreaming(texture)) { blurry.delete(texture); sharp++; }
-      if (frameBytes >= budget) break;
     }
     if (uploaded) changed();
     if (blurry.size) { sharpening = true; void nextFrame(); }
   };
   /**
-   * The next frame of the shared upload budget: it starts the budget again, sharpens first, then lets the warm-ups waiting on it go
-   * on. One frame request serves them all, so a frame's budget starts once, whatever its timestamp.
+   * The next frame of the shared upload budget: it pays a frame's budget off the bytes sent, sharpens first, then lets the warm-ups
+   * waiting on it go on. One frame request serves them all, so a frame's budget starts once, whatever its timestamp.
    */
   const nextFrame = () => budgetFrame ??= new Promise<void>(resolve => {
     requestAnimationFrame(() => {
-      budgetFrame = null; frameBytes = 0;
+      budgetFrame = null; frameBytes = Math.max(0, frameBytes - UPLOAD_BYTES_PER_FRAME);
       if (sharpening) sharpen();
       warmsWait = false;
       resolve();

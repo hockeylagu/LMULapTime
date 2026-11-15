@@ -87,7 +87,7 @@ it('sharpens the car first, then the scenery nearest the camera, the largest fir
   } finally { warmup.dispose(); drain(); }
 });
 
-it('swaps whole textures within the frame budget: the first one even if bigger, then one frame each for big ones', () => {
+it('swaps whole textures within the frame budget: the first one even if bigger, the frames after it paying off the excess', () => {
   const {warmup, texture, upload, drain, bound} = fixture(), [big, other, small, smaller] = [texture(2048), texture(2048), texture(512), texture(512)];
   try {
     for (const made of [big, other, small, smaller]) { upload(made); warmup.sharpen(made); }
@@ -95,7 +95,9 @@ it('swaps whole textures within the frame budget: the first one even if bigger, 
     warmup.shown();
     frame(); // One frame: the 5.3 MiB swap is over the 2 MiB budget alone, so nothing else goes with it.
     expect(bound).toHaveLength(1);
-    frame();
+    frame(); // 3.3 MiB still owed: nothing goes.
+    expect(bound).toHaveLength(1);
+    frame(); // 1.3 MiB owed, under the budget: the next swap goes.
     expect(bound).toHaveLength(2);
     drain();
     expect([big, other, small, smaller].some(isStreaming)).toBe(false);
@@ -112,9 +114,10 @@ it('warms a shown scene within the frame byte budget: the first upload whole, th
     const done = warmup.warm([card(), card(), card()], new AbortController().signal);
     await vi.waitFor(() => expect(bound).toHaveLength(2)); // 1.5 MiB, then 3 MiB: over the 2 MiB budget, the frame ends.
     expect(frames).toHaveLength(1);
-    frame();
+    frame(); // 1 MiB still owed, under the budget: the third goes.
+    await vi.waitFor(() => expect(bound).toHaveLength(3));
+    while (frames.length) await settledFrame();
     await done;
-    expect(bound).toHaveLength(3);
   } finally { warmup.dispose(); vi.restoreAllMocks(); }
 });
 
@@ -131,8 +134,9 @@ it('shares one frame byte budget between warm-ups running together', async () =>
     const sentByFrame = [bound.length];
     while (frames.length) { await settledFrame(); sentByFrame.push(bound.length); }
     await done;
-    // Then the first's last card and the second's first, then the second's last two: each frame stops once over 2 MiB.
-    expect(sentByFrame.slice(0, 3)).toEqual([2, 4, 6]);
+    // Each frame pays 2 MiB off what was sent and stops once 2 MiB is owed: the first's last card (1 MiB owed before it), the
+    // second's first (0.5 MiB owed), then the second's last two.
+    expect(sentByFrame.slice(0, 4)).toEqual([2, 3, 4, 6]);
   } finally { warmup.dispose(); vi.restoreAllMocks(); }
 });
 
