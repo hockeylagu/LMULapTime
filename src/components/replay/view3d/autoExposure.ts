@@ -42,9 +42,10 @@ export function inverseToneCurve(curve: SceneryToneCurve, y: number): number {
 
 /**
  * Metering grid: METER_W × METER_H cells of SAMPLES² taps each, 128 × 72 taps over the window as the reference meters, read back
- * without stalling the frame.
+ * without stalling the frame, at most once a METER_PERIOD_MS: four frames at 60 Hz. Adaptation runs on the wall clock, so a faster
+ * display gains nothing from more readings, and each costs a round trip to the GPU process.
  */
-const METER_W = 32, METER_H = 18, SAMPLES = 4, METER_EVERY_FRAMES = 4;
+const METER_W = 32, METER_H = 18, SAMPLES = 4, METER_PERIOD_MS = 4000 / 60;
 /** The gap (stops) under which exposure counts as settled, and the period the adaptation's sensitivity is a blend fraction of. */
 const SETTLED_STOPS = 0.01, ADAPT_PERIOD_S = 0.15;
 
@@ -153,6 +154,12 @@ export interface AutoExposure {
    * a few hundred milliseconds of the first frame. Call once the renderer's tone mapping is set (a program depends on it).
    */
   link(): Promise<void>;
+  /**
+   * Fetches a reading whose fence has signalled. Call at the top of a frame, before its passes issue draws: the fetch is a round trip
+   * to the GPU process, which waits for every command issued before it (about 4 ms after a race frame's draws, 0.2 ms before them).
+   * A frame poll fetches it too when no frame comes.
+   */
+  collect(): void;
   /** Switches to a camera type's metering, exposure law, white balance and curve; exposure re-adapts from the next reading. */
   setType(type: SceneryCameraType): void;
   /** Chooses every type's profile by another moment's sun and weather; the adapted level carries over. */
@@ -213,7 +220,7 @@ export function meteredLuminance(mean: readonly [number, number, number], exposu
 }
 /**
  * Metered auto-exposure: the frame renders to a half-float target, a small pass averages the luminance of the active camera
- * type's metering window, the GPU reads it back asynchronously every few frames, and the exposure adapts toward the law's value.
+ * type's metering window, the GPU reads it back asynchronously a few times a second, and the exposure adapts toward the law's value.
  * Rendering is on demand, so `invalidate` keeps frames coming until the exposure settles. `cloudCover` (0 to 1) blends each
  * type's profile toward its overcast look, by how much of the sun the clouds hide (`sunVisibility`, when the replay has a cloud field).
  */
@@ -257,7 +264,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   });
   output.add(new Mesh(quad, outputMaterial)); meterScene.add(new Mesh(quad, meterMaterial));
   const readback = new Uint16Array(METER_W * METER_H * 4);
-  let adapted: AdaptedExposure | null = null, metered: number | null = null, reading = false, frames = 0, last = 0, disposed = false, generation = 0;
+  let adapted: AdaptedExposure | null = null, metered: number | null = null, reading = false, meteredAt = -Infinity, last = 0, disposed = false, generation = 0;
   /** The law's exposure (stops) for the metered luminance under the active type. */
   const targetOf = (log: number) => Math.log2(lawExposure(active, active.adaptationScale, log, unit));
 
@@ -270,51 +277,51 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   apply(active);
 
   let pack: WebGLBuffer | null = null;
+  /** The pending reading's fetch, while one waits on its fence. */
+  let collect: (() => void) | null = null;
   /**
    * Reads the metering target back without stalling the frame, called right after its pass while its framebuffer is still bound.
    * three's `readRenderTargetPixelsAsync` does the same, but each call creates and deletes a pixel-pack buffer and a fence, polls the
    * fence on a 4 ms timer and calls `getBufferSubData`, which is a synchronous round trip to the GPU process that waits for every
    * command issued before it: that wait was the whole cost (2.8 % of the main thread). Here one pack buffer serves every reading,
-   * and the data is fetched once the fence has signalled, from a poll on the frame clock (no timers), so the round trip finds the
-   * GPU idle and the next frame's commands not yet issued.
+   * and the data is fetched once the fence has signalled, with no timers: at the top of the next frame (`collect`), so the round
+   * trip finds the frame's commands not yet issued, else from a frame poll.
    */
-  const read = async (exposure: number) => {
-    reading = true;
+  const read = (exposure: number) => {
     const started = generation, gl = renderer.getContext() as WebGL2RenderingContext;
-    let sync: WebGLSync | null = null;
-    try {
-      if (!pack) {
-        // Checked once: the query is itself a round trip in some browsers, and the target's format never changes.
-        if (gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT) !== gl.RGBA || gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) !== gl.HALF_FLOAT) {
-          throw Error('The metering target is not readable as half-float RGBA');
-        }
-        pack = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.bufferData(gl.PIXEL_PACK_BUFFER, readback.byteLength, gl.STREAM_READ);
+    if (!pack) {
+      // Checked once: the query is itself a round trip in some browsers, and the target's format never changes.
+      if (gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_FORMAT) !== gl.RGBA || gl.getParameter(gl.IMPLEMENTATION_COLOR_READ_TYPE) !== gl.HALF_FLOAT) {
+        throw Error('The metering target is not readable as half-float RGBA');
       }
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
-      gl.readPixels(0, 0, METER_W, METER_H, gl.RGBA, gl.HALF_FLOAT, 0);
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-      const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-      if (!fence) throw Error('The metering fence could not be created');
-      sync = fence;
-      gl.flush();
-      await new Promise<void>((resolve, reject) => {
-        const poll = () => {
-          if (disposed) { resolve(); return; }
-          const status = gl.clientWaitSync(fence, 0, 0);
-          if (status === gl.WAIT_FAILED) reject(Error('The metering fence failed'));
-          else if (status === gl.TIMEOUT_EXPIRED) requestAnimationFrame(poll);
-          else resolve();
-        };
-        requestAnimationFrame(poll);
-      });
-      // A reading from before a type switch metered the old window.
-      if (disposed || started !== generation) return;
-      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, readback); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-      const mean: [number, number, number] = [0, 0, 0], cells = METER_W * METER_H;
-      for (let i = 0; i < cells; i++) for (let c = 0; c < 3; c++) mean[c] += DataUtils.fromHalfFloat(readback[i * 4 + c]) / cells;
-      metered = meteredLuminance(mean, exposure);
-      if (adapted === null || Math.abs(targetOf(metered) - adapted.log2) > SETTLED_STOPS) invalidate();
-    } finally { reading = false; if (sync) gl.deleteSync(sync); }
+      pack = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.bufferData(gl.PIXEL_PACK_BUFFER, readback.byteLength, gl.STREAM_READ);
+    }
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack);
+    gl.readPixels(0, 0, METER_W, METER_H, gl.RGBA, gl.HALF_FLOAT, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    if (!fence) throw Error('The metering fence could not be created');
+    gl.flush();
+    reading = true;
+    const fetch = () => {
+      if (collect !== fetch) return;
+      // A failed fence (a lost context) ends this reading; the next metering frame tries again.
+      const status = disposed ? gl.WAIT_FAILED : gl.clientWaitSync(fence, 0, 0);
+      if (status === gl.TIMEOUT_EXPIRED) return;
+      collect = null; reading = false;
+      try {
+        // A reading from before a type switch metered the old window.
+        if (status === gl.WAIT_FAILED || started !== generation) return;
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pack); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, readback); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        const mean: [number, number, number] = [0, 0, 0], cells = METER_W * METER_H;
+        for (let i = 0; i < cells; i++) for (let c = 0; c < 3; c++) mean[c] += DataUtils.fromHalfFloat(readback[i * 4 + c]) / cells;
+        metered = meteredLuminance(mean, exposure);
+        if (adapted === null || Math.abs(targetOf(metered) - adapted.log2) > SETTLED_STOPS) invalidate();
+      } finally { gl.deleteSync(fence); }
+    };
+    collect = fetch;
+    const poll = () => { fetch(); if (collect === fetch) requestAnimationFrame(poll); };
+    requestAnimationFrame(poll);
   };
 
   return {
@@ -329,6 +336,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       types = resolve(at, {cloudCover: cover, sunVisibility: visibility}); apply(types[activeType]); invalidate();
     },
     display: () => active.display,
+    collect: () => collect?.(),
     link() {
       const previous = renderer.getRenderTarget();
       renderer.setRenderTarget(null); const canvas = renderer.compileAsync(output, quadCamera);
@@ -354,10 +362,12 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       surfaceAlphaCut.value = 0; renderer.render(scene, camera); surfaceAlphaCut.value = 1;
       renderer.setRenderTarget(null);
       renderer.render(output, quadCamera);
-      if (!reading && frames++ % METER_EVERY_FRAMES === 0) {
+      if (!reading && now - meteredAt >= METER_PERIOD_MS) {
+        meteredAt = now;
         meterMaterial.uniforms.exposure.value = renderer.toneMappingExposure;
         renderer.setRenderTarget(meter); renderer.render(meterScene, quadCamera);
-        read(renderer.toneMappingExposure).catch(() => {}); // A lost context or a disposed target ends metering; the last exposure stays.
+        // A lost context or a disposed target leaves the last exposure; the next metering frame tries again.
+        try { read(renderer.toneMappingExposure); } catch { /* the last exposure stays */ }
         renderer.setRenderTarget(null);
       }
     },

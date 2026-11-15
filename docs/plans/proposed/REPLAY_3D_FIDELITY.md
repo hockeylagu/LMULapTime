@@ -45,7 +45,7 @@ occlusion scale and then the camera occlusion pass itself, profile placement by 
 
 `src/components/replay/view3d/autoExposure.ts`. The scene renders into a 4× multisampled half-float target. A 16 × 16 pass
 averages luminance (arithmetic mean since 2026-11-09, item 11b) over the camera profile's metering window (16 taps per cell), and the GPU reads it back asynchronously
-every 4 frames. Exposure adapts in log space (rate 2/s, the first reading taken as is) toward target ÷ metered average, with the
+at most once per 4000/60 ms (4 frames at 60 Hz; every 4 frames until 2026-11-15). Exposure adapts in log space (rate 2/s, the first reading taken as is) toward target ÷ metered average, with the
 target from the camera profile by sun elevation. The canvas gets one tone-mapped quad, and the canvas itself no longer
 multisamples. Exposure is relative (target ÷ metered luminance), so the app's light units do not matter once it meters.
 

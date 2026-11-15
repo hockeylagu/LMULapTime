@@ -151,13 +151,25 @@ describe('autoExposure', () => {
       expect(calls).toEqual(['createBuffer', 'bufferData', 'readPixels']);
       flush(); // The fence has not signalled: no data is fetched yet.
       expect(calls).not.toContain('getBufferSubData');
-      flush(); await Promise.resolve();
+      flush();
       expect(calls.slice(-3)).toEqual(['wait', 'getBufferSubData', 'deleteSync']);
       expect(invalidated).toHaveBeenCalled(); // The first reading is unadapted.
-      for (let frame = 0; frame < 4; frame++) exposure.render({} as never, {} as never); // The next reading, four frames on.
+      // The next reading, a period on (four frames at 60 Hz): none before it.
+      let now = performance.now();
+      vi.spyOn(performance, 'now').mockImplementation(() => now);
+      for (let frame = 0; frame < 3; frame++) { now += 17; exposure.render({} as never, {} as never); }
+      expect(calls.filter(call => call === 'readPixels')).toHaveLength(1);
+      now += 17; exposure.render({} as never, {} as never);
       expect(calls.filter(call => call === 'createBuffer')).toHaveLength(1);
       expect(calls.filter(call => call === 'readPixels')).toHaveLength(2);
-    } finally { exposure.dispose(); vi.unstubAllGlobals(); }
+      // A frame's top fetches it before the frame poll does; the poll then finds nothing to fetch.
+      signals.push('signalled');
+      exposure.collect();
+      expect(calls.slice(-3)).toEqual(['wait', 'getBufferSubData', 'deleteSync']);
+      const fetched = calls.length;
+      flush(); exposure.collect();
+      expect(calls).toHaveLength(fetched);
+    } finally { exposure.dispose(); vi.unstubAllGlobals(); vi.restoreAllMocks(); }
     expect(calls.at(-1)).toBe('deleteBuffer');
   });
 });

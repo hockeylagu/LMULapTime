@@ -295,6 +295,23 @@ cascade pass). Same builds otherwise, four interleaved race runs and two lap run
 
 The probe renders about a quarter fewer faces at the race start, so it renews a few frames later.
 
+**The exposure readback at the top of the frame (2026-11-15).** The meter's `getBufferSubData` is a round trip to the GPU
+process. A race start spent ~1.3–1.5 s in it per run (p50 2.4–3.1 ms a reading, up to 46 ms in the start burst), because the
+frame poll ran after the next frame's draws: 0.2 ms before a frame's draws, 3.8 ms after them. In a bare page the same fetch
+costs 0.1–0.3 ms even behind 800 queued draws, so the wait is the GPU process's backlog of a heavy frame. The scene now fetches a
+signalled reading first thing in its frame (`autoExposure.collect`), and meters at most once per 4000/60 ms instead of every
+4 frames: the same at 60 Hz, half the readings uncapped. Adaptation already ran on the wall clock. Separately, the car shadow
+batch's geometry copies now carry their source's bounds: three measured every vertex otherwise, 34 ms of one race-start task.
+Le Mans race start, four interleaved runs; Fuji lap, five runs each (ms):
+
+| Build | Race p50 | Race p95 | Race fps | Lap p50 | Lap p99 |
+|---|---|---|---|---|---|
+| Fetch from a frame poll, every 4 frames | 8.0–8.3 | 14.8–15.6 | 104–107 | 2.9 | 8.4–8.9 |
+| Fetch at the frame's top, 15 Hz | 7.8–7.9 | 14.7–15.4 | 110–111 | 2.7 | 9.4–10.8 |
+
+Lap p99 moved within this machine's run-to-run spread (the 15 Hz build alone, without the top-of-frame fetch, gave 9.6–9.9). The
+race CPU p95 per frame reads 11–12 ms against 9.5–10: the wait now lands inside the frame's own callback.
+
 ## The scene (from the package index)
 
 | | Typical | Worst |

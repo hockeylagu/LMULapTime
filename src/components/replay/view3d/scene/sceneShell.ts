@@ -283,6 +283,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
   const draw = (frameTime?: number) => {
     if (disposed || !content) return;
+    // First, while this frame has issued no draws: the fetch waits for every command before it.
+    exposure.collect();
     if (frameTime !== undefined) frameHook?.(frameTime);
     updateStream();
     // Zoomed trackside views keep every resident instance (their distance scale follows the zoom), as do the free views.
