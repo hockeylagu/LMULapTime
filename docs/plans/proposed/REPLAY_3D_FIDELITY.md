@@ -307,4 +307,28 @@ turbidity and haze-colour calibration (measured in item 8: neither alternative s
   Measured in the same pairs: the car's darkest parts are as dark as the reference's (2nd percentile luminance 0.0003 to
   0.0014 against 0.0007 to 0.0015), so the car's shading contrast is not a gap. Since 2026-11-09 the car parts drawn by the surface program (lamp housings and covers, wheels, trim) reflect the car's own convolved probe by the scenery reflection rule, not the venue's cube (`car/carReflection.ts` `bindCarSurfaceReflection`): the lamp covers lost their pale sky wash and read dark red, unlit (checked on N1, N12, N18).
 
+## v17: replay data not drawn yet (2026-11-15)
+
+For the fidelity round after the optimisation round (freeze v17). Recorded in every replay (docs/VCR_FORMAT.md) and not drawn by
+the 3D view, most useful first. "Every car" means the race grid gets it too.
+
+| # | Data (VCR_FORMAT) | Shows | Decoded | Needs |
+|---|---|---|---|---|
+| 1 | Track surface: rubber, loose material, water, temperature per surface element (§4.21, opcodes 137/139/194, 32 Hz) | The racing line rubbering in through the session, marbles off line, wetness per spot; the road now assumes one rubber level everywhere | No | Package: a per-vertex element index on the race surface's road and kerb primitives, plus the element count (schema bump). App: decode into a per-element array with snapshots for seeking, a data texture the road and kerb shaders read |
+| 2 | Wheel angular speed (§4.1, pose wheels) | Lockups, wheelspin and reverse as recorded, on every car; lap mode now rolls by slip ratios on a fitted radius, the race grid at road speed | Yes (cache v9) | App only; done and parked in `docs/local/parked-wheel-spin` (race windows 15 → 19 channels) |
+| 3 | Tyre effect levels per wheel: skid, slide, smoke (§4.11) | Tyre smoke on lockups, spins and off-track moments | No | Decoder field; a particle effect |
+| 4 | Dents, detached parts, loose objects (§4.5, §4.1 bits 0..17, §4.22) | Damaged cars, lost bodywork and wheels, cones and debris on track | No | Package: body extents and deformation scale, the detachable parts by bit, debris models |
+| 5 | Spark points, contact velocity, underbody height (§4.11) | Sparks from scraping floors and contacts | No | Decoder fields; a particle effect |
+| 6 | Brake temperatures (§4.11) | Glowing discs under braking | Yes | The parked disc glow (`docs/local/parked-disc-glow`) |
+| 7 | Engine speed, gear, engine map, traction control level, hybrid mode (§4.1) | Live gear and shift lights on the cockpit displays | Engine speed and gear | Package: the display layout |
+| 8 | Fitted tyre compound per wheel (§4.12, opcode 144) | Wet tyres unlike slicks | No | Package: a texture per compound |
+| 9 | Marshal post flags, track lights (§4.17, §4.6, §4.18 opcode 211) | Flag panels, start-light sequence, pit exit light | No | Package: the posts and lights; some values not established |
+| 10 | Engine effect levels, engine effect trigger (§4.11 byte 24, §4.3) | Exhaust flames or heat haze | No | What the trigger shows is not established |
+| 11 | Wheel mounting, tread grid (§4.8, §4.9) | Tyre squish, camber, tread wear | No | Player car only |
+
+For item 1, the game's road and kerb shaders read the four values per vertex (rubber → groove, loose material → marbles and
+dust, water → wetness); how the elements map to the race surface's vertices is traced in the render analysis notes
+(`F:\LMUTrackPipeline\pipeline-data\review\render-gap-analysis\followup2\realroad-replay.md` and `realroad-exe.md`), to be
+validated against the package's vertices before the schema change.
+
 Each step is judged by eye against the game and re-runs `npm run benchmark:replay3d:suite` (p99 must stay < 16 ms).
