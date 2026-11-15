@@ -18,7 +18,7 @@ it('uploads each shared geometry once offscreen, passing its bytes to the slice 
   const {renderer, root, render, setRenderTarget, first, second} = fixture();
   const geometries: unknown[] = [];
   render.mockImplementation(scene => { geometries.push((scene.children[0] as Mesh).geometry); });
-  const slice = vi.fn(async (_bytes: number) => {}), warmup = createGeometryWarmup(renderer);
+  const slice = vi.fn((_bytes: number) => undefined), warmup = createGeometryWarmup(renderer);
   const bytes = (geometry: BoxGeometry) => Object.values(geometry.attributes).reduce((sum, attribute) => sum + attribute.array.byteLength, geometry.index!.array.byteLength);
   try {
     await warmup.upload(root, new PerspectiveCamera(), new AbortController().signal, slice);
@@ -42,7 +42,7 @@ it('links its program when created, for its own target and for geometry with pos
 });
 
 it('restores the target after an upload error and does not upload canceled or disposed work', async () => {
-  const {renderer, root, render} = fixture(), slice = async () => {};
+  const {renderer, root, render} = fixture(), slice = () => undefined;
   const warmup = createGeometryWarmup(renderer), camera = new PerspectiveCamera();
   try {
     render.mockImplementation(() => { throw Error('upload failed'); });

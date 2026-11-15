@@ -268,6 +268,21 @@ every eight frames (`CAR_REFLECTION_STEPS`). Same lap and builds, batching-only 
 
 About 8 % more frames and half a millisecond off the median callback; the reflection lags by two more frames, which shows nowhere.
 
+### Race start: one upload budget a frame (2026-11-14)
+
+Each warm-up had its own 2 MiB a frame and the sharpening another, so a race start, which warms every near car's model at
+once, uploaded up to 17.5 MiB in a frame. The budget is now one per frame (`scenery/sceneWarmup.ts`): one frame request starts
+it, the sharpening goes first (half the frame while warm-ups wait), and each warm-up checks for room just before each upload.
+Le Mans race start, production builds, 190 s, four interleaved runs each (ms):
+
+| Build | p50 | p95 | p99 | Max | Frames over 16.7 ms | Largest frame upload |
+|---|---|---|---|---|---|---|
+| Budget per warm-up | 8.3–8.7 | 15.9–21.8 | 30.2–35.2 | 130–136 | 49–77 | 17.5 MiB |
+| One budget a frame | 8.4–8.7 | 15.7–19.4 | 31.4–33.7 | 112–121 | 48–61 | 13.7 MiB |
+
+The remaining large frames are single uploads that go whole: a 2048² texture's swap (5.3 MiB) and a car model's batch
+geometry on its first warm (one of 11 MiB). p95 spreads with the machine's load more than with the change.
+
 ## The scene (from the package index)
 
 | | Typical | Worst |

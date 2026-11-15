@@ -1,7 +1,11 @@
 import { BufferAttribute, BufferGeometry, Camera, Mesh, MeshBasicMaterial, Scene, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
 
-/** Ends an upload slice once enough time or bytes went out: called after each upload with its bytes, it waits for the next slice. */
-export type UploadSlice = (bytes: number) => Promise<void>;
+/**
+ * Ends an upload slice once enough time or bytes went out: called after each upload with its bytes, it returns the wait for the
+ * next slice, or nothing while this one has room. Slices may share a budget, so the caller asks again (with 0) after a wait, just
+ * before its next upload.
+ */
+export type UploadSlice = (bytes: number) => Promise<void> | undefined;
 
 /** The bytes a geometry's first upload sends: its buffers, an interleaved one counted once. */
 function geometryBytes(geometry: BufferGeometry): number {
@@ -48,7 +52,7 @@ export function createGeometryWarmup(renderer: WebGLRenderer) {
           renderer.setRenderTarget(previous);
         }
         // oxlint-disable-next-line no-await-in-loop -- GPU uploads yield between slices
-        await slice(bytes);
+        for (let wait = slice(bytes); wait; wait = slice(0)) await wait;
       }
     },
     dispose() { disposed = true; target.dispose(); material.dispose(); empty.dispose(); },

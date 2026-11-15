@@ -3,10 +3,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isStreaming, startStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import { createSceneWarmup } from '../../../../../src/components/replay/view3d/scenery/sceneWarmup.js';
 
-let frames: (() => void)[] = [];
+let frames: ((time: number) => void)[] = [], clock = 0;
+/** Runs one frame: every callback asked for so far, with the frame's one timestamp, as a browser does. */
+const frame = () => { clock++; for (const run of frames.splice(0)) run(clock); };
+/** One frame as above, letting each callback's promise work settle before the next callback runs, as a browser does. */
+const settledFrame = async () => { clock++; for (const run of frames.splice(0)) { run(clock); await new Promise(resolve => { setTimeout(resolve); }); } };
 beforeEach(() => {
   frames = [];
-  vi.stubGlobal('requestAnimationFrame', (run: () => void) => frames.push(run));
+  vi.stubGlobal('requestAnimationFrame', (run: (time: number) => void) => frames.push(run));
   vi.stubGlobal('cancelAnimationFrame', () => {});
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -32,7 +36,7 @@ function fixture() {
   };
   const upload = (made: Texture) => { made.needsUpdate = true; renderer.initTexture(made); };
   /** Runs frames until none is asked for; returns how many ran. */
-  const drain = () => { let ran = 0; while (frames.length && ran < 100) { frames.shift()!(); ran++; } return ran; };
+  const drain = () => { let ran = 0; while (frames.length && ran < 100) { frame(); ran++; } return ran; };
   return {warmup, texture, upload, drain, changed, bound};
 }
 
@@ -89,9 +93,9 @@ it('swaps whole textures within the frame budget: the first one even if bigger, 
     for (const made of [big, other, small, smaller]) { upload(made); warmup.sharpen(made); }
     bound.length = 0;
     warmup.shown();
-    frames.shift()!(); // One frame: the 5.3 MiB swap is over the 2 MiB budget alone, so nothing else goes with it.
+    frame(); // One frame: the 5.3 MiB swap is over the 2 MiB budget alone, so nothing else goes with it.
     expect(bound).toHaveLength(1);
-    frames.shift()!();
+    frame();
     expect(bound).toHaveLength(2);
     drain();
     expect([big, other, small, smaller].some(isStreaming)).toBe(false);
@@ -108,9 +112,27 @@ it('warms a shown scene within the frame byte budget: the first upload whole, th
     const done = warmup.warm([card(), card(), card()], new AbortController().signal);
     await vi.waitFor(() => expect(bound).toHaveLength(2)); // 1.5 MiB, then 3 MiB: over the 2 MiB budget, the frame ends.
     expect(frames).toHaveLength(1);
-    frames.shift()!();
+    frame();
     await done;
     expect(bound).toHaveLength(3);
+  } finally { warmup.dispose(); vi.restoreAllMocks(); }
+});
+
+it('shares one frame byte budget between warm-ups running together', async () => {
+  const {warmup, bound} = fixture(), mib = 1024 * 1024;
+  vi.spyOn(performance, 'now').mockReturnValue(0);
+  const card = () => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)}));
+  const cards = () => [card(), card(), card()], signal = new AbortController().signal;
+  try {
+    warmup.shown();
+    const done = Promise.all([warmup.warm(cards(), signal), warmup.warm(cards(), signal)]);
+    // The first sends 1.5 MiB, then 3 MiB: the frame's 2 MiB is spent, so the second waits with nothing sent, on the same frame.
+    await vi.waitFor(() => expect([bound.length, frames.length]).toEqual([2, 1]));
+    const sentByFrame = [bound.length];
+    while (frames.length) { await settledFrame(); sentByFrame.push(bound.length); }
+    await done;
+    // Then the first's last card and the second's first, then the second's last two: each frame stops once over 2 MiB.
+    expect(sentByFrame.slice(0, 3)).toEqual([2, 4, 6]);
   } finally { warmup.dispose(); vi.restoreAllMocks(); }
 });
 
