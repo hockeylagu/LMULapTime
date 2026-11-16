@@ -273,7 +273,7 @@ export async function createRaceScene(
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
     pick(x, y) {
       const canvas = shell.renderer.domElement;
-      const under = carsUnder(drawnPlaces, rig.camera, origin, canvas.clientWidth, canvas.clientHeight, x, y);
+      const under = carsUnder(drawnPlaces, shell.drawnView, origin, canvas.clientWidth, canvas.clientHeight, x, y);
       // Seen if its body or its roof is: a low wall can hide the one and not the other.
       const seen = (car: DrawnPlace, height: number) => shell.sees({x: car.x, y: car.y + height, z: car.z});
       return under.find(car => seen(car, PICK_BODY_M) || seen(car, PICK_ROOF_M))?.slot ?? null;
