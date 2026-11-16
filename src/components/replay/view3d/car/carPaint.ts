@@ -1,5 +1,6 @@
-import { RepeatWrapping, ShaderChunk, Vector2, Vector3, Vector4, type IUniform, type Material, type MeshPhysicalMaterial, type Texture } from 'three';
+import { NoColorSpace, RepeatWrapping, ShaderChunk, SRGBColorSpace, Vector2, Vector3, Vector4, type IUniform, type Material, type MeshPhysicalMaterial, type Texture } from 'three';
 import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
+import type { CarMapRef } from '../../../../../shared/packageContract/bodyDescriptor.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { SUN_UNIT } from '../atmosphere/sunSamples.js';
 import type { ReflectionCubes } from '../reflectionCube.js';
@@ -182,12 +183,17 @@ const FRAGMENT = {
   absorption: 'outgoingLight = outgoingLight * mix(vec3(1.0), pow(paintLacquer, vec3(paint_lacquerThickness / clamp(dot(geometryViewDir, normal) + 0.001, 0.001, 1.0))), material.clearcoat) * ( 1.0 - material.clearcoat * Fcc )',
 };
 
-/** A paint map's own texture, sampled on the albedo's UVs with repeat. */
-function paintMap(texture: (path: string) => Texture, path: string | undefined, fallback: Texture): Texture {
-  if (!path) return fallback;
-  const map = texture(path);
-  map.wrapS = RepeatWrapping; map.wrapT = RepeatWrapping; map.anisotropy = MAX_ANISOTROPY; map.needsUpdate = true;
-  return map;
+/**
+ * A paint map's own texture, sampled on the albedo's UVs with repeat and decoded by the map's colour role (the region map is a
+ * colour stage: read through sRGB, then square-rooted in the shader).
+ */
+function paintMap(texture: (path: string) => Texture, map: CarMapRef | undefined, fallback: Texture): Texture {
+  if (!map?.texture) return fallback;
+  const copy = texture(map.texture);
+  copy.wrapS = RepeatWrapping; copy.wrapT = RepeatWrapping; copy.anisotropy = MAX_ANISOTROPY;
+  copy.colorSpace = map.srgb ? SRGBColorSpace : NoColorSpace;
+  copy.needsUpdate = true;
+  return copy;
 }
 
 /**
@@ -215,8 +221,8 @@ export function configureCarPaint(material: MeshPhysicalMaterial, paint: CarSurf
   const region = paint.maps.region?.texture, aoSpec = paint.maps.aoSpec?.texture;
   const uniforms: Record<string, IUniform> = {
     // No region map: a black texel everywhere selects the black region. The albedo stands in and its colour is ignored below.
-    paint_region: {value: paintMap(texture, region, albedo)}, paint_aoSpec: {value: paintMap(texture, aoSpec, albedo)},
-    paint_carbon: {value: paintMap(texture, paint.maps.carbon?.texture, albedo)},
+    paint_region: {value: paintMap(texture, paint.maps.region, albedo)}, paint_aoSpec: {value: paintMap(texture, paint.maps.aoSpec, albedo)},
+    paint_carbon: {value: paintMap(texture, paint.maps.carbon, albedo)},
     paint_coat: {value: coat}, paint_base: {value: base}, paint_lacquer: {value: lacquer},
     paint_carbonColour: {value: colour(parameters.carbonFibreAlbedoColour)},
     paint_flakeColour: {value: colour(parameters.metallicFlakeColour)},

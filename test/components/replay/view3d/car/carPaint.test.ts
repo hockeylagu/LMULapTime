@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { CubeTexture, MeshPhysicalMaterial, ShaderLib, Texture, WebGLCubeRenderTarget, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
+import { CubeTexture, MeshPhysicalMaterial, NoColorSpace, ShaderLib, SRGBColorSpace, Texture, WebGLCubeRenderTarget, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
 import { configureCarPaint, setPaintReflection } from '../../../../../src/components/replay/view3d/car/carPaint.js';
 import { materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarSurface } from '../../../../../shared/types/scenes/car.js';
@@ -10,7 +10,7 @@ const region = (over: Record<string, unknown> = {}) => ({
   clearCoatRefractiveIndex: 1.44, lacquerColour: [1, 1, 1, 1], metallicPaintStrength: 0.8, metallicFlakeStrength: 0, carbonFibreStrength: 0.6,
   orangePeelStrength: 1, ...over,
 });
-const map = (texture: string) => ({texture, uv: 'uv0' as const, scale: [1, 1] as [number, number]});
+const map = (texture: string, srgb?: boolean) => ({texture, uv: 'uv0' as const, scale: [1, 1] as [number, number], srgb});
 const paint = (maps: CarSurface['maps']): CarSurface => ({
   version: 4, kind: 'carPaint', normalShadowInfluence: 0.5, maps,
   parameters: {regions: {black: region(), red: region(), green: region({clearCoatSpecStrength: 0}), blue: region(), white: region()},
@@ -26,9 +26,11 @@ function compile(material: MeshPhysicalMaterial): WebGLProgramParametersWithUnif
 
 it("builds regional layered car paint on three's physical model", () => {
   const material = new MeshPhysicalMaterial({map: new Texture()}), textures: string[] = [];
-  configureCarPaint(material, paint({albedo: map('a'), region: map('r'), aoSpec: map('s'), carbon: map('c')}), path => { textures.push(path); return new Texture(); }, testShading());
+  configureCarPaint(material, paint({albedo: map('a', true), region: map('r', true), aoSpec: map('s', true), carbon: map('c', false)}), path => { textures.push(path); return new Texture(); }, testShading());
   expect(textures).toEqual(['r', 's', 'c']);
   const shader = compile(material), uniforms = shader.uniforms;
+  // Each map decoded by its colour role: the region and AO/spec masks are colour stages, read through sRGB.
+  expect([uniforms.paint_region, uniforms.paint_aoSpec, uniforms.paint_carbon].map(uniform => (uniform.value as Texture).colorSpace)).toEqual([SRGBColorSpace, SRGBColorSpace, NoColorSpace]);
   // Every hook applied: the coat output now carries the lacquer absorption, and both paint maps are sampled.
   expect(shader.fragmentShader).not.toContain('outgoingLight = outgoingLight * ( 1.0 - material.clearcoat * Fcc )');
   for (const marker of ['texture2D(paint_region, vMapUv)', 'texture2D(paint_aoSpec, vMapUv)', 'roughnessFactor = clamp(paintBaseRoughness', 'reflectedLight.indirectDiffuse *= paintAO']) {
