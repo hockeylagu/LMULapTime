@@ -1,7 +1,6 @@
 import { Box3, BufferGeometry, Mesh, Object3D, Vector3, type BatchedMesh, type Material } from 'three';
 import type { SceneryMaterialTotals } from '../../../../../shared/packageContract/index.js';
 import { BATCH_VERTEX_TEXTURES } from './materials/shaderParts.js';
-import { REALROAD_POINT_ATTRIBUTE, REALROAD_STATE_ATTRIBUTE } from './realRoad.js';
 import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, layoutOf, releaseBatchOnUpload } from '../batching/batchedParts.js';
 
 export interface SceneryBatches {
@@ -29,9 +28,6 @@ interface Ranged { instance: number; box: Box3; inSq: number; outSq: number; inR
 interface Placed { batch: BatchedMesh; instances: Ranged[]; geometries: number[] }
 interface Batch { mesh: BatchedMesh; layout: string }
 interface Used { primitives: number; draws: number }
-
-/** Attributes a full batch keeps on the CPU side: the road surface state is written again as the replay's changes (`realRoad.ts`). */
-const KEPT_ON_CPU: ReadonlySet<string> = new Set([REALROAD_POINT_ATTRIBUTE, REALROAD_STATE_ATTRIBUTE]);
 
 /** Stands in for a batched mesh's own geometry: its data lives in the batch. */
 const MOVED = new BufferGeometry();
@@ -164,7 +160,7 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
       // A batch's bounds (its frustum culling) cover the instances it had when first computed: they grow with each chunk.
       for (const batch of byBatch.keys()) computeBatchBounds(batch);
       // The last primitive of a material fills its batches: they keep no CPU copy past their next upload, but for the surface state.
-      for (const key of keys) if (used.get(key)!.primitives === totals.get(key)!.primitives) for (const {mesh} of byKey.get(key)!) releaseBatchOnUpload(mesh, KEPT_ON_CPU);
+      for (const key of keys) if (used.get(key)!.primitives === totals.get(key)!.primitives) for (const {mesh} of byKey.get(key)!) releaseBatchOnUpload(mesh);
       chunks.set(root, {placed: [...byBatch.values()], shown: false});
       return fresh;
     },

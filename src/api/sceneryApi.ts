@@ -35,14 +35,6 @@ export async function fetchSceneryLayout(layoutKey: string, signal: AbortSignal)
   };
 }
 
-/** The session's track surface state at `timeSec` (`elements` x 4 bytes, docs/VCR_FORMAT.md §4.21); rejects when its replay is gone. */
-export async function fetchSurfaceState(sessionId: string, elements: number, timeSec: number, signal: AbortSignal): Promise<Uint8Array> {
-  const query = new URLSearchParams({ elements: String(elements), time: timeSec.toFixed(1) });
-  const bytes = await fetchBinary(`/api/session/${encodeURIComponent(sessionId)}/surface?${query}`, { signal });
-  if (bytes.byteLength !== elements * 4) throw Error(`Track surface state: ${bytes.byteLength} bytes for ${elements} elements`);
-  return new Uint8Array(bytes);
-}
-
 /** One chunk's GLB bytes. Files never change under their hash, so the browser may cache them. */
 export async function fetchSceneryChunk(chunk: SceneryChunk, signal: AbortSignal): Promise<ArrayBuffer> {
   const bytes = await fetchBinary(`${SCENERY_FILES}${chunk.sha256}.glb`, { signal, cache: 'default' });

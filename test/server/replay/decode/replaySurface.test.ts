@@ -3,7 +3,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { applySurfaceEvent, OP_SURFACE_INITIAL, OP_SURFACE_RESET, OP_SURFACE_UPDATE, readReplaySurfaceEvents } from '../../../../server/replay/decode/replaySurface.js';
-import { buildReplaySurfaceIndex, replaySurfaceAt, SNAPSHOT_STEP_S } from '../../../../server/replay/surface/replaySurfaceIndex.js';
 import { bitWriter, repeatBlock, resetPayload, writeRun, writeSurfaceReplay } from './surfaceFixture.js';
 
 const channel = (state: Uint8Array, element: number, c: number) => state[element * 4 + c];
@@ -69,7 +68,7 @@ describe('surface events', () => {
   });
 });
 
-describe('replay surface index', () => {
+describe('replay surface events in a file', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'surface-')), file = path.join(dir, 'surface.Vcr');
   afterEach(() => fs.rmSync(file, {force: true}));
 
@@ -80,21 +79,5 @@ describe('replay surface index', () => {
     const events = [...readReplaySurfaceEvents(file)];
     expect(events.map(event => [event.op, event.time])).toEqual([[OP_SURFACE_RESET, 1], [OP_SURFACE_UPDATE, 2.5]]);
     expect([...readReplaySurfaceEvents(file, events[1].offset)].map(event => event.time)).toEqual([2.5]);
-  });
-
-  it('gives the state at any time as a straight read would, with no event after it', () => {
-    const elements = 500, times = [0.5, 20, 70, 130, 400, 1000];
-    writeSurfaceReplay(file, [
-      {time: 0.2, op: OP_SURFACE_RESET, payload: resetPayload(0, 255, 0, 120)},
-      ...times.map((time, i) => ({time, op: OP_SURFACE_UPDATE, payload: update(i % 3, 37 * i, 20 * (i + 1))})),
-    ]);
-    const index = buildReplaySurfaceIndex(file, elements);
-    expect(index.snapshots.length).toBeGreaterThan(2);
-    expect(index.snapshots[1].time - index.snapshots[0].time).toBeGreaterThanOrEqual(SNAPSHOT_STEP_S);
-    for (const at of [0, 0.3, 69.9, 70, 131, 999, 2000]) {
-      const want = new Uint8Array(elements * 4);
-      for (const event of readReplaySurfaceEvents(file)) if (event.time <= at) applySurfaceEvent(want, elements, event.op, event.payload);
-      expect(replaySurfaceAt(file, index, at)).toEqual(want);
-    }
   });
 });

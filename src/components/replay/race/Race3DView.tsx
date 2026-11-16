@@ -14,7 +14,6 @@ import type { RacePoseCache } from './racePoseCache.js';
 import type { RaceStandingsIndex } from './raceStandings.js';
 
 interface Props {
-  sessionId: string;
   overview: RaceReplayOverview;
   /** The standings the hovered car's tooltip reads. */
   index: RaceStandingsIndex;
@@ -29,10 +28,10 @@ interface Props {
 }
 
 /** The race replay in 3D: the cameras ride on the followed car (its full model), the other cars draw by distance (grey stand-ins while they load). */
-export default function Race3DView({ sessionId, overview, index, clock, poses, followSlot, progress, onToggleView, className = '', active = true }: Props) {
+export default function Race3DView({ overview, index, clock, poses, followSlot, progress, onToggleView, className = '', active = true }: Props) {
   const map = useRef<HTMLDivElement>(null), host = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<CameraMode>('chase'), [retry, setRetry] = useState(0);
-  const { scene, state } = useRaceScene({ host, sessionId, overview, clock, poses, followSlot, progress, mode, retry });
+  const { scene, state } = useRaceScene({ host, overview, clock, poses, followSlot, progress, mode, retry });
   const cars = useMemo(() => new Map<number, RaceReplayCar>(overview.cars.map(car => [car.slot, car])), [overview.cars]);
   const totalLaps = useMemo(() => raceLapCount(overview), [overview]);
   // The race map's keys move the camera: a pan hands a camera locked on the car over to free orbit, as in the lap view.

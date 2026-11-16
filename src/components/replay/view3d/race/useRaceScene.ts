@@ -16,8 +16,6 @@ import { createRaceScene, type RaceSceneHandle } from './raceScene.js';
 
 interface Options {
   host: RefObject<HTMLDivElement | null>;
-  /** The race's session: its replay gives the track surface. */
-  sessionId: string;
   overview: RaceReplayOverview;
   clock: RaceClock;
   poses: RacePoseCache;
@@ -66,7 +64,7 @@ function drawScene(handle: RaceSceneHandle, clock: RaceClock, poses: RacePoseCac
 }
 
 /** The race replay's 3D scene for a layout: every car on the session clock, the followed one as its full model. */
-export function useRaceScene({host, sessionId, overview, clock, poses, followSlot, progress, mode, retry}: Options) {
+export function useRaceScene({host, overview, clock, poses, followSlot, progress, mode, retry}: Options) {
   const key = `${overview.replayName}:${overview.layoutKey ?? ''}:${retry}`;
   const shells = useSceneShells();
   const window = poses.windowAt(clock.getState().timeSec);
@@ -100,7 +98,6 @@ export function useRaceScene({host, sessionId, overview, clock, poses, followSlo
     if (body && body.resource.packageRevision !== layout.packageRevision) throw Error('Body package revision differs from the 3D scene');
     const daylight = raceDaylightClock(overview, clock.getState().timeSec);
     const shell = shells.acquire(layout, {daylightClock: daylight, firstView: {kind: 'free', x: place.x, z: place.z}});
-    shell.setSurface(sessionId, clock.getState().timeSec);
     try {
       return await createRaceScene(shell, container, layout, overview.cars, {slot: followSlot, body, daylight}, slot => bodyOf(slot),
         (slot, timeSec) => poses.nextPose(slot, timeSec), fail, showProgress);
@@ -119,7 +116,7 @@ export function useRaceScene({host, sessionId, overview, clock, poses, followSlo
     if (!handle) return;
     daylight.current.at = performance.now();
     const {timeSec} = clock.getState();
-    handle.daylight(raceDaylightClock(overview, timeSec)); handle.surface(sessionId, timeSec);
+    handle.daylight(raceDaylightClock(overview, timeSec));
   });
   const followDaylight = useEffectEvent(() => {
     const state = daylight.current, wait = state.at + DAYLIGHT_MS - performance.now();

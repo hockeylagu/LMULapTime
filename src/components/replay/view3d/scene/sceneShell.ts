@@ -2,9 +2,7 @@ import { Box3, Group, MathUtils, Matrix4, Quaternion, Scene, Vector3, WebGLRende
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
-import { fetchSurfaceState } from '../../../../api/sceneryApi.js';
 import { createRealRoadSurface } from '../scenery/realRoad.js';
-import { createSceneSurface } from './sceneSurface.js';
 import type { RenderPose } from './replayPose.js';
 import type { CarTextures } from '../cars/carModels.js';
 import { createCarTemplates, type CarTemplates } from '../cars/carTemplates.js';
@@ -133,12 +131,6 @@ export interface SceneShell {
    * the sky, haze, sun light and exposure follow it, the shadows and the venue capture stay.
    */
   setDaylight(clock: ReplayDaylightClock | undefined): void;
-  /**
-   * Draws the road and kerbs with the track surface state (rubber, loose material) of `sessionId`'s replay at session time `timeSec`,
-   * fetched again as the time moves (`sceneSurface.ts`); the assumed state until it arrives or where the replay is gone. The first view
-   * waits for the state asked before it starts.
-   */
-  setSurface(sessionId: string, timeSec: number): void;
   beforeFrame(hook: ((frameTime: number) => void) | null): void;
   invalidate(): void;
   dispose(): void;
@@ -175,7 +167,6 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // Wheel and line contact heights read the package's road height grid; off it, and for the camera checks, one ray tree per resident chunk.
   const ground = createSceneryGround(layout.roadHeightAt);
   const realRoad = createRealRoadSurface(layout.realRoadTable, layout.realRoad.elements);
-  const surface = createSceneSurface(realRoad, fetchSurfaceState, () => invalidate());
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
   const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
   /** A chunk's box in the scene: native coordinates less the origin, z mirrored as the world group draws them. */
@@ -241,7 +232,6 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
         });
         realRoad.prepare(root);
         const created = batches.add(root);
-        realRoad.follow([root, ...created]);
         await lit; // A chunk's programs depend on the scene's environment.
         await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), built.grounded]); signal.throwIfAborted(); return root;
       } catch (error) {
@@ -258,7 +248,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
   const cleanup = () => {
     disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); interiorTextures.dispose(); exposure.dispose();
-    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); surface.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   // Interior textures stay on their reduced levels until a driver camera is used: only there is their full size seen.
   let driverCameraUsed = false;
@@ -423,7 +413,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       show(first); environment.setCamera(rig.camera);
       // The first view's chunks are warm: this compiles and uploads the content, behind the loading screen. The exposure passes
       // and the reflection convolution link meanwhile: each would otherwise link at its first draw.
-      await Promise.all([warmup.warm(scene, new AbortController().signal), exposure.link(), convolution.ready, surface.settled()]);
+      await Promise.all([warmup.warm(scene, new AbortController().signal), exposure.link(), convolution.ready]);
       report({shaders: 1}); loading = false;
       // The scenery around the first view is resident and compiled: capture the venue's light for the scene's environment.
       environment.captureVenue();
@@ -470,7 +460,6 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       // Before the environment exists, it is made from this sun.
       if (environment) { environment.setSun(sun); invalidate(); }
     },
-    setSurface: (sessionId, timeSec) => surface.follow(sessionId, timeSec),
     beforeFrame(hook) { frameHook = hook; },
     invalidate: () => invalidate(),
     dispose() {

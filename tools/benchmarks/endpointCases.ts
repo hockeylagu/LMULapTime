@@ -115,7 +115,5 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   // The first window: the server resamples its laps on a worker the first time, then serves it from memory.
   add('race-poses', '/api/session/:sessionId/race/poses', base ? `${base}/race/poses?window=0` : undefined);
   add('race-progress', '/api/session/:sessionId/race/progress', base ? `${base}/race/progress` : undefined);
-  // Its element count is the layout's, from the package: the cohort does not name a layout.
-  add('track-surface', '/api/session/:sessionId/surface', undefined, 'Needs the surface element count of the layout, from the package.');
   return cases;
 }

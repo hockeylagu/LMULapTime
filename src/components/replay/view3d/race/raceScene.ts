@@ -39,8 +39,6 @@ export interface RaceSceneHandle {
   pick(x: number, y: number): number | null;
   /** Lights the scene by the in-game clock (`SceneShell.setDaylight`: a small move of the sun changes nothing). */
   daylight(clock: ReplayDaylightClock | undefined): void;
-  /** Draws the track surface of the session at `timeSec` (`SceneShell.setSurface`). */
-  surface(sessionId: string, timeSec: number): void;
   dispose(): void;
 }
 
@@ -279,7 +277,6 @@ export async function createRaceScene(
       return under.find(car => seen(car, PICK_BODY_M) || seen(car, PICK_ROOF_M))?.slot ?? null;
     },
     daylight: clock => shell.setDaylight(clock),
-    surface: (sessionId, timeSec) => shell.setSurface(sessionId, timeSec),
     dispose() {
       disposed = true;
       shell.detach(host); content().dispose();

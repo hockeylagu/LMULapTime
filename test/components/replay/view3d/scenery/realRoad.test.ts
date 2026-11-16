@@ -5,7 +5,7 @@ import { patchSurfaceShader } from '../../../../../src/components/replay/view3d/
 import { shaderParts, surfaceTextureUnits } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
 import type { SurfaceConfig, SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 import {
-  ASSUMED_RUBBER, assumedSurfaceState, createRealRoadSurface, fillVertexStates, gatherPointStates, medianRubber, REALROAD_POINT_ATTRIBUTE,
+  ASSUMED_RUBBER, createRealRoadSurface, fillVertexStates, gatherPointStates, REALROAD_POINT_ATTRIBUTE,
   REALROAD_STATE_ATTRIBUTE, realRoadUniforms,
 } from '../../../../../src/components/replay/view3d/scenery/realRoad.js';
 import { surface } from './surfaceFixture.js';
@@ -34,11 +34,7 @@ describe('surface state attribute', () => {
     fillVertexStates(Float32Array.from([1, -1, 0, 2]), Uint8Array.from([1, 2, 3, 4]), out);
     expect([...out]).toEqual([3, 4, 0, 0, 1, 2, 0, 0]);
   });
-  it('takes the median rubber of the elements', () => {
-    expect(medianRubber(Uint8Array.from([0, 9, 9, 9, 51, 0, 0, 0, 255, 0, 0, 0]))).toBe(51 / 255);
-    expect(medianRubber(assumedSurfaceState(5))).toBe(ASSUMED_RUBBER / 255);
-  });
-  it('gives new vertices the state drawn now, writes the followed ones again on each state and forgets them once disposed', () => {
+  it('gives each mesh naming points the assumed state, its points without an element none, and the track average the assumed rubber', () => {
     const surfaceState = createRealRoadSurface(Uint32Array.from([0, REALROAD_NONE, 1]), 2);
     const geometry = new BufferGeometry();
     geometry.setAttribute(REALROAD_POINT_ATTRIBUTE, new BufferAttribute(Float32Array.from([2, 0, 1]), 1));
@@ -47,18 +43,7 @@ describe('surface state attribute', () => {
     const written = geometry.getAttribute(REALROAD_STATE_ATTRIBUTE) as BufferAttribute;
     expect([written.itemSize, written.normalized, [...written.array]]).toEqual([2, true, [ASSUMED_RUBBER, 0, ASSUMED_RUBBER, 0, 0, 0]]);
     expect(plain.getAttribute(REALROAD_STATE_ATTRIBUTE)).toBeUndefined();
-    surfaceState.follow([root]);
-    const version = written.version;
-    surfaceState.setState(Uint8Array.from([200, 30, 0, 0, 100, 0, 0, 0]));
-    expect([...written.array]).toEqual([100, 0, 200, 30, 0, 0]);
-    expect(written.version).toBeGreaterThan(version);
-    expect(realRoadUniforms.surface_realRoadMedian.value).toBe(100 / 255);
-    expect(() => surfaceState.setState(new Uint8Array(4))).toThrow(/2 elements/);
-    geometry.dispose();
-    surfaceState.setState(null);
-    expect([...written.array]).toEqual([100, 0, 200, 30, 0, 0]);
-    surfaceState.dispose();
-    expect(realRoadUniforms.surface_realRoadMedian.value).toBe(0);
+    expect(realRoadUniforms.surface_realRoadMedian.value).toBe(ASSUMED_RUBBER / 255);
   });
   it('refuses a table naming an element past the count', () => {
     expect(() => createRealRoadSurface(Uint32Array.from([0, 3]), 3)).toThrow(/element 3 of 3/);
