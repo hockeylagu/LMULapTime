@@ -130,13 +130,14 @@ describe('autoExposure', () => {
     vi.stubGlobal('requestAnimationFrame', (callback: () => void) => frames.push(callback));
     const half = 0x3c00; // 1.0 as a half float: every metered cell reads 1.
     const calls: string[] = [], signals = ['pending', 'signalled'];
+    let fenceFails = false;
     const gl = {
       PIXEL_PACK_BUFFER: 1, STREAM_READ: 2, RGBA: 3, HALF_FLOAT: 4, IMPLEMENTATION_COLOR_READ_FORMAT: 5, IMPLEMENTATION_COLOR_READ_TYPE: 6,
       SYNC_GPU_COMMANDS_COMPLETE: 7, WAIT_FAILED: 8, TIMEOUT_EXPIRED: 9, ALREADY_SIGNALED: 10,
       getParameter: (name: number) => name === 5 ? 3 : 4,
       createBuffer: () => { calls.push('createBuffer'); return {}; }, deleteBuffer: () => calls.push('deleteBuffer'),
       bindBuffer: () => {}, bufferData: () => calls.push('bufferData'), readPixels: () => calls.push('readPixels'),
-      fenceSync: () => ({}), flush: () => {}, deleteSync: () => calls.push('deleteSync'),
+      fenceSync: () => (fenceFails ? null : {}), flush: () => {}, deleteSync: () => calls.push('deleteSync'),
       clientWaitSync: () => { calls.push('wait'); return signals.shift() === 'pending' ? 9 : 10; },
       getBufferSubData: (_target: number, _offset: number, into: Uint16Array) => { calls.push('getBufferSubData'); into.fill(half); },
     };
@@ -169,6 +170,9 @@ describe('autoExposure', () => {
       const fetched = calls.length;
       flush(); exposure.collect();
       expect(calls).toHaveLength(fetched);
+      // A fence that cannot be made (a lost context) lets its reading's buffer go.
+      fenceFails = true; now += 300; exposure.render({} as never, {} as never); fenceFails = false;
+      expect(calls.slice(-2)).toEqual(['readPixels', 'deleteBuffer']);
       // A reading pending at dispose lets its buffer and fence go.
       now += 300; exposure.render({} as never, {} as never);
       exposure.dispose();

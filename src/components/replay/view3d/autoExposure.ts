@@ -302,7 +302,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     gl.readPixels(0, 0, METER_W, METER_H, gl.RGBA, gl.HALF_FLOAT, 0);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     const fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-    if (!fence) throw Error('The metering fence could not be created');
+    if (!fence) { gl.deleteBuffer(pack); throw Error('The metering fence could not be created'); }
     gl.flush();
     reading = true;
     const fetch = () => {
