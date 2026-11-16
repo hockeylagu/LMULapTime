@@ -89,6 +89,8 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     // Half the frame while warm-ups wait: a car or chunk still missing shows more than a blurry texture.
     let uploaded = 0;
     const budget = warmsWait ? UPLOAD_BYTES_PER_FRAME / 2 : UPLOAD_BYTES_PER_FRAME;
+    // Still paying off an upload: no order to build (a distance per blurry texture) for a frame that sends nothing.
+    if (frameBytes >= budget) { sharpening = true; void nextFrame(); return; }
     camera.getWorldPosition(eye);
     const order = [...blurry].map(texture => ({texture, distance: distance(texture), pixels: fullPixels(texture)}))
       .sort((a, b) => a.distance - b.distance || b.pixels - a.pixels);
