@@ -20,6 +20,8 @@ function isSceneryGround(name: string): boolean {
 
 /** What a triangle is used for: wheel and racing-line contact, camera ground and obstruction checks, or both. */
 const WHEEL = 1, CAMERA = 2;
+/** How far short of its end a sight line stops, metres: the surface a point lies on does not hide it. */
+const SIGHT_SHORT_M = 0.05;
 const roleOf = (name: string) => (isOpaqueSurface(name) ? WHEEL : 0) | (isFillerGround(name) || (isOpaqueSurface(name) && isSceneryGround(name)) ? CAMERA : 0);
 const GROUND_CLEARANCE_M = 1.2, OBSTRUCTION_CLEARANCE_M = 0.6, SURFACE_ABOVE_M = 0.15;
 /** BVH workers: one job each at a time, so several chunks build at once (the parallel builder needs cross-origin isolation). */
@@ -67,6 +69,8 @@ export interface SceneryGround {
   remove(id: string, root?: Object3D): void;
   /** Moves a camera eye (display frame) above the ground and in front of anything between it and `look`. */
   resolve(eye: Vector3, look: Vector3, origin: Vector3, result: Vector3): Vector3;
+  /** Whether a resident opaque surface stands between two native points (up to a few centimetres short of `to`). */
+  blocks(from: NativePosition, to: NativePosition): boolean;
   dispose(): void;
 }
 
@@ -83,6 +87,7 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
   type Chunk = {root: Object3D; geometry: BufferGeometry; roles: Uint8Array; tree: MeshBVH | null; cancel: () => void};
   const chunks = new Map<string, Chunk>();
   const cameraRay = new Ray(), heightRay = new Ray(), nativeEye = new Vector3(), nativeLook = new Vector3(), direction = new Vector3();
+  const sightRay = new Ray();
   let disposed = false;
   /** Distance to the nearest triangle with `role` along `ray`, or null. */
   const nearestHit = (ray: Ray, role: number, near: number, far: number) => {
@@ -162,6 +167,14 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
         }
       }
       return result.set(nativeEye.x - origin.x, nativeEye.y - origin.y, origin.z - nativeEye.z);
+    },
+    blocks(from, to) {
+      sightRay.origin.set(from.x, from.y, from.z);
+      sightRay.direction.set(to.x - from.x, to.y - from.y, to.z - from.z);
+      const length = sightRay.direction.length();
+      if (length <= SIGHT_SHORT_M) return false;
+      sightRay.direction.divideScalar(length);
+      return nearestHit(sightRay, WHEEL | CAMERA, 0, length - SIGHT_SHORT_M) !== null;
     },
     dispose() { disposed = true; for (const id of chunks.keys()) remove(id); for (const worker of workers) worker.dispose(); },
   };

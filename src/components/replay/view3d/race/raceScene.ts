@@ -17,6 +17,7 @@ import { createCarSets } from '../cars/drawnCar.js';
 import { windowPoints } from './raceTrack.js';
 import { createRaceField } from './raceField.js';
 import { createStandInCars } from './standInCars.js';
+import { carsUnder, PICK_BODY_M, PICK_ROOF_M, type DrawnPlace } from './carPick.js';
 
 export interface RaceSceneHandle {
   /**
@@ -31,6 +32,11 @@ export interface RaceSceneHandle {
   center(): void;
   zoom(direction: number): void;
   pan(horizontal: number, vertical: number): void;
+  /**
+   * The car drawn under a point of the canvas (CSS pixels from its top left corner), the nearest to the camera of those under it;
+   * null for none (`carPick.ts`). A car the scenery hides from the camera (a wall, a building) is not under it.
+   */
+  pick(x: number, y: number): number | null;
   /** Lights the scene by the in-game clock (`SceneShell.setDaylight`: a small move of the sun changes nothing). */
   daylight(clock: ReplayDaylightClock | undefined): void;
   /** Draws the track surface of the session at `timeSec` (`SceneShell.setSurface`). */
@@ -145,6 +151,8 @@ export async function createRaceScene(
   let disposed = false, request = 0, timeSec = 0, window: RacePoseWindow | null = null;
   const pose = new Float32Array(RACE_POSE_CHANNEL_COUNT), matrix = new Matrix4(), position = new Vector3(), scale = new Vector3(1, 1, 1);
   const orientation = new Quaternion(), euler = new Euler(), target = new Vector3();
+  /** Where each car on the track was last drawn: what `pick` looks through. */
+  let drawnPlaces: readonly DrawnPlace[] = [];
   /** The followed car's next pose while it has none (asked once per slot and window). */
   let waiting: {slot: number; fromSec: number; next: NextPose | null} | null = null;
   const waitingPose = (slot: number, current: RacePoseWindow): NextPose | null => {
@@ -190,7 +198,7 @@ export async function createRaceScene(
   };
   const draw = () => {
     if (!window || disposed) return;
-    const current = window, places: Array<{slot: number; x: number; z: number}> = [];
+    const current = window, places: DrawnPlace[] = [];
     let followedAt: {x: number; z: number} | null = null;
     standIns.begin();
     for (const [ownIndex, slot] of current.slots.entries()) {
@@ -205,7 +213,7 @@ export async function createRaceScene(
       // The window sample the pose lies after: the wheels and lamps read the car's samples there.
       const sample = (at - samples.fromSec) * samples.hz, index = Math.max(0, Math.min(Math.floor(sample), samples.count - 2));
       const fraction = Math.max(0, Math.min(1, sample - index));
-      if (shown) places.push({slot, x: pose[0], z: pose[2]});
+      if (shown) places.push({slot, x: pose[0], y: pose[1], z: pose[2], rotX: pose[3], rotY: pose[4], rotZ: pose[5]});
       field.pose(slot, shown && !isFollowed ? renderPose(pose, index, fraction, orientation, euler) : null, samples, carIndex);
       if (model) {
         model.visible = shown;
@@ -228,6 +236,7 @@ export async function createRaceScene(
       standIns.place(classOf.get(slot) ?? '', matrix.compose(position.set(pose[0] - origin.x, pose[1] - origin.y, pose[2] - origin.z), orientation, scale));
     }
     standIns.end();
+    drawnPlaces = places;
     if (!followedAt) placeAside(current);
     const from = followedAt ?? places[0];
     field.load(from ? places.filter(car => car.slot !== followed?.slot).map(car => ({slot: car.slot, metres: Math.hypot(car.x - from.x, car.z - from.z)})) : []);
@@ -262,6 +271,13 @@ export async function createRaceScene(
     center: () => rig.center(),
     zoom: direction => rig.zoom(direction),
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
+    pick(x, y) {
+      const canvas = shell.renderer.domElement;
+      const under = carsUnder(drawnPlaces, rig.camera, origin, canvas.clientWidth, canvas.clientHeight, x, y);
+      // Seen if its body or its roof is: a low wall can hide the one and not the other.
+      const seen = (car: DrawnPlace, height: number) => shell.sees({x: car.x, y: car.y + height, z: car.z});
+      return under.find(car => seen(car, PICK_BODY_M) || seen(car, PICK_ROOF_M))?.slot ?? null;
+    },
     daylight: clock => shell.setDaylight(clock),
     surface: (sessionId, timeSec) => shell.setSurface(sessionId, timeSec),
     dispose() {

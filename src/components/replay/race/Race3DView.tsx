@@ -3,6 +3,7 @@ import type { RaceReplayCar, RaceReplayOverview, RaceReplayProgress } from '../.
 import { carLockedCamera, followsCar, type CameraMode } from '../view3d/camera/cameraModes.js';
 import { NARROW_SCENE_BESIDE_CONTROLS, Scene3DFrame } from '../view3d/scene/Scene3DFrame.js';
 import { useRaceScene } from '../view3d/race/useRaceScene.js';
+import { RaceCarHover } from '../view3d/race/RaceCarHover.js';
 import { RaceLapTiming } from './RaceLapTiming.js';
 import { RaceMinimap } from './RaceMinimap.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
@@ -10,10 +11,13 @@ import { useRaceMapKeys } from './useRaceReplayControls.js';
 import { raceLapCount } from './raceLaps.js';
 import type { RaceClock } from './raceClock.js';
 import type { RacePoseCache } from './racePoseCache.js';
+import type { RaceStandingsIndex } from './raceStandings.js';
 
 interface Props {
   sessionId: string;
   overview: RaceReplayOverview;
+  /** The standings the hovered car's tooltip reads. */
+  index: RaceStandingsIndex;
   clock: RaceClock;
   poses: RacePoseCache;
   followSlot: number | null;
@@ -25,7 +29,7 @@ interface Props {
 }
 
 /** The race replay in 3D: the cameras ride on the followed car (its full model), the other cars draw by distance (grey stand-ins while they load). */
-export default function Race3DView({ sessionId, overview, clock, poses, followSlot, progress, onToggleView, className = '', active = true }: Props) {
+export default function Race3DView({ sessionId, overview, index, clock, poses, followSlot, progress, onToggleView, className = '', active = true }: Props) {
   const map = useRef<HTMLDivElement>(null), host = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<CameraMode>('chase'), [retry, setRetry] = useState(0);
   const { scene, state } = useRaceScene({ host, sessionId, overview, clock, poses, followSlot, progress, mode, retry });
@@ -47,6 +51,7 @@ export default function Race3DView({ sessionId, overview, clock, poses, followSl
       <RaceMinimap overview={overview} clock={clock} poses={poses} followSlot={followSlot} />
       <RaceLapTiming clock={clock} car={followSlot === null ? undefined : cars.get(followSlot)} laps={overview.laps}
         totalLaps={totalLaps} className={`absolute right-3 top-16 z-10 ${NARROW_SCENE_BESIDE_CONTROLS}`} />
+      <RaceCarHover host={host} scene={scene} clock={clock} index={index} active={active} />
     </Scene3DFrame>
   );
 }

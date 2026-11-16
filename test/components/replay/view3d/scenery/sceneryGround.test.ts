@@ -124,3 +124,16 @@ it('answers road height from the grid on its corridor and casts rays off it or f
     expect(ground.surfaceHeight({x: 10, y: 0.5, z: 0})).toBeCloseTo(0);
   } finally { ground.dispose(); }
 });
+
+it('tells whether an opaque surface stands between two points, a see-through one never', async () => {
+  const root = new Group();
+  root.add(triangle('wall__OPAQUE', [5, 0, -10, 5, 0, 10, 5, 10, 0], [0, 1, 2]), triangle('fence__BLEND', [2, 0, -10, 2, 0, 10, 2, 10, 0], [0, 1, 2]));
+  const ground = createSceneryGround(noGrid);
+  try {
+    await ground.add('chunk', root);
+    expect(ground.blocks({x: 0, y: 1, z: 0}, {x: 10, y: 1, z: 0})).toBe(true);
+    expect(ground.blocks({x: 0, y: 1, z: 0}, {x: 4, y: 1, z: 0})).toBe(false); // Through the fence only.
+    expect(ground.blocks({x: 0, y: 1, z: 0}, {x: 5, y: 1, z: 0})).toBe(false); // A point on the wall is seen.
+    expect(ground.blocks({x: 0, y: 12, z: 0}, {x: 10, y: 12, z: 0})).toBe(false); // Over it.
+  } finally { ground.dispose(); }
+});

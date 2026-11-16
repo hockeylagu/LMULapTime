@@ -116,6 +116,8 @@ export interface SceneShell {
   show(content: SceneContent): void;
   /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker; wheels and lights follow it. */
   placeCar(car: Object3D, pose: RenderPose, motion: CarMotion | null): void;
+  /** Whether the camera, where it last drew from, sees a native point past the resident scenery's opaque surfaces. */
+  sees(point: {x: number; y: number; z: number}): boolean;
   /** Switches the camera mode with its environment, shadows and exposure; false when it is the current one. */
   setMode(next: CameraMode): boolean;
   /**
@@ -431,6 +433,10 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       started = true; mount();
     },
     show,
+    sees(point) {
+      const {x, y, z} = rig.camera.position;
+      return !ground.blocks({x: x + origin.x, y: y + origin.y, z: origin.z - z}, point);
+    },
     placeCar(car, pose, motion) {
       car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
       if (pose.orientation) car.quaternion.copy(pose.orientation); else car.quaternion.identity();
