@@ -51,9 +51,9 @@ describe('surface state attribute', () => {
 });
 
 describe('road and kerb surface state terms', () => {
-  it('lays the groove by a quarter of the vertex rubber over the road details, weighted by the mask below and above half', () => {
+  it('lays the groove by the vertex rubber over the road details, weighted by the mask below and above half', () => {
     const glsl = literal(road({ groove: 'perVertex', grooveMap: 'on', roadDetailsMap: 'on' }, { groove: map('G'), roadDetails: map('R') }));
-    expect(glsl).toContain('floatrealRoadGroove=0.25000000*vSurfaceRealRoad.x,realRoadMarbles=0.0');
+    expect(glsl).toContain('floatrealRoadGroove=vSurfaceRealRoad.x,realRoadMarbles=0.0');
     expect(glsl).toContain('floatgroovePerc=mix(roadDetails.g,1.0,realRoadGroove);');
     expect(glsl).toContain('floatsurfaceGroove=max(2.0*max(groovePerc-0.5,0.0)*grooveMask.g,grooveMask.r*min(1.5*groovePerc,1.0));');
     expect(glsl).toContain('diffuseColor.rgb=mix(diffuseColor.rgb,grooveAlbedo*grooveAlbedo,surfaceGroove);');
@@ -64,7 +64,7 @@ describe('road and kerb surface state terms', () => {
     expect(literal(road({ groove: 'perVertex' }))).toContain('vec2grooveMask=vec2(1.0);');
     expect(literal(road({ groove: 'perVertex', grooveMap: 'on' }))).toContain('vec2grooveMask=vec2(0.0);');
     expect(literal(road({ groove: 'perVertex' }))).toContain('floatgroovePerc=realRoadGroove;');
-    expect(literal(road({ groove: 'trackAverage' }))).toContain('floatrealRoadGroove=0.25000000*surface_realRoadMedian');
+    expect(literal(road({ groove: 'trackAverage' }))).toContain('floatrealRoadGroove=surface_realRoadMedian');
     expect(literal(road({}))).not.toContain('surfaceGroove');
   });
   it('clears dust with a quarter of the groove and gathers it with marbles, then lays the marbles by their mask', () => {

@@ -11,13 +11,6 @@ export const readsTrackRubber = (config: SurfaceConfig): boolean =>
   (config.kind === 'road' || config.kind === 'kerb') && config.flags.groove === 'trackAverage';
 
 /**
- * The groove's development per unit of the state's rubber. Fitted, not read: the game frames of the reference views show a lighter
- * groove than the rubber taken whole (the road 17 % darker than the frames, with skid arcs they lack); a quarter matches their road
- * brightness. The step from the state's rubber to the groove's development lies outside the road program, which only reads it.
- */
-const GROOVE_PER_RUBBER = 0.25;
-
-/**
  * The surface state terms of a road or kerb: the rubber groove, then dust, then marbles, each mixing the finished surface toward its
  * own colour (squared, as the tint is), roughness and specular level and lifting its occlusion. The groove's mask (red and green weights)
  * scales the rubber below and above half; dust clears with a quarter of the groove and gathers with marbles; a mask flag without its map
@@ -87,7 +80,8 @@ export function roadShaderParts(config: SurfaceConfig, context: ShaderContext): 
   const blendWet = sample('blendWet', 'vec4(0.5)');
   const roadDetails = sample('roadDetails', 'vec4(0.0)');
   const rubber = f.groove === 'trackAverage' ? 'surface_realRoadMedian' : f.groove ? 'vSurfaceRealRoad.x' : '';
-  const groove = rubber ? `${number(GROOVE_PER_RUBBER)}*${rubber}` : '0.0';
+  // The groove develops as the rubber laid, whole.
+  const groove = rubber || '0.0';
   let albedo = `
     float realRoadGroove=${groove}, realRoadMarbles=${f.marbles ? 'vSurfaceRealRoad.y' : '0.0'}, realRoadKeep=1.0;
     vec4 base=${sample('albedo', 'vec4(1.0)')};

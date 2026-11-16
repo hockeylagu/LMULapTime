@@ -238,7 +238,7 @@ scored by `inputs/score.py` against the frozen game frames):
    influence on the target and its adaptation speed limit. Not yet scored on the 62 shots. Later (2026-11-14): the meter reads
    the window's mean tone-mapped luminance y as −ln(1 − y) and the target T as −ln(1 − T), as the reference does, which takes up
    about that 9 % (`(B · T)^(1 − s) · (G / (U · L))^s`, G = −ln(1 − T)).
-11c. **Road rubber groove at an assumed level** (now drawn through the v17 surface attribute, item 1; `ASSUMED_RUBBER` 51/255 on every element until the replay's own state is cached) (`scenery/materials/roadSurface.ts`, 2026-11-09 night, uncommitted; needs a
+11c. **Road rubber groove at an assumed level** (now drawn through the v17 surface attribute, item 1; `ASSUMED_RUBBER` 13/255 on every element until the replay's own state is cached) (`scenery/materials/roadSurface.ts`, 2026-11-09 night, uncommitted; needs a
    package that carries the groove). The sunlit road at 1.2× was the rubber laid on the racing line, which the app did not
    draw. The package now gives each rubbered road its groove map (`flags.grooveMap`, `maps.groove`) and the groove's albedo,
    roughness and specular level (`parameters.groove`); the road mixes toward them after its tint by
@@ -351,3 +351,10 @@ road program takes the groove's development as given, and the step from the stat
 reference frames were taken in continuous playback, then paused (no seek), so the fit holds for playback; a frozen post-seek refill
 is ruled out, and the game's local surface model between the replay's 50 s resends is the likelier cause (U). (U) The fit rests on
 about 5 views whose cameras match the game well. Not carried still: the groove's shift of the index of refraction.
+
+Groove at the game's rule (2026-11-16, the user's call before freeze-v18): the render analysis read the road state the reference
+captures carry (the road vertex textures are rewritten every frame, even paused): rubber on 0–10 % of the visible road (Le Mans 0 %,
+Daytona 1–6 %, Fuji 6–7 %, Silverstone 3–10 %), so the quarter was fitted to nearly bare roads. The groove now develops as the
+rubber whole, as the game's road program reads it, and `ASSUMED_RUBBER` went 51 → 13: the drawn groove 0.050 → 0.051, the same
+picture. The real check waits for a filled surface (surface states in the replay cache, not planned); the Daytona cloud captures
+(rubber on 51–54 % of the road) are the ready reference for it.
