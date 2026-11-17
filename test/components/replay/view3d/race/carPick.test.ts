@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Box3, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh, PerspectiveCamera, Vector3 } from 'three';
-import { carsUnder, envelopeBounds, envelopeParts, insideHull, pickHeights, placeOnRoad } from '../../../../../src/components/replay/view3d/race/carPick.js';
+import { carShowing, carsUnder, envelopeBounds, envelopeParts, insideHull, placeOnRoad } from '../../../../../src/components/replay/view3d/race/carPick.js';
 import { CONTACT_SHADOW_NAME } from '../../../../../src/components/replay/view3d/car/underCarBake.js';
 
 const origin = {x: 100, y: 0, z: 100};
@@ -20,12 +20,7 @@ const slots = (...args: Parameters<typeof carsUnder>) => carsUnder(...args).map(
 describe('carsUnder', () => {
   it('lists the cars whose box the point falls in on screen, nearest first', () => {
     const view = camera();
-    expect(slots([at(4, 40), at(2, 20)], view, origin, 100, 100, 50, 50)).toEqual([2, 4]);
-    // Seen from behind, 20 m away, a car's back is 1 m by 20 m of the half width: 2.5 px, its front 2.2 px; 10 px at least.
-    expect(slots([at(2, 20)], view, origin, 100, 100, 59, 50)).toEqual([2]);
-    expect(slots([at(2, 20)], view, origin, 100, 100, 61, 50)).toEqual([]);
-    // Across the view, its 2.5 m half length shows: 6.25 px at its middle, more at its near corners, still within 10 px.
-    expect(slots([at(2, 20, 0, Math.PI / 2)], view, origin, 100, 100, 59, 50)).toEqual([2]);
+    expect(slots([at(4, 40), at(2, 20)], view, origin, 1000, 1000, 500, 500)).toEqual([2, 4]);
     // 5 m away, its back is 2.5 m from the camera: 20 px each side, the ground 0.6 m below the eye 12 px below the centre.
     expect(slots([at(2, 5)], view, origin, 100, 100, 69, 50)).toEqual([2]);
     expect(slots([at(2, 5)], view, origin, 100, 100, 71, 50)).toEqual([]);
@@ -36,18 +31,24 @@ describe('carsUnder', () => {
   it('leaves out cars behind the camera and around it (the followed car from its cockpit)', () => {
     const view = camera();
     expect(slots([at(2, -20)], view, origin, 100, 100, 50, 50)).toEqual([]);
-    expect(slots([at(2, 1), at(3, 30)], view, origin, 100, 100, 50, 50)).toEqual([3]);
+    expect(slots([at(2, 1), at(3, 30)], view, origin, 1000, 1000, 500, 500)).toEqual([3]);
+  });
+
+  it('leaves out a car too small on screen to tell apart, even under the pointer', () => {
+    // From behind, 20 m away: its 2 m wide back 17.5 m from the camera spans 5.7 px of a 100 px view, 57 px of a 1000 px one.
+    expect(slots([at(2, 20)], camera(), origin, 100, 100, 50, 50)).toEqual([]);
+    expect(slots([at(2, 20)], camera(), origin, 1000, 1000, 500, 500)).toEqual([2]);
+    // Across the view, its 5 m length shows: 12.7 px at the middle of a 100 px view.
+    expect(slots([at(2, 20, 0, Math.PI / 2)], camera(), origin, 100, 100, 50, 50)).toEqual([2]);
   });
 
   it("picks a car by its model's bounds: a low car from its underside to its roof, none above it", () => {
     // A low prototype 5 m ahead, its pose level with the ground under the camera's 0.6 m: its body 0.4 m below the pose to 0.45 m above.
     const low = {...at(2, 5), box: new Box3(new Vector3(-0.95, -0.4, -2.2), new Vector3(0.95, 0.45, 2.3))};
-    // On screen it spans 51 to 68 px down (10 px round its centre, 56, reach 46): the fixed box (0 to 1.2 m) reached up to 38 px.
+    // On screen it spans 51 to 68 px down: the fixed box (0 to 1.2 m) reaches up to 38 px.
     expect(slots([low], camera(), origin, 100, 100, 50, 56)).toEqual([2]);
     expect(slots([low], camera(), origin, 100, 100, 50, 41)).toEqual([]);
     expect(slots([at(2, 5)], camera(), origin, 100, 100, 50, 41)).toEqual([2]);
-    expect(pickHeights(low)).toEqual([expect.closeTo(0.025), expect.closeTo(0.365)]);
-    expect(pickHeights(at(2, 5))).toEqual([expect.closeTo(0.6), expect.closeTo(1.08)]);
   });
 
   it("reads a model's body bounds from its envelope's parts where they hang, without its contact shadow", () => {
@@ -129,7 +130,29 @@ describe('carsUnder', () => {
 
   it('finds a car off the centre where the camera draws it', () => {
     // 10 m left of a point 20 m ahead: a quarter of the width left of the centre (native x is the scene's).
-    expect(slots([at(2, 20, -10)], camera(), origin, 100, 100, 25, 50)).toEqual([2]);
-    expect(slots([at(2, 20, -10)], camera(), origin, 100, 100, 75, 50)).toEqual([]);
+    expect(slots([at(2, 20, -10)], camera(), origin, 1000, 1000, 250, 500)).toEqual([2]);
+    expect(slots([at(2, 20, -10)], camera(), origin, 1000, 1000, 750, 500)).toEqual([]);
+  });
+});
+
+describe('carShowing', () => {
+  // The scene point of a native one: around the origin, z mirrored.
+  const scene = (x: number, y: number, z: number) => new Vector3(x - origin.x, y - origin.y, origin.z - z);
+
+  it('finds the car whose surface is under the pointer, none where the scenery or the sky is', () => {
+    const near = at(2, 20), far = at(3, 40);
+    // On the near car's back (17.5 m ahead), and on the far one's back past it (37.5 m).
+    expect(carShowing([near, far], origin, scene(origin.x, 0.6, origin.z + 17.5))?.slot).toBe(2);
+    expect(carShowing([near, far], origin, scene(origin.x, 0.6, origin.z + 37.5))?.slot).toBe(3);
+    // A wall 10 m ahead stands in front of both.
+    expect(carShowing([near, far], origin, scene(origin.x, 0.6, origin.z + 10))).toBeNull();
+  });
+
+  it("allows a few centimetres off its parts (they sit on the road under the pose), not more", () => {
+    const body = new Box3(new Vector3(-1, 0, -2.3), new Vector3(1, 1.2, 2.3)), car = {...at(2, 20), box: body, parts: [body]};
+    expect(carShowing([car], origin, scene(origin.x + 1.05, 0.6, origin.z + 20))?.slot).toBe(2);
+    expect(carShowing([car], origin, scene(origin.x + 1.3, 0.6, origin.z + 20))).toBeNull();
+    // Turned a quarter, its length lies along native x.
+    expect(carShowing([{...car, rotY: Math.PI / 2}], origin, scene(origin.x + 2.2, 0.6, origin.z + 20))?.slot).toBe(2);
   });
 });

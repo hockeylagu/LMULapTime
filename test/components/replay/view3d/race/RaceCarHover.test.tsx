@@ -11,11 +11,11 @@ vi.mock('../../../../../src/components/replay/race/RaceCarTooltip.js', () => ({
 
 afterEach(cleanup);
 
-/** A host of 1000 by 600 pixels, a scene picking `slot`, and a clock whose ticks the test sends. */
+/** A host of 1000 by 600 pixels, a scene picking `slot` (its answer a step later, as the pixel read), and a clock whose ticks the test sends. */
 function setup(active = true) {
   const host = createRef<HTMLDivElement>(), listeners = new Set<() => void>();
   let slot: number | null = 7;
-  const pick = vi.fn(() => slot);
+  const pick = vi.fn((_x: number, _y: number) => Promise.resolve(slot));
   const clock = { subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); } } as unknown as RaceClock;
   const view = render(
     <div>
@@ -33,33 +33,52 @@ function setup(active = true) {
   };
 }
 
+/** Lets the picks in flight answer, and the looks they queued run and answer. */
+const settle = () => act(async () => { for (let step = 0; step < 6; step++) await Promise.resolve(); });
+
 describe('RaceCarHover', () => {
-  it('shows the tooltip of the car under the pointer beside it, and looks again as the cars move', () => {
+  it('shows the tooltip of the car under the pointer beside it, and looks again as the cars move', async () => {
     const { pick, element, tooltip, setSlot, tick } = setup();
     expect(tooltip()).toBeNull();
     fireEvent.pointerMove(element, { clientX: 40, clientY: 30 });
     expect(pick).toHaveBeenLastCalledWith(40, 30);
+    await settle();
     expect(tooltip()).toHaveTextContent('car 7');
     expect(tooltip()!.parentElement).toHaveStyle({ left: '54px', top: '44px' });
-    setSlot(3); tick();
+    setSlot(3); tick(); await settle();
     expect(tooltip()).toHaveTextContent('car 3');
-    setSlot(null); tick();
+    setSlot(null); tick(); await settle();
     expect(tooltip()).toBeNull();
   });
 
-  it('goes the other side of the pointer near the right and bottom edges', () => {
+  it('runs one look at a time: the pointer that moved meanwhile is looked at once the first answers', async () => {
+    const { pick, element, tooltip } = setup();
+    fireEvent.pointerMove(element, { clientX: 40, clientY: 30 });
+    fireEvent.pointerMove(element, { clientX: 50, clientY: 30 });
+    fireEvent.pointerMove(element, { clientX: 60, clientY: 30 });
+    expect(pick).toHaveBeenCalledTimes(1);
+    await settle();
+    // The first answer was for a place the pointer has left: only the last place is shown.
+    expect(pick).toHaveBeenCalledTimes(2);
+    expect(pick).toHaveBeenLastCalledWith(60, 30);
+    expect(tooltip()!.parentElement).toHaveStyle({ left: '74px' });
+  });
+
+  it('goes the other side of the pointer near the right and bottom edges', async () => {
     const { element, tooltip } = setup();
     fireEvent.pointerMove(element, { clientX: 900, clientY: 550 });
+    await settle();
     expect(tooltip()!.parentElement).toHaveStyle({ right: '114px', bottom: '64px' });
   });
 
-  it('shows none while a button is down (the pointer orbits), after the pointer leaves, or while the view is hidden', () => {
+  it('shows none while a button is down (the pointer orbits), after the pointer leaves, or while the view is hidden', async () => {
     const { pick, element, tooltip, tick, view } = setup();
     fireEvent.pointerMove(element, { clientX: 40, clientY: 30, buttons: 1 });
     tick();
     expect(pick).not.toHaveBeenCalled();
     expect(tooltip()).toBeNull();
     fireEvent.pointerMove(element, { clientX: 40, clientY: 30 });
+    await settle();
     expect(tooltip()).not.toBeNull();
     fireEvent.pointerLeave(element);
     expect(tooltip()).toBeNull();

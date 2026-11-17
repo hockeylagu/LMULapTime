@@ -17,7 +17,7 @@ import { createCarSets } from '../cars/drawnCar.js';
 import { windowPoints } from './raceTrack.js';
 import { createRaceField } from './raceField.js';
 import { createStandInCars } from './standInCars.js';
-import { carsUnder, envelopeBounds, envelopeParts, pickHeights, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
+import { carShowing, carsUnder, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
 
 export interface RaceSceneHandle {
   /**
@@ -33,10 +33,10 @@ export interface RaceSceneHandle {
   zoom(direction: number): void;
   pan(horizontal: number, vertical: number): void;
   /**
-   * The car drawn under a point of the canvas (CSS pixels from its top left corner), the nearest to the camera of those under it;
-   * null for none (`carPick.ts`). A car the scenery hides from the camera (a wall, a building) is not under it.
+   * The car the frame shows under a point of the canvas (CSS pixels from its top left corner); null for none (`carPick.ts`). A car
+   * too small on screen is not picked, nor one hidden there by anything the frame draws in front of it (scenery, another car).
    */
-  pick(x: number, y: number): number | null;
+  pick(x: number, y: number): Promise<number | null>;
   /** Lights the scene by the in-game clock (`SceneShell.setDaylight`: a small move of the sun changes nothing). */
   daylight(clock: ReplayDaylightClock | undefined): void;
   dispose(): void;
@@ -50,6 +50,8 @@ interface FollowedCar {
   /** Its wheels and lamps, and its part table; null without a model. */
   motion: CarMotion | null;
   parts: CarParts | null;
+  /** Its body as the pointer picks it (`DrawnCar.pickShape`); null without a model. */
+  pickShape: {box: Box3; parts: Box3[]} | null;
   cameras: LoadedBody['descriptor']['cameras']['list'];
   chaseLodMultiplier: number;
   /** Once warmed up: its batches each draw only while one of their parts shows. */
@@ -87,9 +89,9 @@ export async function createRaceScene(
   /** The followed car: the own car, a set of one apart from its body's near cars. */
   const buildFollowed = async (slot: number | null, body: LoadedBody | null): Promise<FollowedCar | null> => {
     if (slot === null) return null;
-    if (!body) return {slot, car: null, motion: null, parts: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}};
-    const set = await sets.build([body], {own: true}), [drawn] = set.cars;
-    return {slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, cameras: body.descriptor.cameras.list, chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => set.ready(), dispose: () => set.dispose()};
+    if (!body) return {slot, car: null, motion: null, parts: null, pickShape: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}};
+    const set = await sets.build([body], {own: true, pickShape: true}), [drawn] = set.cars;
+    return {slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, pickShape: drawn.pickShape, cameras: body.descriptor.cameras.list, chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => set.ready(), dispose: () => set.dispose()};
   };
   const pending = buildFollowed(first.slot, first.body);
   pending.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
@@ -152,17 +154,14 @@ export async function createRaceScene(
   /** Where each car on the track was last drawn: what `pick` looks through. */
   let drawnPlaces: readonly DrawnPlace[] = [];
   /** Each followed model's body bounds and its parts'. */
-  const followedBodies = new WeakMap<Group, {box: Box3; parts: Box3[]}>();
   /**
    * A car's body bounds in its frame (`DrawnPlace.box` before it is put on the road), and its parts' for the followed model (its full
    * model, drawn large); the field's far model bounds for another car.
    */
   const pickShapeOf = (slot: number): {box: Box3; parts?: Box3[]} | null => {
-    const model = slot === followed?.slot ? followed.car : null;
-    if (!model) { const box = field.bounds(slot); return box && {box}; }
-    let body = followedBodies.get(model);
-    if (!body) followedBodies.set(model, body = {box: envelopeBounds(model), parts: envelopeParts(model)});
-    return body;
+    if (slot === followed?.slot && followed.pickShape) return followed.pickShape;
+    const box = field.bounds(slot);
+    return box && {box};
   };
   /** The followed car's next pose while it has none (asked once per slot and window). */
   let waiting: {slot: number; fromSec: number; next: NextPose | null} | null = null;
@@ -292,9 +291,9 @@ export async function createRaceScene(
         return {...car, box, parts: body?.parts?.map(part => part.clone().translate(new Vector3(0, lift, 0)))};
       });
       const under = carsUnder(places, shell.drawnView, origin, canvas.clientWidth, canvas.clientHeight, x, y);
-      // Seen if its body or its roof is: a low wall can hide the one and not the other.
-      const seen = (car: DrawnPlace, height: number) => shell.sees({x: car.x, y: car.y + height, z: car.z});
-      return under.find(car => pickHeights(car).some(height => seen(car, height)))?.slot ?? null;
+      if (!under.length) return Promise.resolve(null);
+      // The car whose surface the frame draws under the pointer, read back from the one pixel.
+      return shell.surfaceAt(x, y).then(point => (point ? carShowing(under, origin, point)?.slot ?? null : null));
     },
     daylight: clock => shell.setDaylight(clock),
     dispose() {

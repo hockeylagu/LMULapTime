@@ -1,4 +1,4 @@
-import { Box3, Group, MathUtils, Matrix4, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Box3, Group, MathUtils, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
@@ -16,6 +16,7 @@ import { createSunMeter } from '../atmosphere/sunMeter.js';
 import { assertHazed } from '../atmosphere/haze.js';
 import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
+import { createPointerSurface, type DrawnCamera } from './pointerSurface.js';
 import { underCarBaker } from '../car/carContactShadow.js';
 import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
@@ -78,7 +79,7 @@ export interface SceneShell {
    * The camera as the last frame drew it: its eye after the ground and obstruction checks (the rig's camera keeps the eye it asked
    * for) and the matrices it drew with. What is under the pointer is what that frame showed.
    */
-  readonly drawnView: {readonly position: Vector3; readonly matrixWorldInverse: Matrix4; readonly projectionMatrix: Matrix4};
+  readonly drawnView: DrawnCamera;
   readonly surfaceHeight: SurfaceHeight;
   /** Car textures: from start files, sharpened (the interior's only once a driver camera is used). */
   readonly carTextures: CarTextures;
@@ -121,8 +122,11 @@ export interface SceneShell {
   show(content: SceneContent): void;
   /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker; wheels and lights follow it. */
   placeCar(car: Object3D, pose: RenderPose, motion: CarMotion | null): void;
-  /** Whether the camera, where the last frame drew from (`drawnView`), sees a native point past the resident scenery's opaque surfaces. */
-  sees(point: {x: number; y: number; z: number}): boolean;
+  /**
+   * The nearest surface the last frame's camera (`drawnView`) draws under a point of the canvas (CSS pixels from its top left corner),
+   * in scene coordinates; null over the sky. Glass and a fence's cut-outs show what is behind them, as in the frame.
+   */
+  surfaceAt(x: number, y: number): Promise<Vector3 | null>;
   /** Switches the camera mode with its environment, shadows and exposure; false when it is the current one. */
   setMode(next: CameraMode): boolean;
   /**
@@ -249,7 +253,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
   const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose();
+    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose(); pointer.dispose();
     ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   // The interior's own copies stay on their reduced levels until a driver camera is used: only there is their full size seen.
@@ -293,7 +297,9 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     streamView = next; stream.update(next);
   };
   const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3();
-  const drawnView = {position: new Vector3(), matrixWorldInverse: new Matrix4(), projectionMatrix: new Matrix4()};
+  const drawnCameras = {perspective: new PerspectiveCamera(), orthographic: new OrthographicCamera()};
+  let drawnView: DrawnCamera = drawnCameras.perspective;
+  const pointer = createPointerSurface(renderer);
   let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
   const draw = (frameTime?: number) => {
     if (disposed || !content) return;
@@ -335,7 +341,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
         for (let pass = 0; pass < CAR_REFLECTION_STEPS && reflection.update(probeCentre); pass++);
       }
       exposure.render(scene, camera);
-      drawnView.position.copy(camera.position); drawnView.matrixWorldInverse.copy(camera.matrixWorldInverse); drawnView.projectionMatrix.copy(camera.projectionMatrix);
+      drawnView = camera instanceof PerspectiveCamera ? drawnCameras.perspective.copy(camera, false) : drawnCameras.orthographic.copy(camera, false);
       // The car's reflection probe renders three faces after the frame (car/carReflection.ts), around the body's centre.
       if (car.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
     } finally {
@@ -374,7 +380,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     viewportWidth = 0; viewportHeight = 0; resize();
   };
   const shell: SceneShell = {
-    renderer, scene, rig, origin, drawnView, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(),
+    renderer, scene, rig, origin, get drawnView() { return drawnView; }, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(),
     get started() { return started; },
     get broken() { return broken; },
     attach(next, nextListener) {
@@ -434,9 +440,9 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       started = true; mount();
     },
     show,
-    sees(point) {
-      const {x, y, z} = drawnView.position;
-      return !ground.blocks({x: x + origin.x, y: y + origin.y, z: origin.z - z}, point);
+    surfaceAt(x, y) {
+      const canvas = renderer.domElement;
+      return pointer.read(scene, drawnView, x, y, canvas.clientWidth, canvas.clientHeight);
     },
     placeCar(car, pose, motion) {
       car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);

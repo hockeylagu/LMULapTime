@@ -110,17 +110,21 @@ export function envelopeBounds(car: Object3D, box = new Box3()): Box3 {
   return box.isEmpty() ? box.setFromCenterAndSize(new Vector3(), new Vector3()) : box;
 }
 
-/** Heights in a car's box that show it, metres above its pose: its body and, a little under the top, its roof. */
-export function pickHeights(car: DrawnPlace): [body: number, roof: number] {
-  const {min, max} = car.box ?? PICK_BOX;
-  return [(min.y + max.y) / 2, max.y - (max.y - min.y) * 0.1];
-}
-/** A far car is picked within this many pixels of its centre at least. */
-const PICK_MIN_PX = 10;
+/** A car smaller than this on screen (its outline's larger side, CSS pixels) is not picked: too small to tell apart. */
+export const PICK_MIN_PX = 12;
 /** Cars nearer the camera than this (metres along its view) are around it, not under the pointer: the followed car from its cockpit. */
 const PICK_NEAREST_M = 3;
+/** How far outside its parts the surface under the pointer may lie and still be the car's, metres: the parts are placed on the road under the pose. */
+const SURFACE_SLACK_M = 0.1;
 
 const corner = new Vector3(), toView = new Matrix4(), place = new Matrix4(), mirror = new Matrix4().makeScale(1, 1, -1), euler = new Euler();
+const local = new Vector3(), grown = new Box3(), carFrame = new Matrix4();
+
+/** The car's frame to the scene's: the scene draws native coordinates around the origin, mirrored along z. */
+function carToScene(car: DrawnPlace, origin: {x: number; y: number; z: number}, matrix: Matrix4): Matrix4 {
+  place.makeRotationFromEuler(euler.set(car.rotX, car.rotY, car.rotZ, 'YXZ')).setPosition(car.x - origin.x, car.y - origin.y, car.z - origin.z);
+  return matrix.multiplyMatrices(mirror, place);
+}
 
 type Point = readonly [number, number];
 
@@ -138,6 +142,12 @@ export function insideHull(points: readonly Point[], x: number, y: number): bool
     hull.pop();
   }
   return hull.length >= 3 && hull.every((point, i) => turn(point, hull[(i + 1) % hull.length], [x, y]) >= 0);
+}
+
+/** Whether an outline on screen is at least PICK_MIN_PX across, along either axis. */
+function wideEnough(points: readonly Point[]): boolean {
+  const xs = points.map(point => point[0]), ys = points.map(point => point[1]);
+  return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) >= PICK_MIN_PX;
 }
 
 /** The eight corners of `box` on screen (CSS pixels), through `toView` and `projection`; null when one is behind the camera. */
@@ -162,21 +172,29 @@ export function carsUnder(
 ): DrawnPlace[] {
   const under: Array<{car: DrawnPlace; depth: number}> = [];
   for (const car of places) {
-    // The car's frame to the camera's: the scene draws native coordinates around the origin, mirrored along z.
-    place.makeRotationFromEuler(euler.set(car.rotX, car.rotY, car.rotZ, 'YXZ')).setPosition(car.x - origin.x, car.y - origin.y, car.z - origin.z);
-    toView.multiplyMatrices(view.matrixWorldInverse, mirror).multiply(place);
+    toView.multiplyMatrices(view.matrixWorldInverse, carToScene(car, origin, carFrame));
     const box = car.box ?? PICK_BOX, {min, max} = box;
     const depth = -corner.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2).applyMatrix4(toView).z;
     if (depth < PICK_NEAREST_M) continue;
-    // Within PICK_MIN_PX of its centre, or on the outline its box (one of its parts) draws on screen; a corner of its box behind the
+    // On the outline its box (one of its parts) draws on screen, the box at least PICK_MIN_PX across; a corner of its box behind the
     // camera leaves the car out.
-    corner.applyMatrix4(view.projectionMatrix);
-    const centreX = ((corner.x + 1) / 2) * width, centreY = ((1 - corner.y) / 2) * height;
     const outline = cornersOnScreen(box, view.projectionMatrix, width, height);
-    if (!outline) continue;
-    const near = Math.abs(x - centreX) <= PICK_MIN_PX && Math.abs(y - centreY) <= PICK_MIN_PX;
+    if (!outline || !wideEnough(outline)) continue;
     const onPart = (part: Box3) => { const points = cornersOnScreen(part, view.projectionMatrix, width, height); return points !== null && insideHull(points, x, y); };
-    if (near || (car.parts ? car.parts.some(onPart) : insideHull(outline, x, y))) under.push({car, depth});
+    if (car.parts ? car.parts.some(onPart) : insideHull(outline, x, y)) under.push({car, depth});
   }
   return under.sort((a, b) => a.depth - b.depth).map(({car}) => car);
+}
+
+/**
+ * Of `cars` (nearest the camera first, as `carsUnder` lists them), the one the surface under the pointer belongs to: `point`, in
+ * scene coordinates, lies on one of its parts (its box without them). Null when that surface is another's: scenery, a car not
+ * listed, the sky.
+ */
+export function carShowing(cars: readonly DrawnPlace[], origin: {x: number; y: number; z: number}, point: Vector3): DrawnPlace | null {
+  for (const car of cars) {
+    local.copy(point).applyMatrix4(carToScene(car, origin, carFrame).invert());
+    if ((car.parts ?? [car.box ?? PICK_BOX]).some(part => grown.copy(part).expandByScalar(SURFACE_SLACK_M).containsPoint(local))) return car;
+  }
+  return null;
 }

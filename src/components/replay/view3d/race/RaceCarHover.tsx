@@ -28,20 +28,33 @@ const OFFSET_PX = 14, ROOM_X_PX = 280, ROOM_Y_PX = 100;
 
 /**
  * The race map's tooltip for the car of the 3D race view under the pointer, beside the pointer. The car is looked for again as the
- * pointer moves and as the clock moves the cars; none while a button is down (the pointer orbits the camera).
+ * pointer moves and as the clock moves the cars; none while a button is down (the pointer orbits the camera). The scene answers
+ * a frame later (it reads the pixel back): one look runs at a time, and a pointer that moved meanwhile is looked at once it ends.
  */
 export function RaceCarHover({ host, scene, clock, index, active }: Props) {
   const [hover, setHover] = useState<Hover | null>(null);
   useEffect(() => {
     const element = host.current;
     if (!element || !active) return;
-    let pointer: { x: number; y: number } | null = null;
+    let pointer: { x: number; y: number } | null = null, looking = false, again = false, live = true;
+    const show = (at: { x: number; y: number }, slot: number | null) => setHover(current => {
+      if (slot === null) return null;
+      if (current?.slot === slot && current.x === at.x && current.y === at.y) return current;
+      return { slot, x: at.x, y: at.y, width: element.clientWidth, height: element.clientHeight };
+    });
     const look = () => {
-      const at = pointer, slot = at ? scene.current?.pick(at.x, at.y) ?? null : null;
-      setHover(current => {
-        if (!at || slot === null) return null;
-        if (current?.slot === slot && current.x === at.x && current.y === at.y) return current;
-        return { slot, x: at.x, y: at.y, width: element.clientWidth, height: element.clientHeight };
+      const at = pointer;
+      if (!at) { setHover(null); return; }
+      if (looking) { again = true; return; }
+      const picking = scene.current?.pick(at.x, at.y);
+      if (!picking) { setHover(null); return; }
+      looking = true;
+      // A failed read (a lost graphics context) shows no car.
+      void picking.catch(() => null).then(slot => {
+        looking = false;
+        if (!live) return;
+        if (pointer === at) show(at, slot);
+        if (again) { again = false; look(); }
       });
     };
     const move = (event: PointerEvent) => {
@@ -54,6 +67,7 @@ export function RaceCarHover({ host, scene, clock, index, active }: Props) {
     element.addEventListener('pointerleave', leave);
     const unsubscribe = clock.subscribe(look);
     return () => {
+      live = false;
       element.removeEventListener('pointermove', move);
       element.removeEventListener('pointerleave', leave);
       unsubscribe();

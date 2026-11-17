@@ -1,4 +1,4 @@
-import { Mesh, type Group, type Material, type Object3D } from 'three';
+import { Mesh, type Box3, type Group, type Material, type Object3D } from 'three';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
@@ -11,12 +11,18 @@ import { buildCarParts, type CarParts } from './carParts.js';
 import { batchCars } from './carBatching.js';
 import { createSlicer } from '../batching/batchedParts.js';
 import { createCarMotion, type CarMotion } from './carMotion.js';
+import { envelopeBounds, envelopeParts } from '../race/carPick.js';
 
 /** A car drawn with its full model: the own car (the lap's car, the race's followed car), the lap's ghost and the race's near cars. */
 export interface DrawnCar {
   car: Group;
   parts: CarParts;
   motion: CarMotion;
+  /**
+   * Its body as the pointer picks it (`race/carPick.ts`): its bounds and its parts' cells, measured before the batching takes the
+   * batched parts' vertices. With `pickShape` only.
+   */
+  pickShape: {box: Box3; parts: Box3[]} | null;
 }
 
 /** Cars drawn together: the cars of one body share their batches. */
@@ -36,6 +42,8 @@ export interface DrawnCarsOptions {
   transparent?: boolean;
   /** The materials other cars draw with, which the cars leave when dropped. */
   sharedMaterial?: (material: Material) => boolean;
+  /** Each car's pick shape measured (`DrawnCar.pickShape`): the race's followed car. */
+  pickShape?: boolean;
 }
 
 /**
@@ -45,11 +53,12 @@ export interface DrawnCarsOptions {
  * its file again.
  */
 export async function createDrawnCars(models: readonly Group[], surfaceHeight: SurfaceHeight,
-  {batched = true, transparent = false, sharedMaterial = () => false}: DrawnCarsOptions = {}): Promise<DrawnCars> {
+  {batched = true, transparent = false, sharedMaterial = () => false, pickShape = false}: DrawnCarsOptions = {}): Promise<DrawnCars> {
   // A body's cars build over several tasks (a car's tables, then the batches): playback keeps its frames meanwhile.
   const slice = createSlicer(), cars: DrawnCar[] = [];
   for (const car of models) {
-    cars.push({car, parts: buildCarParts(car), motion: createCarMotion(car, surfaceHeight)});
+    const parts = buildCarParts(car);
+    cars.push({car, parts, motion: createCarMotion(car, surfaceHeight), pickShape: pickShape ? {box: envelopeBounds(car), parts: envelopeParts(car)} : null});
     // oxlint-disable-next-line no-await-in-loop -- yields between cars
     await slice();
   }
@@ -71,6 +80,8 @@ export interface CarSetOptions {
    * for the driver cameras. Otherwise cars of the field: every car of a body draws with the same materials, without an interior.
    */
   own: boolean;
+  /** Each car's pick shape measured (`DrawnCar.pickShape`). */
+  pickShape?: boolean;
 }
 
 /**
@@ -83,7 +94,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
   const fieldModels = createCarModels(templates, carTextures, shading, {shareMaterials: true});
   return {
     /** The cars of `bodies` (liveries of one body) drawn together. */
-    async build(bodies: readonly LoadedBody[], {own}: CarSetOptions): Promise<DrawnCars> {
+    async build(bodies: readonly LoadedBody[], {own, pickShape = false}: CarSetOptions): Promise<DrawnCars> {
       const models = own ? ownModels : fieldModels;
       const cars = await Promise.all(bodies.map(body => models.car(body)));
       if (!own) for (const car of cars) {
@@ -92,7 +103,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
         car.traverse(object => { if (object.userData.interior === true) interior.push(object); });
         for (const part of interior) part.removeFromParent();
       }
-      return createDrawnCars(cars, surfaceHeight, {transparent: true, sharedMaterial: models.sharedMaterial});
+      return createDrawnCars(cars, surfaceHeight, {transparent: true, sharedMaterial: models.sharedMaterial, pickShape});
     },
     /** The lap's ghost: see-through, without shadows; disposed with its parent (`disposeObjects`). */
     async ghost(body: LoadedBody): Promise<DrawnCar> {
