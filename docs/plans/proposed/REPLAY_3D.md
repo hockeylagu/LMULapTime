@@ -127,11 +127,15 @@ a car: the user said "not now"; don't re-offer.
 
 - Le Mans race start shows at 5.4–5.8 s with the reflection set, over the 5 s line; remaining slow frames are the start burst
   (near car batching, warm compile, near loads).
-- Follow switch (personal-v21, 2026-11-17): the camera moves to the clicked car in ~0.1 s, the field drawing it until its own
-  model swaps in 1.0-1.5 s later. Of that: the full-level GLB 0.2-0.3 s to fetch (a held body's parse is used instead), parse and
-  prepare 0.1-0.25 s, then 38-49 MB of geometry and 6-10 MB of textures uploaded in 0.5-0.8 s while its 20-35 new programs
-  link. The followed car shares no GPU copy with the field's cars of its body (own materials, interior, full level only). A
-  cockpit view still waits for the model.
+- Follow switch (2026-11-17): the camera moves to the clicked car in ~0.1 s. The followed car is its body's field near car, lent
+  (shared materials and batches), plus its cabin (the interior parts and the interior file at full level, own batches). It shows
+  0.5-1.8 s later (Fuji, six rows): 0.5 s when the body is already near, else mostly the cabin's parse (0.2-1.3 s), then 14-19 MB
+  of geometry uploaded; long frames 45-75 ms. The full model path it replaced took 1.0-1.5 s with 38-49 MB. Batches and a cabin
+  wait in a layer no pass draws until warmed: drawn first, each new material linked its program at the draw (~200 ms each, a
+  2-4 s stall per switch). A cockpit view still waits for the cabin. At the race start the followed car's body builds its full models
+  first (from ~0.4 s, its cabin loading meanwhile), its far models and the other bodies after: Fuji 5.6 s against 5.1-5.3 s on
+  the full model path (6.2 s waiting for the far models first); play heap 789 MB against 825 MB. The full models now build while
+  the scenery loads (done ~2.1 s) and take 1.8 s instead of 0.8 s: the start is bound by that shared load.
 - Fuji lap p99 18.1 ms against the 16.7 ms aim (personal-v20, measured before the GPU exposure).
 
 ### Race replay
