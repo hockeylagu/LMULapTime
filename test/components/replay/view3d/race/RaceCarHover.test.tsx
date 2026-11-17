@@ -58,10 +58,21 @@ describe('RaceCarHover', () => {
     fireEvent.pointerMove(element, { clientX: 60, clientY: 30 });
     expect(pick).toHaveBeenCalledTimes(1);
     await settle();
-    // The first answer was for a place the pointer has left: only the last place is shown.
     expect(pick).toHaveBeenCalledTimes(2);
     expect(pick).toHaveBeenLastCalledWith(60, 30);
     expect(tooltip()!.parentElement).toHaveStyle({ left: '74px' });
+  });
+
+  it('shows the car while the pointer keeps moving, the tooltip following it at once', async () => {
+    const { element, tooltip } = setup();
+    // Each answer comes after the pointer has moved on: it still shows, beside where the pointer is now.
+    for (let x = 40; x <= 100; x += 10) {
+      fireEvent.pointerMove(element, { clientX: x, clientY: 30 });
+      await act(async () => { await Promise.resolve(); });
+    }
+    expect(tooltip()).toHaveTextContent('car 7');
+    fireEvent.pointerMove(element, { clientX: 300, clientY: 200 });
+    expect(tooltip()!.parentElement).toHaveStyle({ left: '314px', top: '214px' });
   });
 
   it('goes the other side of the pointer near the right and bottom edges', async () => {

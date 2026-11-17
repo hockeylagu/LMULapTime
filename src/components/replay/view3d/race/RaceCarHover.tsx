@@ -29,7 +29,9 @@ const OFFSET_PX = 14, ROOM_X_PX = 280, ROOM_Y_PX = 100;
 /**
  * The race map's tooltip for the car of the 3D race view under the pointer, beside the pointer. The car is looked for again as the
  * pointer moves and as the clock moves the cars; none while a button is down (the pointer orbits the camera). The scene answers
- * a frame or two later (the GPU answers which car's surface is under the pointer): one look runs at a time, and a pointer that moved meanwhile is looked at once it ends.
+ * a frame or two later (the GPU answers which car's surface is under the pointer): one look runs at a time, and a pointer that moved
+ * meanwhile is looked at once it ends. The tooltip follows the pointer as it moves and takes each answer as it comes: a pointer that
+ * never stops still sees its car, a look or two behind.
  */
 export function RaceCarHover({ host, scene, clock, index, active }: Props) {
   const [hover, setHover] = useState<Hover | null>(null);
@@ -37,8 +39,9 @@ export function RaceCarHover({ host, scene, clock, index, active }: Props) {
     const element = host.current;
     if (!element || !active) return;
     let pointer: { x: number; y: number } | null = null, looking = false, again = false, live = true;
-    const show = (at: { x: number; y: number }, slot: number | null) => setHover(current => {
-      if (slot === null) return null;
+    const show = (slot: number | null) => setHover(current => {
+      const at = pointer;
+      if (slot === null || !at) return null;
       if (current?.slot === slot && current.x === at.x && current.y === at.y) return current;
       return { slot, x: at.x, y: at.y, width: element.clientWidth, height: element.clientHeight };
     });
@@ -53,13 +56,16 @@ export function RaceCarHover({ host, scene, clock, index, active }: Props) {
       void picking.catch(() => null).then(slot => {
         looking = false;
         if (!live) return;
-        if (pointer === at) show(at, slot);
+        show(slot);
         if (again) { again = false; look(); }
       });
     };
     const move = (event: PointerEvent) => {
       const rect = element.getBoundingClientRect();
       pointer = event.buttons ? null : { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      // The shown car's tooltip moves with the pointer at once; the look says whether it is still that car.
+      const at = pointer;
+      if (at) setHover(current => (current ? { ...current, x: at.x, y: at.y } : current));
       look();
     };
     const leave = () => { pointer = null; look(); };
