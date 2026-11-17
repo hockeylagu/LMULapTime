@@ -167,7 +167,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const carTextureLoader = new CachedKtx2Loader(renderer, {start: startOf});
   // Until the camera is placed, the clouds are seen from the scene origin.
   let sun = sceneSun(layout, origin.y, daylightClock, [origin.x, 0, origin.z]);
-  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
+  // The exposure asks for frames of its own (`schedule`), which leave a frame quiet: it reads its state back only on quiet frames.
+  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => schedule(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);
   // Wheel and line contact heights read the package's road height grid; off it, and for the camera checks, one ray tree per resident chunk.
   const ground = createSceneryGround(layout.roadHeightAt);
@@ -182,7 +183,9 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // What the car's probe draws in place of the scenery, chunk by chunk with it.
   const reflectionSet = createReflectionSet(layout, loader, origin);
   let content: SceneContent | null = null;
-  let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
+  let disposed = false, refreshTimer = 0, invalidate: () => void = () => {}, schedule: () => void = () => {};
+  /** Something besides the exposure asked for a frame since the last one drew (or a resize drew it). */
+  let asked = true;
   /** Resolves once the scene has its environment and the car's reflection: programs compiled before that would compile again. */
   let lit: Promise<void> = Promise.resolve();
   // Content is draped on the road: when the resident chunks change, drape it again (coalesced).
@@ -340,7 +343,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
         probed = true; car.getWorldPosition(probeCentre);
         for (let pass = 0; pass < CAR_REFLECTION_STEPS && reflection.update(probeCentre); pass++);
       }
-      exposure.render(scene, camera);
+      exposure.render(scene, camera, !asked); asked = false;
       drawnView = camera instanceof PerspectiveCamera ? drawnCameras.perspective.copy(camera, false) : drawnCameras.orthographic.copy(camera, false);
       // The car's reflection probe renders three faces after the frame (car/carReflection.ts), around the body's centre.
       if (car.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
@@ -363,7 +366,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     renderer.setSize(width, height, false); rig.resize(width / height);
     // ResizeObserver runs after animation callbacks, before paint. A canvas resize clears its pixels:
     // draw now, or the embedded map flashes black until next frame when a toolbar changes height.
-    if (rig.placed) draw(); else invalidate();
+    if (rig.placed) { asked = true; draw(); } else invalidate();
   };
   const contextLost = (event: Event) => { event.preventDefault(); onFailure('The 3D graphics context was lost. Retry or return to 2D.'); };
   const observer = new ResizeObserver(resize);
@@ -429,11 +432,12 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       environment.captureVenue();
       warmup.shown();
       assertHazed(scene);
-      invalidate = () => {
+      schedule = () => {
         // Nor while kept hidden behind the 2D map: showing it again resizes, which draws.
         if (disposed || frame || document.hidden || hidden()) return;
         frame = requestAnimationFrame(now => { frame = 0; draw(now); });
       };
+      invalidate = () => { asked = true; schedule(); };
       renderer.domElement.addEventListener('webglcontextlost', contextLost);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.domElement.className = 'h-full w-full';
       document.addEventListener('visibilitychange', invalidate);

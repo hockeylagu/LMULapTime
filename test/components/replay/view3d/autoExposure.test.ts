@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Color, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
-import { adaptExposure, createAutoExposure, inverseToneCurve, lawExposure, meteredLuminance, meterGrey, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { Color, Scene, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
+import { adaptExposure, createAutoExposure, EXPOSURE_PASS, exposureUniforms, inverseToneCurve, lawExposure, meteredLuminance, meterGrey, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
 /** A synthetic camera type (profiles at sun strengths 0 and 60). */
@@ -125,56 +125,115 @@ describe('autoExposure', () => {
     exposure.dispose();
   });
 
-  it('reads the metering target into a pack buffer of its own, once its fence has signalled, and adapts to the reading', async () => {
+  it("meters and adapts on the GPU: the canvas pass and the adaptation read one state target, the adaptation writes the other", () => {
+    const passes: string[] = [];
+    let target: WebGLRenderTarget | null = null;
+    const initRenderTarget = vi.fn();
+    const renderer = {
+      getContext: () => ({}), getRenderTarget: () => target, setRenderTarget: (next: WebGLRenderTarget | null) => { target = next; },
+      initRenderTarget, render: (scene: Scene) => passes.push(`${scene.name || 'replay'}>${target ? `${target.width}x${target.height}` : 'canvas'}`),
+      getDrawingBufferSize: (size: {set(x: number, y: number): unknown}) => size.set(8, 8),
+    } as unknown as WebGLRenderer;
+    const exposure = createAutoExposure(renderer, testCamera(), sun(30, 40), () => {});
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      const shown = () => exposureUniforms.exposure_state.value;
+      exposure.render(new Scene(), {} as never);
+      // The replay into the HDR target, the canvas pass, the metering and the adaptation into a 1 × 1 state: nothing read back.
+      expect(passes).toEqual(['replay>8x8', `${EXPOSURE_PASS}>canvas`, `${EXPOSURE_PASS}>32x18`, `${EXPOSURE_PASS}>1x1`]);
+      expect(initRenderTarget).toHaveBeenCalledTimes(2);
+      const first = shown();
+      passes.length = 0; now += 17; exposure.render(new Scene(), {} as never);
+      // Within the metering period (four frames at 60 Hz): no metering, the state adapted again into the other target.
+      expect(passes).toEqual(['replay>8x8', `${EXPOSURE_PASS}>canvas`, `${EXPOSURE_PASS}>1x1`]);
+      expect(shown()).not.toBe(first);
+      now += 17; exposure.render(new Scene(), {} as never);
+      expect(shown()).toBe(first);
+      expect(target).toBeNull();
+    } finally { exposure.dispose(); vi.restoreAllMocks(); }
+    expect(exposureUniforms.exposure_state.value).toBeNull();
+  });
+
+  it("gives the GPU the law in stops, as lawExposure has it, and the adaptation's values", () => {
+    let material: {uniforms: Record<string, {value: unknown}>} | null = null;
+    const renderer = {
+      getRenderTarget: () => null, setRenderTarget() {}, initRenderTarget() {}, getDrawingBufferSize: (size: {set(x: number, y: number): unknown}) => size.set(8, 8),
+      render: (scene: Scene) => {
+        const mesh = scene.children[0] as unknown as {material: {uniforms: Record<string, {value: unknown}>}} | undefined;
+        if (mesh?.material.uniforms.logUnit) material = mesh.material;
+      },
+    } as unknown as WebGLRenderer;
+    const camera = testCamera(), exposure = createAutoExposure(renderer, camera, sun(30, 40), () => {}, 'onboard');
+    exposure.render(new Scene(), {} as never);
+    const u = material!.uniforms, value = (name: string) => u[name].value as number;
+    const look = profileAt(camera.types.onboard, sun(30, 40)), unit = meterUnit(camera.sceneLuminanceScale), scale = camera.types.onboard.adaptationScale;
+    // The shader's target for a metered luminance L (natural log), from its uniforms, is the law's exposure in stops.
+    for (const metering of [-6, -1, 0, 2, 9]) {
+      const free = (1 - value('scale')) * value('logBorder') + value('scale') * (value('logGrey') - value('logUnit') - metering / Math.LN2);
+      const stops = value('logUnit') + Math.min(value('logMax'), Math.max(value('logMin'), free));
+      expect(stops).toBeCloseTo(Math.log2(lawExposure(look, scale, metering, unit)), 9);
+    }
+    expect((u.adaptation.value as {toArray(): number[]}).toArray()).toEqual([0.25, 1, -1, -1]);
+    // A camera type switch gives the next adaptation the new type's law, metering the new window at once.
+    expect(value('fresh')).toBe(1);
+    exposure.render(new Scene(), {} as never); expect(value('fresh')).toBe(0);
+    exposure.setType('tv'); exposure.render(new Scene(), {} as never);
+    expect(value('scale')).toBe(camera.types.tv.adaptationScale); expect(value('fresh')).toBe(1);
+    exposure.dispose();
+  });
+
+  it('reads the state back on quiet frames only, at most every 250 ms, and stops asking for frames once it has settled', () => {
     const frames: Array<() => void> = [], flush = () => frames.splice(0).forEach(callback => callback());
     vi.stubGlobal('requestAnimationFrame', (callback: () => void) => frames.push(callback));
-    const half = 0x3c00; // 1.0 as a half float: every metered cell reads 1.
-    const calls: string[] = [], signals = ['pending', 'signalled'];
-    let fenceFails = false;
+    const calls: string[] = [], signals: string[] = [];
+    let state = [0, 0, 0, 0], fenceFails = false;
     const gl = {
-      PIXEL_PACK_BUFFER: 1, STREAM_READ: 2, RGBA: 3, HALF_FLOAT: 4, IMPLEMENTATION_COLOR_READ_FORMAT: 5, IMPLEMENTATION_COLOR_READ_TYPE: 6,
-      SYNC_GPU_COMMANDS_COMPLETE: 7, WAIT_FAILED: 8, TIMEOUT_EXPIRED: 9, ALREADY_SIGNALED: 10,
-      getParameter: (name: number) => name === 5 ? 3 : 4,
+      PIXEL_PACK_BUFFER: 1, STREAM_READ: 2, RGBA: 3, FLOAT: 4, SYNC_GPU_COMMANDS_COMPLETE: 7, WAIT_FAILED: 8, TIMEOUT_EXPIRED: 9, ALREADY_SIGNALED: 10,
       createBuffer: () => { calls.push('createBuffer'); return {}; }, deleteBuffer: () => calls.push('deleteBuffer'),
-      bindBuffer: () => {}, bufferData: () => calls.push('bufferData'), readPixels: () => calls.push('readPixels'),
+      bindBuffer: () => {}, bufferData: () => {}, readPixels: () => calls.push('readPixels'),
       fenceSync: () => (fenceFails ? null : {}), flush: () => {}, deleteSync: () => calls.push('deleteSync'),
-      clientWaitSync: () => { calls.push('wait'); return signals.shift() === 'pending' ? 9 : 10; },
-      getBufferSubData: (_target: number, _offset: number, into: Uint16Array) => { calls.push('getBufferSubData'); into.fill(half); },
+      clientWaitSync: () => (signals.shift() === 'pending' ? 9 : 10),
+      getBufferSubData: (_target: number, _offset: number, into: Float32Array) => { calls.push('getBufferSubData'); into.set(state); },
     };
     const invalidated = vi.fn();
     const renderer = {
-      getContext: () => gl, getRenderTarget: () => null, setRenderTarget() {}, render() {}, toneMappingExposure: 1,
+      getContext: () => gl, getRenderTarget: () => null, setRenderTarget() {}, initRenderTarget() {}, render() {},
       getDrawingBufferSize: (size: {set(x: number, y: number): unknown}) => size.set(8, 8),
     } as unknown as WebGLRenderer;
-    const exposure = createAutoExposure(renderer, testCamera(), sun(30, 40), invalidated);
+    const camera = testCamera(), exposure = createAutoExposure(renderer, camera, sun(30, 40), invalidated);
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const frame = (quiet: boolean) => { now += 17; invalidated.mockClear(); exposure.render(new Scene(), {} as never, quiet); };
     try {
-      exposure.render({} as never, {} as never);
-      expect(calls).toEqual(['createBuffer', 'bufferData', 'readPixels']);
-      flush(); // The fence has not signalled: no data is fetched yet.
-      expect(calls).not.toContain('getBufferSubData');
+      // A frame something else asked for (the replay moving) reads nothing back, and asks for the next.
+      frame(false);
+      expect(calls).toEqual([]); expect(invalidated).toHaveBeenCalled();
+      // A quiet frame reads the state; the fence has not signalled at the next frame's top, then has.
+      signals.push('pending', 'signalled');
+      frame(true);
+      expect(calls).toEqual(['createBuffer', 'readPixels']);
+      exposure.collect(); expect(calls).not.toContain('getBufferSubData');
+      // Not yet settled: 1 stop off the law's target for its metering. The reading asks for more frames.
+      const look = profileAt(camera.types.external, sun(30, 40)), unit = meterUnit(camera.sceneLuminanceScale);
+      const target = Math.log2(lawExposure(look, camera.types.external.adaptationScale, -1, unit));
+      state = [target - 1, 0, -1, 1]; invalidated.mockClear();
       flush();
-      expect(calls.slice(-4)).toEqual(['wait', 'getBufferSubData', 'deleteSync', 'deleteBuffer']);
-      expect(invalidated).toHaveBeenCalled(); // The first reading is unadapted.
-      // The next reading, a period on (four frames at 60 Hz): none before it.
-      let now = performance.now();
-      vi.spyOn(performance, 'now').mockImplementation(() => now);
-      for (let frame = 0; frame < 3; frame++) { now += 17; exposure.render({} as never, {} as never); }
-      expect(calls.filter(call => call === 'readPixels')).toHaveLength(1);
-      now += 17; exposure.render({} as never, {} as never);
-      expect(calls.filter(call => call === 'createBuffer')).toHaveLength(2); // Written once each: the browser's copy of it stays.
-      expect(calls.filter(call => call === 'readPixels')).toHaveLength(2);
-      // A frame's top fetches it before the frame poll does; the poll then finds nothing to fetch.
-      signals.push('signalled');
-      exposure.collect();
-      expect(calls.slice(-4)).toEqual(['wait', 'getBufferSubData', 'deleteSync', 'deleteBuffer']);
-      const fetched = calls.length;
-      flush(); exposure.collect();
-      expect(calls).toHaveLength(fetched);
+      expect(calls.slice(-3)).toEqual(['getBufferSubData', 'deleteSync', 'deleteBuffer']); expect(invalidated).toHaveBeenCalled();
+      // The next reading waits 250 ms; then on the target it settles, and quiet frames stop asking.
+      frame(true); expect(calls.filter(call => call === 'readPixels')).toHaveLength(1);
+      now += 250; frame(true); expect(calls.filter(call => call === 'readPixels')).toHaveLength(2);
+      state = [target, 0, -1, 1]; exposure.collect();
+      frame(true); expect(invalidated).not.toHaveBeenCalled();
+      // A frame that moved unsettles it again; a reading taken before such a frame is dropped.
+      frame(false); expect(invalidated).toHaveBeenCalled();
+      now += 250; frame(true); frame(false); exposure.collect();
+      frame(true); expect(invalidated).toHaveBeenCalled();
       // A fence that cannot be made (a lost context) lets its reading's buffer go.
-      fenceFails = true; now += 300; exposure.render({} as never, {} as never); fenceFails = false;
+      fenceFails = true; now += 250; frame(true); fenceFails = false;
       expect(calls.slice(-2)).toEqual(['readPixels', 'deleteBuffer']);
       // A reading pending at dispose lets its buffer and fence go.
-      now += 300; exposure.render({} as never, {} as never);
+      now += 250; frame(true);
       exposure.dispose();
       expect(calls.slice(-2)).toEqual(['deleteSync', 'deleteBuffer']);
     } finally { vi.unstubAllGlobals(); vi.restoreAllMocks(); }

@@ -4,7 +4,7 @@ import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M,
 import { getHeatmapColor } from '../../../../../src/components/replay/map/replayMapUtils.js';
 import { TELEMETRY_COLORS } from '../../../../../src/utils/themeColors.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
-import { inverseToneCurve, toneCurve } from '../../../../../src/components/replay/view3d/autoExposure.js';
+import { EXPOSURE_GLSL, exposureUniforms, inverseToneCurve, toneCurve } from '../../../../../src/components/replay/view3d/autoExposure.js';
 
 const curve = {a: 2.5, b: 0.6}, display = {toneCurve: curve, outputGamma: 1};
 
@@ -34,8 +34,14 @@ it('divides auto-exposure out of the line colour, so the line keeps its colours 
     {x: 0, y: 0, z: 0, timeSec: 0}, {x: 1, y: 0, z: 0, timeSec: 0.1},
   ]};
   const line = makeRacingLine(lap, new Vector3(), [], () => 0, () => display);
-  line.onBeforeRender({toneMappingExposure: 2} as never, null as never, null as never, null as never, null as never, null as never);
-  expect(line.material.color.r).toBeCloseTo(0.5);
+  const shader = {uniforms: {} as Record<string, unknown>, vertexShader: '#include <fog_pars_vertex>\n#include <fog_vertex>',
+    fragmentShader: '#include <common>\n#include <fog_pars_fragment>\nvoid main() {\n#include <color_fragment>\n#include <fog_fragment>\n}'};
+  line.material.onBeforeCompile(shader as never, null as never);
+  // It reads the exposure the GPU adapted (the same uniform as the canvas pass) and divides it out of the colour before the haze.
+  expect(shader.uniforms.exposure_state).toBe(exposureUniforms.exposure_state);
+  expect(shader.fragmentShader).toContain(EXPOSURE_GLSL);
+  expect(shader.fragmentShader.indexOf('diffuseColor.rgb /= displayExposure()')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <color_fragment>'));
+  expect(shader.fragmentShader.indexOf('diffuseColor.rgb /= displayExposure()')).toBeLessThan(shader.fragmentShader.indexOf('haze'));
 });
 
 it('colours the ribbon with the 2D map modes', () => {

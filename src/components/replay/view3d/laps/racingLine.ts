@@ -5,7 +5,7 @@ import { computeLapComparisons } from '../../../../utils/replayComparison.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
-import { inverseToneCurve, type DisplayTransform } from '../autoExposure.js';
+import { EXPOSURE_GLSL, exposureUniforms, inverseToneCurve, type DisplayTransform } from '../autoExposure.js';
 import { hazeProgram } from '../atmosphere/haze.js';
 
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
@@ -82,13 +82,18 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
 export function makeDataMesh(geometry: BufferGeometry, colors: string[], display: () => DisplayTransform, renderOrder: number): Mesh<BufferGeometry, MeshBasicMaterial> {
   // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
   const material = new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
+  // Data, not lit scenery: its vertex colours are what the display transform shows as the 2D map's colours (colorRacingLine), and
+  // exposure is a linear scale before the curve, so dividing the GPU's adapted exposure out keeps those pixels whatever auto-exposure
+  // picks. A camera type with another curve re-bakes the colours (syncRacingLine).
+  material.onBeforeCompile = shader => {
+    shader.uniforms.exposure_state = exposureUniforms.exposure_state;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${EXPOSURE_GLSL}`)
+      .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb /= displayExposure();');
+  };
   hazeProgram(material);
   const mesh = new Mesh(geometry, material);
   mesh.renderOrder = renderOrder;
-  // Data, not lit scenery: its vertex colours are what the display transform shows as the 2D map's colours (colorRacingLine), and
-  // exposure is a linear scale before the curve, so dividing it out keeps those pixels whatever auto-exposure picks. A camera
-  // type with another curve re-bakes the colours (syncRacingLine).
-  mesh.onBeforeRender = renderer => { mesh.material.color.setScalar(1 / renderer.toneMappingExposure); };
   lineColours.set(mesh, {display, colors, baked: null});
   colorRacingLine(mesh, colors);
   return mesh;
