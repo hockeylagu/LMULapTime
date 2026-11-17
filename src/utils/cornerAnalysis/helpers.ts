@@ -251,6 +251,20 @@ export function maxSpeedInRangeKmh(points: ReplayTrajectoryPoint[], dists: numbe
   return maxV;
 }
 
+/**
+ * Where a lap is slowest between two distances, its own apex of a corner: the last sample at the lowest speed, as
+ * `findSpeedTurningPoints` picks the primary lap's. Undefined when no sample lies between them.
+ */
+export function slowestDistInRange(points: ReplayTrajectoryPoint[], dists: number[], fromDist: number, toDist: number): number | undefined {
+  let slowest: number | undefined, minV = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    if (!(dists[i] >= fromDist && dists[i] <= toDist)) continue;
+    const v = points[i].speedKmh || 0;
+    if (v <= minV) { minV = v; slowest = dists[i]; }
+  }
+  return slowest;
+}
+
 export function getHeadingAtDistance(points: ReplayTrajectoryPoint[], dists: number[], d: number, spanM = 4): number {
   if (points.length < 2 || dists.length < 2) return 0;
   const maxD = dists[dists.length - 1] || d;

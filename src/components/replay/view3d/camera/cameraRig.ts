@@ -71,6 +71,8 @@ export interface CameraRig {
   /** Switches the mode; false when it is the current one. */
   setMode(next: CameraMode): boolean;
   reset(): void;
+  /** Stands a free camera at `eye` looking at `look` (scene coordinates); the car moving on leaves it there. */
+  frame(eye: Vector3, look: Vector3): void;
   center(): void;
   zoom(direction: number): void;
   pan(horizontal: number, vertical: number): void;
@@ -181,6 +183,11 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
       return true;
     },
     reset,
+    frame(eye, look) {
+      placed = true;
+      camera.up.set(0, 1, 0); camera.position.copy(eye); controls.target.copy(look); camera.lookAt(look);
+      controls.update(); changed();
+    },
     center() {
       if (isDriverCamera(mode)) { reset(); return; }
       camera.position.add(new Vector3().subVectors(target, controls.target));

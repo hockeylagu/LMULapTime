@@ -6,6 +6,7 @@ import type { MapColorMode } from '../../map/replayMapUtils.js';
 import { createGhostClock } from '../../map/ghostSync.js';
 import type { CarSets } from '../cars/drawnCar.js';
 import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine, syncRacingLine } from './racingLine.js';
+import { makeDrivingMarks, type DrivingMark } from './drivingMarks.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { DisplayTransform } from '../autoExposure.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
@@ -40,6 +41,14 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const root = new Group(); root.add(primary, ghost, primaryLine); if (baselineLine) root.add(baselineLine);
     const primaryDistances = getTrajectoryDistances(trajectory.points, trajectory.trackLengthM);
     const baselineDistances = baseline ? getDistancesInReferenceFrame(baseline.points, trajectory.points, trajectory.trackLengthM) : [];
+    const markedLaps = {primary: {points: trajectory.points, distances: primaryDistances}, baseline: baseline ? {points: baseline.points, distances: baselineDistances} : null};
+    let marks: (ReturnType<typeof makeDrivingMarks> & {list: DrivingMark[]}) | null = null;
+    const showMarks = (list: DrivingMark[] | null) => {
+      if (marks) { marks.mesh.removeFromParent(); disposeObjects(marks.mesh); marks = null; }
+      if (!list?.length) return;
+      marks = {...makeDrivingMarks(list, markedLaps, origin, surfaceHeight, display), list};
+      root.add(marks.mesh);
+    };
     return {
       root, trajectory, baseline, primary, ghost, primaryMotion, ghostMotion,
       /** The primary car's game cameras (cockpit, hood and roof views). */
@@ -52,7 +61,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         colorRacingLine(primaryLine, colors.primary); if (baselineLine) colorRacingLine(baselineLine, colors.baseline);
       },
       /** The camera type changed: re-bake the line colours for its display transform. */
-      syncLines() { syncRacingLine(primaryLine); if (baselineLine) syncRacingLine(baselineLine); },
+      syncLines() { syncRacingLine(primaryLine); if (baselineLine) syncRacingLine(baselineLine); if (marks) syncRacingLine(marks.mesh); },
+      /** Draws a corner's driving marks on the road (`drivingMarks.ts`), replacing any shown; null clears them. */
+      showMarks,
       fadeLines(primaryOpacity: number, baselineOpacity: number) {
         // Opacity 0 hides a line: nothing to draw, and nothing for its transparent pass to sort.
         primaryLine.material.opacity = primaryOpacity; primaryLine.visible = primaryOpacity > 0;
@@ -67,6 +78,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         primaryMotion.refreshHeights(); ghostMotion?.refreshHeights();
         refreshRacingLine(primaryLine, trajectory, origin, colors.primary, surfaceHeight);
         if (baselineLine && baseline) refreshRacingLine(baselineLine, baseline, origin, colors.baseline, surfaceHeight, BASELINE_LINE.widthM, BASELINE_LINE.liftM);
+        if (marks?.missing) showMarks(marks.list);
       },
       dispose() { root.removeFromParent(); cars.primarySet.dispose(); disposeObjects(root); },
     };

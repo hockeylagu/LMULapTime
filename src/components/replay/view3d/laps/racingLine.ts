@@ -69,20 +69,29 @@ function fillHeights(heights: Array<number | null>, lap: ReplayTrajectoryData, s
 export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, display: () => DisplayTransform, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): Mesh<BufferGeometry, MeshBasicMaterial> {
   const heights: Array<number | null> = lap.points.map(() => null);
   fillHeights(heights, lap, surfaceHeight);
-  const geometry = racingLineGeometry(lap, origin, heights, widthM, liftM);
+  const line = makeDataMesh(racingLineGeometry(lap, origin, heights, widthM, liftM), colors, display, liftM > LIFT_M ? 3 : 2);
+  line.name = 'racing-line';
+  lineHeights.set(line, heights);
+  return line;
+}
+
+/**
+ * A mesh drawn in the 2D map's colours on the road (the racing lines, the driving marks): `geometry` has a `color` attribute with
+ * two vertices per entry of `colors`. `colorRacingLine` and `syncRacingLine` keep its colours.
+ */
+export function makeDataMesh(geometry: BufferGeometry, colors: string[], display: () => DisplayTransform, renderOrder: number): Mesh<BufferGeometry, MeshBasicMaterial> {
   // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
   const material = new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
   hazeProgram(material);
-  const line = new Mesh(geometry, material);
-  line.name = 'racing-line';
-  line.renderOrder = liftM > LIFT_M ? 3 : 2;
+  const mesh = new Mesh(geometry, material);
+  mesh.renderOrder = renderOrder;
   // Data, not lit scenery: its vertex colours are what the display transform shows as the 2D map's colours (colorRacingLine), and
   // exposure is a linear scale before the curve, so dividing it out keeps those pixels whatever auto-exposure picks. A camera
   // type with another curve re-bakes the colours (syncRacingLine).
-  line.onBeforeRender = renderer => { line.material.color.setScalar(1 / renderer.toneMappingExposure); };
-  lineHeights.set(line, heights); lineColours.set(line, {display, colors, baked: null});
-  colorRacingLine(line, colors);
-  return line;
+  mesh.onBeforeRender = renderer => { mesh.material.color.setScalar(1 / renderer.toneMappingExposure); };
+  lineColours.set(mesh, {display, colors, baked: null});
+  colorRacingLine(mesh, colors);
+  return mesh;
 }
 
 /** Inverts each colour through the output encode and the tone curve: the exposed value the display shows as that colour. */

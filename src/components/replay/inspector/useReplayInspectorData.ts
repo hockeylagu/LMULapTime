@@ -605,7 +605,9 @@ export function useReplayInspectorData({
       let clock = playbackClockRef.current;
       // The cursor was moved (scrub, corner jump) while playing: carry on from there.
       if (!clock) clock = playbackClockAt(points, currentIndexRef.current);
-      const next = advancePlaybackClock(points, clock, elapsedMs, playbackSpeed);
+      let next = advancePlaybackClock(points, clock, elapsedMs, playbackSpeed);
+      const loop = playbackCursor.loopOf(points);
+      if (loop && (!next || next.index > loop.end)) next = playbackClockAt(points, loop.start);
       if (!next) {
         playbackCursor.drive(null);
         playbackCursor.clear();

@@ -96,6 +96,17 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.baselineExitSpeedKmh).toBe(200);
     expect(corner.primaryMinSpeedKmh).toBe(90);
     expect(corner.minSpeedDeltaKmh).toBe(-10);
+    // The comparison lap's own slowest point, picked as the primary lap's: the same shape gives the same spot.
+    expect(corner.baselineMinDistM).toBe(70);
+  });
+
+  it("finds the comparison lap's own slowest point, which can lie away from the primary lap's", () => {
+    const primary = buildLap(90, 0.3);
+    const baseline = buildLap(100, 0.3).map(p => p.x === 80 ? {...p, speedKmh: 95} : p);
+    const corner = computeLapSegmentComparisons(primary, baseline).find(s => s.type === 'corner');
+    if (corner?.type !== 'corner') throw new Error('expected corner segment');
+    expect(corner.minDistM).toBe(70);
+    expect(corner.baselineMinDistM).toBe(80);
   });
 
   it('reports a positive (lost time) delta isolated to the corner segment only', () => {

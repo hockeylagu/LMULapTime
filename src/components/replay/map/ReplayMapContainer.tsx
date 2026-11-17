@@ -136,7 +136,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
         onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))} trackGeometry={trackGeometry}
         isExpanded={is3d && isExpanded} onToggleExpanded={handleToggleExpanded}
-        showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
+        showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)}
+        focusCorner={selectedCorner} onLeaveCorner={onSelectCornerNumber && (() => onSelectCornerNumber(null))} />
     </Suspense>
   </div>;
 

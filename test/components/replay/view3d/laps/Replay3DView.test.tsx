@@ -9,8 +9,10 @@ import { ReplayShortcutHelp } from '../../../../../src/components/replay/ReplayS
 import { replayShortcutBlocked } from '../../../../../src/utils/replayShortcuts.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../../src/components/replay/inspector/replayPlaybackCursor.js';
+import { ReplayFullscreenControlsContext, type ReplayFullscreenControls } from '../../../../../src/components/replay/inspector/replayFullscreenControls.js';
+import type { CornerSegmentComparison } from '../../../../../src/utils/cornerAnalysis/types.js';
 
-const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
+const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), frameStretch: vi.fn(), showMarks: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
 vi.mock('../../../../../src/components/replay/view3d/laps/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene), lapFirstStation: () => 0}));
 vi.mock('../../../../../src/components/replay/view3d/scene/sceneShell.js', () => ({createSceneShell: () => ({started: false, broken: false, detach() {}, dispose() {}})}));
 const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
@@ -332,4 +334,45 @@ it('uses the interpolated playhead for the collapsed HUD, fullscreen comparison 
   const advance = vi.fn(); cursor.drive(advance);
   (scene.beforeFrame.mock.calls.at(-1)![0] as (frameTime: number) => void)(40);
   expect(advance).toHaveBeenCalledWith(40);
+});
+
+it('repeats a picked corner from its entry, keeping the camera until the corner view is asked for', async () => {
+  const cursor = createPlaybackCursor(), onSelectIndex = vi.fn(), onLeaveCorner = vi.fn(), onChangeSpeed = vi.fn();
+  const corner = {type: 'corner', cornerNumber: 4, entryDistM: 1, primaryBrakingDistM: null, minDistM: 3, baselineMinDistM: 2.5,
+    primaryThrottleOnDistM: 4, exitDistM: 5, timeDeltaSec: 0.25} as CornerSegmentComparison;
+  const controls = {playback: {speed: 1, speeds: [0.5, 1], onChangeSpeed}} as unknown as ReplayFullscreenControls;
+  const view = (active: boolean) => <ReplayPlaybackCursorContext.Provider value={cursor}><ReplayFullscreenControlsContext.Provider value={controls}>
+    <Replay3DView trajectory={trajectory} baseline={trajectory} currentIndex={0} onSelectIndex={onSelectIndex} onReturnTo2D={vi.fn()}
+      active={active} focusCorner={corner} onLeaveCorner={onLeaveCorner} />
+  </ReplayFullscreenControlsContext.Provider></ReplayPlaybackCursorContext.Provider>;
+  const {rerender} = render(view(true));
+  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toMatch(/Textured car/));
+  expect(onSelectIndex).toHaveBeenLastCalledWith(1);
+  expect(cursor.loopOf(trajectory.points)).toEqual({points: trajectory.points, start: 1, end: 5});
+  expect(scene.mode).not.toHaveBeenCalledWith('orbit');
+  // Each lap's driving marks lie on its line; a point the lap lacks (no braking here) is left out.
+  expect(scene.showMarks).toHaveBeenLastCalledWith([{lap: 'primary', kind: 'apex', distM: 3}, {lap: 'primary', kind: 'throttle', distM: 4},
+    {lap: 'baseline', kind: 'apex', distM: 2.5}]);
+  const bar = screen.getByTestId('corner-focus-bar');
+  expect(within(bar).getByText('T4')).toBeInTheDocument();
+  expect(within(bar).getByText('+0.250s')).toBeInTheDocument();
+  fireEvent.click(within(bar).getByRole('button', {name: /Slow/}));
+  expect(onChangeSpeed).toHaveBeenCalledWith(0.5);
+  fireEvent.click(within(bar).getByRole('button', {name: /Corner view/}));
+  await waitFor(() => expect(scene.frameStretch).toHaveBeenCalledWith(trajectory.points, 1, 5, 3));
+  expect(scene.mode).toHaveBeenLastCalledWith('orbit');
+  // Asked again after orbiting away, the corner view is placed again.
+  fireEvent.click(within(bar).getByRole('button', {name: /Corner view/}));
+  await waitFor(() => expect(scene.frameStretch).toHaveBeenCalledTimes(2));
+  fireEvent.click(within(bar).getByRole('button', {name: /Loop/}));
+  expect(cursor.loopOf(trajectory.points)).toBeNull();
+  fireEvent.click(within(bar).getByRole('button', {name: 'Leave corner focus'}));
+  expect(onLeaveCorner).toHaveBeenCalledOnce();
+  // Hidden behind the 2D map, the view neither shows the bar nor loops.
+  fireEvent.click(within(bar).getByRole('button', {name: /Loop/}));
+  expect(cursor.loopOf(trajectory.points)).not.toBeNull();
+  rerender(view(false));
+  expect(screen.queryByTestId('corner-focus-bar')).toBeNull();
+  expect(cursor.loopOf(trajectory.points)).toBeNull();
+  expect(scene.showMarks).toHaveBeenLastCalledWith(null);
 });

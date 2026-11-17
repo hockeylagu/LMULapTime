@@ -24,6 +24,9 @@ import { useGpsMapShortcuts } from '../../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
 import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../../inspector/ghostSyncContext.js';
 import { nextGhostSyncMode } from '../../map/ghostSync.js';
+import type { CornerSegmentComparison } from '../../../../utils/cornerAnalysis/types.js';
+import { useCornerFocus } from './useCornerFocus.js';
+import { CornerFocusBar } from './CornerFocusBar.js';
 
 interface Props {
   trajectory: ReplayTrajectoryData;
@@ -46,9 +49,12 @@ interface Props {
   /** False while kept loaded behind the 2D map: the view is hidden and takes the focus again when shown. */
   active?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
+  /** The corner picked in the inspector: the view repeats it (corner focus); null for none. */
+  focusCorner?: CornerSegmentComparison | null;
+  onLeaveCorner?: () => void;
 }
 
-export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy, currentPoint, fadedLine, onToggleFadedLine, trackGeometry, showFrictionCircle, onToggleFrictionCircle, isExpanded: controlledExpanded, onToggleExpanded, active = true}: Props) {
+export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy, currentPoint, fadedLine, onToggleFadedLine, trackGeometry, showFrictionCircle, onToggleFrictionCircle, isExpanded: controlledExpanded, onToggleExpanded, active = true, focusCorner = null, onLeaveCorner}: Props) {
   const map = useRef<HTMLDivElement>(null), [internalExpanded, setInternalExpanded] = useState(false);
   const isExpanded = controlledExpanded ?? internalExpanded;
   const handleToggleExpanded = (expanded?: boolean) => {
@@ -77,6 +83,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
     syncMode: ghostSync.mode, anchorDistM: ghostSync.markerDistM,
   });
   const activePrimaryPoint = currentPrimaryPoint ?? currentPoint ?? null;
+  const cornerFocus = useCornerFocus({scene, sceneState: state, points: trajectory.points, primaryDists, corner: focusCorner, compared: Boolean(baseline), active,
+    mode, setMode, onSelectIndex});
   const primaryLapSummary = trajectory.laps?.find(l => l.lapNumber === trajectory.currentLap) ?? trajectory.laps?.[0];
   const baselineLapSummary = baseline?.laps?.find(l => l.lapNumber === baseline.currentLap) ?? baseline?.laps?.[0];
 
@@ -117,6 +125,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
       )}
       overlays={<>
         <HeatmapLegendBar colorBy={colorBy} />
+        {cornerFocus.focused && focusCorner && onLeaveCorner && <CornerFocusBar corner={focusCorner} compared={Boolean(baseline)}
+          looping={cornerFocus.looping} onToggleLoop={cornerFocus.toggleLoop} onFrame={cornerFocus.frame} onClose={onLeaveCorner} />}
         {isExpanded && <GpsMapExpandedOverlays points={trajectory.points} currentIndex={activeIndex}
           primaryLapSummary={primaryLapSummary} baselineLapSummary={baselineLapSummary} comparisons={comparisons}
           sectors={trajectory.sectors} deltaTimeSec={currentDeltaTimeSec} primaryPoint={activePrimaryPoint ?? undefined}

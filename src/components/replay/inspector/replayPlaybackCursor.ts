@@ -7,6 +7,13 @@ interface PlaybackPosition extends PlaybackClock {
   fraction: number;
 }
 
+/** A stretch of a lap's samples that playback repeats: past `end`, or the lap's end, it starts again at `start`. */
+export interface PlaybackLoop {
+  points: ReplayTrajectoryPoint[];
+  start: number;
+  end: number;
+}
+
 /**
  * Frame updates go only to moving visuals; the inspector still reads real samples.
  *
@@ -17,7 +24,7 @@ interface PlaybackPosition extends PlaybackClock {
 export function createPlaybackCursor() {
   let position: PlaybackPosition | null = null;
   let reactPosition: PlaybackPosition | null = null;
-  let driver: ((frameTime: number) => void) | null = null, lastTick = -Infinity;
+  let driver: ((frameTime: number) => void) | null = null, lastTick = -Infinity, loop: PlaybackLoop | null = null;
   const listeners = new Set<() => void>();
   const reactListeners = new Set<() => void>();
   return {
@@ -31,6 +38,10 @@ export function createPlaybackCursor() {
       listeners.add(listener);
       return () => { listeners.delete(listener); };
     },
+    /** Repeats a stretch of the lap (a corner in focus); null plays the lap through. */
+    setLoop: (next: PlaybackLoop | null) => { loop = next; },
+    /** The stretch repeated on `points`, if any. */
+    loopOf: (points: ReplayTrajectoryPoint[]) => (loop?.points === points ? loop : null),
     /** While playing, the function that advances the clock to a frame's time and publishes it; null when stopped. */
     drive: (next: ((frameTime: number) => void) | null) => { driver = next; lastTick = -Infinity; },
     /** Advances the playing clock to `frameTime` (an animation-frame timestamp) unless this frame already did. */

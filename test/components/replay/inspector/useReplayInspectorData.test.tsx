@@ -291,6 +291,41 @@ describe('useReplayInspectorData session locators', () => {
     expect(result.current.playbackCursor.getSnapshot()).toBeNull();
   });
 
+  it('repeats a looped stretch past its end and past the lap end', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = requestUrl(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response({ ...trajectory, pointsCount: 101,
+        points: Array.from({ length: 101 }, (_, index) => ({ x: index, y: 0, z: 0, timeSec: index / 100 })),
+      });
+    });
+    let frame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frame = callback; return 1; });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => { frame = undefined; });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const points = result.current.trajectory!.points, cursor = result.current.playbackCursor;
+    cursor.setLoop({ points, start: 2, end: 5 });
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    act(() => result.current.setIsPlaying(true));
+    act(() => frame?.(1015));
+    expect(cursor.getSnapshot()?.index).toBe(1);
+    act(() => frame?.(1080));
+    expect(cursor.getSnapshot()?.index).toBe(2);
+    // A loop running past the lap's end starts again too: the last sample shows for a frame first.
+    cursor.setLoop({ points, start: 2, end: 1000 });
+    act(() => frame?.(3000));
+    expect(cursor.getSnapshot()?.index).toBe(100);
+    act(() => frame?.(3016));
+    expect(cursor.getSnapshot()?.index).toBe(2);
+    expect(result.current.isPlaying).toBe(true);
+    // Another lap's loop is not this one's.
+    cursor.setLoop({ points: [...points], start: 2, end: 5 });
+    act(() => frame?.(3200));
+    expect(cursor.getSnapshot()?.index).toBe(20);
+  });
+
   it('preserves the interpolated playback position when pausing so the car does not rewind', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);

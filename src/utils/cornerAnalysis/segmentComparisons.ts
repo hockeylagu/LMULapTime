@@ -16,7 +16,7 @@ import type {
 import {
   BRAKE_ONSET_LOOKBACK_M, BRAKE_ON_THRESHOLD_PCT, MIN_STRAIGHT_LENGTH_M, SEGMENT_SCAN_STEP_M, STEER_REVERSAL_FRACTION,
   THROTTLE_ON_MIN_HOLD_SEC, THROTTLE_ON_THRESHOLD_PCT, computeMaxAbsSteer, findSpeedTurningPoints, findThresholdCrossingDistM,
-  getHeadingAtDistance, maxSpeedInRangeKmh, throttleOnsetLookbackM, type SpeedTurningPoint,
+  getHeadingAtDistance, maxSpeedInRangeKmh, slowestDistInRange, throttleOnsetLookbackM, type SpeedTurningPoint,
 } from './helpers.js';
 
 type RoadEdge = 'leftRoadDistanceM' | 'rightRoadDistanceM';
@@ -560,6 +560,7 @@ export function computeLapSegmentComparisons(
       primaryTurnInDistM,
       baselineTurnInDistM,
       turnInDeltaM,
+      baselineMinDistM: slowestDistInRange(baselinePoints, baselineDists, entry.distM, exit.distM),
       straightBrakingDistM,
       trailBrakeDistM: roundedTrailBrakeDistM,
       trailBrakeDurationSec: roundedTrailBrakeDurationSec,
