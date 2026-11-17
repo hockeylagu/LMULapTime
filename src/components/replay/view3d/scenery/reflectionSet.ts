@@ -10,8 +10,8 @@ import type { ChunkLoader } from './chunkLoader.js';
  * sector and shows while the sector does; `root` itself stays hidden outside the probe's faces.
  */
 export interface ReflectionSet {
-  /** Null when the layout has no reflection chunk: the probe then draws the scenery. */
-  readonly root: Group | null;
+  /** The loaded reflection chunks: empty when the layout has none, and the probe reflects only the sky. */
+  readonly root: Group;
   /** Loads the reflection chunk of a scenery chunk, if it has one. */
   load(id: string, signal: AbortSignal): Promise<Object3D | null>;
   /** A scenery chunk and its loaded reflection chunk: from now on the reflection shows while the scenery does. */
@@ -23,8 +23,8 @@ export interface ReflectionSet {
 /** `origin` is the scene origin the scenery root is shifted by; the set's root is shifted alike. */
 export function createReflectionSet(layout: SceneryLayout, loader: ChunkLoader, origin: Vector3): ReflectionSet {
   const chunks = new Map(layout.reflection.chunks.map(chunk => [chunk.id, chunk]));
-  const root = chunks.size > 0 ? new Group() : null;
-  if (root) { root.position.copy(origin).negate(); root.visible = false; }
+  const root = new Group();
+  root.position.copy(origin).negate(); root.visible = false;
   const pairs: Array<readonly [Object3D, Object3D]> = [];
   return {
     root,
@@ -33,7 +33,6 @@ export function createReflectionSet(layout: SceneryLayout, loader: ChunkLoader, 
       return chunk ? loader.load(chunk, signal) : Promise.resolve(null);
     },
     join(scenery, reflection) {
-      if (!root) return;
       reflection.visible = false;
       root.add(reflection);
       // The scene's matrices update only where it shows, and the set never shows in a frame: placed once, here.

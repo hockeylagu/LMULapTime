@@ -175,7 +175,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     .translate(new Vector3(-origin.x, -origin.y, origin.z));
   // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
   const batches = createSceneryBatches(sceneryRoot, layout.materials, renderer.capabilities.maxTextures);
-  // What the car's probe draws in place of the scenery, chunk by chunk with it (null without one: the probe draws the scenery).
+  // What the car's probe draws in place of the scenery, chunk by chunk with it.
   const reflectionSet = createReflectionSet(layout, loader, origin);
   let content: SceneContent | null = null;
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
@@ -275,13 +275,13 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const convolution = linkConvolution(renderer, layout.shading.convolution.kernels);
   lit = Promise.resolve().then(() => {
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null, sun);
-    reflection = createCarReflection(renderer, scene, layout.shading, reflectionSet.root && {set: reflectionSet.root, scenery: sceneryRoot});
+    reflection = createCarReflection(renderer, scene, layout.shading, {set: reflectionSet.root, scenery: sceneryRoot});
   });
   lit.then(() => report({lighting: 1}), () => {}); // Awaited by the content.
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(sceneryRoot);
-  if (reflectionSet.root) world.add(reflectionSet.root);
+  world.add(reflectionSet.root);
   const route = layout.routeLengthM;
   /** Stream scenery around the car (lap distance, plus what is near the camera) or, for the panned orbit and overhead cameras, around the camera. */
   const updateStream = () => {
@@ -336,7 +336,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       }
       exposure.render(scene, camera);
       drawnView.position.copy(camera.position); drawnView.matrixWorldInverse.copy(camera.matrixWorldInverse); drawnView.projectionMatrix.copy(camera.projectionMatrix);
-      // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
+      // The car's reflection probe renders three faces after the frame (car/carReflection.ts), around the body's centre.
       if (car.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
     } finally {
       if (corrected) {

@@ -57,7 +57,10 @@ function stubRenderer() {
   return {renderer: renderer as unknown as WebGLRenderer, faces, eyes, ranges, cars, target: () => target};
 }
 
-it('renders the probe one face a frame from the roof without the cars, then gives the car its reflection', () => {
+/** What the faces draw: an empty reflection set, and the scenery it stands for. */
+const setFaces = () => ({set: new Group(), scenery: new Group()});
+
+it('renders the probe three faces a frame from the roof without the cars, then gives the car its reflection', () => {
   const {renderer, faces, eyes, ranges, cars, target} = stubRenderer();
   const glass = new MeshPhysicalMaterial(), unlit = new MeshBasicMaterial({envMap: null}), paint = new MeshPhysicalMaterial({map: new Texture()});
   configureCarPaint(paint, carPaint(), () => new Texture(), testShading());
@@ -76,17 +79,16 @@ it('renders the probe one face a frame from the roof without the cars, then give
   const body = new Mesh(new BoxGeometry(2, 2, 4), [glass, unlit, paint, lamp]); body.position.y = 1;
   const car = new Group().add(body);
   cars.add(car);
-  const reflection = createCarReflection(renderer, new Scene(), testShading()), centre = new Vector3(10, 0.5, 20);
+  const reflection = createCarReflection(renderer, new Scene(), testShading(), setFaces()), centre = new Vector3(10, 0.5, 20);
   // The prefiltered target is converted once from the empty cube, and the car's lit materials take it at once: its size is a
   // program define, so they compile a single time.
   expect(pmrem.conversions).toBe(1);
   reflection.setCar(car, cars);
   expect(glass.envMap).not.toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0);
-  for (let i = 0; i < 6; i++) expect(reflection.update(centre)).toBe(true);
-  // The conversions wait for frames of their own: three's prefilter, then the paint's convolution.
-  expect(pmrem.conversions).toBe(1); expect(pmrem.convolutions).toBe(0);
+  // Three faces a frame: three's prefilter rides with the last three, the paint's convolution takes the frame after.
+  expect(reflection.update(centre)).toBe(true); expect(pmrem.conversions).toBe(1);
   expect(reflection.update(centre)).toBe(true); expect(pmrem.conversions).toBe(2); expect(pmrem.convolutions).toBe(0);
-  expect(reflection.update(centre)).toBe(true); expect(CAR_REFLECTION_STEPS).toBe(8);
+  expect(reflection.update(centre)).toBe(true); expect(CAR_REFLECTION_STEPS).toBe(3);
   // The cube's mips regenerate after the last face only: the kernels read them.
   expect(faces).toEqual([0, 1, 2, 3, 4, 5].map(face => ({face, carShown: false, mips: face === 5})));
   // The eye sits 0.72 m over the box centre (roof height) and each face sees from 0.1 m to 150 m.
@@ -108,23 +110,23 @@ it('renders the probe one face a frame from the roof without the cars, then give
   sceneryReflectionUniforms.surface_reflectionReady.value = 0; expect(lampUniforms().surface_reflectionReady.value).toBe(1);
   expect(lampUniforms().overhead_ready.value).toBe(0);
 
-  // A paused car keeps its probe; moving the car or new scenery starts another. Now that the car has a probe, a face renders
-  // every other frame (the frames between ask for the next): six faces and two conversions over 14 frames.
+  // A paused car keeps its probe; moving the car or new scenery starts another.
   expect(reflection.update(centre)).toBe(false);
   reflection.stale(); expect(overhead.stale).toBe(1); // New scenery: the map is drawn again too.
-  for (let i = 0; i < 14; i++) expect(reflection.update(centre)).toBe(true);
+  for (let i = 0; i < 3; i++) expect(reflection.update(centre)).toBe(true);
   expect(faces).toHaveLength(12);
   expect(reflection.update(centre)).toBe(false);
-  expect(reflection.update(new Vector3(11, 0.5, 20))).toBe(true); expect(faces).toHaveLength(12);
-  expect(reflection.update(new Vector3(11, 0.5, 20))).toBe(true);
-  expect(faces).toHaveLength(13); expect(pmrem.conversions).toBe(3); expect(pmrem.convolutions).toBe(2); expect(pmrem.reused).toBe(1); expect(pmrem.disposed).toBe(0);
-  // The second probe drew into the other cube while the car showed the first; the paint now reads the one just drawn.
-  const [shownFirst, drawnSecond] = pmrem.sources as {texture: Texture}[];
-  expect(drawnSecond).not.toBe(shownFirst); expect(paintUniforms().paint_sharp.value).toBe(drawnSecond.texture);
-  // A moving car: each face looks from where the car is at its frame, not where the probe began, so no face sees the road the
-  // car has left (sunlit where its shadow had been).
+  const moved = new Vector3(11, 0.5, 20);
+  expect(reflection.update(moved)).toBe(true); expect(reflection.update(moved)).toBe(true); expect(faces).toHaveLength(18);
+  expect(reflection.update(moved)).toBe(true);
+  expect(pmrem.conversions).toBe(4); expect(pmrem.convolutions).toBe(3); expect(pmrem.reused).toBe(2); expect(pmrem.disposed).toBe(0);
+  // Each probe drew into the other cube while the car showed the one before; the paint now reads the one just drawn.
+  const [shown, drawn] = (pmrem.sources as {texture: Texture}[]).slice(-2);
+  expect(drawn).not.toBe(shown); expect(paintUniforms().paint_sharp.value).toBe(drawn.texture);
+  // A moving car: each frame's faces look from where the car is at that frame, not where the probe began, so no face sees the
+  // road the car has left (sunlit where its shadow had been).
   reflection.update(new Vector3(12, 0.5, 20)); reflection.update(new Vector3(13, 0.5, 20));
-  expect(eyes.slice(-2).map(eye => eye.x)).toEqual([11, 13]);
+  expect(eyes.slice(-6).map(eye => eye.x)).toEqual([12, 12, 12, 13, 13, 13]);
 
   reflection.dispose();
   expect(glass.envMap).toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0); expect(pmrem.disposed).toBe(1);
@@ -135,23 +137,22 @@ it('renders the probe one face a frame from the roof without the cars, then give
 
 it('leaves a due step to the next frame when the frame is busy, never two frames in a row, and never the first probe', () => {
   const {renderer, faces} = stubRenderer();
-  const reflection = createCarReflection(renderer, new Scene(), testShading()), centre = new Vector3();
+  const reflection = createCarReflection(renderer, new Scene(), testShading(), setFaces()), centre = new Vector3();
   reflection.setCar(new Mesh(new BoxGeometry(), new MeshPhysicalMaterial()), new Group());
   for (let i = 0; i < CAR_REFLECTION_STEPS; i++) reflection.update(centre, true);
   expect(faces).toHaveLength(6);
   // The map is told the frame is busy, and waits by its own rule (overheadMap.ts).
   expect(overhead.updates.at(-1)?.busy).toBe(true);
   reflection.stale();
-  reflection.update(centre, true); // a frame between faces: nothing to leave
-  reflection.update(centre, true); expect(faces).toHaveLength(6); // the face is due: left to the next frame
-  reflection.update(centre, true); expect(faces).toHaveLength(7); // busy again, but it waited once already
-  reflection.update(centre); reflection.update(centre); expect(faces).toHaveLength(8);
+  reflection.update(centre, true); expect(faces).toHaveLength(6); // the faces are due: left to the next frame
+  reflection.update(centre, true); expect(faces).toHaveLength(9); // busy again, but it waited once already
+  reflection.update(centre); expect(faces).toHaveLength(12);
   reflection.dispose();
 });
 
 it('gives a near car the probe: its glass and trim the prefiltered cube, its paint the probe cubes from the first one on', () => {
   const {renderer} = stubRenderer();
-  const reflection = createCarReflection(renderer, new Scene(), testShading());
+  const reflection = createCarReflection(renderer, new Scene(), testShading(), setFaces());
   const own = new MeshPhysicalMaterial(), nearGlass = new MeshPhysicalMaterial(), nearPaint = new MeshPhysicalMaterial({map: new Texture()}), unlit = new MeshBasicMaterial();
   configureCarPaint(nearPaint, carPaint(), () => new Texture(), testShading());
   const probe = () => { const shader = {uniforms: {}, vertexShader: '', fragmentShader: ''}; nearPaint.onBeforeCompile(shader as never, null as never); return (shader.uniforms as Record<string, {value: unknown}>).paint_probe.value; };

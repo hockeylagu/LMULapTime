@@ -19,10 +19,10 @@ function stubLoader() {
   return {loader, loaded};
 }
 
-it('has no root without reflection chunks: the probe then draws the scenery', async () => {
+it('has an empty root without reflection chunks: the probe then reflects only the sky', async () => {
   const {loader, loaded} = stubLoader();
   const set = createReflectionSet(withReflection([]), loader, new Vector3());
-  expect(set.root).toBeNull();
+  expect(set.root.children).toEqual([]); expect(set.root.visible).toBe(false);
   expect(await set.load('s000', new AbortController().signal)).toBeNull();
   expect(loaded).toEqual([]);
 });
@@ -30,7 +30,7 @@ it('has no root without reflection chunks: the probe then draws the scenery', as
 it("loads a scenery chunk's reflection chunk by id, shifted by the scene origin, and shows it while its scenery shows", async () => {
   const {loader, loaded} = stubLoader();
   const set = createReflectionSet(withReflection([chunk('s000')]), loader, new Vector3(100, 0, 50));
-  expect(set.root?.visible).toBe(false); expect(set.root?.position.toArray()).toEqual([-100, -0, -50]);
+  expect(set.root.visible).toBe(false); expect(set.root.position.toArray()).toEqual([-100, -0, -50]);
   // A sector without a reflection chunk (sectors may have none) loads nothing.
   expect(await set.load('s001', new AbortController().signal)).toBeNull();
   const reflection = await set.load('s000', new AbortController().signal) as Object3D;

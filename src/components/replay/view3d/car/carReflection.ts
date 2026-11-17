@@ -6,31 +6,19 @@ import { isCarPaint, setPaintReflection } from './carPaint.js';
 import { createOverheadMap, OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
 
 /**
- * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. One face a frame, so a probe renews every eight
- * frames (six faces, then its two conversions): each face is a full scenery pass, and three a frame cost ~5 ms of a Silverstone frame (user, 2026-11-11). How far each
- * face sees: beyond 150 m the sky shows, the range the reference reflections reach. Each face draws its share of the scenery, so
- * the reach is the probe's cost: at 1.5 km Silverstone's frames doubled (p50 7 → 14 ms, production pass); at 300 m they matched
- * the frame without the probe.
+ * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. How far each face sees: beyond 150 m the sky shows,
+ * the range the reference reflections reach.
  */
 export const CAR_REFLECTION_PX = 1024;
-const FACES_PER_FRAME = 1, NEAR_M = 0.1, FAR_M = 150;
+const NEAR_M = 0.1, FAR_M = 150;
 /**
- * Updates a probe takes: its faces, then three's prefilter and the paint's convolution, each in a frame of its own (together with
- * the last face they made every sixth frame the slowest of a playing lap, 2026-11-12). With the reflection set it takes fewer.
+ * The probe draws the game's reflection set (scenery/reflectionSet.ts), a face a few draws of few triangles, three faces a frame:
+ * a cube every two frames, as a capture of the game's own car cube shows (2026-11-16). The conversions ride with the faces: three's
+ * prefilter with the last three, the paint's convolution with the next cube's first three, so every frame carries one step.
  */
-export const CAR_REFLECTION_STEPS = 6 / FACES_PER_FRAME + 2;
-/**
- * With the game's reflection set (scenery/reflectionSet.ts) a face is a few draws of few triangles, and the probe draws three faces
- * a frame, a cube every two frames, as a capture of the game's own car cube shows (2026-11-16). The conversions ride with the faces:
- * the prefilter with the last three, the convolution with the next cube's first three, so every frame carries one step.
- */
-const SET_FACES_PER_FRAME = 3;
-/**
- * Once the car has a probe, a face renders every other frame (the frames between ask for the next): the probe renews every
- * 14 frames instead of 8 and costs half as much a frame (a face is ~2.4 ms of GPU at the Le Mans start, 2026-11-13). The first
- * probe still renders a face a call, so the scene completes it before its first frame.
- */
-const FRAMES_PER_FACE = 2;
+const FACES_PER_FRAME = 3;
+/** Updates a first probe takes: its faces, then the frame of its convolution. */
+export const CAR_REFLECTION_STEPS = 6 / FACES_PER_FRAME + 1;
 /** A paused view keeps its finished probe until the car or the scenery moves. */
 const MOVED_M = 0.5;
 /** The probe's eye above the centre of the car's bounding box: roof height, as the reference frames place it (0.72 m on a GT3). */
@@ -53,9 +41,9 @@ export interface CarReflection {
   /** The resident scenery changed: render a new probe even if the car has not moved. */
   stale(): void;
   /**
-   * Renders the next cube face from the car's roof, given the car's position in scene coordinates, one face a frame so no
-   * frame pays for all six; the two frames after the last face convert the cube. True until the frame that shows a finished probe: the caller renders another frame.
-   * On a `busy` frame (one already carrying heavy work) a probe that has one leaves its step to the next frame, never two in a row.
+   * Renders the next three cube faces from the car's roof, given the car's position in scene coordinates, and the conversion step
+   * due. True until the frame that shows a finished probe: the caller renders another frame. On a `busy` frame (one already
+   * carrying heavy work) a probe that has one leaves its step to the next frame, never two in a row.
    */
   update(car: Vector3, busy?: boolean): boolean;
   dispose(): void;
@@ -140,17 +128,17 @@ function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null,
 }
 
 /**
- * Reflects the scenery in the cars, in place of the sky environment the scenery uses: a cube camera at the car, rendering the scene
- * without the cars. When the sixth face completes, the cube is convolved with the package's kernels for the car paint (which reads
- * the sharp cube and the convolved one by its own rule) and prefiltered by three (PMREM) for the car's other lit materials. Faces
- * render after the frame, against its current shadow cascades. Both conversions run here, between frames: given the cube itself,
- * three converts it in the middle of drawing the car, and that nested render left the car's material one texture unit over the
- * GPU's 16. The cube's mips, which the kernels read, regenerate after the last face only. The faces draw into a second cube while
- * the car shows the finished one (the paint reads the sharp cube itself): read while drawn, the paint mixed faces of two probes
- * with the mips of the older one, and popped at every eighth frame. The two cubes swap once a probe is converted.
+ * Reflects the scenery in the cars, in place of the sky environment the scenery uses: a cube camera at the car, rendering the
+ * game's reflection set (`faces`) without the cars. When the sixth face completes, the cube is prefiltered by three (PMREM) for the
+ * car's other lit materials and, the next frame, convolved with the package's kernels for the car paint (which reads the sharp
+ * cube and the convolved one by its own rule). Faces render after the frame, against its current shadow cascades. Both
+ * conversions run here, between frames: given the cube itself, three converts it in the middle of drawing the car, and that nested
+ * render left the car's material one texture unit over the GPU's 16. The cube's mips, which the kernels read, regenerate after the
+ * last face only. The faces draw into a second cube while the car shows the finished one (the paint reads the sharp cube itself):
+ * read while drawn, the paint mixed faces of two probes with the mips of the older one, and popped at each new probe. The two
+ * cubes swap once a probe is converted.
  */
-export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shading: SceneryShading, faces: ReflectionFaces | null = null): CarReflection {
-  const facesPerFrame = faces ? SET_FACES_PER_FRAME : FACES_PER_FRAME, framesPerFace = faces ? 1 : FRAMES_PER_FACE;
+export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shading: SceneryShading, faces: ReflectionFaces): CarReflection {
   const cube = () => new WebGLCubeRenderTarget(CAR_REFLECTION_PX, {type: HalfFloatType, generateMipmaps: false, minFilter: LinearMipmapLinearFilter});
   const targets = [cube(), cube()];
   /** The cube the faces draw into; the other one is shown. */
@@ -162,15 +150,14 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   const prefiltered: WebGLCubeRenderTarget = generator.fromCubemap(target.texture);
   /** What stands over the scenery around the car, and the shown probe's face eyes: the paint tells where the probe is stale. */
   const map = createOverheadMap(renderer, scene), overhead: CarOverhead = {map, eyes: new Float32Array(18)}, drawnEyes = new Float32Array(18);
-  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, rested = 0, deferred = false;
+  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, deferred = false;
   /** The paint of the cars sharing the probe (`share`), until each material is disposed. */
   const sharedPaint = new Set<Material>();
   const forget = (event: {target: Material}) => { sharedPaint.delete(event.target); };
-  /** What the next update does once the faces are drawn: prefilter them for three's materials, then convolve them for the paint. */
-  let pending: 'prefilter' | 'convolve' | null = null;
+  /** The faces are drawn and prefiltered: the next update convolves them for the paint. */
+  let convolving = false;
   let cubes: ReflectionCubes | null = null, eyeAbove = EYE_ABOVE_CENTRE_M;
   const at = new Vector3(), probed = new Vector3(), box = new Box3(), measure = new Vector3();
-  const prefilter = () => { generator.fromCubemap(target.texture, prefiltered); pending = 'convolve'; };
   const takeReflection = () => {
     for (const material of materials) {
       setSurfaceReflection(material, cubes, overhead);
@@ -207,27 +194,22 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
     stale() { stale = true; map.stale(); },
     update(car, busy = false) {
       // A step stacked on a busy frame made it one of the slowest of a race start (a face and a shadow redraw, 2026-11-15).
-      const faceDue = (face > 0 || stale || probed.distanceToSquared(car) >= MOVED_M * MOVED_M) && (rested + 1) % framesPerFace === 0;
-      if (busy && cubes && !deferred && (pending !== null || faceDue)) { deferred = true; return true; }
+      const moved = probed.distanceToSquared(car) >= MOVED_M * MOVED_M;
+      if (busy && cubes && !deferred && (convolving || face > 0 || stale || moved)) { deferred = true; return true; }
       deferred = false;
       // The map is drawn before the faces it is read with.
       if (map.update(car, hidden ? [hidden] : [], busy)) takeReflection();
-      // With the set, the convolution shares its frame with the next cube's first faces, which draw into the cube just let go.
+      // The convolution shares its frame with the next cube's first faces, which draw into the cube just let go.
       let converted = false;
-      if (pending === 'convolve') {
-        pending = null;
+      if (convolving) {
+        convolving = false;
         cubes = convolveReflection(renderer, target, shading.convolution.kernels, cubes ?? undefined); // Reuses its cube after the first probe.
         overhead.eyes.set(drawnEyes);
         takeReflection(); // The paint's sharp cube is now the one just drawn.
         target = targets[target === targets[0] ? 1 : 0];
-        if (!faces) return true; // The next frame shows the new probe.
         converted = true;
-      } else if (pending === 'prefilter' && !faces) {
-        prefilter();
-        return true;
       }
-      if (face === 0 && !stale && cubes && probed.distanceToSquared(car) < MOVED_M * MOVED_M) return converted;
-      if (cubes && ++rested % framesPerFace !== 0) return true;
+      if (face === 0 && !stale && cubes && !moved) return converted;
       if (face === 0) stale = false;
       // Each face from where the car is now, not where the probe began: the faces render against the frame's shadows, so a face
       // drawn from a place the car has left saw sunlit road where its own shadow had been, and the cockpit roof, which reflects
@@ -235,23 +217,23 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       at.copy(car);
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
       camera.position.copy(at); camera.position.y += eyeAbove; camera.updateMatrixWorld();
-      for (let each = face; each < face + facesPerFrame; each++) camera.position.toArray(drawnEyes, each * 3);
+      for (let each = face; each < face + FACES_PER_FRAME; each++) camera.position.toArray(drawnEyes, each * 3);
       const previous = renderer.getRenderTarget(), shown = hidden?.visible ?? false;
       try {
         if (hidden) hidden.visible = false;
-        if (faces) { faces.scenery.visible = false; faces.set.visible = true; }
-        for (const last = face + facesPerFrame; face < last; face++) {
+        faces.scenery.visible = false; faces.set.visible = true;
+        for (const last = face + FACES_PER_FRAME; face < last; face++) {
           target.texture.generateMipmaps = face === 5;
           renderer.setRenderTarget(target, face);
           renderer.render(scene, camera.children[face] as Parameters<WebGLRenderer['render']>[1]);
         }
       } finally {
         if (hidden) hidden.visible = shown;
-        if (faces) { faces.scenery.visible = true; faces.set.visible = false; }
+        faces.scenery.visible = true; faces.set.visible = false;
         renderer.setRenderTarget(previous);
       }
       face %= 6;
-      if (face === 0) { probed.copy(at); pending = 'prefilter'; if (faces) prefilter(); }
+      if (face === 0) { probed.copy(at); generator.fromCubemap(target.texture, prefiltered); convolving = true; }
       return true;
     },
     dispose() {
