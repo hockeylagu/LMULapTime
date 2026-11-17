@@ -6,7 +6,7 @@ import { fetchBinary, fetchJson } from '../../../src/api/apiClient.js';
 import { fetchBody } from '../../../src/api/vehicles/bodyApi.js';
 
 const json = vi.mocked(fetchJson), binary = vi.mocked(fetchBinary), signal = new AbortController().signal;
-const body = { packageRevision: 'r', folder: 'Car', sha256: 'aa', byteLength: 4, interior: null as { sha256: string; byteLength: number } | null,
+const body = { packageRevision: 'r', folder: 'Car', sha256: 'aa', byteLength: 4, full: { sha256: 'ff', byteLength: 4 }, interior: null as { sha256: string; byteLength: number } | null,
   volumes: [] as { sha256: string; byteLength: number }[] };
 
 beforeEach(() => {
@@ -32,6 +32,13 @@ it('reads the interior file with the body and rejects one of the wrong size', as
   expect(binary.mock.calls.map(call => call[0])).toEqual(['/api/data-plugin/vehicles/files/aa.glb', '/api/data-plugin/vehicles/files/bb.glb']);
   body.interior = { sha256: 'bb', byteLength: 3 };
   await expect((await fetchBody('car.veh', 'r', signal)).files()).rejects.toThrow('Incomplete 3D body');
+});
+
+it('reads the full level file in place of the exterior when asked, with the interior', async () => {
+  body.interior = { sha256: 'bb', byteLength: 2 };
+  const files = await (await fetchBody('car.veh', 'r', signal)).files(true);
+  expect([files.bytes.byteLength, files.interiorBytes?.byteLength]).toEqual([4, 2]);
+  expect(binary.mock.calls.map(call => call[0])).toEqual(['/api/data-plugin/vehicles/files/ff.glb', '/api/data-plugin/vehicles/files/bb.glb']);
 });
 
 it('loads the cabin volumes of the body by their descriptor path and rejects one of the wrong size', async () => {

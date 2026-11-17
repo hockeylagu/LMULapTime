@@ -55,16 +55,20 @@ function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn:
 /**
  * Each livery's car models from the scene's parsed bodies: one material per native material and content, the livery's textures
  * loaded first, lamps and glow meshes set up. `shareMaterials` gives every car of a body the same material for the same content
- * (cars drawn many at once); without it each car owns its materials (a ghost, or a reflection probe, changes them).
+ * (cars drawn many at once); without it each car owns its materials (a ghost, or a reflection probe, changes them). `full`: models
+ * drawn at full detail alone, from the body's full level (`CarTemplates.body`).
  */
-export function createCarModels(templates: CarTemplates, carTextures: CarTextures, shading: SceneryShading, {shareMaterials = false}: {shareMaterials?: boolean} = {}) {
+export function createCarModels(templates: CarTemplates, carTextures: CarTextures, shading: SceneryShading,
+  {shareMaterials = false, full = false}: {shareMaterials?: boolean; full?: boolean} = {}) {
   const loadParts = async (car: LoadedBody) => {
-    const template = await templates.body(car), appearance = appearanceOf(car);
+    const template = await templates.body(car, full), appearance = appearanceOf(car);
     if (!appearance) throw Error(`The car package has no appearance for ${car.vehicleId}`);
     // Option parts are alternatives between entries (number plates, lights, body panels): this entry shows its own, the rest stay out.
     const shown = new Set(appearance.optionNodes), hidden = new Set<Object3D>();
+    // The full level's file lacks the option and lamp parts of the farther levels alone (`full`): only the whole body must hold them all.
     for (const name of car.descriptor.optionNodes) {
       const node = template.getObjectByName(name);
+      if (!node && full) continue;
       if (!node) throw Error(`Car ${car.vehicleId} has no option part ${name}`);
       if (!shown.has(name)) hidden.add(node);
     }
@@ -83,7 +87,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     const glows = new Map(car.descriptor.lamps.map(lamp => [lamp, lampGlow(lamp, car.descriptor.materials)] as const));
     const drawn = car.descriptor.lamps.filter(lamp => lampFrame(lamp, rainFlashes, glows.get(lamp)!) !== null);
     // The GLB loader drops `.`, `:`, `/`, `[` and `]` from node names; lamp nodes are the GLB's own names.
-    for (const lamp of [...drawn, ...surfaces]) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
+    if (!full) for (const lamp of [...drawn, ...surfaces]) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
     const isGlow = (object: Object3D) => {
       if (!(object instanceof Mesh)) return false;
       const list: Material[] = Array.isArray(object.material) ? object.material as Material[] : [object.material as Material];

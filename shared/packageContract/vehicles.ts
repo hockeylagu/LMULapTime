@@ -71,6 +71,11 @@ export interface VehicleBody extends VehicleBodyModel {
   descriptorSha256: string;
   /** The driver-camera-only GLB; null when the body has no such part. */
   interior: VehicleBodyModel | null;
+  /**
+   * The full-detail GLB: the exterior GLB's mesh nodes drawn at camera distance 0 (`extras.lod.inM` 0), with the same rig, node names, extras and
+   * materials (docs/PACKAGE_FORMAT.md, Vehicles), for a car shown only at full detail.
+   */
+  full: VehicleBodyModel;
   /** The far model GLB: the exterior parts drawn from `fromM` metres on, merged by role (docs/PACKAGE_FORMAT.md, Vehicles). */
   far: VehicleFarModel;
   /** Every texture the body uses, sorted by `sha256`. */
@@ -86,7 +91,7 @@ export interface VehicleBuildCatalog {vehicles: VehicleRecord[]; bodies?: Vehicl
 
 export const VEHICLE_CATALOG_KEYS = ['vehicles', 'bodies'] as const;
 const RECORD_KEYS = ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'deploymentKw', 'outlineXZ', 'replayOriginOffsetXZ'];
-const BODY_KEYS = ['folder', 'vehicleIds', 'descriptorSha256', 'sha256', 'byteLength', 'triangles', 'vertices', 'interior', 'far', 'textures', 'volumes'];
+const BODY_KEYS = ['folder', 'vehicleIds', 'descriptorSha256', 'sha256', 'byteLength', 'triangles', 'vertices', 'interior', 'full', 'far', 'textures', 'volumes'];
 const MAX_RECORDS = 2000, MAX_BODIES = 256, MAX_IDS = 5000, MAX_TEXTURES = 4096, MAX_VOLUMES = 64, MAX_VOLUME_SIDE = 512;
 
 /** A VEH id as the records and the game write it: any case, with or without `.veh`; the canonical form is upper case without it. */
@@ -109,6 +114,7 @@ function parseBody(value: unknown, what: string): VehicleBody {
   sha256(body.descriptorSha256, `${what}.descriptorSha256`);
   parseModel(body, what, BODY_KEYS);
   if (body.interior !== null) parseModel(body.interior, `${what}.interior`, ['sha256', 'byteLength', 'triangles', 'vertices']);
+  parseModel(body.full, `${what}.full`, ['sha256', 'byteLength', 'triangles', 'vertices']);
   parseModel(body.far, `${what}.far`, ['sha256', 'byteLength', 'triangles', 'vertices', 'fromM']);
   const fromM = (body.far as Obj).fromM;
   if (typeof fromM !== 'number' || !Number.isFinite(fromM) || fromM < 0 || fromM > 10000) throw Error(`${what}.far.fromM: expected a distance in metres`);

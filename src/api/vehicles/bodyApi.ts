@@ -5,7 +5,10 @@ import { fetchBinary, fetchJson } from '../apiClient.js';
 /** Content-named body files of the package's `vehicles/` folder: the GLB at `<sha256>.glb`, the descriptor at `bodies/<folder>.json`, textures at `textures/<sha256>.ktx2.zst`. */
 export const VEHICLE_FILES = '/api/data-plugin/vehicles/files/';
 
-/** A body's GLB files: the exterior, and the interior (the parts only the driver cameras draw) or null for a body without one. */
+/**
+ * A body's GLB files: the exterior (every distance level) or its full level alone (`resource.full`), and the interior (the parts
+ * only the driver cameras draw) or null for a body without one.
+ */
 export interface BodyFiles {
   bytes: ArrayBuffer;
   interiorBytes: ArrayBuffer | null;
@@ -15,9 +18,10 @@ export interface LoadedBody {
   resource: BodyResource;
   /**
    * Reads the body's GLB files, for the parse only: the parsed model is what stays, so nothing holds them after it. The files are
-   * named by their content, so every call returns the same bytes.
+   * named by their content, so every call returns the same bytes. `full`: the full level's file in place of the exterior, for a
+   * car drawn only at full detail (the lap's car, the race's followed car).
    */
-  files(): Promise<BodyFiles>;
+  files(full?: boolean): Promise<BodyFiles>;
   /** Reads the body's far model GLB (the exterior from `resource.far.fromM` metres on, merged by role), for the parse only. */
   farFile(): Promise<ArrayBuffer>;
   descriptor: BodyDescriptor;
@@ -48,9 +52,10 @@ export async function fetchBody(vehicleId: string, packageRevision: string | und
   if (packageRevision && resource.packageRevision !== packageRevision) throw Error('Body package revision differs from the selected lap');
   const {interior} = resource;
   const file = (path: string) => fetchBinary(`${VEHICLE_FILES}${path}`, { signal, cache: 'default' });
-  const files = async (): Promise<BodyFiles> => {
-    const [bytes, interiorBytes] = await Promise.all([file(`${resource.sha256}.glb`), interior ? file(`${interior.sha256}.glb`) : null]);
-    if (bytes.byteLength !== resource.byteLength || (interior && interiorBytes?.byteLength !== interior.byteLength)) throw Error('Incomplete 3D body');
+  const files = async (full = false): Promise<BodyFiles> => {
+    const model = full ? resource.full : resource;
+    const [bytes, interiorBytes] = await Promise.all([file(`${model.sha256}.glb`), interior ? file(`${interior.sha256}.glb`) : null]);
+    if (bytes.byteLength !== model.byteLength || (interior && interiorBytes?.byteLength !== interior.byteLength)) throw Error('Incomplete 3D body');
     return { bytes, interiorBytes };
   };
   const farFile = async () => {

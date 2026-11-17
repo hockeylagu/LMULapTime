@@ -35,8 +35,12 @@ async function prepareGeometry(body: Group): Promise<void> {
 }
 
 export interface CarTemplates {
-  /** The body's parsed model (its interior joined under the chassis), parsed once for every car and loader of the scene. */
-  body(car: LoadedBody): Promise<Group>;
+  /**
+   * The body's parsed model (its interior joined under the chassis), parsed once for every car and loader of the scene. `full`: for
+   * a car drawn at full detail alone, which drops the farther levels (`CarSets.build`): the body's held or pending parse when there
+   * is one, else its full level's file, about half the exterior's.
+   */
+  body(car: LoadedBody, full?: boolean): Promise<Group>;
   /** Keeps the body's parse (parsing it if no parse is held or pending) until `release`: the next car of the body builds from it. */
   hold(car: LoadedBody): void;
   release(car: LoadedBody): void;
@@ -50,13 +54,13 @@ export interface CarTemplates {
  */
 export function createCarTemplates(): CarTemplates {
   const templates = new Map<string, Promise<Group>>(), held = new Map<string, Promise<Group>>();
-  const keyOf = (car: LoadedBody) => `${car.resource.sha256}:${car.resource.interior?.sha256 ?? ''}`;
-  const body = (car: LoadedBody): Promise<Group> => {
-    const key = keyOf(car);
-    let pending = templates.get(key) ?? held.get(key);
+  const keyOf = (car: LoadedBody, full = false) => `${full ? car.resource.full.sha256 : car.resource.sha256}:${car.resource.interior?.sha256 ?? ''}`;
+  const body = (car: LoadedBody, full = false): Promise<Group> => {
+    const key = keyOf(car, full), whole = keyOf(car);
+    let pending = templates.get(key) ?? (full ? held.get(whole) ?? templates.get(whole) : held.get(key));
     if (!pending) {
       const parse = (bytes: ArrayBuffer) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '').then(result => result.scene);
-      pending = car.files().then(({bytes, interiorBytes}) => Promise.all([parse(bytes), interiorBytes ? parse(interiorBytes) : null])).then(async ([model, interior]) => {
+      pending = car.files(full).then(({bytes, interiorBytes}) => Promise.all([parse(bytes), interiorBytes ? parse(interiorBytes) : null])).then(async ([model, interior]) => {
         // The interior's parts hang under its chassis node and join the body's: one model, whose driver-camera parts the
         // cockpit view switches.
         if (interior) {

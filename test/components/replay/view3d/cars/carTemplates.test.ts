@@ -14,7 +14,7 @@ function parsed(part: string): {scene: Group} {
 const exterior = new ArrayBuffer(1), interior = new ArrayBuffer(2);
 const body = (vehicleId: string, withInterior: boolean) => ({
   vehicleId,
-  resource: {sha256: 'body', interior: withInterior ? {sha256: 'cabin'} : null},
+  resource: {sha256: 'body', full: {sha256: 'full'}, interior: withInterior ? {sha256: 'cabin'} : null},
   files: vi.fn(async () => ({bytes: exterior, interiorBytes: withInterior ? interior : null})),
 }) as unknown as LoadedBody & {files: ReturnType<typeof vi.fn>};
 
@@ -46,6 +46,21 @@ describe('createCarTemplates', () => {
     expect(parse).toHaveBeenCalledTimes(3);
     templates.release(car);
     expect(await templates.body(car)).not.toBe(kept);
+  });
+
+  it('parses the full level for a car drawn at full detail alone, unless the whole body is held or parsing', async () => {
+    vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async () => parsed('hull') as never);
+    const templates = createCarTemplates(), car = body('A', false);
+    const full = await templates.body(car, true);
+    expect(car.files).toHaveBeenLastCalledWith(true);
+    // Its own parse: the field's cars of the body read the whole exterior.
+    expect(await templates.body(car)).not.toBe(full);
+    expect(car.files).toHaveBeenLastCalledWith(false);
+    templates.hold(car);
+    const whole = await templates.body(car);
+    car.files.mockClear();
+    expect(await templates.body(car, true)).toBe(whole);
+    expect(car.files).not.toHaveBeenCalled();
   });
 
   it('forgets a failed parse, so the next car tries again', async () => {

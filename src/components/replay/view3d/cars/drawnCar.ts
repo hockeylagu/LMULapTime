@@ -90,7 +90,7 @@ export interface CarSetOptions {
  * its materials and interior. The lap's ghost stays part by part (`ghost`): its see-through parts draw in a fixed order.
  */
 export function createCarSets(templates: CarTemplates, carTextures: CarTextures, shading: SceneryShading, surfaceHeight: SurfaceHeight) {
-  const ownModels = createCarModels(templates, carTextures, shading);
+  const ownModels = createCarModels(templates, carTextures, shading, {full: true});
   const fieldModels = createCarModels(templates, carTextures, shading, {shareMaterials: true});
   return {
     /** The cars of `bodies` (liveries of one body) drawn together. */

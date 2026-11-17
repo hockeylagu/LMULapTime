@@ -5,7 +5,7 @@
  */
 
 /** The only package schema the tools and the app read. */
-export const PACKAGE_SCHEMA = 17;
+export const PACKAGE_SCHEMA = 18;
 
 /** The catalog files of every package, release or debug. These paths are constants of the schema: the manifest names none. */
 export const PACKAGE_FILES = {tracks: 'tracks/index.json', vehicles: 'vehicles/index.json', logos: 'vehicles/logos.json', scenery: 'scenery/index.json', rendering: 'rendering/index.json'} as const;
@@ -22,7 +22,7 @@ export const sceneryHeightPath = (sha256: string): string => `scenery/heights/${
 /** Scenery RealRoad point table of a content hash (raw little-endian uint32, docs/SCENE_PACKAGE.md#realroad-elements). */
 export const sceneryRealRoadPath = (sha256: string): string => `scenery/realroad/${sha256}.bin`;
 
-/** Vehicle body GLB (exterior, interior or far), texture (or start) file and descriptor. */
+/** Vehicle body GLB (exterior, interior, full or far), texture (or start) file and descriptor. */
 export const bodyGlbPath = (sha256: string): string => `vehicles/${sha256}.glb`;
 export const bodyTexturePath = (sha256: string): string => `vehicles/textures/${sha256}.ktx2.zst`;
 export const bodyDescriptorPath = (folder: string): string => `vehicles/bodies/${folder}.json`;

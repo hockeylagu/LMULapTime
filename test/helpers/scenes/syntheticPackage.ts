@@ -132,6 +132,7 @@ export function syntheticPackage() {
   const car = {
     folder: 'Test_Car', vehicleIds: ['TEST_CAR'], descriptorSha256: '',
     ...rowOf(store(bodyGlbPath, glb('car'))), triangles: 100, vertices: 300, interior: null as null | Record<string, unknown>,
+    full: { ...rowOf(store(bodyGlbPath, glb('car-full'))), triangles: 80, vertices: 240 },
     far: { ...rowOf(store(bodyGlbPath, glb('car-far'))), triangles: 20, vertices: 60, fromM: 50 }, textures: [rowOf(carTexture)] as Array<Record<string, unknown>>,
     volumes: [] as Array<Record<string, unknown>>,
   };
