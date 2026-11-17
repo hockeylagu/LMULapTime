@@ -24,15 +24,15 @@ race replay steps 1–3, fidelity audits) are in Git history before this file.
 Production build, headless Edge, 1920×1080, cold (fresh profile, no browser cache), this machine (RTX 5070 Ti). Machine load
 moves these by several ms: compare only interleaved A/B runs taken back to back, never during a build or export.
 
-| Measure | Target (user) | freeze-v18 tree |
-|---|---|---|
-| Lap first frame | < 5 s (2026-11-11) | Fuji 4.1 s, Silverstone 4.7 s |
-| Lap playable, not stuck | < 7 s | met |
-| Lap frame p50 / p99 after 7 s | < 10 / < 30 ms (2026-11-11); p99 ≤ 16.7 ms kept as the v2 aim | Fuji 2.8 / 16.5 ms, Silverstone 3.2 / 20.2 ms |
-| Le Mans race start shown | < 5 s | 5.0–5.3 s |
-| Le Mans race start p50 / p95 / p99 | ≤ 10 / ≤ 16.7 ms (2026-11-14); p99 < 30 | 8.1–8.8 ms / 14.7–16 ms / 26.5–28.7 ms |
-| Draws per frame | < 1,000 in every frame (a guide only) | ~750 at the race start |
-| JS heap, disk | no higher than before each change; the package must not grow without an offsetting saving | — |
+| Measure | Target (user) | freeze-v18 tree | personal-v20 tree (2026-11-16) |
+|---|---|---|---|
+| Lap first frame | < 5 s (2026-11-11) | Fuji 4.1 s, Silverstone 4.7 s | Fuji 4.6 s, Silverstone 5.1 s |
+| Lap playable, not stuck | < 7 s | met | met |
+| Lap frame p50 / p99 after 7 s | < 10 / < 30 ms (2026-11-11); p99 ≤ 16.7 ms kept as the v2 aim | Fuji 2.8 / 16.5 ms, Silverstone 3.2 / 20.2 ms | Fuji 3.0 / 18.1 ms, Silverstone 3.2 / 15.0 ms |
+| Le Mans race start shown | < 5 s | 5.0–5.3 s | 5.4–5.8 s |
+| Le Mans race start p50 / p95 / p99 | ≤ 10 / ≤ 16.7 ms (2026-11-14); p99 < 30 | 8.1–8.8 ms / 14.7–16 ms / 26.5–28.7 ms | 9.6–9.8 ms / 15.2–15.8 ms / 27–30 ms |
+| Draws per frame | < 1,000 in every frame (a guide only) | ~750 at the race start | — |
+| JS heap, disk | no higher than before each change; the package must not grow without an offsetting saving | — | — |
 
 Tools: `npm run benchmark:replay3d:suite -- --package personal-v18 --runs 2 --seconds 20` with
 `PLAYWRIGHT_NODE_MODULES=C:/Documents/LMUTrackPipeline` ([harness](../../../tools/benchmarks/replay3d/README.md)); `--package`
@@ -62,7 +62,7 @@ states run to run (stand chunk in the cached far cascade or not); the 10-view su
 |---|---|
 | Texture sharpening | 2 MiB upload budget a frame, shared by every warm-up and the sharpening, excess carried as debt; 1 MiB and 0.5 MiB were measured and rejected (sharpening 12–36 s, tail unchanged) |
 | Car textures | The package sizes them (livery albedo and paint region 2048, other exterior maps 1024); the app adds no cap |
-| Car reflection probe | 1024 px faces. With the package's reflection set (schema 17, the game's REFMAP0 set: a face is ~5 draws and 0.1-0.6 M triangles instead of ~216 draws and up to 3.7 M) three faces a frame, a cube every two frames as the game draws it, the prefilter and convolution riding the frames after (2026-11-16, personal-v20). Measured at the Le Mans start: frame p50 unchanged (~10.4 ms), GPU memory +165 MB, JS heap +194 MB; p95 16 to 27 ms from the conversions every frame (the next lever). Against a cube renewed every frame, the set reflects nearly the full scenery's picture (mean difference 0.29 Silverstone, 1.37 Barcelona), and the set at the game's rate is as close to that reference as the slower full-scenery probe with the overhead correction (Silverstone 0.98 vs 0.85, Barcelona 3.6 vs 4.2). Every layout ships the set; the full-scenery probe (one face a frame) was removed 2026-11-16. Near race cars share the followed car's probe. Between probes, car paint corrects its rising rays with depth maps of the scenery from above and below (car/overheadMap.ts): a ray meets a bridge, gantry or tree where it passes between an underside and its top, so their reflection slides over the car instead of stepping at each probe (2026-11-16; against a probe renewed every frame, Barcelona's bridge mean error 8.1 to 3.9). A fixed thickness under the tops was tried first: 3 m missed thick decks, 8 m counted the open space under gantries. Glass, lamps and trim take the same correction (car/carReflection.ts), with the venue's cube for the sky. A probe renewed 3x faster scored the same against the every-frame reference, and a ground-lit underside in place of the probe's view of the structure scored worse (Barcelona 3.9 to 9.7). A probe parallax (per-texel distances) was tried first and dropped: the probe, drawn ~25 m behind the car at speed, never saw the deck above the car and flashed bright on entry |
+| Car reflection probe | 1024 px faces. With the package's reflection set (schema 17, the game's REFMAP0 set: a face is ~5 draws and 0.1-0.6 M triangles instead of ~216 draws and up to 3.7 M) three faces a frame, a cube every two frames as the game draws it, the prefilter and convolution riding the frames after (2026-11-16, personal-v20). Measured at the Le Mans start: frame p50 unchanged (~10.4 ms), GPU memory +165 MB, JS heap +194 MB; p95 16 to 27 ms, which was the exposure's CPU readback waiting on the busier GPU (4–6 ms median, 24 ms worst, ~15 a second), not the conversions: the exposure now meters and adapts on the GPU (2026-11-16, p95 back to 15.2–15.8 ms, slow frames 67 to ~28). Against a cube renewed every frame, the set reflects nearly the full scenery's picture (mean difference 0.29 Silverstone, 1.37 Barcelona), and the set at the game's rate is as close to that reference as the slower full-scenery probe with the overhead correction (Silverstone 0.98 vs 0.85, Barcelona 3.6 vs 4.2). Every layout ships the set; the full-scenery probe (one face a frame) was removed 2026-11-16. Near race cars share the followed car's probe. Between probes, car paint corrects its rising rays with depth maps of the scenery from above and below (car/overheadMap.ts): a ray meets a bridge, gantry or tree where it passes between an underside and its top, so their reflection slides over the car instead of stepping at each probe (2026-11-16; against a probe renewed every frame, Barcelona's bridge mean error 8.1 to 3.9). A fixed thickness under the tops was tried first: 3 m missed thick decks, 8 m counted the open space under gantries. Glass, lamps and trim take the same correction (car/carReflection.ts), with the venue's cube for the sky. A probe renewed 3x faster scored the same against the every-frame reference, and a ground-lit underside in place of the probe's view of the structure scored worse (Barcelona 3.9 to 9.7). A probe parallax (per-texel distances) was tried first and dropped: the probe, drawn ~25 m behind the car at speed, never saw the deck above the car and flashed bright on entry |
 | Far shadow cascade | Cached; not redrawn when a chunk joins (Silverstone garages lighter or darker by load order, accepted) |
 | Race field | Nearest 6 in view as full models (kept once built, for smooth traversal; parsed bodies not released), the rest as the body's far model, which casts and takes the sun's shadow too (the shadow does not pop at the tier switch, 2026-11-16); steering on full models only; far lamps for the nearest 16 within 300 m; ghost drawn part by part |
 | Clouds and exposure | World-fixed cloud layer, sun visibility from the camera; meter −ln(1 − Y709(mean tone-mapped)) / E and the package's law; cloud sun dimming on |
@@ -125,10 +125,14 @@ a car: the user said "not now"; don't re-offer.
 
 ### Performance
 
-- Le Mans race start shows at 5.0–5.3 s, just over the 5 s line; remaining slow frames are the start burst (near car batching,
-  warm compile, near loads).
-- Follow switch to a car of another body ~1.0 s (programs at two environment sizes link in play).
-- Silverstone lap p99 20.2 ms against the 16.7 ms aim.
+- Le Mans race start shows at 5.4–5.8 s with the reflection set, over the 5 s line; remaining slow frames are the start burst
+  (near car batching, warm compile, near loads).
+- Follow switch (personal-v21, 2026-11-17): the camera moves to the clicked car in ~0.1 s, the field drawing it until its own
+  model swaps in 1.0-1.5 s later. Of that: the full-level GLB 0.2-0.3 s to fetch (a held body's parse is used instead), parse and
+  prepare 0.1-0.25 s, then 38-49 MB of geometry and 6-10 MB of textures uploaded in 0.5-0.8 s while its 20-35 new programs
+  link. The followed car shares no GPU copy with the field's cars of its body (own materials, interior, full level only). A
+  cockpit view still waits for the model.
+- Fuji lap p99 18.1 ms against the 16.7 ms aim (personal-v20, measured before the GPU exposure).
 
 ### Race replay
 
