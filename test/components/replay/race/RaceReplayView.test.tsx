@@ -54,6 +54,35 @@ describe('RaceReplayView', () => {
     vi.clearAllMocks();
   });
 
+  it('skips the wait on the grid to the frame the followed car starts from', async () => {
+    // Bea pulls away at 70 s, Ann (the player, followed) at 75 s, in the second window.
+    vi.mocked(fetchRacePoseWindow).mockImplementation((_session, index) => {
+      const window = poseWindow(index);
+      for (let i = 0; i < window.count; i++) {
+        const t = index * 60 + i / 10;
+        if (t < 75) window.data[i * RACE_POSE_CHANNEL_COUNT + 6] = 0;
+        if (t < 70) window.data[(window.count + i) * RACE_POSE_CHANNEL_COUNT + 6] = 0;
+      }
+      return Promise.resolve(window);
+    });
+    view({ initialTimeSec: 0 });
+    fireEvent.click(await screen.findByRole('button', { name: /Skip to start/ }));
+    expect(screen.getAllByLabelText('Session time')[0]).toHaveTextContent('1:14.9');
+    expect(screen.queryByRole('button', { name: /Skip to start/ })).toBeNull();
+    // Following Bea from the start, the skip lands on her start.
+    cleanup();
+    view({ initialTimeSec: 0, initialSlot: 2 });
+    fireEvent.click(await screen.findByRole('button', { name: /Skip to start/ }));
+    expect(screen.getAllByLabelText('Session time')[0]).toHaveTextContent('1:09.9');
+  });
+
+  it('has nothing to skip when the cars move from the start', async () => {
+    view({ initialTimeSec: 0 });
+    await screen.findAllByTestId('race-lap-ticks');
+    await waitFor(() => expect(fetchRacePoseWindow).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: /Skip to start/ })).toBeNull();
+  });
+
   const view = (props: Partial<React.ComponentProps<typeof RaceReplayView>> = {}) => render(
     <RaceReplayView sessionId="s1" onClose={vi.fn()} onOpenLap={vi.fn()} onStateChange={vi.fn()} initialTimeSec={30} {...props} />);
 

@@ -7,7 +7,7 @@ import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { LoadingState } from '../../common/LoadingState.js';
 import { createRaceClock } from './raceClock.js';
-import { createRacePoseCache } from './racePoseCache.js';
+import { createRacePoseCache, findRaceStartSec } from './racePoseCache.js';
 import { indexRaceStandings } from './raceStandings.js';
 import { RaceMapScene } from './RaceMapScene.js';
 import { RaceStandingsTower } from './RaceStandingsTower.js';
@@ -108,6 +108,16 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
     fetchRaceProgress(sessionId, { signal: controller.signal }).then(setProgress, () => {});
     return () => controller.abort();
   }, [sessionId, overview]);
+  // A race's cars wait on the grid before the formation lap: the playback bar skips to where the followed car starts.
+  const [raceStart, setRaceStart] = useState<{ slot: number | null; sec: number | null } | null>(null);
+  useEffect(() => {
+    if (isNonRaceSession(overview.sessionType)) return;
+    const controller = new AbortController();
+    findRaceStartSec(overview.windowSec, overview.startSec, followSlot, (window, signal) => fetchRacePoseWindow(sessionId, window, { signal }),
+      controller.signal).then(sec => setRaceStart({ slot: followSlot, sec }), () => {});
+    return () => controller.abort();
+  }, [sessionId, overview, followSlot]);
+  const raceStartSec = raceStart?.slot === followSlot ? raceStart.sec : null;
   const index = useMemo(() => indexRaceStandings(overview, progress), [overview, progress]);
   const carsBySlot = useMemo(() => new Map(overview.cars.map(car => [car.slot, car])), [overview]);
   useRaceReplayKeys(clock);
@@ -141,7 +151,7 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
         <RaceStandingsTower className="w-[360px] shrink-0" index={index} clock={clock} followSlot={followSlot}
           onFollow={setFollowSlot} pittedAt={timeSec => racePitSlots(poses.windowAt(timeSec), timeSec)} onTrack={slot => { setFollowSlot(slot); setTrackRequest(n => n + 1); }} onHover={setHoverSlot} />
       </div>
-      <RacePlaybackBar clock={clock} events={overview.events} cars={carsBySlot} followSlot={followSlot} laps={overview.laps} />
+      <RacePlaybackBar clock={clock} events={overview.events} cars={carsBySlot} followSlot={followSlot} laps={overview.laps} raceStartSec={raceStartSec} />
     </>
   );
 };

@@ -68,6 +68,27 @@ export function decodeRacePoseWindow(buffer: ArrayBuffer): RacePoseWindow {
 }
 
 const IN_PIT = RACE_POSE_CHANNELS.indexOf('inPit');
+const SPEED = RACE_POSE_CHANNELS.indexOf('speedKmh');
+/** Faster than this a car is moving, km/h: a car standing on the grid reads up to about 1. */
+const MOVING_KMH = 5;
+
+/**
+ * The frame car `slot` (any car when null) starts from: the first sample, at or after `afterSec`, where it moves on the track (not
+ * in the pit lane or the garage), less one where it stood still drawn the sample before. Null when it does not move in the window.
+ */
+export function firstMovingSec(window: RacePoseWindow, afterSec: number, slot: number | null = null): number | null {
+  const first = Math.max(0, Math.ceil((afterSec - window.fromSec) * window.hz));
+  const cars = slot === null ? window.slots.map((_, car) => car) : [window.slots.indexOf(slot)].filter(car => car >= 0);
+  const at = (car: number, sample: number) => (car * window.count + sample) * RACE_POSE_CHANNEL_COUNT;
+  for (let sample = first; sample < window.count; sample++) {
+    for (const car of cars) {
+      if (window.data[at(car, sample) + IN_PIT] === 1 || !(window.data[at(car, sample) + SPEED] > MOVING_KMH)) continue;
+      const still = sample > first && !Number.isNaN(window.data[at(car, sample - 1)]);
+      return window.fromSec + (still ? sample - 1 : sample) / window.hz;
+    }
+  }
+  return null;
+}
 
 /** The cars in the pit lane or the garage at `timeSec` (at the nearest sample), drawn or not. */
 export function racePitSlots(window: RacePoseWindow | null, timeSec: number): Set<number> {

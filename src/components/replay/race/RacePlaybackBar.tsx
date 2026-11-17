@@ -1,5 +1,5 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play, SkipForward } from 'lucide-react';
 import type { RaceReplayCar, RaceReplayEvent, RaceReplayLap } from '../../../../shared/types/index.js';
 import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
@@ -13,7 +13,12 @@ interface Props {
   followSlot: number | null;
   /** Every car's laps: the timeline marks where the followed car's laps start. */
   laps: RaceReplayLap[];
+  /** The frame the followed car starts from after waiting on the grid: Skip to start jumps there while the clock is before it. */
+  raceStartSec?: number | null;
 }
+
+/** A start under this many seconds after the replay's does not need skipping to. */
+const MIN_GRID_WAIT_SEC = 2;
 
 /** The range thumb's width: the track it travels is the bar less half a thumb at each end. */
 const THUMB_PX = 16;
@@ -21,7 +26,7 @@ const THUMB_PX = 16;
 const MAX_LAP_LABELS = 20;
 
 /** Play/pause, speed and the session timeline of the race replay, with the followed car's incidents. */
-export const RacePlaybackBar: React.FC<Props> = ({ clock, events, cars, followSlot, laps }) => {
+export const RacePlaybackBar: React.FC<Props> = ({ clock, events, cars, followSlot, laps, raceStartSec = null }) => {
   const tenth = useSyncExternalStore(clock.subscribe, () => Math.round(clock.getState().timeSec * 10));
   const playing = useSyncExternalStore(clock.subscribe, () => clock.getState().playing);
   const speed = useSyncExternalStore(clock.subscribe, () => clock.getState().speed);
@@ -29,6 +34,7 @@ export const RacePlaybackBar: React.FC<Props> = ({ clock, events, cars, followSl
   const span = Math.max(1, clock.endSec - clock.startSec);
   const followedLaps = useMemo(() => laps.filter(lap => lap.slot === followSlot).sort((a, b) => a.startSec - b.startSec), [laps, followSlot]);
   const labelEvery = Math.max(1, Math.ceil(followedLaps.length / MAX_LAP_LABELS));
+  const skipToStart = raceStartSec !== null && raceStartSec - clock.startSec >= MIN_GRID_WAIT_SEC && timeSec < raceStartSec - 0.1;
   const along = (sec: number) => `calc(${THUMB_PX / 2}px + (100% - ${THUMB_PX}px) * ${Math.max(0, Math.min(1, (sec - clock.startSec) / span))})`;
 
   return (
@@ -38,6 +44,13 @@ export const RacePlaybackBar: React.FC<Props> = ({ clock, events, cars, followSl
         className={`grid h-8 w-8 place-items-center rounded-md bg-lmu-card text-lmu-text hover:bg-lmu-cardHover ${FOCUS_RING}`}>
         {playing ? <Pause aria-hidden="true" className="h-4 w-4" /> : <Play aria-hidden="true" className="h-4 w-4" />}
       </button>
+      {skipToStart && (
+        <button type="button" onClick={() => clock.seek(raceStartSec)} title="Skip the wait on the grid to where the followed car starts moving"
+          className={`flex h-8 items-center gap-1.5 rounded-md bg-lmu-card px-2.5 text-xs text-lmu-text hover:bg-lmu-cardHover ${FOCUS_RING}`}>
+          <SkipForward aria-hidden="true" className="h-3.5 w-3.5" />
+          Skip to start
+        </button>
+      )}
       <div role="group" aria-label="Playback speed" className="flex items-center gap-0.5">
         {RACE_SPEEDS.map(value => (
           <button key={value} type="button" aria-pressed={speed === value} onClick={() => clock.setSpeed(value)}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  decodeRacePoseWindow, encodeRacePoseWindow, RACE_POSE_CHANNEL_COUNT, racePitSlots, sampleRacePose, type RacePoseWindow,
+  decodeRacePoseWindow, encodeRacePoseWindow, firstMovingSec, RACE_POSE_CHANNEL_COUNT, racePitSlots, sampleRacePose, type RacePoseWindow,
 } from '../../../shared/domain/raceReplay/poseWindow.js';
 
 /** Two cars, three samples at 10 Hz from 60 s; car 3 enters the pit lane at its second, car 7 leaves the track after its first. */
@@ -31,6 +31,30 @@ describe('race pose windows', () => {
     expect([...racePitSlots(window(), 60.02)]).toEqual([]);
     expect([...racePitSlots(window(), 60.06)]).toEqual([3]);
     expect([...racePitSlots(null, 60)]).toEqual([]);
+  });
+
+  it('finds the frame the cars start from, leaving out cars in the pits and off the track', () => {
+    // Car 0 stands on the grid (1 km/h of noise) and pulls away at sample 4; car 1 drives in the pit lane from the start.
+    const count = 6, data = new Float32Array(2 * count * RACE_POSE_CHANNEL_COUNT).fill(NaN);
+    const put = (car: number, sample: number, speedKmh: number, inPit: number) =>
+      data.set([0, 0, 0, 0, 0, 0, speedKmh, inPit], (car * count + sample) * RACE_POSE_CHANNEL_COUNT);
+    [1, 0, 1, 0, 30, 60].forEach((speed, sample) => put(0, sample, speed, 0));
+    [40, 40, 40].forEach((speed, sample) => put(1, sample, speed, 1));
+    const grid: RacePoseWindow = { fromSec: 60, hz: 10, count, slots: [3, 7], data };
+    expect(firstMovingSec(grid, 60)).toBeCloseTo(60.3);
+    expect(firstMovingSec(grid, 60, 3)).toBeCloseTo(60.3);
+    expect(firstMovingSec(grid, 60.4)).toBeCloseTo(60.4);
+    // Car 7 only drives in the pits; a car not in the window has no start.
+    expect(firstMovingSec(grid, 60, 7)).toBeNull();
+    expect(firstMovingSec(grid, 60, 9)).toBeNull();
+    // Still all through: car 0 never pulls away.
+    const still = new Float32Array(data);
+    for (const sample of [4, 5]) still[sample * RACE_POSE_CHANNEL_COUNT + 6] = 0;
+    expect(firstMovingSec({ ...grid, data: still }, 60)).toBeNull();
+    // A car that appears already moving starts from its first drawn sample.
+    const appearing = new Float32Array(data);
+    for (const sample of [0, 1, 2, 3]) appearing[sample * RACE_POSE_CHANNEL_COUNT] = NaN;
+    expect(firstMovingSec({ ...grid, data: appearing }, 60, 3)).toBeCloseTo(60.4);
   });
 
   it('rejects what is not a window', () => {

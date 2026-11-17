@@ -1,4 +1,4 @@
-import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
+import { firstMovingSec, RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
 
 type FetchWindow = (index: number, signal: AbortSignal) => Promise<RacePoseWindow>;
 
@@ -6,6 +6,24 @@ type FetchWindow = (index: number, signal: AbortSignal) => Promise<RacePoseWindo
 const KEEP_WINDOWS = 6;
 /** Windows a car's next pose is looked for in, from the clock's: a car out of the replay longer than this has none. */
 const NEXT_POSE_WINDOWS = 30;
+
+/** Windows the race start is looked for in: a grid wait longer than this (minutes) is not skipped. */
+const START_SEARCH_WINDOWS = 15;
+
+/**
+ * The frame car `slot` (any car when null) starts from after the grid (`firstMovingSec`), searched window by window from
+ * `fromSec`. Null when it does not move in the first windows.
+ */
+export async function findRaceStartSec(windowSec: number, fromSec: number, slot: number | null, fetchWindow: FetchWindow,
+  signal: AbortSignal): Promise<number | null> {
+  const first = Math.floor(fromSec / windowSec);
+  for (let index = first; index < first + START_SEARCH_WINDOWS; index++) {
+    // oxlint-disable-next-line no-await-in-loop -- one window at a time: the search stops at the first that holds the start
+    const startSec = firstMovingSec(await fetchWindow(index, signal), fromSec, slot);
+    if (startSec !== null) return startSec;
+  }
+  return null;
+}
 
 /** A car's next sample with a pose: the window holding it, the car's index in it and the sample's time. */
 export interface NextPose { window: RacePoseWindow; carIndex: number; timeSec: number }
