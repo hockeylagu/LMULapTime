@@ -29,7 +29,7 @@ const OFFSET_PX = 14, ROOM_X_PX = 280, ROOM_Y_PX = 100;
 /**
  * The race map's tooltip for the car of the 3D race view under the pointer, beside the pointer. The car is looked for again as the
  * pointer moves and as the clock moves the cars; none while a button is down (the pointer orbits the camera). The scene answers
- * a frame later (it reads the pixel back): one look runs at a time, and a pointer that moved meanwhile is looked at once it ends.
+ * a frame or two later (the GPU answers which car's surface is under the pointer): one look runs at a time, and a pointer that moved meanwhile is looked at once it ends.
  */
 export function RaceCarHover({ host, scene, clock, index, active }: Props) {
   const [hover, setHover] = useState<Hover | null>(null);

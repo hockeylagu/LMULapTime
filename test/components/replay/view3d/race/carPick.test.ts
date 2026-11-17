@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Box3, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh, PerspectiveCamera, Vector3 } from 'three';
-import { carShowing, carsUnder, envelopeBounds, envelopeParts, insideHull, placeOnRoad } from '../../../../../src/components/replay/view3d/race/carPick.js';
+import { Box3, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh, PerspectiveCamera, Ray, Vector3 } from 'three';
+import { carSpans, carsUnder, envelopeBounds, envelopeParts, insideHull, placeOnRoad } from '../../../../../src/components/replay/view3d/race/carPick.js';
 import { CONTACT_SHADOW_NAME } from '../../../../../src/components/replay/view3d/car/underCarBake.js';
 
 const origin = {x: 100, y: 0, z: 100};
@@ -135,24 +135,29 @@ describe('carsUnder', () => {
   });
 });
 
-describe('carShowing', () => {
-  // The scene point of a native one: around the origin, z mirrored.
-  const scene = (x: number, y: number, z: number) => new Vector3(x - origin.x, y - origin.y, origin.z - z);
+describe('carSpans', () => {
+  // A ray 0.6 m up (the middle of a car's box) along native +z (scene -z), `left` metres along native x (scene x).
+  const ray = (left = 0) => new Ray(new Vector3(left, 0.6, 0), new Vector3(0, 0, -1));
+  // A span as metres ahead along native z, rounded to the centimetre.
+  const ahead = (spans: ReturnType<typeof carSpans>) => spans.map(({car, enter, leave}) => [car.slot, Math.round(-enter.z * 100) / 100, Math.round(-leave.z * 100) / 100]);
 
-  it('finds the car whose surface is under the pointer, none where the scenery or the sky is', () => {
-    const near = at(2, 20), far = at(3, 40);
-    // On the near car's back (17.5 m ahead), and on the far one's back past it (37.5 m).
-    expect(carShowing([near, far], origin, scene(origin.x, 0.6, origin.z + 17.5))?.slot).toBe(2);
-    expect(carShowing([near, far], origin, scene(origin.x, 0.6, origin.z + 37.5))?.slot).toBe(3);
-    // A wall 10 m ahead stands in front of both.
-    expect(carShowing([near, far], origin, scene(origin.x, 0.6, origin.z + 10))).toBeNull();
+  it('gives where the ray passes through each car, car by car as listed, its box grown by a few centimetres', () => {
+    // The near car's box from 17.5 to 22.5 m ahead, the far one's from 37.5 to 42.5 m: 10 cm more each way.
+    expect(ahead(carSpans([at(2, 20), at(3, 40)], origin, ray()))).toEqual([[2, 17.4, 22.6], [3, 37.4, 42.6]]);
+    // A car the ray passes beside gives none.
+    expect(carSpans([at(2, 20, 3)], origin, ray())).toEqual([]);
   });
 
-  it("allows a few centimetres off its parts (they sit on the road under the pose), not more", () => {
+  it("allows a few centimetres off its parts (they sit on the road under the pose), not more, and joins overlapping parts", () => {
     const body = new Box3(new Vector3(-1, 0, -2.3), new Vector3(1, 1.2, 2.3)), car = {...at(2, 20), box: body, parts: [body]};
-    expect(carShowing([car], origin, scene(origin.x + 1.05, 0.6, origin.z + 20))?.slot).toBe(2);
-    expect(carShowing([car], origin, scene(origin.x + 1.3, 0.6, origin.z + 20))).toBeNull();
+    expect(carSpans([car], origin, ray(1.05))).toHaveLength(1);
+    expect(carSpans([car], origin, ray(1.3))).toEqual([]);
     // Turned a quarter, its length lies along native x.
-    expect(carShowing([{...car, rotY: Math.PI / 2}], origin, scene(origin.x + 2.2, 0.6, origin.z + 20))?.slot).toBe(2);
+    expect(carSpans([{...car, rotY: Math.PI / 2}], origin, ray(2.2))).toHaveLength(1);
+    // The nose and the tail touching (with their slack) are one stretch; with a gap between them, two.
+    const nose = new Box3(new Vector3(-1, 0, 0), new Vector3(1, 1.2, 2.3)), tail = new Box3(new Vector3(-1, 0, -2.3), new Vector3(1, 1.2, -0.1));
+    expect(ahead(carSpans([{...car, parts: [nose, tail]}], origin, ray()))).toEqual([[2, 17.6, 22.4]]);
+    const short = new Box3(new Vector3(-1, 0, -2.3), new Vector3(1, 1.2, -1));
+    expect(ahead(carSpans([{...car, parts: [nose, short]}], origin, ray()))).toEqual([[2, 17.6, 19.1], [2, 19.9, 22.4]]);
   });
 });

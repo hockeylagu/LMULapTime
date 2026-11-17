@@ -17,7 +17,7 @@ import { createCarSets } from '../cars/drawnCar.js';
 import { windowPoints } from './raceTrack.js';
 import { createRaceField } from './raceField.js';
 import { createStandInCars } from './standInCars.js';
-import { carShowing, carsUnder, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
+import { carSpans, carsUnder, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
 
 export interface RaceSceneHandle {
   /**
@@ -283,7 +283,8 @@ export async function createRaceScene(
     center: () => rig.center(),
     zoom: direction => rig.zoom(direction),
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
-    pick(x, y) {
+    // Right after a frame: the cars where that frame drew them, as the pointer sees them.
+    pick: (x, y) => shell.afterFrame(() => {
       const canvas = shell.renderer.domElement;
       // Each car's box: its body, or the fixed box for a stand-in, on the road under it (a pose is the body's centre, above the road).
       const places = drawnPlaces.map(car => {
@@ -291,10 +292,11 @@ export async function createRaceScene(
         return {...car, box, parts: body?.parts?.map(part => part.clone().translate(new Vector3(0, lift, 0)))};
       });
       const under = carsUnder(places, shell.drawnView, origin, canvas.clientWidth, canvas.clientHeight, x, y);
-      if (!under.length) return Promise.resolve(null);
-      // The car whose surface the frame draws under the pointer, read back from the one pixel.
-      return shell.surfaceAt(x, y).then(point => (point ? carShowing(under, origin, point)?.slot ?? null : null));
-    },
+      const spans = carSpans(under, origin, shell.pointerRay(x, y));
+      if (!spans.length) return null;
+      // The car whose surface the frame draws under the pointer: the GPU tells which car's stretch of the ray holds it.
+      return shell.surfaceWithin(x, y, spans.map(span => [span.enter, span.leave] as const)).then(index => spans[index]?.car.slot ?? null);
+    }),
     daylight: clock => shell.setDaylight(clock),
     dispose() {
       disposed = true;

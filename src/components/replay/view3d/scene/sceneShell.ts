@@ -1,4 +1,4 @@
-import { Box3, Group, MathUtils, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
+import { Box3, Group, MathUtils, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type Ray } from 'three';
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
@@ -16,7 +16,7 @@ import { createSunMeter } from '../atmosphere/sunMeter.js';
 import { assertHazed } from '../atmosphere/haze.js';
 import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
-import { createPointerSurface, type DrawnCamera } from './pointerSurface.js';
+import { createPointerSurface, type DrawnCamera, type RaySpan } from './pointerSurface.js';
 import { underCarBaker } from '../car/carContactShadow.js';
 import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
@@ -123,10 +123,19 @@ export interface SceneShell {
   /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker; wheels and lights follow it. */
   placeCar(car: Object3D, pose: RenderPose, motion: CarMotion | null): void;
   /**
-   * The nearest surface the last frame's camera (`drawnView`) draws under a point of the canvas (CSS pixels from its top left corner),
-   * in scene coordinates; null over the sky. Glass and a fence's cut-outs show what is behind them, as in the frame.
+   * Runs `read` right after the next frame is drawn (asking for one), when the scene, `drawnView` and what the content placed are
+   * what that frame shows: between frames the clock has moved the cars, whose drawn parts follow at the next frame. Rejects when
+   * the shell is disposed first.
    */
-  surfaceAt(x: number, y: number): Promise<Vector3 | null>;
+  afterFrame<T>(read: () => T | Promise<T>): Promise<T>;
+  /** The ray from the last frame's camera (`drawnView`) through a point of the canvas (CSS pixels from its top left corner), in scene coordinates. */
+  pointerRay(x: number, y: number): Ray;
+  /**
+   * Which of `spans` (stretches of `pointerRay(x, y)`) holds the nearest surface the last frame's camera draws there: the first such
+   * span's index, -1 for none (`PointerSurface.within`: a frame or two later, without waiting on the GPU). Glass and a fence's
+   * cut-outs show what is behind them, as in the frame.
+   */
+  surfaceWithin(x: number, y: number, spans: readonly RaySpan[]): Promise<number>;
   /** Switches the camera mode with its environment, shadows and exposure; false when it is the current one. */
   setMode(next: CameraMode): boolean;
   /**
@@ -256,7 +265,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
   const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose(); pointer.dispose();
+    disposed = true; for (const waiting of afterFrames.splice(0)) waiting.fail(new Error('The scene was disposed.'));
+    window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose(); pointer.dispose();
     ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   // The interior's own copies stay on their reduced levels until a driver camera is used: only there is their full size seen.
@@ -304,6 +314,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   let drawnView: DrawnCamera = drawnCameras.perspective;
   const pointer = createPointerSurface(renderer);
   let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
+  /** What waits for the next frame to be drawn (`afterFrame`). */
+  const afterFrames: Array<{run: () => void; fail: (error: Error) => void}> = [];
   const draw = (frameTime?: number) => {
     if (disposed || !content) return;
     // First, while this frame has issued no draws: the fetch waits for every command before it.
@@ -345,6 +357,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       }
       exposure.render(scene, camera, !asked); asked = false;
       drawnView = camera instanceof PerspectiveCamera ? drawnCameras.perspective.copy(camera, false) : drawnCameras.orthographic.copy(camera, false);
+      for (const waiting of afterFrames.splice(0)) waiting.run();
       // The car's reflection probe renders three faces after the frame (car/carReflection.ts), around the body's centre.
       if (car.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
     } finally {
@@ -444,9 +457,21 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       started = true; mount();
     },
     show,
-    surfaceAt(x, y) {
+    afterFrame<T>(read: () => T | Promise<T>) {
+      if (disposed) return Promise.reject(new Error('The scene was disposed.'));
+      return new Promise<T>((resolve, reject) => {
+        afterFrames.push({run: () => { try { resolve(read()); } catch (error) { reject(error instanceof Error ? error : new Error(String(error))); } }, fail: reject});
+        // A frame of its own while nothing else asks for one (a paused replay): the exposure reads it as a quiet frame.
+        schedule();
+      });
+    },
+    pointerRay(x, y) {
       const canvas = renderer.domElement;
-      return pointer.read(scene, drawnView, x, y, canvas.clientWidth, canvas.clientHeight);
+      return pointer.ray(drawnView, x, y, canvas.clientWidth, canvas.clientHeight);
+    },
+    surfaceWithin(x, y, spans) {
+      const canvas = renderer.domElement;
+      return pointer.within(scene, drawnView, x, y, canvas.clientWidth, canvas.clientHeight, spans);
     },
     placeCar(car, pose, motion) {
       car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);

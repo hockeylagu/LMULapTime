@@ -1,4 +1,4 @@
-import { Box3, Euler, Matrix4, Mesh, Vector3, type Object3D } from 'three';
+import { Box3, Euler, Matrix4, Mesh, Ray, Vector3, type Object3D } from 'three';
 import { CONTACT_SHADOW_NAME } from '../car/underCarBake.js';
 
 /** A car where it was drawn: native metres and the body's rotations (race pose channels `x` to `rotZ`). */
@@ -118,7 +118,7 @@ const PICK_NEAREST_M = 3;
 const SURFACE_SLACK_M = 0.1;
 
 const corner = new Vector3(), toView = new Matrix4(), place = new Matrix4(), mirror = new Matrix4().makeScale(1, 1, -1), euler = new Euler();
-const local = new Vector3(), grown = new Box3(), carFrame = new Matrix4();
+const grown = new Box3(), carFrame = new Matrix4(), toLocal = new Matrix4(), localRay = new Ray();
 
 /** The car's frame to the scene's: the scene draws native coordinates around the origin, mirrored along z. */
 function carToScene(car: DrawnPlace, origin: {x: number; y: number; z: number}, matrix: Matrix4): Matrix4 {
@@ -186,15 +186,53 @@ export function carsUnder(
   return under.sort((a, b) => a.depth - b.depth).map(({car}) => car);
 }
 
+/** A stretch of the pointer's ray through a car's parts: where it enters and leaves them, in scene coordinates. */
+export interface CarSpan {
+  car: DrawnPlace;
+  enter: Vector3;
+  leave: Vector3;
+}
+
+/** Where `ray` enters and leaves `box`, as distances along it from its origin (0 at the earliest); null when it misses. */
+function crossing(ray: Ray, box: Box3): [number, number] | null {
+  let enter = 0, leave = Infinity;
+  for (const axis of ['x', 'y', 'z'] as const) {
+    const from = ray.origin[axis], step = ray.direction[axis], min = box.min[axis], max = box.max[axis];
+    if (step === 0) {
+      if (from < min || from > max) return null;
+      continue;
+    }
+    const a = (min - from) / step, b = (max - from) / step;
+    enter = Math.max(enter, Math.min(a, b)); leave = Math.min(leave, Math.max(a, b));
+    if (enter > leave) return null;
+  }
+  return [enter, leave];
+}
+
 /**
- * Of `cars` (nearest the camera first, as `carsUnder` lists them), the one the surface under the pointer belongs to: `point`, in
- * scene coordinates, lies on one of its parts (its box without them). Null when that surface is another's: scenery, a car not
+ * Where the pointer's `ray` (scene coordinates, from the near plane) passes through `cars` (nearest the camera first, as `carsUnder`
+ * lists them), car by car and nearest first: its parts (its box without them) each grown by SURFACE_SLACK_M, overlapping stretches
+ * joined. The surface under the pointer is the car's of the first stretch it lies in; in none, it is another's: scenery, a car not
  * listed, the sky.
  */
-export function carShowing(cars: readonly DrawnPlace[], origin: {x: number; y: number; z: number}, point: Vector3): DrawnPlace | null {
+export function carSpans(cars: readonly DrawnPlace[], origin: {x: number; y: number; z: number}, ray: Ray): CarSpan[] {
+  const spans: CarSpan[] = [];
   for (const car of cars) {
-    local.copy(point).applyMatrix4(carToScene(car, origin, carFrame).invert());
-    if ((car.parts ?? [car.box ?? PICK_BOX]).some(part => grown.copy(part).expandByScalar(SURFACE_SLACK_M).containsPoint(local))) return car;
+    const toScene = carToScene(car, origin, carFrame);
+    localRay.copy(ray).applyMatrix4(toLocal.copy(toScene).invert());
+    const stretches = (car.parts ?? [car.box ?? PICK_BOX])
+      .map(part => crossing(localRay, grown.copy(part).expandByScalar(SURFACE_SLACK_M)))
+      .filter(stretch => stretch !== null)
+      .sort((a, b) => a[0] - b[0]);
+    const joined: Array<[number, number]> = [];
+    for (const [enter, leave] of stretches) {
+      const last = joined.at(-1);
+      if (last && enter <= last[1]) last[1] = Math.max(last[1], leave); else joined.push([enter, leave]);
+    }
+    // The frame is rigid (a turn, a mirror, a move): distances along the ray are the scene's.
+    for (const [enter, leave] of joined) {
+      spans.push({car, enter: localRay.at(enter, new Vector3()).applyMatrix4(toScene), leave: localRay.at(leave, new Vector3()).applyMatrix4(toScene)});
+    }
   }
-  return null;
+  return spans;
 }
