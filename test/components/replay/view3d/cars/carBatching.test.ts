@@ -36,11 +36,10 @@ const batchesIn = (parent: Group) => parent.children.filter((child): child is Ba
 const expectClose = (actual: Matrix4, expected: Matrix4) => actual.elements.forEach((value, index) => expect(value).toBeCloseTo(expected.elements[index], 4));
 
 describe('batchable and layoutOf', () => {
-  it('accepts opaque lit single-material meshes only', async () => {
+  it('accepts lit single-material meshes only, glass included', async () => {
     const geometry = new BoxGeometry(1, 1, 1);
     expect(batchable(new Mesh(geometry, new MeshStandardMaterial()))).toBe(true);
-    expect(batchable(new Mesh(geometry, new MeshStandardMaterial({ transparent: true })))).toBe(false);
-    expect(batchable(new Mesh(geometry, new MeshStandardMaterial({ transparent: true })), true)).toBe(true);
+    expect(batchable(new Mesh(geometry, new MeshStandardMaterial({ transparent: true })))).toBe(true);
     expect(batchable(new Mesh(geometry, new MeshBasicMaterial()))).toBe(false);
     expect(batchable(new Mesh(geometry, [new MeshStandardMaterial()]))).toBe(false);
     const hidden = new MeshStandardMaterial(); hidden.visible = false;
@@ -61,16 +60,16 @@ describe('batchable and layoutOf', () => {
 });
 
 describe('batchCars, one car', () => {
-  it('draws the opaque parts that share a material as one batch inside the car, and leaves the rest alone', async () => {
+  it('draws the parts that share a material as one batch inside the car, casting from the shadow batch, and leaves the rest alone', async () => {
     const { root, table, hull, wing, rim, tyre, glass, lamp } = car(body());
-    const set = await batchCars([table], { releaseParsed: false });
+    const set = await batchCars([table]);
     expect(set.shared.children).toHaveLength(0);
     const batches = batchesIn(root);
-    expect(batches).toHaveLength(1);
+    expect(batches.map(batch => batch.name)).toEqual([`car batch ${hull.material.name}`, 'car shadow batch']);
     expect(table.own).toEqual(batches);
     expect(batches[0].material).toBe(hull.material);
     expect(batches[0].maxInstanceCount).toBe(3);
-    expect(batches[0].castShadow).toBe(true);
+    expect(batches[0].castShadow).toBe(false);
     for (const mesh of [hull, wing, rim]) { expect(mesh.layers.mask).toBe(0); expect(mesh.castShadow).toBe(false); }
     for (const mesh of [tyre, glass, lamp]) { expect(mesh.layers.mask).toBe(1); expect(mesh.castShadow).toBe(true); }
     expect(table.parts.filter(part => part.batch).map(part => part.mesh)).toEqual([hull, wing, rim]);
@@ -78,7 +77,7 @@ describe('batchCars, one car', () => {
 
   it('keeps instances in the car frame: the car moving changes nothing, a turning spin node does', async () => {
     const { root, table, rim, spin, wing } = car(body());
-    await batchCars([table], { releaseParsed: false });
+    await batchCars([table]);
     const field = new Group(); field.add(root);
     const batch = batchesIn(root)[0], id = instanceOf(table, rim);
     table.sync();
@@ -98,19 +97,20 @@ describe('batchCars, one car', () => {
 });
 
 describe('batchCars, several cars', () => {
-  async function field(releaseParsed: boolean) {
+  async function field() {
     const shared = body(), parent = new Group(), a = car(shared), b = car(shared);
     a.root.position.set(10, 0, 0); b.root.position.set(0, 0, 20); b.root.rotation.y = 0.8;
     parent.add(a.root, b.root);
-    const set = await batchCars([a.table, b.table], { releaseParsed });
+    const set = await batchCars([a.table, b.table]);
     parent.add(set.shared);
     return { shared, parent, a, b, set };
   }
 
   it('shares one batch per material, sized for every car, drawing in the parent frame of the cars', async () => {
-    const { a, b, set, shared } = await field(false);
+    const { a, b, set, shared } = await field();
     const batches = batchesIn(set.shared);
-    expect(batches).toHaveLength(2);
+    // Carbon, rubber, glass and the shadow batch.
+    expect(batches).toHaveLength(4);
     expect(set.batches).toEqual(batches);
     expect(batchesIn(a.root)).toHaveLength(0);
     expect(a.table.own).toEqual([]);
@@ -125,9 +125,9 @@ describe('batchCars, several cars', () => {
     }
   });
 
-  it('batches the glass too with transparent, its instances sorted back to front; the opaque batches unsorted', async () => {
+  it('batches the glass too, its instances sorted back to front; the opaque batches unsorted', async () => {
     const shared = body(), a = car(shared), b = car(shared);
-    const set = await batchCars([a.table, b.table], { releaseParsed: false, transparent: true });
+    const set = await batchCars([a.table, b.table]);
     const glass = set.batches.find(batch => batch.material === shared.glass)!;
     expect(glass.maxInstanceCount).toBe(2);
     expect(glass.sortObjects).toBe(true);
@@ -136,10 +136,10 @@ describe('batchCars, several cars', () => {
     expect(set.batches.some(batch => batch.material === shared.lamp)).toBe(false);
   });
 
-  it('casts the solid parts from one shadow-only batch with shadows, which follows their instances and only the sun layers see', async () => {
+  it('casts the solid parts from one shadow-only batch, which follows their instances and only the sun layers see', async () => {
     const shared = body(), a = car(shared), b = car(shared), parent = new Group();
     parent.add(a.root, b.root);
-    const set = await batchCars([a.table, b.table], { releaseParsed: false, transparent: true, shadows: true });
+    const set = await batchCars([a.table, b.table]);
     const shadow = set.batches.find(batch => batch.name === 'car shadow batch')!;
     // Hull, wing, rim and tyre of both cars: every opaque batched part.
     expect(shadow.maxInstanceCount).toBe(8);
@@ -166,7 +166,7 @@ describe('batchCars, several cars', () => {
     shared.solid.computeBoundingBox(); shared.solid.computeBoundingSphere();
     // Bounds no vertex walk would give: the batch took them as they are.
     shared.solid.boundingSphere!.radius = 7; shared.solid.boundingBox!.max.set(3, 3, 3);
-    const set = await batchCars([a.table], { releaseParsed: false, transparent: true, shadows: true });
+    const set = await batchCars([a.table]);
     const shadow = set.batches.find(batch => batch.name === 'car shadow batch')!;
     const id = shadow.getGeometryIdAt(a.table.parts.find(part => part.mesh === a.hull)!.shadow!.instance);
     expect(shadow.getBoundingSphereAt(id, new Sphere())!.radius).toBe(7);
@@ -178,34 +178,30 @@ describe('batchCars, several cars', () => {
     // The hulls share the body's livery material, each car its own layer; one hull casts, the other not (one batch all the same).
     a.hull.material = paint; a.hull.userData.liveryLayer = 3;
     b.hull.material = paint; b.hull.userData.liveryLayer = 1; b.hull.castShadow = false;
-    const set = await batchCars([a.table, b.table], { releaseParsed: false });
+    const set = await batchCars([a.table, b.table]);
     expect(set.batches.filter(batch => batch.material === paint)).toHaveLength(1);
     const values = (paint.userData.carLiveryLayer as DataTexture).image.data as Float32Array;
     expect([values[instanceOf(a.table, a.hull)], values[instanceOf(b.table, b.hull)]]).toEqual([3, 1]);
     // Alone, a livery part still draws from its batch.
     const lone = car(body()), solo = new MeshStandardMaterial();
     lone.hull.material = solo; lone.hull.userData.liveryLayer = 0;
-    await batchCars([lone.table], { releaseParsed: false });
+    await batchCars([lone.table]);
     expect((solo.userData.carLiveryLayer as DataTexture).image.data).toEqual(new Float32Array([0]));
   });
 
-  it('lets the batched stand-ins go of their geometry with releaseParsed, keeping what a part drawn on its own reads', async () => {
-    const disposed: unknown[] = [], released = await field(true);
+  it('lets the batched stand-ins go of their geometry, keeping what a part drawn on its own reads', async () => {
+    const released = await field();
     expect(released.a.hull.geometry).not.toBe(released.shared.solid);
     expect(released.a.hull.geometry.attributes.position).toBeUndefined();
     // Its bounds stay: a wheel rig measures its wheel from them.
     released.shared.solid.computeBoundingBox();
     expect(released.a.hull.geometry.boundingBox).toEqual(released.shared.solid.boundingBox);
-    // The glass and lamp draw on their own: they keep theirs.
+    // The lamp draws on its own: it keeps its geometry.
     expect(released.a.lamp.geometry).toBe(released.shared.plain);
-    const kept = await field(false);
-    kept.shared.solid.addEventListener('dispose', () => disposed.push(kept.shared.solid));
-    expect(kept.a.hull.geometry).toBe(kept.shared.solid);
-    expect(disposed).toHaveLength(0);
   });
 
   it('shows a batch only while one of its instances shows, once ready', async () => {
-    const { a, set } = await field(false);
+    const { a, set } = await field();
     const [batch] = set.batches;
     expect(set.batches.every(item => item.visible)).toBe(true);
     set.ready();
@@ -221,7 +217,7 @@ describe('batchCars, several cars', () => {
   });
 
   it('removes its batches on dispose', async () => {
-    const { set, a } = await field(false);
+    const { set, a } = await field();
     const spies = set.batches.map(batch => vi.spyOn(batch, 'dispose'));
     set.dispose();
     expect(set.shared.children).toHaveLength(0);

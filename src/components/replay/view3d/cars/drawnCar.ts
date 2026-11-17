@@ -20,9 +20,9 @@ export interface DrawnCar {
   motion: CarMotion;
   /**
    * Its body as the pointer picks it (`race/carPick.ts`): its bounds and its parts' cells, measured before the batching takes the
-   * batched parts' vertices. With `pickShape` only.
+   * batched parts' vertices.
    */
-  pickShape: {box: Box3; parts: Box3[]} | null;
+  pickShape: {box: Box3; parts: Box3[]};
 }
 
 /** Cars drawn together: the cars of one body share their batches. */
@@ -38,34 +38,30 @@ export interface DrawnCars {
 export interface DrawnCarsOptions {
   /** Batched (the default), or kept part by part: the ghost, whose see-through parts draw in a fixed order. */
   batched?: boolean;
-  /** Glass and decals batched too, sorted in their batch: the race's other cars (`batchCars`). */
-  transparent?: boolean;
   /** The materials other cars draw with, which the cars leave when dropped. */
   sharedMaterial?: (material: Material) => boolean;
-  /** Each car's pick shape measured (`DrawnCar.pickShape`): the race's followed car. */
-  pickShape?: boolean;
 }
 
 /**
  * `models` (of `makeCar`) with their part tables, wheels and lamps, batched together: one copy of each geometry, the solid parts
- * casting their sun shadow from one shadow-only batch. The batched parts let go of the parsed body's vertices (`releaseParsed`):
+ * casting their sun shadow from one shadow-only batch. The batched parts let go of the parsed body's vertices (`batchCars`):
  * once its build is done nothing holds the parse (`createCarTemplates`) unless the body is held, and the next car of the body parses
  * its file again.
  */
 export async function createDrawnCars(models: readonly Group[], surfaceHeight: SurfaceHeight,
-  {batched = true, transparent = false, sharedMaterial = () => false, pickShape = false}: DrawnCarsOptions = {}): Promise<DrawnCars> {
+  {batched = true, sharedMaterial = () => false}: DrawnCarsOptions = {}): Promise<DrawnCars> {
   // A body's cars build over several tasks (a car's tables, then the batches): playback keeps its frames meanwhile.
   const slice = createSlicer(), cars: DrawnCar[] = [];
   // The cars of a set are liveries of one body: one pick shape serves them all.
-  let shape: DrawnCar['pickShape'] = null;
+  let shape: DrawnCar['pickShape'] | undefined;
   for (const car of models) {
     const parts = buildCarParts(car);
-    if (pickShape) shape ??= {box: envelopeBounds(car), parts: envelopeParts(car)};
+    shape ??= {box: envelopeBounds(car), parts: envelopeParts(car)};
     cars.push({car, parts, motion: createCarMotion(car, surfaceHeight), pickShape: shape});
     // oxlint-disable-next-line no-await-in-loop -- yields between cars
     await slice();
   }
-  const batches = batched ? await batchCars(cars.map(car => car.parts), {releaseParsed: true, transparent, shadows: true}) : null;
+  const batches = batched ? await batchCars(cars.map(car => car.parts)) : null;
   return {
     cars, shared: batches && cars.length > 1 ? batches.shared : null,
     ready() { batches?.ready(); },
@@ -103,10 +99,10 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
   const ownModels = createCarModels(templates, carTextures, shading);
   return {
     /**
-     * The cars of `bodies` (liveries of one body) drawn together. `pickShape`: each car's pick shape measured (`DrawnCar.pickShape`);
-     * `ownMaterials`: the cars' materials their own, freed with them (the lap's car).
+     * The cars of `bodies` (liveries of one body) drawn together. `ownMaterials`: the cars' materials their own, freed with them (the
+     * lap's car).
      */
-    async build(bodies: readonly LoadedBody[], {pickShape = false, ownMaterials = false}: {pickShape?: boolean; ownMaterials?: boolean} = {}): Promise<DrawnCars> {
+    async build(bodies: readonly LoadedBody[], {ownMaterials = false}: {ownMaterials?: boolean} = {}): Promise<DrawnCars> {
       const from = ownMaterials ? ownModels : models, cars = await Promise.all(bodies.map(body => from.car(body)));
       for (const car of cars) {
         // The parts marked interior are seats and dashboards, small through a window: only the car the cameras ride on draws them
@@ -115,7 +111,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
         car.traverse(object => { if (object.userData.interior === true) dropped.push(object); });
         for (const part of dropped) part.removeFromParent();
       }
-      return createDrawnCars(cars, surfaceHeight, {transparent: true, sharedMaterial: from.sharedMaterial, pickShape});
+      return createDrawnCars(cars, surfaceHeight, {sharedMaterial: from.sharedMaterial});
     },
     /**
      * Adds `body`'s cabin to its car of `build`, once `car` has it (none without one). The cabin loads meanwhile: a car still to build
@@ -141,7 +137,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
       }
       disposeObjects(cabin);
       const parts = buildCarParts(drawn.car, new Set(added));
-      const batches = await batchCars([parts], {releaseParsed: true, transparent: true, shadows: true});
+      const batches = await batchCars([parts]);
       return {
         parts,
         show() {

@@ -196,7 +196,7 @@ export function createRaceField(
       const present = built.filter(entry => entry !== null);
       unplaced = present.map(({car}) => car);
       const boxes = present.map(({car}) => envelopeBounds(car)), tables = present.map(({car}) => buildCarParts(car));
-      const batches = await batchCars(tables, {releaseParsed: true, transparent: true, shadows: true});
+      const batches = await batchCars(tables);
       farSets.push(batches);
       await Promise.all([shell.warm(batches.shared), ...present.map(({car}) => shell.warm(car))]);
       if (disposed) return;
@@ -247,7 +247,7 @@ export function createRaceField(
     try {
       const liveries = await Promise.all(slots.map(bodyOf));
       if (liveries.some(livery => !livery)) throw Error(`A car of ${folder} has no body`);
-      set = await sets.build(liveries as LoadedBody[], {pickShape: true});
+      set = await sets.build(liveries as LoadedBody[]);
       // Every car of the body has the same wheels: the far models fit to the road by them from now on.
       const contact = tyreContact(set.cars[0].car);
       if (contact !== null) contactOf.set(folder, contact);

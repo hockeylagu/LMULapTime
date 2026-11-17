@@ -7,16 +7,16 @@ import type { CarPart, CarParts } from './carParts.js';
 export const GUARANTEED_TEXTURE_UNITS = 16;
 
 /**
- * A lit car part whose material and geometry a batch can draw: lamps keep their own draws (switched per frame), and so do glass and
- * decals (`transparent`) unless the batching sorts them. A surface-program material whose samplers (`userData.surfaceTextureUnits`,
- * carMaterials.ts) leave no room for the batch's vertex textures keeps its own draws: a cabin part with nine maps and the cabin
- * volume needed 17 units batched, and three bound the 17th to no unit.
+ * A lit car part whose material and geometry a batch can draw, glass and decals included (sorted in their batch): lamps keep their
+ * own draws (switched per frame). A surface-program material whose samplers (`userData.surfaceTextureUnits`, carMaterials.ts) leave
+ * no room for the batch's vertex textures keeps its own draws: a cabin part with nine maps and the cabin volume needed 17 units
+ * batched, and three bound the 17th to no unit.
  */
-export function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, transparent = false): mesh is Mesh<BufferGeometry, MeshStandardMaterial> {
+export function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>): mesh is Mesh<BufferGeometry, MeshStandardMaterial> {
   const material = mesh.material;
   if (Array.isArray(material)) return false;
   const units: unknown = material.userData.surfaceTextureUnits;
-  return material instanceof MeshStandardMaterial && (transparent || !material.transparent) && material.visible
+  return material instanceof MeshStandardMaterial && material.visible
     && (typeof units !== 'number' || units + BATCH_VERTEX_TEXTURES <= GUARANTEED_TEXTURE_UNITS)
     && !mesh.customDepthMaterial && mesh.onBeforeRender === Object3D.prototype.onBeforeRender;
 }
@@ -38,7 +38,7 @@ export const UNSEEN_LAYER = 31;
 const SHADOW_ONLY = new MeshBasicMaterial({shadowSide: DoubleSide});
 
 /**
- * What a batched stand-in holds once its vertices are only in its batch (`releaseParsed`): no vertices, the geometry's bounds (a
+ * What a batched stand-in holds once its vertices are only in its batch: no vertices, the geometry's bounds (a
  * wheel rig measures its wheel from them).
  */
 function moved(geometry: BufferGeometry): BufferGeometry {
@@ -102,22 +102,19 @@ export interface CarBatchSet {
  * each geometry: only the livery's own materials split them. The parts stay in each model as stand-ins without a camera layer,
  * their tables placing the instances (`sync`). A material with a single part keeps its own draw.
  *
- * The set is built at its exact size. With `releaseParsed` (cars of a body loaded all at once from a parsed file no other car reads),
- * the batched stand-ins let go of their geometry; the batches drop their own CPU copy once uploaded, in any case. With `transparent`
- * (every car drawn with its full model but the lap's ghost, and the far cars), glass and decals batch too, their instances drawn
- * back to front within each batch.
- * With `shadows`, the batched parts that cast a solid shadow cast it from one shadow-only batch (positions only, on
- * `SHADOW_ONLY_LAYER`) instead of their own batches: one draw per sun shadow layer for the set rather than one per material.
+ * The set is built at its exact size. The batched stand-ins let go of their geometry and the batches drop their own CPU copy once
+ * uploaded: the batches alone hold the vertices. Glass and decals batch too, their instances drawn back to front within each batch.
+ * The batched parts that cast a solid shadow cast it from one shadow-only batch (positions only, on `SHADOW_ONLY_LAYER`) instead of
+ * their own batches: one draw per sun shadow layer for the set rather than one per material.
  */
-export async function batchCars(tables: readonly CarParts[], {releaseParsed, transparent = false, shadows = false}:
-  {releaseParsed: boolean; transparent?: boolean; shadows?: boolean}): Promise<CarBatchSet> {
+export async function batchCars(tables: readonly CarParts[]): Promise<CarBatchSet> {
   // A body's copy into its batches runs to tens of milliseconds: it yields between geometries, so playback keeps its frames.
   const slice = createSlicer();
   const groups = new Map<string, CarPart[]>(), unbatched = new Set<BufferGeometry>();
   for (const table of tables) for (const part of table.parts) {
     const mesh = part.mesh;
     const livery = liveryLayerOf(mesh) !== undefined;
-    if (!batchable(mesh, transparent)) {
+    if (!batchable(mesh)) {
       if (livery) throw Error(`Car livery material ${String((mesh.material as Material).name)} cannot be batched`);
       unbatched.add(mesh.geometry); continue;
     }
@@ -144,7 +141,7 @@ export async function batchCars(tables: readonly CarParts[], {releaseParsed, tra
     const indices = geometries.reduce((sum, geometry) => sum + (geometry.index?.count ?? 0), 0);
     // The caller culls a car as a whole. A field spreads round the lap: a shared batch draws in each pass (main view, each shadow
     // cascade) the parts inside it. A car's own batch draws in the car's frame, which its table sets (`sync`).
-    const shadowOnly = shadows && first.castShadow && castsSolid(first.material) && geometries.every(geometry => geometry.index);
+    const shadowOnly = first.castShadow && castsSolid(first.material) && geometries.every(geometry => geometry.index);
     if (shadowOnly) casting.push(...members);
     const batch = createBatch({
       draws: members.length, vertices, indices, material: first.material, name: `car batch ${first.material.name}`,
@@ -195,21 +192,19 @@ export async function batchCars(tables: readonly CarParts[], {releaseParsed, tra
     batches.push(batch);
   }
   for (const table of tables) { table.onShown = counts.change; table.own = single ? batches : []; }
-  if (releaseParsed) {
-    // The batches hold the vertices now. The batched stand-ins draw nothing and no pass reads their vertices (no camera layer, no
-    // shadow): they keep the bounds alone, and once the caller drops its parsed file nothing holds the parsed vertices.
-    const stands = new Map<BufferGeometry, BufferGeometry>();
-    for (const table of tables) for (const part of table.parts) {
-      const geometry = part.mesh.geometry;
-      if (!part.batch || unbatched.has(geometry)) continue;
-      let stand = stands.get(geometry);
-      if (!stand) { stand = moved(geometry); stands.set(geometry, stand); }
-      part.mesh.geometry = stand;
-    }
-    // A parsed body's geometry (`sharedAsset`) may still draw another car built from the same parse (the lap's ghost): the parse
-    // owns it.
-    for (const geometry of copied) if (!unbatched.has(geometry) && geometry.userData.sharedAsset !== true) geometry.dispose();
+  // The batches hold the vertices now. The batched stand-ins draw nothing and no pass reads their vertices (no camera layer, no
+  // shadow): they keep the bounds alone, and once the caller drops its parsed file nothing holds the parsed vertices.
+  const stands = new Map<BufferGeometry, BufferGeometry>();
+  for (const table of tables) for (const part of table.parts) {
+    const geometry = part.mesh.geometry;
+    if (!part.batch || unbatched.has(geometry)) continue;
+    let stand = stands.get(geometry);
+    if (!stand) { stand = moved(geometry); stands.set(geometry, stand); }
+    part.mesh.geometry = stand;
   }
+  // A parsed body's geometry (`sharedAsset`) may still draw another car built from the same parse (the lap's ghost): the parse
+  // owns it.
+  for (const geometry of copied) if (!unbatched.has(geometry) && geometry.userData.sharedAsset !== true) geometry.dispose();
   return {
     shared, batches,
     ready() {
