@@ -84,9 +84,9 @@ ${shader.vertexShader}`; patchBillboardVertex(shader, 'surface_shadowEye'); };
 /**
  * Rewrites a `MeshStandardMaterial`/`MeshPhysicalMaterial` program into the native surface: tunables become uniforms (so one program
  * serves every material of the same shape), and the albedo, normal, emissive and occlusion includes are replaced by the family's GLSL.
- * `uniforms` carries the per-material sampler and scale uniforms.
+ * `uniforms` carries the per-material sampler and scale uniforms; without `vertexColour` the geometry has none and reads white.
  */
-export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, config: SurfaceConfig, uniforms: Record<string, IUniform>): void {
+export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, config: SurfaceConfig, uniforms: Record<string, IUniform>, vertexColour = true): void {
   const code = shaderParts(config, { uniforms: true });
   const p = config.parameters;
   // Each family reads its own groups: a tunable becomes a uniform only where the surface carries its value.
@@ -143,7 +143,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     ${hasUv1 ? '#ifndef USE_UV1\n    attribute vec2 uv1;\n    #endif' : 'vec2 uv1 = vec2(0.0);'}
     ${hasUv2 ? '#ifndef USE_UV2\n    attribute vec2 uv2;\n    #endif' : 'vec2 uv2 = vec2(0.0);'}
     ${hasUv3 ? '#ifndef USE_UV3\n    attribute vec2 uv3;\n    #endif' : 'vec2 uv3 = vec2(0.0);'}
-    attribute vec4 _lmu_colour;
+    ${vertexColour ? 'attribute vec4 _lmu_colour;' : 'const vec4 _lmu_colour = vec4(1.0);'}
     varying vec2 vSurfaceXZ;
     varying float vSurfaceRandom;
     varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;${axle ? '\n    varying float vSurfaceAxle;' : ''}

@@ -55,10 +55,10 @@ export function lampTexturePaths(lamp: CarLamp, rainFlashes: boolean, glow: Lamp
 /**
  * A lamp's glow, unlit, in the package's light unit and blended with its alpha when `blend` is alpha. A lamp emission gives
  * rgb = tex.rgb · scale · tex.a · (1 + gain · (N·V)^power), alpha tex.a; a display glow gives rgb = tex.rgb · colour.rgb · intensity,
- * alpha tex.a · colour.a (colour: the vertex colour). A lamp with states takes `switching`, its own texture per frame, which its car
+ * alpha tex.a · colour.a (colour: the vertex colour, white without `vertexColour`). A lamp with states takes `switching`, its own texture per frame, which its car
  * swaps in. A lamp emission with vertex colour or ambient scaling is not supported yet, so it throws.
  */
-export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Texture, switching?: LampSwitch): ShaderMaterial {
+export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Texture, switching?: LampSwitch, vertexColour = true): ShaderMaterial {
   const display = 'displayIntensity' in glow;
   const {scale, viewBoost} = display ? {scale: glow.displayIntensity, viewBoost: null} : glow;
   if (!display && (glow.vertexColour || glow.ambientScaled || glow.vertexAlpha)) throw Error(`Lamp ${lamp.material}: vertex colour and ambient scaled emission are not supported`);
@@ -77,7 +77,7 @@ export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Textu
       opacity: {get value() { return material.opacity; }},
     },
     vertexShader: `
-      ${display ? 'attribute vec4 _lmu_colour; varying vec4 vColour;' : ''}
+      ${display ? `${vertexColour ? 'attribute vec4 _lmu_colour;' : 'const vec4 _lmu_colour = vec4(1.0);'} varying vec4 vColour;` : ''}
       varying vec2 vUv; varying vec3 vNormal, vView;
       void main() {
         // An instanced lamp (a far car's glow, \`farGlows\`) places each car's copy by its instance matrix.

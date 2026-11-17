@@ -103,6 +103,18 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
         for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.set(path, interior && paths.get(path) !== false);
       }
     });
+    // A native material carries its vertex colour on every part or on none (none: white everywhere); its shaders read white without it.
+    const coloured = new Map<string, boolean>();
+    template.traverse(object => {
+      if (!(object instanceof Mesh)) return;
+      const has = '_lmu_colour' in (object.geometry as BufferGeometry).attributes;
+      for (const material of Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]) {
+        const recipe = recipeOf(material);
+        if (coloured.get(recipe.id) === !has) throw Error(`Car ${car.vehicleId} material ${recipe.name} has vertex colours on some parts only`);
+        coloured.set(recipe.id, has);
+      }
+    });
+    const white = (material: Material) => coloured.get(recipeOf(material).id) === false;
     // A surface lamp's slot is a car part on a glow mesh: its material's textures load like the other parts'.
     const surfaceNames = new Set(surfaces.map(lamp => lamp.material));
     for (const recipe of car.descriptor.materials) if (surfaceNames.has(recipe.name)) for (const path of materialTexturePaths(recipe, appearance)) paths.set(path, false);
@@ -117,7 +129,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
       if (!bytes) throw Error(`Car ${car.vehicleId} has no cabin volume ${path}`);
       return [path, cockpitVolumeTexture(bytes, row)] as const;
     }));
-    return {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
+    return {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** With `shareMaterials`, the materials of each parsed body, by content: every car of the body draws with the same ones. */
   const sharedMaterials = new WeakMap<Group, Map<string, Material>>(), shared = new WeakSet<Material>();
@@ -135,7 +147,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths, hiddenNames} = await partsOf(car);
+    const {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths, hiddenNames} = await partsOf(car);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
       carTextures.copied(copy, original, interiorPaths.get(path) === true);
@@ -154,9 +166,9 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     let materials = shareMaterials ? sharedMaterials.get(template) : undefined;
     if (!materials) { materials = new Map<string, Material>(); if (shareMaterials) sharedMaterials.set(template, materials); }
     const replace = (material: Material) => {
-      const recipe = recipeOf(material), key = carMaterialKey(recipe, appearance);
+      const recipe = recipeOf(material), plain = white(material), key = `${carMaterialKey(recipe, appearance)}${plain ? '|white' : ''}`;
       let created = materials.get(key);
-      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading, volumeOf); materials.set(key, created); if (shareMaterials) shared.add(created); }
+      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading, volumeOf, !plain); materials.set(key, created); if (shareMaterials) shared.add(created); }
       return created;
     };
     for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, [...drawn, ...surfaces], rainFlashes, (lamp, current) => {
@@ -169,7 +181,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
         return frame === null ? [] : [[index, copyOf(frame)] as const];
       }))} : undefined;
       const glow = glows.get(lamp)!;
-      created = createLampMaterial(lamp, glow, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp, rainFlashes, glow)!), switching);
+      created = createLampMaterial(lamp, glow, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp, rainFlashes, glow)!), switching, !white(current));
       lampMaterials.set(lamp, created);
       return created;
     })) mesh.removeFromParent();

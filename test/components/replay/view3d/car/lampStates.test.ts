@@ -113,8 +113,10 @@ it('draws a lamp without a lamp emission only when its material is a dashboard s
   expect(material.uniforms.scale.value).toBeCloseTo(10000 * SUN_UNIT);
   sceneDayLight.value = 0.25;
   try { expect(material.uniforms.scale.value).toBeCloseTo(7000 * SUN_UNIT); } finally { sceneDayLight.value = 1; }
-  expect(material.vertexShader).toContain('_lmu_colour');
+  expect(material.vertexShader).toContain('attribute vec4 _lmu_colour;');
   expect(material.fragmentShader).toContain('tex.rgb * vColour.rgb * scale');
+  // A screen whose parts carry no vertex colour glows white.
+  expect(createLampMaterial(lit, {displayIntensity: 10000, displayNight: 6000}, new Texture(), undefined, false).vertexShader).toContain('const vec4 _lmu_colour = vec4(1.0);');
 });
 
 it('draws a lamp without a lamp emission as its own surface when its standard material glows always', () => {

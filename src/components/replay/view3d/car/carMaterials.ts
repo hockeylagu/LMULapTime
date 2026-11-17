@@ -91,9 +91,10 @@ function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Textur
  * map to a standard or physical material with the albedo map.
  * `texture` returns a copy of the KTX2 texture at a `textures/<sha256>.ktx2.zst` path, the caller's to set up: each map has its own for its UV channel.
  * `shading` is the scenery package's shading section, read by the car paint. `volume` returns a copy of the cabin volume at a
- * `volumes/<sha256>.bin` path, for a material with a cockpit reflection occlusion (cockpitOcclusion.ts).
+ * `volumes/<sha256>.bin` path, for a material with a cockpit reflection occlusion (cockpitOcclusion.ts). `vertexColour`: whether its
+ * parts carry the package's vertex colour (without it, white).
  */
-export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture, shading: SceneryShading, volume?: (path: string) => Data3DTexture): MeshStandardMaterial {
+export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture, shading: SceneryShading, volume?: (path: string) => Data3DTexture, vertexColour = true): MeshStandardMaterial {
   const config = recipe.paint ? appearance.paint : recipe.surface;
   if (!config) throw Error(`Car material ${recipe.name} has no shader configuration`);
   const surface = nativeSurface(recipe, appearance);
@@ -135,7 +136,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   if (surface) {
     const loaded: Record<string, Texture> = {};
     for (const [key, map] of Object.entries(surface.maps)) loaded[key] = mapTexture(texture, map!);
-    bindSurfaceProgram(material, surface, loaded);
+    bindSurfaceProgram(material, surface, loaded, vertexColour);
     // A cabin part with nine maps and the cabin volume has no room left for the overhead correction: past the limit its program
     // fails to link and the part is not drawn.
     const units = surfaceTextureUnits(surface) + (recipe.reflectionOcclusion ? 1 : 0);

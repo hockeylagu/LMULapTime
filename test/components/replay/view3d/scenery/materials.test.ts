@@ -219,6 +219,13 @@ describe('patchSurfaceShader', () => {
     expect((shader.uniforms as Record<string, { value: Vector2 }>).surface_scale_albedo.value.toArray()).toEqual([2, 3]);
     expect((shader.uniforms as Record<string, { value: Vector2 }>).surface_normalScale.value.toArray()).toEqual([0.5, -1]);
     expect(shader.vertexShader).toContain('vSurfaceColour = _lmu_colour;');
+    expect(shader.vertexShader).toContain('attribute vec4 _lmu_colour;');
+  });
+  it('reads white for geometry without the vertex colour', () => {
+    const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: fragment } as unknown as Parameters<typeof patchSurfaceShader>[0];
+    patchSurfaceShader(shader, surface('standard', { maps: { albedo: map('A', true) } }), {}, false);
+    expect(shader.vertexShader).not.toContain('attribute vec4 _lmu_colour;');
+    expect(shader.vertexShader).toContain('const vec4 _lmu_colour = vec4(1.0);');
   });
   it('cuts a cut-out by the shared alpha cut scale, so the multisampled scene pass can leave the cut to coverage', () => {
     const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: `#include <alphatest_pars_fragment>\n${fragment}\n#include <alphatest_fragment>` } as unknown as Parameters<typeof patchSurfaceShader>[0];
