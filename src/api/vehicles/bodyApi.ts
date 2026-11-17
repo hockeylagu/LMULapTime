@@ -38,8 +38,14 @@ export function startFileOf(body: LoadedBody, path: string): {path: string; skip
   return row?.start && row.levels !== undefined ? {path: descriptorTexturePath(row.start.sha256), skip: row.levels - row.start.levels} : undefined;
 }
 
-/** The 3D body serving a VEH id. A vehicle without one is an error: the package covers every catalogued vehicle. */
-export async function fetchBody(vehicleId: string, packageRevision: string | undefined, signal: AbortSignal): Promise<LoadedBody> {
+/** What every livery of a body reads alike (its descriptor and cabin volumes), by folder and package revision (`fetchBody`). */
+export type BodyFolders = Map<string, Promise<Pick<LoadedBody, 'descriptor' | 'volumes'>>>;
+
+/**
+ * The 3D body serving a VEH id. A vehicle without one is an error: the package covers every catalogued vehicle. The liveries of a
+ * body share its descriptor and volumes through `folders`: fetched once for them all (a race fetches every livery of the field).
+ */
+export async function fetchBody(vehicleId: string, packageRevision: string | undefined, signal: AbortSignal, folders: BodyFolders = new Map()): Promise<LoadedBody> {
   const resource = await fetchJson<BodyResource>(`/api/data-plugin/vehicles/${encodeURIComponent(vehicleId)}/body`, { signal });
   if (packageRevision && resource.packageRevision !== packageRevision) throw Error('Body package revision differs from the selected lap');
   const {interior} = resource;
@@ -49,16 +55,27 @@ export async function fetchBody(vehicleId: string, packageRevision: string | und
     if (bytes.byteLength !== row.byteLength) throw Error('Incomplete 3D body');
     return bytes;
   };
-  const [descriptor, volumes] = await Promise.all([
-    fetchJson<BodyDescriptor>(`${VEHICLE_FILES}bodies/${resource.folder}.json`, { signal }),
-    Promise.all(resource.volumes.map(async row => {
-      const volume = await file(`volumes/${row.sha256}.bin`);
-      if (volume.byteLength !== row.byteLength) throw Error('Incomplete 3D body');
-      return [`volumes/${row.sha256}.bin`, volume] as const;
-    })),
-  ]);
+  const key = `${resource.folder}:${resource.packageRevision}`;
+  let shared = folders.get(key);
+  if (!shared) {
+    const own = (async () => {
+      const [descriptor, volumes] = await Promise.all([
+        fetchJson<BodyDescriptor>(`${VEHICLE_FILES}bodies/${resource.folder}.json`, { signal }),
+        Promise.all(resource.volumes.map(async row => {
+          const volume = await file(`volumes/${row.sha256}.bin`);
+          if (volume.byteLength !== row.byteLength) throw Error('Incomplete 3D body');
+          return [`volumes/${row.sha256}.bin`, volume] as const;
+        })),
+      ]);
+      return {descriptor, volumes: new Map(volumes)};
+    })();
+    // A failed fetch is forgotten: the next livery tries again.
+    own.catch(() => { if (folders.get(key) === own) folders.delete(key); });
+    folders.set(key, own); shared = own;
+  }
+  const {descriptor, volumes} = await shared;
   return {
     resource, file: () => glb(resource), interiorFile: async () => (interior ? glb(interior) : null),
-    farFile: () => glb(resource.far), descriptor, volumes: new Map(volumes), vehicleId,
+    farFile: () => glb(resource.far), descriptor, volumes, vehicleId,
   };
 }

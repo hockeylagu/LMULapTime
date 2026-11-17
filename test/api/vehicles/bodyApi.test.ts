@@ -43,3 +43,15 @@ it('loads the cabin volumes of the body by their descriptor path and rejects one
   body.volumes = [{ sha256: 'cc', byteLength: 9 }];
   await expect(fetchBody('car.veh', 'r', signal)).rejects.toThrow('Incomplete 3D body');
 });
+
+it('reads the descriptor and volumes once for the liveries of a body, and again after a failed read', async () => {
+  body.interior = null; body.volumes = [{ sha256: 'cc', byteLength: 8 }];
+  const folders = new Map(), reads = () => json.mock.calls.filter(call => call[0].endsWith('/Car.json')).length;
+  const [a, b] = await Promise.all([fetchBody('a.veh', 'r', signal, folders), fetchBody('b.veh', 'r', signal, folders)]);
+  expect([a.vehicleId, b.vehicleId, a.descriptor === b.descriptor, a.volumes === b.volumes, reads()]).toEqual(['a.veh', 'b.veh', true, true, 1]);
+  const other = new Map();
+  binary.mockRejectedValueOnce(Error('offline'));
+  await expect(fetchBody('a.veh', 'r', signal, other)).rejects.toThrow('offline');
+  await fetchBody('a.veh', 'r', signal, other);
+  expect(reads()).toBe(3);
+});
