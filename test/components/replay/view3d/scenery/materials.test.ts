@@ -354,7 +354,7 @@ it('casts a foliage card from both sides, and leaves the other cut-outs to the c
   expect((await configured(surface('standard', {maps: {albedo: map('fence', true)}}))).shadowSide).toBeNull();
 });
 
-it('shares one configured material among meshes of the same surface, textures and GLB state, disposed with its last user', async () => {
+it('shares one configured material among meshes of the same surface, textures and GLB state, disposed with the set', async () => {
   const shared = createSharedSurfaceMaterials(), grass = new Texture(), gravel = new Texture();
   const configured = async (texture: Texture, glb: Partial<MeshStandardMaterial> = {}, packageKey = 'fb81305939eff0a5') => {
     const material = Object.assign(new MeshStandardMaterial(), glb);
@@ -371,11 +371,10 @@ it('shares one configured material among meshes of the same surface, textures an
   expect(otherBatch.material).toBe(a);
   expect(first.userData.lmuMaterial).toBe('fb81305939eff0a5');
   expect(otherBatch.userData.lmuMaterial).toBe('1b81305939eff0a5');
-  shared.release(otherBatch.material);
-  expect(shared.owns(a)).toBe(true); expect(shared.release(new MeshStandardMaterial())).toBe(false);
+  expect(shared.owns(a)).toBe(true); expect(shared.owns(new MeshStandardMaterial())).toBe(false);
   let disposed = 0, texturesFreed = 0; a.addEventListener('dispose', () => { disposed++; }); grass.addEventListener('dispose', () => { texturesFreed++; });
-  expect(shared.release(a)).toBe(true); expect(disposed).toBe(0);
-  expect(shared.release(b)).toBe(true); expect(disposed).toBe(1);
+  shared.dispose();
+  expect([disposed, shared.owns(a)]).toEqual([1, false]);
   // The textures belong to the pool, not the shared material.
   expect(texturesFreed).toBe(0);
 });

@@ -5,8 +5,6 @@ import { planResidency, type StreamView } from './residency.js';
 export interface SceneryStreamDeps {
   /** Fetches and parses one chunk into a native-coordinate root. Must reject with the signal's reason when aborted. */
   load(chunk: SceneryChunk, signal: AbortSignal): Promise<Object3D>;
-  /** A root leaves the scene (or never joined it): free its GPU resources. */
-  unload(chunk: SceneryChunk, root: Object3D): void;
   /** The drawn scenery changed (a chunk joined the scene, or chunks were shown or hidden). */
   changed(): void;
   /** A chunk failed to load; it is not retried. */
@@ -33,8 +31,8 @@ const MAX_CONCURRENT_LOADS = 3;
  * Loads the whole circuit and keeps it: the chunks under the view first, then the resident-set rule's window
  * (docs/SCENE_PACKAGE.md), then the rest of the lap ahead. Chunking only orders the load. Only the horizon and the window (plus
  * its hysteresis margin) are drawn; the other loaded chunks are hidden, so going back along the lap reloads nothing and the
- * frame draws what streaming drew. The loader frees the textures when it is disposed. A load failure is reported and never
- * retried.
+ * frame draws what streaming drew. No chunk unloads: `dispose` takes the roots out of the scene and whoever loaded them frees
+ * them. A load failure is reported and never retried.
  */
 export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: SceneryStreamDeps): SceneryStream {
   const chunks = new Map<string, SceneryChunk>([[layout.horizon.id, layout.horizon], ...layout.sectors.map(sector => [sector.id, sector] as const)]);
@@ -59,7 +57,7 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
     deps.load(chunk, abort.signal).then(root => {
       entry.abort = null;
       // Disposed while loading: the parsed root never joins the scene.
-      if (disposed || entries.get(id) !== entry) { deps.unload(chunk, root); return; }
+      if (disposed) return;
       root.visible = shown.has(id);
       entry.root = root; parent.add(root);
       deps.changed();
@@ -114,9 +112,9 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
     dispose() {
       if (disposed) return;
       disposed = true;
-      for (const {chunk, root, abort} of entries.values()) {
-        if (abort) abort.abort();
-        if (root) { root.removeFromParent(); deps.unload(chunk, root); }
+      for (const {root, abort} of entries.values()) {
+        abort?.abort();
+        root?.removeFromParent();
       }
       entries.clear(); waiters = [];
     },

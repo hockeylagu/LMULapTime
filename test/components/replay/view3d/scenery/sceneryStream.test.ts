@@ -31,7 +31,7 @@ beforeEach(() => {
       const entry = { chunk, signal, resolve, reject }; pending.push(entry);
       signal.addEventListener('abort', () => { pending.splice(pending.indexOf(entry), 1); reject(signal.reason as Error); });
     })),
-    unload: vi.fn(), changed: vi.fn(), failed: vi.fn(),
+    changed: vi.fn(), failed: vi.fn(),
   };
 });
 
@@ -111,7 +111,7 @@ describe('sceneryStream', () => {
     deps.changed.mockClear();
     stream.update({ kind: 'lap', lapDistanceM: 1600 });
     expect(s0.visible).toBe(false); expect(s0.parent).toBe(group); expect(deps.changed).toHaveBeenCalledOnce();
-    expect(joined(group)).toContain('s0'); expect(deps.unload).not.toHaveBeenCalled();
+    expect(joined(group)).toContain('s0');
     deps.changed.mockClear();
     stream.update({ kind: 'lap', lapDistanceM: 1600 });
     expect(deps.changed).not.toHaveBeenCalled(); // Nothing toggled.
@@ -147,14 +147,14 @@ describe('sceneryStream', () => {
     await expect(stream.whenUnderView()).rejects.toThrow('boom');
   });
 
-  it('unloads everything on dispose, ignores later updates and settles late loads', async () => {
+  it('takes everything out of the scene on dispose, ignores later updates and settles late loads', async () => {
     const group = parent(), stream = createSceneryStream(testLayout(), group, deps);
     await finish('horizon');
     stream.update({ kind: 'lap', lapDistanceM: 1000.5 }); await finish('s1');
     const late = pending.find(entry => entry.chunk.id === 's2')!;
     stream.dispose();
     expect(group.children).toHaveLength(0);
-    expect(deps.unload).toHaveBeenCalledTimes(2); expect(late.signal.aborted).toBe(true);
+    expect(late.signal.aborted).toBe(true);
     const calls = deps.load.mock.calls.length;
     stream.update({ kind: 'lap', lapDistanceM: 3000 }); expect(deps.load.mock.calls).toHaveLength(calls);
   });

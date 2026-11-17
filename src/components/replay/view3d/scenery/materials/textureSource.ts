@@ -50,52 +50,33 @@ async function loadSurfaceTexture(ktx2: CachedKtx2Loader, renderer: WebGLRendere
 }
 
 /**
- * The scenery's surface textures, one per file and colour role, counted by the chunks that use them. `base` is the folder the
- * chunks' `textures/...` URIs are relative to.
+ * The scenery's surface textures, one per file and colour role, shared by every chunk that uses them. Chunks stay loaded until the
+ * scene goes, so the pool frees its textures all at once (`dispose`). `base` is the folder the chunks' `textures/...` URIs are
+ * relative to.
  */
 export function createSurfaceTexturePool(ktx2: CachedKtx2Loader, renderer: WebGLRenderer, base: string) {
-  type Entry = {pending: Promise<Texture>; owners: number};
-  const entries = new Map<string, Entry>();
+  const entries = new Map<string, Promise<Texture>>();
   let disposed = false;
-  const release = (key: string, entry: Entry) => {
-    if (entry.owners <= 0) return;
-    entry.owners--;
-    if (entry.owners) return;
-    if (entries.get(key) === entry) entries.delete(key);
-    void entry.pending.then(texture => texture.dispose(), () => undefined);
-  };
   return {
-    source(uris: ReadonlyMap<string, string>): SurfaceTextureSource & {dispose(): void} {
-      const owned = new Map<string, Entry>();
-      let released = false;
+    /** The textures of one chunk, found through the images it declares (`uris`). */
+    source(uris: ReadonlyMap<string, string>): SurfaceTextureSource {
       return {
         load(map) {
-          if (disposed || released) return Promise.reject(Error('Scenery texture source was disposed'));
+          if (disposed) return Promise.reject(Error('Scenery texture pool was disposed'));
           const uri = resolveMapUri(map, uris), key = `${uri}|${map.srgb}`;
-          let entry = owned.get(key);
-          if (entry) return entry.pending;
-          entry = entries.get(key);
-          if (entry) entry.owners++;
-          else {
-            entry = {pending: loadSurfaceTexture(ktx2, renderer, `${base}${uri}`, map.srgb), owners: 1};
-            entries.set(key, entry);
-            const created = entry;
-            void entry.pending.catch(() => { if (entries.get(key) === created) entries.delete(key); });
+          let pending = entries.get(key);
+          if (!pending) {
+            const created = pending = loadSurfaceTexture(ktx2, renderer, `${base}${uri}`, map.srgb);
+            entries.set(key, created);
+            void created.catch(() => { if (entries.get(key) === created) entries.delete(key); });
           }
-          owned.set(key, entry);
-          return entry.pending;
-        },
-        dispose() {
-          if (released) return;
-          released = true;
-          owned.forEach((entry, key) => release(key, entry));
-          owned.clear();
+          return pending;
         },
       };
     },
     dispose() {
       disposed = true;
-      entries.forEach((entry, key) => { entry.owners = 1; release(key, entry); });
+      for (const pending of entries.values()) void pending.then(texture => texture.dispose(), () => undefined);
       entries.clear();
     },
   };

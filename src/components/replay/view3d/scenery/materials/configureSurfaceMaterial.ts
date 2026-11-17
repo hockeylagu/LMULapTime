@@ -62,35 +62,31 @@ export function bindSurfaceProgram(material: MeshStandardMaterial, config: Surfa
 
 /**
  * Configured scenery materials shared between meshes: every mesh of a surface with the same textures and GLB material state draws
- * with one material, so consecutive draws need no material switch (each switch uploads the material's uniforms again). A material
- * is disposed when the last mesh that took it is released.
+ * with one material, so consecutive draws need no material switch (each switch uploads the material's uniforms again). Chunks stay
+ * loaded until the scene goes, so the materials are disposed all at once (`dispose`).
  */
 export interface SharedSurfaceMaterials {
-  /** The material for `key`, built by `build` the first time; each call counts one user. */
+  /** The material for `key`, built by `build` the first time. */
   take(key: string, build: () => MeshStandardMaterial): MeshStandardMaterial;
-  /** Gives back one user of `material`; false for a material this registry did not hand out. */
-  release(material: Material): boolean;
   /** Whether this registry handed `material` out (its disposal is the registry's). */
   owns(material: Material): boolean;
+  /** Disposes every material handed out. */
+  dispose(): void;
 }
 
 export function createSharedSurfaceMaterials(): SharedSurfaceMaterials {
-  const entries = new Map<string, { material: MeshStandardMaterial; users: number }>(), keys = new WeakMap<Material, string>();
+  const entries = new Map<string, MeshStandardMaterial>(), owned = new Set<Material>();
   return {
     take(key, build) {
-      let entry = entries.get(key);
-      if (!entry) { entry = { material: build(), users: 0 }; entries.set(key, entry); keys.set(entry.material, key); }
-      entry.users++;
-      return entry.material;
+      let material = entries.get(key);
+      if (!material) { material = build(); entries.set(key, material); owned.add(material); }
+      return material;
     },
-    release(material) {
-      const key = keys.get(material);
-      if (key === undefined) return false;
-      const entry = entries.get(key);
-      if (entry && --entry.users === 0) { entries.delete(key); material.dispose(); }
-      return true;
+    owns: material => owned.has(material),
+    dispose() {
+      for (const material of owned) material.dispose();
+      entries.clear(); owned.clear();
     },
-    owns: material => keys.has(material),
   };
 }
 

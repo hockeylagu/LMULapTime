@@ -69,7 +69,7 @@ it('splits a material by shadow flags, each part reserving the material totals',
   expect(created.map(batch => [batch.castShadow, batch.maxInstanceCount])).toEqual([[false, 2], [true, 2]]);
 });
 
-it('keeps its own draw for a glTF material, a camera-facing or hooked mesh, and gives back a removed chunk', () => {
+it('keeps its own draw for a glTF material, a camera-facing or hooked mesh', () => {
   const batches = createSceneryBatches(new Group(), [totals('a', 1, 1), totals('g', 1, 1)], 16);
   const card = new Mesh(new BoxGeometry(), material('c')); card.customDepthMaterial = new MeshDepthMaterial(); card.userData.lmuMaterial = 'c';
   const flag = new Mesh(new BoxGeometry(), material('f')); flag.onBeforeRender = () => {}; flag.userData.lmuMaterial = 'f';
@@ -81,8 +81,6 @@ it('keeps its own draw for a glTF material, a camera-facing or hooked mesh, and 
   // The see-through surface batches too, its instances sorted back to front; the opaque batch is not sorted.
   expect((root.children as Mesh[]).map(mesh => mesh.visible)).toEqual([false, false, true, true, true]);
   expect([batch.sortObjects, glass.sortObjects]).toEqual([false, true]);
-  batches.remove(root);
-  expect(() => batch.getVisibleAt(0)).toThrow();
 });
 
 it('goes by each mesh\'s own key when two package materials share one configured material', () => {

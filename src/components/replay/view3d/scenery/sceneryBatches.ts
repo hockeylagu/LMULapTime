@@ -9,8 +9,6 @@ export interface SceneryBatches {
    * created: they have programs to compile and buffers to upload.
    */
   add(root: Object3D): BatchedMesh[];
-  /** Gives back `root`'s instances (a chunk that never joined the scene). */
-  remove(root: Object3D): void;
   /** Shows each chunk's instances while its root is in the scene and visible. */
   sync(): void;
   /**
@@ -25,7 +23,7 @@ export interface SceneryBatches {
 
 /** An instance and its node's distance range (squared, metres), against its box in the batch's space. */
 interface Ranged { instance: number; box: Box3; inSq: number; outSq: number; inRange: boolean; drawn: boolean }
-interface Placed { batch: BatchedMesh; instances: Ranged[]; geometries: number[] }
+interface Placed { batch: BatchedMesh; instances: Ranged[] }
 interface Batch { mesh: BatchedMesh; layout: string }
 interface Used { primitives: number; draws: number }
 
@@ -65,6 +63,7 @@ function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, maxTexture
  * chunk: a draw costs the main thread about the same whatever its size, and a venue has about one primitive per material per
  * chunk. The package names each material by its content (`lmuMaterial`, kept on the mesh by the chunk loader) and gives its totals
  * over the layout, so a batch is sized once and its buffers never grow; a material split by shadow flags reserves its totals in each part.
+ * A chunk's instances stay in their batches until the scene goes (chunks never unload): a hidden chunk only hides them.
  * `maxTextures` is the renderer's `capabilities.maxTextures`. Instances are neither frustum culled nor sorted one by one: that per-pass
  * work cost more than the draws it saved. They are culled by distance once per step of the eye (`cull`), within the package's per-node draw distances.
  */
@@ -137,14 +136,14 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
         const count = used.get(key) ?? {primitives: 0, draws: 0};
         used.set(key, count); keys.add(key);
         let placed = byBatch.get(batch.mesh);
-        if (!placed) { placed = {batch: batch.mesh, instances: [], geometries: []}; byBatch.set(batch.mesh, placed); }
+        if (!placed) { placed = {batch: batch.mesh, instances: []}; byBatch.set(batch.mesh, placed); }
         let geometryId = stored.get(mesh.geometry);
         if (geometryId === undefined) {
           if (++count.primitives > total.primitives) throw Error(`Scenery material ${key} has more primitives than the layout gives`);
           try { geometryId = batch.mesh.addGeometry(mesh.geometry); } catch (error) {
             throw Error(`Scenery material ${key} has more geometry than the layout gives (${mesh.name})`, {cause: error});
           }
-          stored.set(mesh.geometry, geometryId); placed.geometries.push(geometryId);
+          stored.set(mesh.geometry, geometryId);
         }
         if (++count.draws > total.draws) throw Error(`Scenery material ${key} draws more than the layout gives`);
         mesh.geometry.computeBoundingBox();
@@ -159,20 +158,10 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
       for (const mesh of moved) { mesh.geometry.dispose(); mesh.geometry = MOVED; mesh.visible = false; mesh.layers.disableAll(); }
       // A batch's bounds (its frustum culling) cover the instances it had when first computed: they grow with each chunk.
       for (const batch of byBatch.keys()) computeBatchBounds(batch);
-      // The last primitive of a material fills its batches: they keep no CPU copy past their next upload, but for the surface state.
+      // The last primitive of a material fills its batches: they keep no CPU copy past their next upload.
       for (const key of keys) if (used.get(key)!.primitives === totals.get(key)!.primitives) for (const {mesh} of byKey.get(key)!) releaseBatchOnUpload(mesh);
       chunks.set(root, {placed: [...byBatch.values()], shown: false});
       return fresh;
-    },
-    remove(root) {
-      const chunk = chunks.get(root);
-      if (!chunk) return;
-      chunks.delete(root);
-      if (chunk.shown) show(chunk.placed, false);
-      for (const {batch, instances, geometries} of chunk.placed) {
-        for (const {instance} of instances) batch.deleteInstance(instance);
-        for (const geometry of geometries) batch.deleteGeometry(geometry);
-      }
     },
     sync() {
       for (const [root, chunk] of chunks) {

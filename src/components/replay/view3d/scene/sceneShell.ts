@@ -223,25 +223,20 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const stream = createSceneryStream(layout, sceneryRoot, {
     load: async (chunk, signal) => {
       // The ray tree needs only the geometry: it builds in a worker from the parsed chunk, while its textures download and the
-      // chunk waits its turn to compile and upload (warm-ups stay one at a time).
-      const built: {parsed: Object3D | null; grounded: Promise<void>; root: Object3D | null} = {parsed: null, grounded: Promise.resolve(), root: null};
-      try {
-        const root = built.root = await loader.load(chunk, signal, parsed => {
-          built.parsed = parsed; built.grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
-          built.grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
-        });
-        realRoad.prepare(root);
-        const created = batches.add(root);
-        await lit; // A chunk's programs depend on the scene's environment.
-        await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), built.grounded]); signal.throwIfAborted(); return root;
-      } catch (error) {
-        // The loader releases a chunk whose own load failed; one that failed after it is released here.
-        if (built.parsed) ground.remove(chunk.id, built.parsed);
-        if (built.root) { batches.remove(built.root); loader.releaseChunk(built.root); }
-        throw error;
-      }
+      // chunk waits its turn to compile and upload (warm-ups stay one at a time). A chunk that fails leaves what it built (its ray
+      // tree, its hidden batch instances) to the shell's disposal: the failure breaks the shell, and the next view makes a new one.
+      let grounded: Promise<void> = Promise.resolve();
+      const root = await loader.load(chunk, signal, parsed => {
+        grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
+        grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
+      });
+      realRoad.prepare(root);
+      const created = batches.add(root);
+      await lit; // A chunk's programs depend on the scene's environment.
+      await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), grounded]);
+      signal.throwIfAborted();
+      return root;
     },
-    unload: (chunk, root) => { ground.remove(chunk.id, root); batches.remove(root); loader.releaseChunk(root); },
     changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });

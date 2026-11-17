@@ -39,15 +39,6 @@ it("releases a batch's arrays after its next upload, keeping its bounds", () => 
   expect(batch.geometry.boundingSphere!.radius).toBeCloseTo(batch.boundingSphere!.radius);
 });
 
-it('keeps the arrays of the attributes named to keep', () => {
-  const batch = made();
-  batch.addGeometry(new BoxGeometry());
-  computeBatchBounds(batch);
-  releaseBatchOnUpload(batch, new Set(['uv']));
-  for (const buffer of [batch.geometry.index!, ...Object.values(batch.geometry.attributes)] as BufferAttribute[]) buffer.onUploadCallback();
-  expect([batch.geometry.getAttribute('uv').array.length > 0, batch.geometry.getAttribute('position').array.length]).toEqual([true, 0]);
-});
-
 it('counts the owners showing a batch and reports whether any does', () => {
   const batch = made(), seen: boolean[] = [], counts = createShownCounts((_, visible) => seen.push(visible));
   counts.change(batch, 1); counts.change(batch, 1); counts.change(batch, -1); counts.change(batch, -1);

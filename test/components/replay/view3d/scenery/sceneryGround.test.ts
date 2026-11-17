@@ -18,21 +18,20 @@ it('uses BVH terrain intersections to bring an obstructed camera above banking a
   // A banking rising from 10 m to 16 m over x 0..10, nothing past its top edge (native z 0..100).
   const banking = sheet([0, 10, 0, 10, 16, 0, 10, 16, 100, 0, 10, 0, 10, 16, 100, 0, 10, 100]), origin = new Vector3();
   // Car at the bottom, eye 5 m past the top and below it: the top edge three quarters of the way out blocks the view.
-  const collision = createSceneryGround(noGrid);
+  const collision = createSceneryGround(noGrid), open = createSceneryGround(noGrid);
   try {
     await collision.add('bank', banking);
     const eye = new Vector3(15, 14, -50), corrected = collision.resolve(eye, new Vector3(1, 10.6, -50), origin, new Vector3());
     expect(corrected.x).toBeLessThan(eye.x);
     expect(corrected.y).toBeGreaterThanOrEqual(10 + corrected.x * 0.6 + 1.2 - 1e-6);
-    collision.remove('bank');
     const flat = sheet([0, 0, 0, 100, 0, 0, 100, 0, 100, 0, 0, 0, 100, 0, 100, 0, 0, 100]);
-    await collision.add('flat', flat);
+    await open.add('flat', flat);
     const clear = new Vector3(60, 1.5, -50);
-    expect(collision.resolve(clear, new Vector3(40, 0.5, -50), origin, new Vector3())).toEqual(clear);
-  } finally { collision.dispose(); }
+    expect(open.resolve(clear, new Vector3(40, 0.5, -50), origin, new Vector3())).toEqual(clear);
+  } finally { collision.dispose(); open.dispose(); }
 });
 
-it('keeps the eye above resident ground, preserves native handedness, and releases unloaded collision geometry', async () => {
+it('keeps the eye above resident ground, preserves native handedness, and lets the ground go when disposed', async () => {
   const root = new Group(), road = new Mesh(new BoxGeometry(20, 1, 20), new MeshBasicMaterial());
   road.name = 'terrain__OPAQUE'; road.position.set(100, 4.5, 200); root.add(road);
   const original = road.geometry.getAttribute('position').array.slice();
@@ -41,7 +40,7 @@ it('keeps the eye above resident ground, preserves native handedness, and releas
     await collision.add('road', root);
     expect(collision.resolve(eye, look, origin, new Vector3()).y).toBeCloseTo(4.2);
     expect(road.geometry.getAttribute('position').array).toEqual(original);
-    collision.remove('road');
+    collision.dispose();
     expect(collision.resolve(eye, look, origin, new Vector3())).toEqual(eye);
   } finally { collision.dispose(); }
 });
@@ -69,7 +68,7 @@ it('answers the highest opaque surface in reach, picking the right bridge layer 
     expect(ground.surfaceHeight({x: 5, y: 4, z: 1})).toBeNull();
     expect(ground.surfaceHeight({x: NaN, y: 0, z: 0})).toBeNull();
     expect(ground.surfaceHeight({x: 5, y: 4, z: 1}, 5)).toBeCloseTo(1.5); // A wider reach finds the road far below.
-    ground.remove('chunk');
+    ground.dispose();
     expect(ground.surfaceHeight({x: 5, y: 1.82, z: 1})).toBeNull();
   } finally { ground.dispose(); }
 });
@@ -96,16 +95,19 @@ it('applies native transforms to large terrain triangles', async () => {
   } finally { ground.dispose(); }
 });
 
-it('builds chunks concurrently and ignores a removal from a load the chunk no longer belongs to', async () => {
+it('builds chunks concurrently, refuses a second tree for a chunk and rejects a build its disposal overtakes', async () => {
   const chunk = (y: number) => { const root = new Group(); root.add(triangle('road__OPAQUE', [0, y, 0, 10, y, 0, 0, y, 10], [0, 1, 2])); return root; };
-  const ground = createSceneryGround(noGrid), stale = chunk(1), current = chunk(2), other = chunk(5);
+  const ground = createSceneryGround(noGrid);
   try {
-    const first = ground.add('a', stale);
-    await Promise.all([ground.add('a', current), ground.add('b', other), expect(first).rejects.toThrow('removed')]);
-    ground.remove('a', stale); // The replaced load's cleanup must not drop the newer tree.
+    await Promise.all([ground.add('a', chunk(2)), ground.add('b', chunk(5))]);
     expect(ground.surfaceHeight({x: 1, y: 2.1, z: 1})).toBeCloseTo(2);
     expect(ground.surfaceHeight({x: 1, y: 5.1, z: 1})).toBeCloseTo(5);
-    ground.remove('a', current);
+    await expect(ground.add('a', chunk(1))).rejects.toThrow('already has its ground');
+    expect(ground.surfaceHeight({x: 1, y: 2.1, z: 1})).toBeCloseTo(2);
+    const late = ground.add('c', chunk(8));
+    ground.dispose();
+    await expect(late).rejects.toThrow('disposed');
+    await expect(ground.add('d', chunk(9))).rejects.toThrow('disposed');
     expect(ground.surfaceHeight({x: 1, y: 2.1, z: 1})).toBeNull();
   } finally { ground.dispose(); }
 });

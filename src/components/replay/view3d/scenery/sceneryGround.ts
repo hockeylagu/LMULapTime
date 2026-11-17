@@ -65,8 +65,6 @@ export interface SceneryGround {
    * height found on it would be kept after the detailed chunk loads.
    */
   add(id: string, root: Object3D, coarse?: boolean): Promise<void>;
-  /** Drops a chunk's tree; with `root`, only if that root's load owns it (a newer load of the same chunk may have replaced it). */
-  remove(id: string, root?: Object3D): void;
   /** Moves a camera eye (display frame) above the ground and in front of anything between it and `look`. */
   resolve(eye: Vector3, look: Vector3, origin: Vector3, result: Vector3): Vector3;
   /** Whether a resident opaque surface stands between two native points (up to a few centimetres short of `to`). */
@@ -77,14 +75,14 @@ export interface SceneryGround {
 /**
  * One ray tree per resident chunk, over its opaque surfaces and filler ground, answers both the wheel/line contact heights and
  * the camera checks. Each triangle keeps its role, so a query only accepts the surfaces it used to. Chunks build concurrently,
- * one per worker.
+ * one per worker. A chunk's tree stays until the ground is disposed: chunks never unload.
  */
 export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGround {
   const workers = Array.from({length: WORKER_COUNT}, () => new GenerateMeshBVHWorker()), idle = [...workers];
   const waiting: ((worker: GenerateMeshBVHWorker) => void)[] = [];
   const acquire = () => new Promise<GenerateMeshBVHWorker>(resolve => { const worker = idle.pop(); if (worker) resolve(worker); else waiting.push(resolve); });
   const release = (worker: GenerateMeshBVHWorker) => { const next = waiting.shift(); if (next) next(worker); else idle.push(worker); };
-  type Chunk = {root: Object3D; geometry: BufferGeometry; roles: Uint8Array; tree: MeshBVH | null; cancel: () => void};
+  type Chunk = {geometry: BufferGeometry; roles: Uint8Array; tree: MeshBVH | null; cancel: () => void};
   const chunks = new Map<string, Chunk>();
   const cameraRay = new Ray(), heightRay = new Ray(), nativeEye = new Vector3(), nativeLook = new Vector3(), direction = new Vector3();
   const sightRay = new Ray();
@@ -105,11 +103,6 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
     const distance = nearestHit(cameraRay, CAMERA, 0, 400);
     if (distance !== null) position.y = Math.max(position.y, cameraRay.origin.y - distance + GROUND_CLEARANCE_M);
   };
-  const remove = (id: string, root?: Object3D) => {
-    const chunk = chunks.get(id);
-    if (!chunk || (root && chunk.root !== root)) return;
-    chunks.delete(id); chunk.cancel(); chunk.geometry.dispose();
-  };
   heightRay.direction.set(0, -1, 0);
   return {
     surfaceHeight(point, reach = 1.5) {
@@ -124,7 +117,7 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
     },
     async add(id, root, coarse = false) {
       if (disposed) throw new DOMException('Scenery ground disposed', 'AbortError');
-      remove(id);
+      if (chunks.has(id)) throw Error(`Scenery chunk ${id} already has its ground`);
       const meshes: Mesh[] = [], meshRoles: number[] = [];
       root.updateWorldMatrix(true, true);
       root.traverse(object => {
@@ -135,23 +128,22 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
       if (!meshes.length) return;
       const {geometry, roles} = mergePositions(meshes, meshRoles);
       geometry.computeBoundingBox();
-      const chunk: Chunk = {root, geometry, roles, tree: null, cancel: () => {}};
-      const canceled = new Promise<never>((_resolve, reject) => { chunk.cancel = () => reject(new DOMException('Scenery ground removed', 'AbortError')); });
+      const chunk: Chunk = {geometry, roles, tree: null, cancel: () => {}};
+      const canceled = new Promise<never>((_resolve, reject) => { chunk.cancel = () => reject(new DOMException('Scenery ground disposed', 'AbortError')); });
       chunks.set(id, chunk);
       const build = (async () => {
         const worker = await acquire();
         try {
-          if (chunks.get(id) !== chunk) throw new DOMException('Scenery ground removed', 'AbortError');
+          if (chunks.get(id) !== chunk) throw new DOMException('Scenery ground disposed', 'AbortError');
           // At the depth cap a node just becomes a larger leaf (dense props stacked in one spot): rays stay exact, so no warning.
           return await worker.generate(geometry, {indirect: true, verbose: false});
         } finally { release(worker); }
       })();
-      build.catch(() => {}); // A removed chunk's build may finish or fail after the race settled.
+      build.catch(() => {}); // A build may finish or fail after the ground was disposed and the race settled.
       try { chunk.tree = await Promise.race([build, canceled]); }
       catch (error) { if (chunks.get(id) === chunk) chunks.delete(id); geometry.dispose(); throw error; }
       finally { chunk.cancel = () => {}; }
     },
-    remove,
     resolve(eye, look, origin, result) {
       nativeEye.set(eye.x + origin.x, eye.y + origin.y, origin.z - eye.z);
       nativeLook.set(look.x + origin.x, look.y + origin.y + 0.1, origin.z - look.z);
@@ -176,6 +168,11 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
       sightRay.direction.divideScalar(length);
       return nearestHit(sightRay, WHEEL | CAMERA, 0, length - SIGHT_SHORT_M) !== null;
     },
-    dispose() { disposed = true; for (const id of chunks.keys()) remove(id); for (const worker of workers) worker.dispose(); },
+    dispose() {
+      disposed = true;
+      for (const chunk of chunks.values()) { chunk.cancel(); chunk.geometry.dispose(); }
+      chunks.clear();
+      for (const worker of workers) worker.dispose();
+    },
   };
 }
