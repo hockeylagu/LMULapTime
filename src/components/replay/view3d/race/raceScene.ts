@@ -87,9 +87,11 @@ export async function createRaceScene(
   const handlingOf = new Map(cars.map(car => [car.slot, car.handling]));
   const sets = createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight);
   /** The followed car: the own car, a set of one apart from its body's near cars. */
+  /** A followed car without its own model: a grey stand-in, or the field's model of it while its own builds. */
+  const bare = (slot: number): FollowedCar => ({slot, car: null, motion: null, parts: null, pickShape: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}});
   const buildFollowed = async (slot: number | null, body: LoadedBody | null): Promise<FollowedCar | null> => {
     if (slot === null) return null;
-    if (!body) return {slot, car: null, motion: null, parts: null, pickShape: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}};
+    if (!body) return bare(slot);
     const set = await sets.build([body], {own: true, pickShape: true}), [drawn] = set.cars;
     return {slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, pickShape: drawn.pickShape, cameras: body.descriptor.cameras.list, chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => set.ready(), dispose: () => set.dispose()};
   };
@@ -213,7 +215,7 @@ export async function createRaceScene(
     standIns.begin();
     for (const [ownIndex, slot] of current.slots.entries()) {
       if (!classOf.has(slot)) continue;
-      const isFollowed = slot === followed?.slot, model = isFollowed ? followed?.car : null, drawn = isFollowed || field.has(slot);
+      const isFollowed = slot === followed?.slot, model = isFollowed ? followed?.car : null;
       let shown = sampleRacePose(current, ownIndex, timeSec, pose), samples = current, carIndex = ownIndex, at = timeSec;
       if (!shown && isFollowed) {
         // Out of the replay: it waits at its next pose, still.
@@ -224,7 +226,8 @@ export async function createRaceScene(
       const sample = (at - samples.fromSec) * samples.hz, index = Math.max(0, Math.min(Math.floor(sample), samples.count - 2));
       const fraction = Math.max(0, Math.min(1, sample - index));
       if (shown) places.push({slot, x: pose[0], y: pose[1], z: pose[2], rotX: pose[3], rotY: pose[4], rotZ: pose[5]});
-      field.pose(slot, shown && !isFollowed ? renderPose(pose, index, fraction, orientation, euler) : null, samples, carIndex);
+      // The field draws every car but a followed one with its own model.
+      field.pose(slot, shown && !model ? renderPose(pose, index, fraction, orientation, euler) : null, samples, carIndex);
       if (model) {
         model.visible = shown;
         if (shown) {
@@ -241,7 +244,7 @@ export async function createRaceScene(
         const stationM = distances[index] + ((distances[index + 1] ?? distances[index]) - distances[index]) * fraction;
         rig.follow({target: target.set(...nativeToScene(placed, origin)), yaw: placed.yaw ?? 0, timeSec, stationM, index, fraction});
       }
-      if (!shown || model || (drawn && !isFollowed)) continue;
+      if (!shown || model || field.has(slot)) continue;
       renderPose(pose, 0, 0, orientation, euler);
       // A stand-in's lowest point is its origin: on the road under the pose (the body's centre, above it).
       const ground = shell.surfaceHeight({x: pose[0], y: pose[1], z: pose[2]}) ?? pose[1];
@@ -265,10 +268,15 @@ export async function createRaceScene(
       const ticket = ++request;
       // The car the scene already follows (the view asks again once the scene is ready): rebuilding it would parse, upload and
       // link its whole model again, and drop the programs it holds.
-      if (slot === followed?.slot) return true;
+      if (slot === followed?.slot && (followed.car || !body)) return true;
+      // The camera goes to the car at once, the field drawing it until its own model is ready (2 to 4 s to build, compile and
+      // upload, 2026-11-16); a driver camera needs that model's cameras and stays on the car it follows until then.
+      if (slot !== null && slot !== followed?.slot && !isDriverCamera(rig.mode)) { setFollowed(bare(slot)); shell.show(content()); draw(); }
       const next = await buildFollowed(slot, body);
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
-      if (next?.car) await shell.warm(next.car);
+      // Its lit materials take the probe's prefiltered cube before they compile: warmed with the venue's (another size, a program
+      // define), each would link again at its first draw, a dozen programs one after another in the frame it shows (2 s, 2026-11-16).
+      if (next?.car) { shell.shareReflection(next.car); await shell.warm(next.car); }
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
       // A driver camera needs the car's own cameras: without a model, the chase camera follows its stand-in.
       if (!next?.car && isDriverCamera(rig.mode)) shell.setMode('chase');

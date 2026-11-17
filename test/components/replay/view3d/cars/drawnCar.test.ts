@@ -16,6 +16,9 @@ vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async (
   const withParts = () => {
     const model = rig(), cabin = new three.Mesh(new three.BoxGeometry(1, 1, 1), new three.MeshStandardMaterial());
     cabin.name = 'cabin'; cabin.userData.interior = true;
+    // A level drawn from 30 m: the field's cars switch to it, the own car never does.
+    const far = new three.Group(), farHull = new three.Mesh(new three.BoxGeometry(1, 1, 1), new three.MeshStandardMaterial());
+    far.name = 'far'; far.userData.lod = {inM: 30, outM: null}; far.add(farHull); model.add(far);
     const tint = new three.MeshStandardMaterial({transparent: true, opacity: 0.4}), pane = new three.BoxGeometry(1, 1, 1);
     model.add(cabin, new three.Mesh(pane, tint), new three.Mesh(pane, tint));
     return model;
@@ -82,11 +85,13 @@ describe('createCarSets', () => {
   const body = {vehicleId: 'oreca'} as unknown as LoadedBody;
   const sortedBatches = (car: Group) => batchesIn(car).filter(batch => batch.sortObjects);
 
-  it('builds the own car and the field on one path: glass sorted in its batch, the interior kept only by the own car', async () => {
+  it('builds the own car and the field on one path: glass sorted in its batch, the interior kept only by the own car, its farther levels dropped', async () => {
     const built = sets(), own = await built.build([body], {own: true}), field = await built.build([body], {own: false});
     expect(loaders).toEqual([false, true]);
     expect(own.cars[0].car.getObjectByName('cabin')).toBeDefined();
     expect(field.cars[0].car.getObjectByName('cabin')).toBeUndefined();
+    expect(own.cars[0].car.getObjectByName('far')).toBeUndefined();
+    expect(field.cars[0].car.getObjectByName('far')).toBeDefined();
     for (const set of [own, field]) expect(sortedBatches(set.cars[0].car)).toHaveLength(1);
     own.dispose(); field.dispose();
   });

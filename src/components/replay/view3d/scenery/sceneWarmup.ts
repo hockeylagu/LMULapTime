@@ -142,7 +142,9 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     return compiled;
   };
   const warm = async (roots: readonly Object3D[], signal: AbortSignal, compiled: Promise<unknown> = compile(roots), where?: Box3) => {
-    await compiled;
+    // The programs link off the main thread while the textures and geometry upload (a followed car's 0.1-0.6 s of links and
+    // 0.3-1 s of uploads one after the other, 2026-11-17); a failed link rejects at the end.
+    compiled.catch(() => {});
     const textures = new Set<Texture>();
     for (const root of roots) root.traverse(object => {
       if (!(object instanceof Mesh)) return;
@@ -166,6 +168,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     }
     // oxlint-disable-next-line no-await-in-loop -- one root's geometry after another, in the same slices
     for (const root of roots) await geometryWarmup.upload(root, camera, signal, next);
+    await compiled;
     for (const texture of textures) {
       if (!isStreaming(texture)) continue;
       if (where) places.set(texture, [...places.get(texture) ?? [], where]);

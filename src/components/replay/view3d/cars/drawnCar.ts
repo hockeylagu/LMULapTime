@@ -97,11 +97,15 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
     async build(bodies: readonly LoadedBody[], {own, pickShape = false}: CarSetOptions): Promise<DrawnCars> {
       const models = own ? ownModels : fieldModels;
       const cars = await Promise.all(bodies.map(body => models.car(body)));
-      if (!own) for (const car of cars) {
-        // No driver camera rides on them: their interior parts would only add to their draws.
-        const interior: Object3D[] = [];
-        car.traverse(object => { if (object.userData.interior === true) interior.push(object); });
-        for (const part of interior) part.removeFromParent();
+      for (const car of cars) {
+        // No driver camera rides on the field's cars: their interior parts would only add to their draws. The own car draws its full
+        // level alone (no camera distance is set on it): built from a held parse of the whole exterior, its farther levels would only
+        // add to its batches and uploads (a followed car's shadow batch held 765k triangles of every level, 2026-11-17).
+        const dropped: Object3D[] = [];
+        car.traverse(object => {
+          if (own ? ((object.userData.lod as {inM: number} | undefined)?.inM ?? 0) > 0 : object.userData.interior === true) dropped.push(object);
+        });
+        for (const part of dropped) part.removeFromParent();
       }
       return createDrawnCars(cars, surfaceHeight, {transparent: true, sharedMaterial: models.sharedMaterial, pickShape});
     },

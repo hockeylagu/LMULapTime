@@ -36,6 +36,9 @@ const toEnvelope = new Matrix4(), a = new Vector3(), b = new Vector3(), c = new 
  */
 export const PART_CELL_M = 0.25;
 
+/** A cell's key: its indices shifted positive, `CELL_KEY_SPAN` apart (a car's cells span far fewer). */
+const CELL_KEY_OFFSET = 1 << 15, CELL_KEY_SPAN = 1 << 16;
+
 /** The cells (`PART_CELL_M`) a span from `min` to `max` crosses, the first and the last: one at least. */
 function cellsOf(min: number, max: number): [first: number, last: number] {
   const first = Math.floor(min / PART_CELL_M);
@@ -57,22 +60,31 @@ function clip(polygon: Vector3[], axis: 'x' | 'z', at: number, keep: 1 | -1): Ve
  * A mesh's triangles, through `matrix`, into `cells` of PART_CELL_M across and along the car: each cell widened over the part of
  * each triangle in it (a windscreen's few triangles give the cells by the hood the hood's height, not the roof's).
  */
-function addToCells(cells: Map<string, Box3>, geometry: Mesh['geometry'], matrix: Matrix4): void {
+function addToCells(cells: Map<number, Box3>, geometry: Mesh['geometry'], matrix: Matrix4): void {
   const position = geometry.getAttribute('position'), index = geometry.getIndex();
   if (!position) return;
-  const count = index ? index.count : position.count;
+  const count = index ? index.count : position.count, points = [a, b, c];
+  // A cell's key: its two indices, a car spans a few dozen cells each way.
+  const cellAt = (cellX: number, cellZ: number) => {
+    const key = (cellX + CELL_KEY_OFFSET) * CELL_KEY_SPAN + cellZ + CELL_KEY_OFFSET;
+    return cells.get(key) ?? cells.set(key, new Box3()).get(key)!;
+  };
+  // Measured while the followed car builds, before its first frame: a body's levels hold hundreds of thousands of triangles, so the
+  // loop allocates nothing for a triangle within one cell (most of them).
   for (let corner = 0; corner + 2 < count; corner += 3) {
-    const vertex = (n: number, into: Vector3) => into.fromBufferAttribute(position, index ? index.getX(corner + n) : corner + n).applyMatrix4(matrix);
-    const points = [vertex(0, a), vertex(1, b), vertex(2, c)];
-    triangle.setFromPoints(points);
-    const [firstX, lastX] = cellsOf(triangle.min.x, triangle.max.x), [firstZ, lastZ] = cellsOf(triangle.min.z, triangle.max.z);
+    a.fromBufferAttribute(position, index ? index.getX(corner) : corner).applyMatrix4(matrix);
+    b.fromBufferAttribute(position, index ? index.getX(corner + 1) : corner + 1).applyMatrix4(matrix);
+    c.fromBufferAttribute(position, index ? index.getX(corner + 2) : corner + 2).applyMatrix4(matrix);
+    const [firstX, lastX] = cellsOf(Math.min(a.x, b.x, c.x), Math.max(a.x, b.x, c.x));
+    const [firstZ, lastZ] = cellsOf(Math.min(a.z, b.z, c.z), Math.max(a.z, b.z, c.z));
+    if (firstX === lastX && firstZ === lastZ) { cellAt(firstX, firstZ).expandByPoint(a).expandByPoint(b).expandByPoint(c); continue; }
     for (let cellX = firstX; cellX <= lastX; cellX++) for (let cellZ = firstZ; cellZ <= lastZ; cellZ++) {
       let piece = points;
       // A triangle in one cell is whole; one across cells is cut at the edges it crosses.
       if (firstX !== lastX) piece = clip(clip(piece, 'x', cellX * PART_CELL_M, 1), 'x', (cellX + 1) * PART_CELL_M, -1);
       if (firstZ !== lastZ) piece = clip(clip(piece, 'z', cellZ * PART_CELL_M, 1), 'z', (cellZ + 1) * PART_CELL_M, -1);
       if (!piece.length) continue;
-      const key = `${cellX},${cellZ}`, box = cells.get(key) ?? cells.set(key, new Box3()).get(key)!;
+      const box = cellAt(cellX, cellZ);
       for (const point of piece) box.expandByPoint(point);
     }
   }
@@ -80,11 +92,11 @@ function addToCells(cells: Map<string, Box3>, geometry: Mesh['geometry'], matrix
 
 /**
  * A car model's body in its envelope's frame (the car's, without the envelope's lift), where its parts hang, as boxes over cells
- * of `PART_CELL_M` across and along it, its contact shadow left out: the parts in a cell (the shell, the cockpit inside it, a
- * detail level's copy) share its box.
+ * of `PART_CELL_M` across and along it, its contact shadow left out: the parts in a cell (the shell, the cockpit inside it) share
+ * its box. The followed car's model holds its full detail level alone (`CarSets.build`).
  */
 export function envelopeParts(car: Object3D): Box3[] {
-  const cells = new Map<string, Box3>();
+  const cells = new Map<number, Box3>();
   eachPart(car, (geometry, matrix) => addToCells(cells, geometry, matrix));
   return [...cells.values()];
 }
