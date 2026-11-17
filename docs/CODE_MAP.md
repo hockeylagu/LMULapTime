@@ -364,7 +364,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   tables, motion, batches shared by the set, solid parts casting from one shadow-only batch on `SHADOW_ONLY_LAYER`),
   `carTemplates.ts` the scene's parsed bodies (the shell's `carTemplates`: the exterior GLB for every car; `cabin` the exterior's
   outermost parts marked interior and the interior GLB's chassis parts at their full level, each naming the car node it hangs under;
-  the package's full-level GLB is not read; a parse shared by the builds asking while it is pending, then dropped, unless held: the race holds the exteriors of the bodies with cars near the camera, so following one parses only its interior), `carModels.ts` each livery's model, or cabin, from them (materials by content, lamps and glow, textures from start files;
+  a parse shared by the builds asking while it is pending, then dropped, unless held: the race holds the exteriors of the bodies with cars near the camera, so following one parses only its interior), `carModels.ts` each livery's model, or cabin, from them (materials by content, lamps and glow, textures from start files;
   `shareMaterials` for cars drawn many at once, whose dropped models leave the shared materials), plus the wheel files
   (`wheelGeometry.ts`, `wheelAnimation.ts`, `wheelMotion.ts`: each wheel turns by the replay's recorded angular speed, else the
   car's travel over the wheel radius) and `sceneObjects.ts` (`makeCar`). `src/api/vehicles/bodyStore.ts`

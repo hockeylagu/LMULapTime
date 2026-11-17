@@ -6,7 +6,7 @@ import { fetchBinary, fetchJson } from '../../../src/api/apiClient.js';
 import { fetchBody } from '../../../src/api/vehicles/bodyApi.js';
 
 const json = vi.mocked(fetchJson), binary = vi.mocked(fetchBinary), signal = new AbortController().signal;
-const body = { packageRevision: 'r', folder: 'Car', sha256: 'aa', byteLength: 4, full: { sha256: 'ff', byteLength: 4 }, interior: null as { sha256: string; byteLength: number } | null,
+const body = { packageRevision: 'r', folder: 'Car', sha256: 'aa', byteLength: 4, interior: null as { sha256: string; byteLength: number } | null,
   volumes: [] as { sha256: string; byteLength: number }[] };
 
 beforeEach(() => {

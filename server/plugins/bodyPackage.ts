@@ -27,7 +27,6 @@ export function loadBodyPackage(root: string, bodies: readonly VehicleBody[]): B
     for (const id of body.vehicleIds) rows.set(normalizeVehicleId(id), body);
     register(bodyGlbPath(body.sha256), body.sha256, body.byteLength, MAX_GLB_BYTES);
     if (body.interior) register(bodyGlbPath(body.interior.sha256), body.interior.sha256, body.interior.byteLength, MAX_GLB_BYTES);
-    register(bodyGlbPath(body.full.sha256), body.full.sha256, body.full.byteLength, MAX_GLB_BYTES);
     for (const texture of body.textures) {
       register(bodyTexturePath(texture.sha256), texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
       if (texture.start) register(bodyTexturePath(texture.start.sha256), texture.start.sha256, texture.start.byteLength, MAX_TEXTURE_BYTES);
