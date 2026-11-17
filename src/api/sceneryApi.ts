@@ -1,7 +1,7 @@
 import { cloudMapFiles, loadClouds } from '../../shared/domain/scenery/cloudMaps.js';
 import { readRoadHeight } from '../../shared/domain/scenery/roadHeight.js';
 import { realRoadBytes } from '../../shared/packageContract/scenery.js';
-import type { SceneryChunk, SceneryLayoutPayload, SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
+import type { SceneryChunkFile, SceneryLayoutPayload, SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
 import { fetchBinary, fetchJson } from './apiClient.js';
 
 /** Content-named scenery files: a chunk GLB at `<sha256>.glb` and the KTX2 textures it names at `textures/<sha256>.ktx2.zst` beside it. */
@@ -36,7 +36,7 @@ export async function fetchSceneryLayout(layoutKey: string, signal: AbortSignal)
 }
 
 /** One chunk's GLB bytes. Files never change under their hash, so the browser may cache them. */
-export async function fetchSceneryChunk(chunk: SceneryChunk, signal: AbortSignal): Promise<ArrayBuffer> {
+export async function fetchSceneryChunk(chunk: SceneryChunkFile, signal: AbortSignal): Promise<ArrayBuffer> {
   const bytes = await fetchBinary(`${SCENERY_FILES}${chunk.sha256}.glb`, { signal, cache: 'default' });
   if (bytes.byteLength !== chunk.byteLength) throw Error(`Incomplete 3D scenery chunk ${chunk.id}`);
   return bytes;

@@ -90,6 +90,11 @@ export function syntheticPackage() {
       chunk('s0', 'sector 0', { kind: 'main', lapStartM: 0, lapEndM: L / 2 }),
       chunk('s1', 'sector 1', { kind: 'main', lapStartM: L / 2, lapEndM: L }),
     ],
+    // The car reflection set: one chunk, for the first sector only (sectors may have none).
+    reflection: { name: 'REFMAP0', textureSize: 1024, updateRate: 100, staticSwitchM: 300, observedClipM: 150, blockLengthM: 150, chunks: [{
+      id: 's0', kind: 'main', lapStartM: 0, lapEndM: L / 2, bounds: { min: [-10, 0, -10], max: [10, 5, 10] }, ...rowOf(store(sceneryChunkPath, glb('reflection 0'))),
+      triangles: 4, vertices: 12, drawCalls: 1, blocks: 1, geometryBytes: 40, textures: [0],
+    }] },
     textures: [{ texture: 0 }] as Array<Record<string, unknown>>,
     // One material over the three chunks: 2 draw calls, 30 vertices and 10 triangles each.
     materials: [{ key: '0123456789abcdef', vertices: 90, indices: 90, primitives: 6, draws: 6 }] as Array<Record<string, unknown>>,

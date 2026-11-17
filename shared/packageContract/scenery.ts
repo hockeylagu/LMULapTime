@@ -145,6 +145,23 @@ export const REALROAD_MAX_POINTS = 1 << 24, REALROAD_MAX_ELEMENTS = 1 << 21;
 /** The file size a RealRoad row implies. */
 export const realRoadBytes = (table: Pick<SceneryRealRoad, 'points'>): number => 4 * table.points;
 
+/**
+ * One car reflection chunk (docs/SCENE_PACKAGE.md#reflection-set): the game's REFMAP0 instances of one own main or pit sector, in blocks of at most
+ * `blockLengthM` along the route (one node and mesh per block). Same range fields as the sector of that id.
+ */
+export interface SceneryReflectionChunkFields {
+  id: string; bounds: SceneryBounds; sha256: string; byteLength: number; triangles: number; vertices: number; drawCalls: number; blocks: number; geometryBytes: number;
+}
+export type CompactReflectionChunk = SceneryReflectionChunkFields & SceneryRangeFields & {textures: number[]};
+/**
+ * The car reflection set of a layout: the SCN `ReflectionMapper=REFMAP0` values (`textureSize` px, `updateRate` per second, `staticSwitchM` the distance
+ * after which the game stops updating the probe), `observedClipM` (the scenery clip distance seen in a capture of the game's cube; in no file) and
+ * the chunks, main by lap start then pit by pit start.
+ */
+export interface SceneryReflection<Chunk = CompactReflectionChunk> {
+  name: 'REFMAP0'; textureSize: number; updateRate: number; staticSwitchM: number; observedClipM: number; blockLengthM: number; chunks: Chunk[];
+}
+
 /** One local irradiance probe (see CompactLayoutRow.irradianceProbes). */
 export interface SceneryIrradianceProbe {
   name: string;
@@ -173,6 +190,8 @@ export interface CompactLayoutRow {
   daylight: SceneryDaylight;
   horizon: CompactHorizonChunk;
   sectors: CompactSectorChunk[];
+  /** The game's car reflection set (REFMAP0) in its own chunks. */
+  reflection: SceneryReflection;
   textures: SceneryTextureRef[];
   /** Sorted by key. */
   materials: SceneryMaterialTotals[];
@@ -190,7 +209,9 @@ export interface SceneryCatalog {
 export type SceneryTexture = Omit<SceneryTextureFile, 'start'> & {asset: string; maxPx?: number; start?: TextureStart & {asset: string}};
 export type SceneryHorizonChunk = SceneryChunkFields & {kind: 'horizon'; asset: string; textures: string[]};
 export type ScenerySectorChunk = SceneryChunkFields & SceneryRangeFields & {asset: string; textures: string[]};
-export type SceneryLayoutRow = Omit<CompactLayoutRow, 'horizon' | 'sectors' | 'textures'> & {horizon: SceneryHorizonChunk; sectors: ScenerySectorChunk[]; textures: SceneryTexture[]};
+export type SceneryReflectionChunk = SceneryReflectionChunkFields & SceneryRangeFields & {asset: string; textures: string[]};
+export type SceneryLayoutRow = Omit<CompactLayoutRow, 'horizon' | 'sectors' | 'reflection' | 'textures'> & {horizon: SceneryHorizonChunk; sectors: ScenerySectorChunk[];
+  reflection: SceneryReflection<SceneryReflectionChunk>; textures: SceneryTexture[]};
 
 export const SCENERY_CATALOG_KEYS = ['chunking', 'streaming', 'textures', 'layouts'] as const;
 export const CHUNKING_KEYS = ['sectorLengthM', 'minSectorLengthM', 'maxSectorTriangles', 'horizonDistanceM', 'skylineHeightM', 'skylineMinDistanceM', 'terrainScaleExtentM', 'pitBandM'] as const;
@@ -198,8 +219,10 @@ export const STREAMING_KEYS = ['residentBehindM', 'residentAheadM', 'freeCameraR
 const SESSIONS = ['race', 'qualify', 'practice1', 'practice2'];
 const TEXTURE_KEYS = ['sha256', 'byteLength', 'width', 'height', 'levels', 'format', 'srgb', 'gpuBytes'];
 const CHUNK_COMMON = ['id', 'kind', 'bounds', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'shadowDrawCalls', 'shadowTriangles', 'geometryBytes', 'meshes', 'materials', 'textures'];
-const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'irradianceProbes', 'roadHeight', 'realRoad', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
+const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'irradianceProbes', 'roadHeight', 'realRoad', 'daylight', 'horizon', 'sectors', 'reflection', 'textures', 'materials'];
 const MATERIAL_KEYS = ['key', 'vertices', 'indices', 'primitives', 'draws'];
+const REFLECTION_KEYS = ['name', 'textureSize', 'updateRate', 'staticSwitchM', 'observedClipM', 'blockLengthM', 'chunks'];
+const REFLECTION_CHUNK_COMMON = ['id', 'kind', 'bounds', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'blocks', 'geometryBytes', 'textures'];
 export const MATERIAL_KEY = /^[0-9a-f]{16}$/;
 const MAX_IRRADIANCE_PROBES = 64, MAX_LAYOUTS = 100, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192, MAX_MATERIALS = 8192;
 
@@ -235,12 +258,34 @@ export function layoutRowProblems(row: any, {links = true}: {links?: boolean} = 
     if (i && sector.lapStartM < main[i - 1].lapStartM) problems.push(`${sector.id}: main chunks are not ordered by lap start`);
     if (links && (sector.prev !== main[(i + main.length - 1) % main.length].id || sector.next !== main[(i + 1) % main.length].id)) problems.push(`${sector.id}: prev/next do not follow the lap order`);
   });
-  problems.push(...materialSumProblems(row));
+  problems.push(...materialSumProblems(row), ...reflectionProblems(row));
   pit.forEach((sector: any, i: number) => {
     if (links && (sector.prev !== (i ? pit[i - 1].id : null) || sector.next !== (i + 1 < pit.length ? pit[i + 1].id : null))) problems.push(`${sector.id}: prev/next do not follow the pit lane order`);
     if (!(sector.pitStartM < sector.pitEndM)) problems.push(`${sector.id}: invalid pit range`);
     if (i && sector.pitStartM < pit[i - 1].pitStartM) problems.push(`${sector.id}: pit chunks are not ordered by pit start`);
   });
+  return problems;
+}
+
+/** Reflection chunks: unique ids, own-sector lap ranges (main ones ordered and not overlapping), pit ones ordered by pit start, main before pit. */
+function reflectionProblems(row: any): string[] {
+  const chunks = row.reflection?.chunks;
+  if (!Array.isArray(chunks)) return ['no reflection chunks list'];
+  const problems: string[] = [];
+  if (new Set(chunks.map((chunk: any) => chunk.id)).size !== chunks.length) problems.push('reflection: duplicate chunk ids');
+  let seenPit = false, previous: any = null;
+  for (const chunk of chunks) {
+    if (chunk.kind === 'pit') {
+      if (seenPit && previous && chunk.pitStartM < previous.pitStartM) problems.push(`reflection ${chunk.id}: pit chunks are not ordered by pit start`);
+      if (!(chunk.pitStartM < chunk.pitEndM)) problems.push(`reflection ${chunk.id}: invalid pit range`);
+      seenPit = true;
+    } else {
+      if (seenPit) problems.push(`reflection ${chunk.id}: a main chunk after the pit chunks`);
+      if (!(chunk.lapStartM < chunk.lapEndM) || chunk.lapEndM > row.routeLengthM + 1e-6) problems.push(`reflection ${chunk.id}: invalid lap range`);
+      if (previous && chunk.lapStartM < previous.lapEndM) problems.push(`reflection ${chunk.id}: overlaps ${previous.id}`);
+    }
+    previous = chunk;
+  }
   return problems;
 }
 
@@ -355,6 +400,27 @@ function parseChunk(value: unknown, what: string, rowTextures: number): CompactH
   return value as CompactSectorChunk;
 }
 
+/** The compact reflection block: the mapper values and its chunks (shape, counts, ranges, texture indices into the row's list). */
+function parseReflection(value: unknown, what: string, rowTextures: number): SceneryReflection {
+  const block = record(value, what);
+  exactKeys(block, REFLECTION_KEYS, what);
+  if (block.name !== 'REFMAP0') throw Error(`${what}.name: expected REFMAP0`);
+  for (const key of ['textureSize', 'updateRate', 'staticSwitchM', 'observedClipM', 'blockLengthM']) positive(block[key], `${what}.${key}`);
+  array(block.chunks, `${what}.chunks`, MAX_CHUNKS).forEach((item, i) => {
+    const at = `${what}.chunks[${i}]`, chunk = record(item, at), kind = chunk.kind;
+    if (kind !== 'main' && kind !== 'pit') throw Error(`${at}: a reflection chunk is a main or pit chunk`);
+    exactKeys(chunk, [...REFLECTION_CHUNK_COMMON, ...(kind === 'main' ? ['lapStartM', 'lapEndM'] : ['lapStartM', 'lapEndM', 'pitStartM', 'pitEndM'])], at);
+    text(chunk.id, `${at}.id`, 32);
+    sha256(chunk.sha256, `${at}.sha256`);
+    for (const key of ['byteLength', 'triangles', 'vertices', 'drawCalls', 'blocks', 'geometryBytes']) positiveCount(chunk[key], `${at}.${key}`);
+    if ((chunk.blocks as number) > (chunk.drawCalls as number)) throw Error(`${at}: more blocks than draw calls`);
+    bounds(chunk.bounds, `${at}.bounds`);
+    chunkTextures(chunk.textures, rowTextures, at);
+    for (const key of kind === 'main' ? ['lapStartM', 'lapEndM'] : ['lapStartM', 'lapEndM', 'pitStartM', 'pitEndM']) nonNegative(chunk[key], `${at}.${key}`);
+  });
+  return value as SceneryReflection;
+}
+
 const ROAD_HEIGHT_KEYS = ['sha256', 'byteLength', 'cellM', 'tileCells', 'originM', 'tilesX', 'tilesZ', 'tiles', 'heightOffsetM', 'heightStepM', 'corridorM'];
 const MAX_HEIGHT_TILES = 1 << 20;
 
@@ -453,10 +519,11 @@ function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[
     if (chunk.kind === 'horizon') throw Error(`${what}.sectors[${i}]: a sector cannot be the horizon`);
     return chunk;
   });
+  const reflection = parseReflection(row.reflection, `${what}.reflection`, refs.length);
   parseMaterials(row.materials, `${what}.materials`);
   const problems = layoutRowProblems({...row, horizon, sectors}, {links: false});
   if (problems.length) throw Error(`${what}: layout index is inconsistent: ${problems.slice(0, 5).join('; ')}`);
-  const inChunks = new Set<number>([...horizon.textures, ...sectors.flatMap(sector => sector.textures)]);
+  const inChunks = new Set<number>([...horizon.textures, ...sectors.flatMap(sector => sector.textures), ...reflection.chunks.flatMap(chunk => chunk.textures)]);
   if (inChunks.size !== refs.length) throw Error(`${what}.textures: the texture list names textures no chunk uses`);
   return value as CompactLayoutRow;
 }
@@ -554,9 +621,16 @@ export function compactSceneryLayouts(rows: Obj[]): {textures: Obj[]; layouts: O
     };
     if (!Array.isArray(row.sectors)) throw Error(`${row.layoutKey}: layout row has no sectors list`);
     return Object.fromEntries(Object.entries(row).map(([key, entry]) => [key,
-      key === 'horizon' ? chunk(entry, 'horizon') : key === 'sectors' ? (row.sectors as unknown[]).map((sector, i) => chunk(sector, `sector ${i}`)) : key === 'textures' ? rowTextures : entry]));
+      key === 'horizon' ? chunk(entry, 'horizon') : key === 'sectors' ? (row.sectors as unknown[]).map((sector, i) => chunk(sector, `sector ${i}`))
+        : key === 'reflection' ? reflectionChunks(entry, row.layoutKey, chunk) : key === 'textures' ? rowTextures : entry]));
   });
   return {textures, layouts};
+}
+
+/** The reflection block with each chunk converted by `chunk` (compacting or expanding like the sectors). */
+function reflectionChunks(value: unknown, layoutKey: unknown, chunk: (value: unknown, what: string) => Obj): Obj {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray((value as Obj).chunks)) throw Error(`${layoutKey}: reflection has no chunks list`);
+  return {...(value as Obj), chunks: ((value as Obj).chunks as unknown[]).map((entry, i) => chunk(entry, `reflection chunk ${i}`))};
 }
 
 function indexIn(value: unknown, length: number, what: string): number {
@@ -600,7 +674,8 @@ export function expandSceneryCatalog(catalog: {textures?: unknown; layouts?: unk
     };
     if (!Array.isArray(row.sectors)) throw Error(`${row.layoutKey}: layout row has no sectors list`);
     return Object.fromEntries(Object.entries(row).map(([key, entry]) => [key,
-      key === 'horizon' ? chunk(entry, 'horizon') : key === 'sectors' ? (row.sectors as unknown[]).map((sector, i) => chunk(sector, `sector ${i}`)) : key === 'textures' ? textures : entry]));
+      key === 'horizon' ? chunk(entry, 'horizon') : key === 'sectors' ? (row.sectors as unknown[]).map((sector, i) => chunk(sector, `sector ${i}`))
+        : key === 'reflection' ? reflectionChunks(entry, row.layoutKey, chunk) : key === 'textures' ? textures : entry]));
   });
   const missing = table.findIndex((_entry, i) => !used.has(i));
   if (missing >= 0) throw Error(`Scenery texture table entry ${missing} (${table[missing].sha256}) is used by no layout`);

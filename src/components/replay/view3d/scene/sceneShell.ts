@@ -25,6 +25,7 @@ import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
 import { createSceneryStream } from '../scenery/sceneryStream.js';
+import { createReflectionSet } from '../scenery/reflectionSet.js';
 import { createSceneWarmup } from '../scenery/sceneWarmup.js';
 import { startStreaming } from '../scenery/materials/mipStreaming.js';
 import { focusing } from '../scenery/textureFocus.js';
@@ -174,6 +175,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     .translate(new Vector3(-origin.x, -origin.y, origin.z));
   // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
   const batches = createSceneryBatches(sceneryRoot, layout.materials, renderer.capabilities.maxTextures);
+  // What the car's probe draws in place of the scenery, chunk by chunk with it (null without one: the probe draws the scenery).
+  const reflectionSet = createReflectionSet(layout, loader, origin);
   let content: SceneContent | null = null;
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
   /** Resolves once the scene has its environment and the car's reflection: programs compiled before that would compile again. */
@@ -226,6 +229,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       // chunk waits its turn to compile and upload (warm-ups stay one at a time). A chunk that fails leaves what it built (its ray
       // tree, its hidden batch instances) to the shell's disposal: the failure breaks the shell, and the next view makes a new one.
       let grounded: Promise<void> = Promise.resolve();
+      const reflected = reflectionSet.load(chunk.id, signal);
+      reflected.catch(() => {}); // Awaited below; the scenery's own failure may reject the load first.
       const root = await loader.load(chunk, signal, parsed => {
         grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
         grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
@@ -233,11 +238,13 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       realRoad.prepare(root);
       const created = batches.add(root);
       await lit; // A chunk's programs depend on the scene's environment.
-      await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), grounded]);
+      const reflection = await reflected;
+      await Promise.all([warmup.queue(reflection ? [root, ...created, reflection] : [root, ...created], signal, worldBox(chunk.bounds)), grounded]);
       signal.throwIfAborted();
+      if (reflection) reflectionSet.join(root, reflection);
       return root;
     },
-    changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
+    changed: () => { batches.sync(); reflectionSet.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
@@ -268,12 +275,13 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const convolution = linkConvolution(renderer, layout.shading.convolution.kernels);
   lit = Promise.resolve().then(() => {
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null, sun);
-    reflection = createCarReflection(renderer, scene, layout.shading);
+    reflection = createCarReflection(renderer, scene, layout.shading, reflectionSet.root && {set: reflectionSet.root, scenery: sceneryRoot});
   });
   lit.then(() => report({lighting: 1}), () => {}); // Awaited by the content.
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(sceneryRoot);
+  if (reflectionSet.root) world.add(reflectionSet.root);
   const route = layout.routeLengthM;
   /** Stream scenery around the car (lap distance, plus what is near the camera) or, for the panned orbit and overhead cameras, around the camera. */
   const updateStream = () => {

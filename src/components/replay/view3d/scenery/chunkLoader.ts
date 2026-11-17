@@ -1,7 +1,7 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
 import { Mesh, type Object3D, type WebGLRenderer } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
-import type { SceneryChunk, SceneryTexture } from '../../../../../shared/types/scenes/scenery.js';
+import type { SceneryChunkFile, SceneryTexture } from '../../../../../shared/types/scenes/scenery.js';
 import { fetchSceneryChunk, SCENERY_FILES } from '../../../../api/sceneryApi.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
@@ -10,7 +10,7 @@ import { createSurfaceTexturePool, imageUriMap } from './materials/textureSource
 
 export interface ChunkLoader {
   /** `onParsed` gets the root once its meshes exist, before their textures load: work that needs only geometry starts there. */
-  load(chunk: SceneryChunk, signal: AbortSignal, onParsed?: (root: Object3D) => void): Promise<Object3D>;
+  load(chunk: SceneryChunkFile, signal: AbortSignal, onParsed?: (root: Object3D) => void): Promise<Object3D>;
   /** Frees every chunk it parsed with their materials and textures: chunks stay loaded until the scene goes. */
   dispose(): void;
 }

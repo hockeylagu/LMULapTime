@@ -6,7 +6,6 @@ import { createReplayScene, lapFirstStation } from '../../../../../src/component
 import { createSceneShell, type SceneShell } from '../../../../../src/components/replay/view3d/scene/sceneShell.js';
 import { describeLoad, type SceneLoadProgress } from '../../../../../src/components/replay/view3d/scene/loadProgress.js';
 import { sceneSun } from '../../../../../src/components/replay/view3d/sceneEnvironment.js';
-import { disposeObjects } from '../../../../../src/components/replay/view3d/scene/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import { isStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import { SUN_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
@@ -18,7 +17,7 @@ import { TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from '../../../..
 
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
-/** Car texture reads, as `car` or `interior` by the loader that made them and the start file each was read from, and the textures read from one. */
+/** Car texture reads with the start file each was read from, and the textures read from one. */
 const carTextureLoads = vi.hoisted(() => ({paths: [] as string[], started: new WeakSet<object>()}));
 import { hazeProgram } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
 vi.mock('three-mesh-bvh/worker', async () => {
@@ -122,18 +121,15 @@ vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', ()
     onParsed?.(root); // As the loader: the parsed root is handed over before its textures load.
     return root;
   },
-  releaseChunk: (root: Object3D) => disposeObjects(root, true), dispose() {},
+  dispose() {},
 })}));
 vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js', () => ({CachedKtx2Loader: class Loader {
-  /** A scene makes its car loader, then its interior loader. */
-  static made = 0;
-  private readonly role = Loader.made++ % 2 ? 'interior' : 'car';
   constructor(_renderer: unknown, private readonly textureDetail?: {maxPx?: unknown; start?: (url: string) => {url: string; skip: number} | undefined}) {}
   async loadAsync(url: string) {
     const texture = new Texture(), start = this.textureDetail?.start?.(url), name = (path: string) => path.split('/').at(-1)!;
-    // Neither loader cuts levels: the package sizes car textures.
+    // The loader cuts no levels: the package sizes car textures.
     if (this.textureDetail?.maxPx) throw Error('car textures load at the package size');
-    carTextureLoads.paths.push(`${this.role} ${name(url)}${start ? ` from ${name(start.url)}` : ''}`);
+    carTextureLoads.paths.push(`${name(url)}${start ? ` from ${name(start.url)}` : ''}`);
     if (start) { texture.mipmaps = [{data: new Uint8Array(4), width: 512, height: 512}]; carTextureLoads.started.add(texture); }
     return texture;
   }
@@ -156,7 +152,7 @@ const layout = {
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
   camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]}, roadHeightAt: () => null, realRoad: {sha256: 'r', byteLength: 8, points: 2, elements: 2}, realRoadTable: Uint32Array.of(0, 1),
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
-  horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
+  horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [], reflection: {name: 'REFMAP0', textureSize: 1024, updateRate: 100, staticSwitchM: 300, observedClipM: 150, blockLengthM: 150, chunks: []},
   // A box has 24 vertices and 36 indices: the horizon's ground, and a road and an obstacle in each sector (up to eight).
   materials: [['ground', 1], ['road', 8], ['obstacle', 8]].map(([key, count]) => ({key, vertices: 24 * +count, indices: 36 * +count, primitives: +count, draws: +count})),
 } as unknown as SceneryLayoutResource;
@@ -430,12 +426,12 @@ it('joins the interior file to the body under its chassis node, drawn in the dri
   handle.dispose();
 });
 
-it('reads car textures from their start files, the ones only the interior uses through the interior loader', async () => {
+it("reads car textures from their start files, the interior's like the body's", async () => {
   const handle = await openScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
-  // The seat is interior only; the trim is also on an outside part, so it loads like the body. The paint has no start file.
-  expect(carTextureLoads.paths.filter(path => path.startsWith('interior'))).toEqual([`interior ${hashOf('seat')}.ktx2.zst from ${hashOf('seat-start')}.ktx2.zst`]);
-  expect(carTextureLoads.paths).toEqual(expect.arrayContaining([`car ${hashOf('trim')}.ktx2.zst from ${hashOf('trim-start')}.ktx2.zst`, 'car a.ktx2']));
+  // The seat is interior only; the trim is also on an outside part. The paint has no start file.
+  expect(carTextureLoads.paths).toEqual(expect.arrayContaining([
+    `${hashOf('seat')}.ktx2.zst from ${hashOf('seat-start')}.ktx2.zst`, `${hashOf('trim')}.ktx2.zst from ${hashOf('trim-start')}.ktx2.zst`, 'a.ktx2']));
   const [scene] = lastSceneRender(), map = (name: string) => (scene.getObjectByName(name) as Mesh<BufferGeometry, MeshBasicMaterial>).material.map!;
   // Each map's own copy draws from the 512 start file and waits to sharpen.
   expect([isStreaming(map('seat')), map('seat').mipmaps.map(level => level.width), isStreaming(map('dash'))]).toEqual([true, [512], true]);

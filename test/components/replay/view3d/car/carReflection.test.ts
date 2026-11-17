@@ -191,6 +191,30 @@ it("corrects either of the car's surface reads for the scenery overhead, in a pr
   expect(glass.fragment).not.toContain('carSurfaceReflection(light');
 });
 
+it('draws the reflection set in place of the scenery three faces a frame, a conversion step riding with them', () => {
+  const {renderer, faces} = stubRenderer();
+  const set = new Group(), scenery = new Group(), seen: Array<[boolean, boolean]> = [];
+  set.visible = false;
+  const render = renderer.render.bind(renderer);
+  renderer.render = (scene, camera) => { seen.push([set.visible, scenery.visible]); render(scene, camera); };
+  const reflection = createCarReflection(renderer, new Scene(), testShading(), {set, scenery}), centre = new Vector3();
+  reflection.setCar(new Mesh(new BoxGeometry(), new MeshPhysicalMaterial()), new Group());
+  const conversions = pmrem.conversions, convolutions = pmrem.convolutions;
+  // The first cube: three faces, then three more with the prefilter, then the convolution alone (the car has not moved).
+  expect(reflection.update(centre)).toBe(true); expect(faces.map(f => f.face)).toEqual([0, 1, 2]);
+  expect(reflection.update(centre)).toBe(true); expect(faces.map(f => f.face)).toEqual([0, 1, 2, 3, 4, 5]);
+  expect(pmrem.conversions - conversions).toBe(1); expect(pmrem.convolutions - convolutions).toBe(0);
+  expect(reflection.update(centre)).toBe(true); expect(pmrem.convolutions - convolutions).toBe(1); expect(faces).toHaveLength(6);
+  expect(reflection.update(centre)).toBe(false);
+  // Only the set draws into the faces; outside them the scenery shows and the set hides.
+  expect(seen.every(([setShown, sceneryShown]) => setShown && !sceneryShown)).toBe(true);
+  expect(set.visible).toBe(false); expect(scenery.visible).toBe(true);
+  // A moving car: a new cube every two frames, the convolution of the last sharing a frame with the first faces of the next.
+  for (let x = 1; x <= 4; x++) reflection.update(new Vector3(x, 0, 0));
+  expect(faces).toHaveLength(6 + 12); expect(pmrem.conversions - conversions).toBe(3); expect(pmrem.convolutions - convolutions).toBe(2);
+  reflection.dispose();
+});
+
 const region = {
   baseCoatRoughness: 0.3, baseCoatSpecStrength: 0.5, baseCoatRefractiveIndex: 2.25, clearCoatSpecStrength: 1, clearCoatRoughness: 0,
   clearCoatRefractiveIndex: 1.44, lacquerColour: [1, 1, 1, 1], metallicPaintStrength: 0.8, metallicFlakeStrength: 0, carbonFibreStrength: 0.6, orangePeelStrength: 1,
