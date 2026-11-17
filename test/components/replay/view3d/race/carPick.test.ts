@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Box3, BoxGeometry, Group, Mesh, PerspectiveCamera, Vector3 } from 'three';
+import { Box3, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh, PerspectiveCamera, Vector3 } from 'three';
 import { carsUnder, envelopeBounds, envelopeParts, insideHull, pickHeights, placeOnRoad } from '../../../../../src/components/replay/view3d/race/carPick.js';
 import { CONTACT_SHADOW_NAME } from '../../../../../src/components/replay/view3d/car/underCarBake.js';
 
@@ -93,15 +93,38 @@ describe('carsUnder', () => {
     expect(insideHull([[0, 0], [10, 10], [20, 20]], 10, 10)).toBe(false);
   });
 
-  it("keeps a model's parts once: one inside another (the cockpit in the shell, a detail level's copy) goes", () => {
+  it("keeps a model's body in cells: the parts in one (the cockpit in the shell, a detail level's copy) share its box", () => {
     const car = new Group(), envelope = new Group(), aerial = new Mesh(new BoxGeometry(0.04, 0.4, 0.1));
     envelope.name = 'body-envelope';
-    aerial.position.set(0, 0.7, -2);
+    aerial.position.set(0, 0.7, -1.85);
     envelope.add(new Mesh(new BoxGeometry(2, 1, 4)), new Mesh(new BoxGeometry(1, 0.5, 1)), new Mesh(new BoxGeometry(2, 1, 4)), aerial);
     car.add(envelope);
+    // The shell's 8 by 16 quarter-metre cells, and 16 + 8 flat ones for its right side and front, on cells' edges; the two cells the
+    // aerial stands in (either side of the middle) reach its top.
     const parts = envelopeParts(car);
-    expect(parts.map(part => part.max.y)).toEqual([expect.closeTo(0.5), expect.closeTo(0.9)]);
+    expect(parts).toHaveLength(128 + 16 + 8);
+    expect(parts.filter(part => part.max.y > 0.6).map(part => [part.min.x, part.max.x, part.min.z, part.max.y].map(value => Number(value.toFixed(3)))))
+      .toEqual([[-0.25, 0, -2, 0.9], [0, 0.25, -2, 0.9]]);
     expect(envelopeBounds(car).max.y).toBeCloseTo(0.9);
+  });
+
+  it("cuts a part in cells along and across the car: the roof's height stands over neither the hood nor the windscreen's foot", () => {
+    // One mesh: a hood 0.6 m high from 1 to 2 m forward, a windscreen of one triangle from it up to a roof 1.2 m high at 0 m.
+    const geometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute([
+      -1, 0.6, 1, 1, 0.6, 1, 0, 0.6, 2,
+      -1, 0.6, 1, 1, 0.6, 1, 0, 1.2, 0,
+    ], 3));
+    const car = new Group(), envelope = new Group();
+    envelope.name = 'body-envelope';
+    envelope.add(new Mesh(geometry));
+    car.add(envelope);
+    const parts = envelopeParts(car), top = (from: number) => Math.max(...parts.filter(part => part.min.z >= from - 1e-6).map(part => part.max.y));
+    expect(top(1)).toBeCloseTo(0.6);
+    // The windscreen climbs 0.15 m a quarter metre back from its foot.
+    expect(top(0.75)).toBeCloseTo(0.75);
+    expect(top(0.25)).toBeCloseTo(1.2 - 0.15);
+    expect(Math.max(...parts.map(part => part.max.y))).toBeCloseTo(1.2);
+    expect(envelopeBounds(car).max.y).toBeCloseTo(1.2);
   });
 
   it('finds a car off the centre where the camera draws it', () => {

@@ -27,33 +27,86 @@ export function placeOnRoad(body: Box3, poseY: number, groundY: number | null, b
   return box;
 }
 
-const toEnvelope = new Matrix4(), size = new Vector3();
+const toEnvelope = new Matrix4(), a = new Vector3(), b = new Vector3(), c = new Vector3(), triangle = new Box3();
 
 /**
- * A car model's parts' bounds in its envelope's frame (the car's, without the envelope's lift), where they hang, its contact shadow
- * left out; a part inside another's bounds (the cockpit in the shell, a detail level's copy) only once, the largest first.
+ * The cells a part is cut into, metres across (x) and along (z) the car: a body shell's box holds the roof's height over the hood,
+ * the tail and the rounded sides too, and seen from the chase camera above the car its far top edge draws well over the roof; a
+ * cell holds its own height.
+ */
+export const PART_CELL_M = 0.25;
+
+/** The cells (`PART_CELL_M`) a span from `min` to `max` crosses, the first and the last: one at least. */
+function cellsOf(min: number, max: number): [first: number, last: number] {
+  const first = Math.floor(min / PART_CELL_M);
+  return [first, Math.max(first, Math.ceil(max / PART_CELL_M) - 1)];
+}
+
+/** The part of `polygon` on one side of a plane across `axis` at `at`: `keep` 1 where the axis is at least `at`, -1 at most. */
+function clip(polygon: Vector3[], axis: 'x' | 'z', at: number, keep: 1 | -1): Vector3[] {
+  const kept: Vector3[] = [];
+  polygon.forEach((point, i) => {
+    const next = polygon[(i + 1) % polygon.length], side = (point[axis] - at) * keep, nextSide = (next[axis] - at) * keep;
+    if (side >= 0) kept.push(point);
+    if ((side < 0 && nextSide > 0) || (side > 0 && nextSide < 0)) kept.push(point.clone().lerp(next, side / (side - nextSide)));
+  });
+  return kept;
+}
+
+/**
+ * A mesh's triangles, through `matrix`, into `cells` of PART_CELL_M across and along the car: each cell widened over the part of
+ * each triangle in it (a windscreen's few triangles give the cells by the hood the hood's height, not the roof's).
+ */
+function addToCells(cells: Map<string, Box3>, geometry: Mesh['geometry'], matrix: Matrix4): void {
+  const position = geometry.getAttribute('position'), index = geometry.getIndex();
+  if (!position) return;
+  const count = index ? index.count : position.count;
+  for (let corner = 0; corner + 2 < count; corner += 3) {
+    const vertex = (n: number, into: Vector3) => into.fromBufferAttribute(position, index ? index.getX(corner + n) : corner + n).applyMatrix4(matrix);
+    const points = [vertex(0, a), vertex(1, b), vertex(2, c)];
+    triangle.setFromPoints(points);
+    const [firstX, lastX] = cellsOf(triangle.min.x, triangle.max.x), [firstZ, lastZ] = cellsOf(triangle.min.z, triangle.max.z);
+    for (let cellX = firstX; cellX <= lastX; cellX++) for (let cellZ = firstZ; cellZ <= lastZ; cellZ++) {
+      let piece = points;
+      // A triangle in one cell is whole; one across cells is cut at the edges it crosses.
+      if (firstX !== lastX) piece = clip(clip(piece, 'x', cellX * PART_CELL_M, 1), 'x', (cellX + 1) * PART_CELL_M, -1);
+      if (firstZ !== lastZ) piece = clip(clip(piece, 'z', cellZ * PART_CELL_M, 1), 'z', (cellZ + 1) * PART_CELL_M, -1);
+      if (!piece.length) continue;
+      const key = `${cellX},${cellZ}`, box = cells.get(key) ?? cells.set(key, new Box3()).get(key)!;
+      for (const point of piece) box.expandByPoint(point);
+    }
+  }
+}
+
+/**
+ * A car model's body in its envelope's frame (the car's, without the envelope's lift), where its parts hang, as boxes over cells
+ * of `PART_CELL_M` across and along it, its contact shadow left out: the parts in a cell (the shell, the cockpit inside it, a
+ * detail level's copy) share its box.
  */
 export function envelopeParts(car: Object3D): Box3[] {
-  const envelope = car.getObjectByName('body-envelope'), boxes: Box3[] = [];
+  const cells = new Map<string, Box3>();
+  eachPart(car, (geometry, matrix) => addToCells(cells, geometry, matrix));
+  return [...cells.values()];
+}
+
+/** Each mesh of a car model's envelope but its contact shadow, with the matrix from the mesh's frame to the envelope's. */
+function eachPart(car: Object3D, visit: (geometry: Mesh['geometry'], matrix: Matrix4) => void): void {
+  const envelope = car.getObjectByName('body-envelope');
   envelope?.updateWorldMatrix(true, true);
   envelope?.traverse(object => {
     // The contact shadow lies flat under the body, wider and longer than it.
     if (!(object instanceof Mesh) || object.name === CONTACT_SHADOW_NAME) return;
-    const geometry = object.geometry as Mesh['geometry'];
-    if (!geometry.boundingBox) geometry.computeBoundingBox();
-    toEnvelope.copy(envelope.matrixWorld).invert().multiply(object.matrixWorld);
-    boxes.push(geometry.boundingBox!.clone().applyMatrix4(toEnvelope));
+    visit(object.geometry as Mesh['geometry'], toEnvelope.copy(envelope.matrixWorld).invert().multiply(object.matrixWorld));
   });
-  const volume = (box: Box3) => { box.getSize(size); return size.x * size.y * size.z; };
-  const kept: Box3[] = [];
-  for (const box of boxes.sort((a, b) => volume(b) - volume(a))) if (!kept.some(other => other.containsBox(box))) kept.push(box);
-  return kept;
 }
 
-/** A car model's body bounds in its envelope's frame: its parts' (`envelopeParts`); a point at the origin without parts. */
+/** A car model's body bounds in its envelope's frame, over its parts where they hang; a point at the origin without parts. */
 export function envelopeBounds(car: Object3D, box = new Box3()): Box3 {
   box.makeEmpty();
-  for (const part of envelopeParts(car)) box.union(part);
+  eachPart(car, (geometry, matrix) => {
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    box.union(triangle.copy(geometry.boundingBox!).applyMatrix4(matrix));
+  });
   return box.isEmpty() ? box.setFromCenterAndSize(new Vector3(), new Vector3()) : box;
 }
 
