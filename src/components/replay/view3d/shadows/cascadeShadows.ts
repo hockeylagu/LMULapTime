@@ -12,7 +12,7 @@ import { cascadeCentres, sunSquareAxes, type ShadowCascadeLayout, type SunSquare
  * held centre has drifted (see `holdM`). Farther ones are cached: their static depth is redrawn once their centre has moved an eighth
  * of their side, at most one per frame (a redraw of a 1 km square is ~1,000 draws). One whose slice holds a casting car has the cars
  * drawn over it each frame as a live one does (a trackside view's cars cast); the others leave the cars out.
- * Every shadow pass re-draws each caster it meets, the frame's main cost (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
+ * Every shadow pass re-draws each caster it meets, the frame's main cost.
  */
 const LIVE_CASCADE_SPLIT_M = 100;
 const CACHED_REDRAW_SIDE_FRACTION = 1 / 8;

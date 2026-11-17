@@ -1,7 +1,7 @@
 # 3D replay frame-time benchmark
 
 Opens one lap in the running app's fullscreen 3D view in headless Edge on the real GPU, measures load, plays the lap and reports
-frame-time percentiles. Targets and the plan it measures: [`docs/plans/proposed/REPLAY_3D_PERFORMANCE.md`](../../../docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
+frame-time percentiles. Targets and the plan it measures: [`docs/plans/proposed/REPLAY_3D.md`](../../../docs/plans/proposed/REPLAY_3D.md).
 
 ## Reference suite (compare packages and builds)
 

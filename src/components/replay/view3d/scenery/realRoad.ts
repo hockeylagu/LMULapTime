@@ -17,8 +17,8 @@ export const REALROAD_STATE_ATTRIBUTE = 'surfaceRealRoad';
 /** Bytes per element of a replay surface state: rubber laid, loose material, surface water, surface temperature. */
 const SURFACE_STATE_CHANNELS = 4;
 /**
- * The rubber drawn on every element: 13 of 255, a nearly bare road. The game frames of the reference views were nearly bare (the
- * captures' road state held rubber on 0–10 % of the visible road), and a fifth of full drew the road 17 % darker than them.
+ * The rubber drawn on every element: a fifth of full, the look accepted with freeze-v18. The game frames of the reference views
+ * were nearly bare (the captures' road state held rubber on 0–10 % of the visible road), so the road draws darker than them.
  */
 export const ASSUMED_RUBBER = 51;
 

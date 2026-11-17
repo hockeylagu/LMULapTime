@@ -6,7 +6,7 @@ Current implementation belongs in [CODE_MAP](../CODE_MAP.md), not in completed d
 ## Corner comparison
 
 [Corner-map design](CORNER_COMPARISON_REWORK.md) remains a substantial unfinished plan on the
-separate `corner-map` worktree. At review it is `b2a5c44f`, not an ancestor of main. Read that
+separate `corner-map` worktree. On 2026-11-15 its tip is `eeed3fe1` (2026-10-26), 58 commits not on main. Read that
 worktree's current handoff before continuing; do not restart completed metric/map phases or infer
 visual acceptance from implemented code. Remaining work includes M2 metric/sequence revalidation,
 M3 inspector acceptance and shared consumer integration. Preserve the separate `debrief-first`
@@ -151,8 +151,9 @@ Settings action, refused on track. Existing fake-plugin tests do not replace thi
 
 ## 3D replay
 
-[Simplified 3D replay](proposed/REPLAY_3D_PLAN.md) is in progress: every layout has a 3D scene in the
-data package; car models for every record, camera/comparison acceptance and performance remain.
+[3D replay](proposed/REPLAY_3D.md): lap and race views share one scene on the accepted personal-v18 package and
+freeze-v18 look; the performance goal is met. Next round: the analysis/UX features (awaiting the user's pick), parked fidelity
+items and the open code-review findings.
 
 ## Unstarted proposals
 
