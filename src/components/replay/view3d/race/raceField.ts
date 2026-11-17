@@ -8,7 +8,7 @@ import { disposeObjects } from '../scene/disposeObjects.js';
 import type { RenderPose } from '../scene/replayPose.js';
 import type { SceneShell } from '../scene/sceneShell.js';
 import { makeCar } from '../cars/sceneObjects.js';
-import { buildCarParts, setCameraDistance, type CarParts } from '../cars/carParts.js';
+import { buildCarParts, setCameraDistance, setCockpitView, type CarParts } from '../cars/carParts.js';
 import { batchCars, type CarBatchSet } from '../cars/carBatching.js';
 import type { CarSets, DrawnCar, DrawnCars } from '../cars/drawnCar.js';
 import { createFarCarLoader } from '../cars/farCars.js';
@@ -35,16 +35,15 @@ const FIT_SAMPLES = 32, MAX_FIT_M = 0.75;
 const FAR_GLOW_M = 300;
 const BRAKE = RACE_POSE_CHANNELS.indexOf('brake'), LAMPS = RACE_POSE_CHANNELS.indexOf('lamps');
 
-/** A body's cars: their full models, built together the first time one of them turns near, then kept. */
+/** A body's cars with their far models loaded. Their full models build per body (`buildNear`), the far models in or not. */
 interface FieldBody {
+  folder: string;
   cars: FieldCar[];
-  near: 'none' | 'loading' | 'ready' | 'failed';
-  /** Whether its parse is held (`CarTemplates.hold`): from its near build while any of its cars is near. */
-  held: boolean;
 }
 
 /** A car of the field: its far model always, its full model once its body's full models are built. */
 interface FieldCar {
+  slot: number;
   body: LoadedBody;
   of: FieldBody;
   far: {car: Group; parts: CarParts};
@@ -75,6 +74,14 @@ export interface RaceField {
   pose(slot: number, pose: RenderPose | null, window: RacePoseWindow, carIndex: number): void;
   /** Starts the next bodies to load: those of the cars given (on the track, without a model), nearest first. */
   load(distances: ReadonlyArray<{slot: number; metres: number}>): void;
+  /**
+   * The car's full model, its body's full models built first when they are not, ahead of every other load (its body's far models
+   * and the other bodies' start once they are): null for a car without a model or whose body's full models fail.
+   */
+  near(slot: number): Promise<DrawnCar | null>;
+  /** The followed car draws the car's full model from now on (`near`), until `reclaim`: the field draws it again, outside view. */
+  lend(slot: number): void;
+  reclaim(slot: number): void;
   /** Places the cars in view for the frame: the nearest few with their full model, wheels and lamps, the others with their far model. */
   beforeDraw(camera: PerspectiveCamera | OrthographicCamera): void;
   /** The car's body bounds in its frame (metres, its far model's), its bottom where it meets the road; null without a model. */
@@ -102,7 +109,14 @@ export function createRaceField(
   /** The field by slot: null while its body loads, 'none' for a car that cannot load (its stand-in stays). */
   const field = new Map<number, FieldCar | null | 'none'>();
   const farSets: CarBatchSet[] = [], nearSets: DrawnCars[] = [], bodies = new Set<string>(), fieldBodies: FieldBody[] = [];
-  let bodyLoads = 0, nearLoads = 0, disposed = false;
+  /** Loads under way; and the followed car's full model builds under way, during which no other load starts (`near`). */
+  let bodyLoads = 0, nearLoads = 0, followedLoads = 0, disposed = false;
+  /** Each body's full models by folder once asked for (whether they built), its cars' full models by slot, and its tyre contact. */
+  const nearBuilds = new Map<string, Promise<boolean>>(), nearBySlot = new Map<number, DrawnCar>(), contactOf = new Map<string, number>();
+  /** The bodies whose parse is held (`CarTemplates.hold`): from their full models' build while any of their cars is near. */
+  const held = new Map<string, LoadedBody>();
+  /** The cars whose full model the followed car draws (`lend`): the field leaves them alone. */
+  const lent = new Set<number>();
   const view = new Frustum(), viewMatrix = new Matrix4(), bounds = new Sphere(), centre = new Vector3();
   const glows = createFarGlows(root, shell.carTextures, object => shell.warm(object), changed), glowing: FarGlowCar[] = [];
   const blobs = createBlobShadows(root, cars.length, object => shell.warm(object));
@@ -152,6 +166,11 @@ export function createRaceField(
     reported = key;
     shell.report({carModels: {loaded, total: field.size}});
   };
+  /** The cars of the race `body` draws: its far and full models are built for them all. */
+  const carsOf = (body: LoadedBody) => {
+    const served = new Set(body.resource.vehicleIds.map(normalizeVehicleId));
+    return cars.filter(car => car.vehicleId && served.has(normalizeVehicleId(car.vehicleId))).map(car => car.slot);
+  };
   const loadBody = async (slot: number) => {
     let slots = [slot];
     // Far cars built but not yet in the field: a load that fails or outlives the field frees them.
@@ -162,9 +181,9 @@ export function createRaceField(
       if (!body || disposed) return;
       // A body already loading covers this car: that load settles it.
       if (bodies.has(body.resource.folder)) { slots = []; return; }
-      bodies.add(body.resource.folder);
-      const served = new Set(body.resource.vehicleIds.map(normalizeVehicleId));
-      slots = cars.filter(car => car.vehicleId && served.has(normalizeVehicleId(car.vehicleId))).map(car => car.slot);
+      const folder = body.resource.folder;
+      bodies.add(folder);
+      slots = carsOf(body);
       for (const each of slots) if (!field.get(each)) field.set(each, null);
       // The body's far file is parsed for this load alone: once its cars are batched, nothing holds the parsed vertices.
       const farLoader = createFarCarLoader(shell.carTextures);
@@ -182,18 +201,20 @@ export function createRaceField(
       await Promise.all([shell.warm(batches.shared), ...present.map(({car}) => shell.warm(car))]);
       if (disposed) return;
       root.add(batches.shared); batches.ready();
-      const of: FieldBody = {cars: [], near: 'none', held: false};
+      const of: FieldBody = {folder, cars: []};
       fieldBodies.push(of);
       built.forEach((entry, index) => {
         if (!entry) { field.set(slots[index], 'none'); return; }
         entry.car.visible = false; root.add(entry.car);
+        // A body whose full models came first (the followed car's) fits its far models by their wheels at once.
+        const each = slots[index];
         const car: FieldCar = {
-          body: entry.livery, of, far: {car: entry.car, parts: tables[present.indexOf(entry)]}, near: null,
-          fit: {envelope: entry.car.getObjectByName('body-envelope')!, bottomY: boxes[present.indexOf(entry)].min.y, y: 0, window: null},
+          slot: each, body: entry.livery, of, far: {car: entry.car, parts: tables[present.indexOf(entry)]}, near: nearBySlot.get(each) ?? null,
+          fit: {envelope: entry.car.getObjectByName('body-envelope')!, bottomY: contactOf.get(folder) ?? boxes[present.indexOf(entry)].min.y, y: 0, window: null},
           footprint: boxes[present.indexOf(entry)],
-          tier: 'far', pose: null, orientation: new Quaternion(), window: null, carIndex: 0, glowFrame: new Matrix4(),
+          tier: lent.has(each) ? 'near' : 'far', pose: null, orientation: new Quaternion(), window: null, carIndex: 0, glowFrame: new Matrix4(),
         };
-        of.cars.push(car); field.set(slots[index], car);
+        of.cars.push(car); field.set(each, car);
       });
       unplaced = [];
       changed();
@@ -207,35 +228,52 @@ export function createRaceField(
     }
   };
   /**
-   * Builds the full models of every car of the body at once, from one parse of the body, their parts sharing batches as their far
-   * models do (one copy of each geometry; only the livery's own materials split them). A car turning near then only shows its
-   * instances: going back and forth through the grid loads nothing. Until then, and for a body that fails, its cars stay far.
+   * Builds the full models of every car of the body at once, once, from one parse of the body, their parts sharing batches as their
+   * far models do (one copy of each geometry; only the livery's own materials split them). A car turning near then only shows its
+   * instances: going back and forth through the grid loads nothing. They do not wait for the body's far models: the followed car's
+   * come first. Until built, and for a body that fails, its cars stay far.
    */
-  const loadNear = async (of: FieldBody) => {
-    of.near = 'loading'; nearLoads++;
+  const buildNear = (body: LoadedBody): Promise<boolean> => {
+    let building = nearBuilds.get(body.resource.folder);
+    if (!building) { building = buildNearOf(body); nearBuilds.set(body.resource.folder, building); }
+    return building;
+  };
+  const buildNearOf = async (body: LoadedBody): Promise<boolean> => {
+    const folder = body.resource.folder, slots = carsOf(body);
+    nearLoads++;
     let set: DrawnCars | null = null;
-    // The body's parse stays while its cars are near: following one of them builds from it instead of parsing the file again.
-    shell.carTemplates.hold(of.cars[0].body); of.held = true;
+    // The body's parse stays while its cars are near: following one of them builds its cabin from it instead of parsing the file again.
+    shell.carTemplates.hold(body); held.set(folder, body);
     try {
-      set = await sets.build(of.cars.map(car => car.body), {own: false});
+      const liveries = await Promise.all(slots.map(bodyOf));
+      if (liveries.some(livery => !livery)) throw Error(`A car of ${folder} has no body`);
+      set = await sets.build(liveries as LoadedBody[], {pickShape: true});
       // Every car of the body has the same wheels: the far models fit to the road by them from now on.
       const contact = tyreContact(set.cars[0].car);
-      if (contact !== null) for (const car of of.cars) { car.fit.bottomY = contact; car.fit.window = null; }
+      if (contact !== null) contactOf.set(folder, contact);
       const shared = set.shared;
       for (const object of [...(shared ? [shared] : []), ...set.cars.map(car => car.car)]) shell.shareReflection(object);
       await Promise.all([...(shared ? [shell.warm(shared)] : []), ...set.cars.map(car => shell.warm(car.car))]);
-      if (disposed) { set.dispose(); return; }
+      if (disposed) { set.dispose(); return false; }
       nearSets.push(set);
       if (shared) root.add(shared);
       set.ready();
-      set.cars.forEach((near, index) => { near.car.visible = false; root.add(near.car); of.cars[index].near = near; });
-      of.near = 'ready';
-      changed();
-    } catch {
-      // The cars stay far.
-      of.near = 'failed';
+    } catch (error) {
+      // The cars stay far, for the rest of the race: said in the console, or a package error only shows as far models up close.
+      console.warn(`[raceField] The full models of ${folder} failed; its cars stay far:`, error);
       set?.dispose();
+      return false;
     } finally { nearLoads--; }
+    // Once built: what the cars do with their models from here on is not the build's failure.
+    set.cars.forEach((near, index) => { near.car.visible = false; root.add(near.car); nearBySlot.set(slots[index], near); });
+    const contact = contactOf.get(folder);
+    for (const car of field.values()) {
+      if (!car || car === 'none' || car.of.folder !== folder) continue;
+      car.near = nearBySlot.get(car.slot) ?? null;
+      if (contact !== undefined) { car.fit.bottomY = contact; car.fit.window = null; }
+    }
+    changed();
+    return true;
   };
   const hide = (shape: {car: Group; parts: CarParts} | null) => { if (shape?.car.visible) { shape.car.visible = false; shape.parts.hide(); } };
   /** The cars in view this frame, nearest first. */
@@ -259,17 +297,43 @@ export function createRaceField(
       car.window = window; car.carIndex = carIndex;
     },
     load(distances) {
-      if (bodyLoads >= BODY_LOADS) return;
+      if (bodyLoads >= BODY_LOADS || followedLoads > 0) return;
       const waiting = distances.filter(car => !field.has(car.slot)).sort((a, b) => a.metres - b.metres);
       for (const {slot} of waiting.slice(0, BODY_LOADS - bodyLoads)) { field.set(slot, null); void loadBody(slot); }
       reportLoads();
+    },
+    async near(slot) {
+      let body: LoadedBody | null;
+      followedLoads++;
+      try {
+        body = await bodyOf(slot);
+        if (body && !disposed) await buildNear(body);
+      } finally { followedLoads--; }
+      if (!body || disposed) return null;
+      // Its body's far models next (the field draws the car with them when its full models fail), then the rest of the field.
+      if (!field.has(slot)) { field.set(slot, null); void loadBody(slot); reportLoads(); }
+      return nearBySlot.get(slot) ?? null;
+    },
+    lend(slot) {
+      const near = nearBySlot.get(slot), car = field.get(slot);
+      if (!near) return;
+      lent.add(slot);
+      if (car && car !== 'none') { hide(car.far); car.tier = 'near'; }
+      // The followed car draws its full level whatever the camera's distance.
+      setCameraDistance(near.car, 0);
+    },
+    reclaim(slot) {
+      const near = nearBySlot.get(slot);
+      if (!lent.delete(slot) || !near) return;
+      setCockpitView(near.car, 'out'); hide(near);
+      changed();
     },
     beforeDraw(camera) {
       camera.updateMatrixWorld();
       view.setFromProjectionMatrix(viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       inView.length = 0;
       for (const car of field.values()) {
-        if (!car || car === 'none') continue;
+        if (!car || car === 'none' || lent.has(car.slot)) continue;
         const pose = car.pose;
         // A car out of view costs nothing more this frame (its shadow included): most of the field is behind the camera or far
         // round the lap. The world group mirrors native z: the car's centre goes through the root's world matrix.
@@ -287,7 +351,7 @@ export function createRaceField(
         car.tier = near < NEAR_MAX && metres < reach ? 'near' : 'far';
         if (car.tier === 'near') {
           near++;
-          if (car.of.near === 'none' && nearLoads < NEAR_LOADS) void loadNear(car.of);
+          if (!nearBuilds.has(car.of.folder) && nearLoads < NEAR_LOADS && followedLoads === 0) void buildNear(car.body);
         }
         const shown = car.tier === 'near' && car.near ? car.near : car.far, other = shown === car.far ? car.near : car.far;
         hide(other);
@@ -305,7 +369,11 @@ export function createRaceField(
       }
       blobs.end();
       glows.draw(glowing);
-      for (const body of fieldBodies) if (body.held && !body.cars.some(car => car.tier === 'near')) { shell.carTemplates.release(body.cars[0].body); body.held = false; }
+      for (const [folder, body] of held) {
+        // A body not yet in the field is the followed car's, whose full models came first: its parse stays.
+        const of = fieldBodies.find(each => each.folder === folder);
+        if (of && !of.cars.some(car => car.tier === 'near')) { shell.carTemplates.release(body); held.delete(folder); }
+      }
     },
     casters: () => casting.map((car, i) => car.getWorldPosition(castingAt[i] ??= new Vector3())),
     refreshHeights() {

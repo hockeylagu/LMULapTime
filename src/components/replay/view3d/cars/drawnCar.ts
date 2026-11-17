@@ -1,4 +1,4 @@
-import { Mesh, type Box3, type Group, type Material, type Object3D } from 'three';
+import { Group, Mesh, type Box3, type Material, type Object3D } from 'three';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
@@ -7,8 +7,8 @@ import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import { createCarModels, type CarTextures } from './carModels.js';
 import type { CarTemplates } from './carTemplates.js';
 import { makeCar } from './sceneObjects.js';
-import { buildCarParts, type CarParts } from './carParts.js';
-import { batchCars } from './carBatching.js';
+import { buildCarParts, setCockpitView, type CarParts } from './carParts.js';
+import { batchCars, UNSEEN_LAYER } from './carBatching.js';
 import { createSlicer } from '../batching/batchedParts.js';
 import { createCarMotion, type CarMotion } from './carMotion.js';
 import { envelopeBounds, envelopeParts } from '../race/carPick.js';
@@ -56,9 +56,12 @@ export async function createDrawnCars(models: readonly Group[], surfaceHeight: S
   {batched = true, transparent = false, sharedMaterial = () => false, pickShape = false}: DrawnCarsOptions = {}): Promise<DrawnCars> {
   // A body's cars build over several tasks (a car's tables, then the batches): playback keeps its frames meanwhile.
   const slice = createSlicer(), cars: DrawnCar[] = [];
+  // The cars of a set are liveries of one body: one pick shape serves them all.
+  let shape: DrawnCar['pickShape'] = null;
   for (const car of models) {
     const parts = buildCarParts(car);
-    cars.push({car, parts, motion: createCarMotion(car, surfaceHeight), pickShape: pickShape ? {box: envelopeBounds(car), parts: envelopeParts(car)} : null});
+    if (pickShape) shape ??= {box: envelopeBounds(car), parts: envelopeParts(car)};
+    cars.push({car, parts, motion: createCarMotion(car, surfaceHeight), pickShape: shape});
     // oxlint-disable-next-line no-await-in-loop -- yields between cars
     await slice();
   }
@@ -74,40 +77,84 @@ export async function createDrawnCars(models: readonly Group[], surfaceHeight: S
   };
 }
 
-export interface CarSetOptions {
-  /**
-   * The own car (the lap's car, the race's followed car): its own materials, which the reflection probe changes, and its interior,
-   * for the driver cameras. Otherwise cars of the field: every car of a body draws with the same materials, without an interior.
-   */
-  own: boolean;
-  /** Each car's pick shape measured (`DrawnCar.pickShape`). */
-  pickShape?: boolean;
+/**
+ * What the driver cameras add to the car they ride on (`CarTemplates.cabin`), on a car already drawn: its own part table and
+ * batches, riding in the car, its parts hanging under the car's nodes. Hidden from its build until `show`: the field draws the car
+ * meanwhile.
+ */
+export interface Cabin {
+  /** Placed after the car's own table, each frame the car is drawn. */
+  parts: CarParts;
+  show(): void;
+  /** Takes the cabin out of the car, which goes back to the outside view. */
+  dispose(): void;
 }
 
 /**
- * Every car of a scene drawn with its full model. `build` is the one path for the lap's car, the race's followed car (each a set of
- * one) and the race's near cars (a set per body): glass and decals batched and sorted in their batch, the own car differing only by
- * its materials and interior. The lap's ghost stays part by part (`ghost`): its see-through parts draw in a fixed order.
+ * Every car of a scene drawn with its full model. `build` is the one path for every car (the lap's car, the race's near cars, a set
+ * per body), drawn without the parts marked interior: the car the cameras ride on (the lap's, the race's followed one, which is the
+ * field's model of it) adds them with `cabin`. The race's cars of a body share their materials; the lap's car owns its own, which
+ * go with it when the lap changes. Glass and decals are batched and
+ * sorted in their batch. The lap's ghost stays part by part (`ghost`): its see-through parts draw in a fixed order.
  */
 export function createCarSets(templates: CarTemplates, carTextures: CarTextures, shading: SceneryShading, surfaceHeight: SurfaceHeight) {
-  const ownModels = createCarModels(templates, carTextures, shading, {full: true});
-  const fieldModels = createCarModels(templates, carTextures, shading, {shareMaterials: true});
+  const models = createCarModels(templates, carTextures, shading, {shareMaterials: true});
+  /** The lap's car, the cabins and the ghost, each with materials of its own (the ghost changes them). */
+  const ownModels = createCarModels(templates, carTextures, shading);
   return {
-    /** The cars of `bodies` (liveries of one body) drawn together. */
-    async build(bodies: readonly LoadedBody[], {own, pickShape = false}: CarSetOptions): Promise<DrawnCars> {
-      const models = own ? ownModels : fieldModels;
-      const cars = await Promise.all(bodies.map(body => models.car(body)));
+    /**
+     * The cars of `bodies` (liveries of one body) drawn together. `pickShape`: each car's pick shape measured (`DrawnCar.pickShape`);
+     * `ownMaterials`: the cars' materials their own, freed with them (the lap's car).
+     */
+    async build(bodies: readonly LoadedBody[], {pickShape = false, ownMaterials = false}: {pickShape?: boolean; ownMaterials?: boolean} = {}): Promise<DrawnCars> {
+      const from = ownMaterials ? ownModels : models, cars = await Promise.all(bodies.map(body => from.car(body)));
       for (const car of cars) {
-        // No driver camera rides on the field's cars: their interior parts would only add to their draws. The own car draws its full
-        // level alone (no camera distance is set on it): built from a held parse of the whole exterior, its farther levels would only
-        // add to its batches and uploads (a followed car's shadow batch held 765k triangles of every level, 2026-11-17).
+        // The parts marked interior are seats and dashboards, small through a window: only the car the cameras ride on draws them
+        // (its cabin).
         const dropped: Object3D[] = [];
-        car.traverse(object => {
-          if (own ? ((object.userData.lod as {inM: number} | undefined)?.inM ?? 0) > 0 : object.userData.interior === true) dropped.push(object);
-        });
+        car.traverse(object => { if (object.userData.interior === true) dropped.push(object); });
         for (const part of dropped) part.removeFromParent();
       }
-      return createDrawnCars(cars, surfaceHeight, {transparent: true, sharedMaterial: models.sharedMaterial, pickShape});
+      return createDrawnCars(cars, surfaceHeight, {transparent: true, sharedMaterial: from.sharedMaterial, pickShape});
+    },
+    /**
+     * Adds `body`'s cabin to its car of `build`, once `car` has it (none without one). The cabin loads meanwhile: a car still to build
+     * (the race's followed one waits for its body's far and full models) does not hold up its parse.
+     */
+    async cabin(body: LoadedBody, car: Promise<DrawnCar | null>): Promise<Cabin | null> {
+      const loading = ownModels.cabin(body);
+      const drop = () => { void loading.then(disposeObjects, () => {}); };
+      let drawn: DrawnCar | null;
+      try { drawn = await car; } catch (error) { drop(); throw error; }
+      if (!drawn) { drop(); return null; }
+      const cabin = await loading, envelope = drawn.car.getObjectByName('body-envelope');
+      if (!envelope) throw Error(`Car ${body.vehicleId} has no body to add its cabin to`);
+      const added: Object3D[] = [], drawing: Array<{mesh: Object3D; mask: number}> = [];
+      // A copy of the list: each part found a parent leaves it.
+      for (const part of cabin.children.slice()) {
+        const name = part.userData.cabinParent as string | null, parent = name === null ? envelope : envelope.getObjectByName(name);
+        // A part under a node this livery leaves out (another livery's option part) stays out with it.
+        if (!parent) continue;
+        // The car is drawn while its cabin builds: until shown, the cabin waits in a layer no pass draws (`UNSEEN_LAYER`).
+        part.traverse(object => { if (object instanceof Mesh) { drawing.push({mesh: object, mask: object.layers.mask}); object.layers.set(UNSEEN_LAYER); } });
+        parent.add(part); added.push(part);
+      }
+      disposeObjects(cabin);
+      const parts = buildCarParts(drawn.car, new Set(added));
+      const batches = await batchCars([parts], {releaseParsed: true, transparent: true, shadows: true});
+      return {
+        parts,
+        show() {
+          // A batched part's mesh left every layer: its batch draws it.
+          for (const {mesh, mask} of drawing) if (mesh.layers.mask !== 0) mesh.layers.mask = mask;
+          batches.ready();
+        },
+        dispose() {
+          parts.hide(); batches.dispose();
+          for (const part of added) { part.removeFromParent(); disposeObjects(part); }
+          setCockpitView(drawn.car, 'out');
+        },
+      };
     },
     /** The lap's ghost: see-through, without shadows; disposed with its parent (`disposeObjects`). */
     async ghost(body: LoadedBody): Promise<DrawnCar> {

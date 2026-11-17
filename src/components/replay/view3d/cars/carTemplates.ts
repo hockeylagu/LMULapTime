@@ -1,5 +1,5 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
-import { Box3, BufferGeometry, Matrix4, Mesh, Vector3, type BufferAttribute, type Group, type InterleavedBufferAttribute, type Object3D } from 'three';
+import { Box3, BufferGeometry, Group, Matrix4, Mesh, Vector3, type BufferAttribute, type InterleavedBufferAttribute, type Object3D } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createSlicer } from '../batching/batchedParts.js';
@@ -34,14 +34,30 @@ async function prepareGeometry(body: Group): Promise<void> {
   }
 }
 
+/** Whether the node is drawn from farther than the full level only (`extras.lod`): a cabin, seen up close alone, leaves it out. */
+const fartherLevel = (node: Object3D) => ((node.userData.lod as {inM: number} | undefined)?.inM ?? 0) > 0;
+
+/** A cabin part without the levels of it drawn from farther away. */
+function closeCopy(node: Object3D): Object3D {
+  const copy = node.clone(true), farther: Object3D[] = [];
+  copy.traverse(object => { if (object !== copy && fartherLevel(object)) farther.push(object); });
+  for (const object of farther) object.removeFromParent();
+  return copy;
+}
+
 export interface CarTemplates {
   /**
-   * The body's parsed model (its interior joined under the chassis), parsed once for every car and loader of the scene. `full`: for
-   * a car drawn at full detail alone, which drops the farther levels (`CarSets.build`): the body's held or pending parse when there
-   * is one, else its full level's file, about half the exterior's.
+   * The body's parsed exterior, parsed once for every car and loader of the scene: the body's held or pending parse when there
+   * is one. Every car draws it (the field's, the lap's, the followed one).
    */
-  body(car: LoadedBody, full?: boolean): Promise<Group>;
-  /** Keeps the body's parse (parsing it if no parse is held or pending) until `release`: the next car of the body builds from it. */
+  body(car: LoadedBody): Promise<Group>;
+  /**
+   * What the driver cameras add to the car closest to them (the lap's, the race's followed one): the exterior's parts marked
+   * interior, which every car leaves out, and the interior file's, at their full level. Each part, a copy, names the car node it
+   * hangs under (`userData.cabinParent`, null for the body's root) and is marked interior.
+   */
+  cabin(car: LoadedBody): Promise<Group>;
+  /** Keeps the body's exterior parse (parsing it if no parse is held or pending) until `release`: the next car of the body builds from it. */
   hold(car: LoadedBody): void;
   release(car: LoadedBody): void;
 }
@@ -50,42 +66,62 @@ export interface CarTemplates {
  * A scene's parsed bodies, shared by the builds that ask for a body while its parse is pending (the cars of a body built together,
  * the lap's car and ghost): each car is a clone of its body's and batches from its vertices. Once the parse settles the next build
  * parses the file again, so a body's vertices stay only as long as its cars need them (their batches hold copies), unless the body
- * is held: the race holds the bodies with cars near the camera, the ones the next followed car most likely drives.
+ * is held: the race holds the bodies with cars near the camera, the ones the next followed car most likely drives. The interior
+ * file is read only for a cabin.
  */
 export function createCarTemplates(): CarTemplates {
-  const templates = new Map<string, Promise<Group>>(), held = new Map<string, Promise<Group>>();
-  const keyOf = (car: LoadedBody, full = false) => `${full ? car.resource.full.sha256 : car.resource.sha256}:${car.resource.interior?.sha256 ?? ''}`;
-  const body = (car: LoadedBody, full = false): Promise<Group> => {
-    const key = keyOf(car, full), whole = keyOf(car);
-    let pending = templates.get(key) ?? (full ? held.get(whole) ?? templates.get(whole) : held.get(key));
+  const parses = new Map<string, Promise<Group>>(), held = new Map<string, Promise<Group>>();
+  /** The pending parse of the file named `sha256`, shared until it settles. */
+  const shared = (sha256: string, bytes: () => Promise<ArrayBuffer | null>): Promise<Group> => {
+    let pending = parses.get(sha256);
     if (!pending) {
-      const parse = (bytes: ArrayBuffer) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '').then(result => result.scene);
-      pending = car.files(full).then(({bytes, interiorBytes}) => Promise.all([parse(bytes), interiorBytes ? parse(interiorBytes) : null])).then(async ([model, interior]) => {
-        // The interior's parts hang under its chassis node and join the body's: one model, whose driver-camera parts the
-        // cockpit view switches.
-        if (interior) {
-          const chassis = model.getObjectByName(CHASSIS), parts = interior.getObjectByName(CHASSIS);
-          if (!chassis || !parts) throw Error(`Car ${car.vehicleId} has no chassis node for its interior`);
-          chassis.add(...parts.children);
-        }
+      pending = bytes().then(async read => {
+        if (!read) throw Error(`No body file ${sha256}`);
+        const model = (await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(read, '')).scene;
         await prepareGeometry(model);
         return model;
       });
-      templates.set(key, pending);
-      const settled = () => { if (templates.get(key) === pending) templates.delete(key); };
+      parses.set(sha256, pending);
+      const settled = () => { if (parses.get(sha256) === pending) parses.delete(sha256); };
       pending.then(settled, settled);
     }
     return pending;
   };
+  const body = (car: LoadedBody) => held.get(car.resource.sha256) ?? shared(car.resource.sha256, () => car.file());
   return {
     body,
+    async cabin(car) {
+      const {interior} = car.resource;
+      const [exterior, inside] = await Promise.all([body(car), interior ? shared(interior.sha256, () => car.interiorFile()) : null]);
+      const cabin = new Group(), add = (node: Object3D, parent: string | null) => {
+        const copy = closeCopy(node);
+        copy.userData.cabinParent = parent; copy.userData.interior = true;
+        cabin.add(copy);
+      };
+      // The outermost parts marked interior: a marked part's own parts come with it.
+      const marked: Object3D[] = [];
+      exterior.traverse(object => {
+        if (object.userData.interior !== true || fartherLevel(object)) return;
+        for (let at = object.parent; at; at = at.parent) if (at.userData.interior === true) return;
+        marked.push(object);
+      });
+      for (const node of marked) add(node, node.parent === exterior ? null : node.parent!.name);
+      if (inside) {
+        // The interior's parts hang under its chassis node, placed as the body's (both files place the chassis alike, so each part's
+        // footprint stands).
+        const chassis = inside.getObjectByName(CHASSIS);
+        if (!chassis) throw Error(`Car ${car.vehicleId} has no chassis node for its interior`);
+        for (const part of chassis.children) add(part, CHASSIS);
+      }
+      return cabin;
+    },
     hold(car) {
-      const key = keyOf(car);
+      const key = car.resource.sha256;
       if (held.has(key)) return;
       const parse = body(car);
       held.set(key, parse);
       parse.catch(() => { if (held.get(key) === parse) held.delete(key); });
     },
-    release: car => { held.delete(keyOf(car)); },
+    release: car => { held.delete(car.resource.sha256); },
   };
 }

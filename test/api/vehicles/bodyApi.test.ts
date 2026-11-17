@@ -21,24 +21,18 @@ it('holds no GLB bytes: it reads the files only when asked, for the parse', asyn
   const loaded = await fetchBody('car.veh', 'r', signal);
   expect(binary).not.toHaveBeenCalled();
   expect(Object.values(loaded).some(value => value instanceof ArrayBuffer)).toBe(false);
-  const files = await loaded.files();
-  expect([files.bytes.byteLength, files.interiorBytes, binary.mock.calls.map(call => call[0])]).toEqual([4, null, ['/api/data-plugin/vehicles/files/aa.glb']]);
+  expect([(await loaded.file()).byteLength, await loaded.interiorFile(), binary.mock.calls.map(call => call[0])]).toEqual([4, null, ['/api/data-plugin/vehicles/files/aa.glb']]);
 });
 
-it('reads the interior file with the body and rejects one of the wrong size', async () => {
+it('reads the interior file only when asked, and rejects one of the wrong size', async () => {
   body.interior = { sha256: 'bb', byteLength: 2 };
-  const files = await (await fetchBody('car.veh', 'r', signal)).files();
-  expect(files.interiorBytes?.byteLength).toBe(2);
+  const loaded = await fetchBody('car.veh', 'r', signal);
+  await loaded.file();
+  expect(binary.mock.calls.map(call => call[0])).toEqual(['/api/data-plugin/vehicles/files/aa.glb']);
+  expect((await loaded.interiorFile())?.byteLength).toBe(2);
   expect(binary.mock.calls.map(call => call[0])).toEqual(['/api/data-plugin/vehicles/files/aa.glb', '/api/data-plugin/vehicles/files/bb.glb']);
   body.interior = { sha256: 'bb', byteLength: 3 };
-  await expect((await fetchBody('car.veh', 'r', signal)).files()).rejects.toThrow('Incomplete 3D body');
-});
-
-it('reads the full level file in place of the exterior when asked, with the interior', async () => {
-  body.interior = { sha256: 'bb', byteLength: 2 };
-  const files = await (await fetchBody('car.veh', 'r', signal)).files(true);
-  expect([files.bytes.byteLength, files.interiorBytes?.byteLength]).toEqual([4, 2]);
-  expect(binary.mock.calls.map(call => call[0])).toEqual(['/api/data-plugin/vehicles/files/ff.glb', '/api/data-plugin/vehicles/files/bb.glb']);
+  await expect((await fetchBody('car.veh', 'r', signal)).interiorFile()).rejects.toThrow('Incomplete 3D body');
 });
 
 it('loads the cabin volumes of the body by their descriptor path and rejects one of the wrong size', async () => {

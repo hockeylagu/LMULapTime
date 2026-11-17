@@ -13,7 +13,7 @@ import { nativeToScene } from '../scene/sceneFrame.js';
 import type { SceneContent, SceneShell } from '../scene/sceneShell.js';
 import type { CarParts } from '../cars/carParts.js';
 import type { CarMotion } from '../cars/carMotion.js';
-import { createCarSets } from '../cars/drawnCar.js';
+import { createCarSets, type Cabin } from '../cars/drawnCar.js';
 import { windowPoints } from './raceTrack.js';
 import { createRaceField } from './raceField.js';
 import { createStandInCars } from './standInCars.js';
@@ -47,9 +47,10 @@ interface FollowedCar {
   slot: number;
   /** The model; null for a car without a body (a grey stand-in draws it). */
   car: Group | null;
-  /** Its wheels and lamps, and its part table; null without a model. */
+  /** Its wheels and lamps, its part table and its cabin's; null without a model. */
   motion: CarMotion | null;
   parts: CarParts | null;
+  cabin: Cabin | null;
   /** Its body as the pointer picks it (`DrawnCar.pickShape`); null without a model. */
   pickShape: {box: Box3; parts: Box3[]} | null;
   cameras: LoadedBody['descriptor']['cameras']['list'];
@@ -68,7 +69,8 @@ function renderPose(pose: Float32Array, index: number, fraction: number, orienta
 
 /**
  * The race replay's 3D scene: the scene shell with every car of the session on one clock, each its body model. The cameras ride on
- * the followed car, drawn at its full level; the others draw the body's level for their distance from the camera (`extras.lod`).
+ * the followed car: the field's full model of it (`RaceField.lend`), drawn at its full level with its cabin; the others draw the
+ * body's level for their distance from the camera (`extras.lod`).
  * A car is a grey stand-in while its model loads, or for good without a body (`standInCars.ts`). `bodyOf` loads a
  * car's body (null for a car the replay does not name). The followed car out of the replay (in its garage before it drives out)
  * waits where it next appears, facing its way out (`nextPose`), with the cameras on it. The scene is the shared shell's (`shell`, of
@@ -86,17 +88,6 @@ export async function createRaceScene(
   const {rig, origin} = shell;
   const handlingOf = new Map(cars.map(car => [car.slot, car.handling]));
   const sets = createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight);
-  /** The followed car: the own car, a set of one apart from its body's near cars. */
-  /** A followed car without its own model: a grey stand-in, or the field's model of it while its own builds. */
-  const bare = (slot: number): FollowedCar => ({slot, car: null, motion: null, parts: null, pickShape: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}});
-  const buildFollowed = async (slot: number | null, body: LoadedBody | null): Promise<FollowedCar | null> => {
-    if (slot === null) return null;
-    if (!body) return bare(slot);
-    const set = await sets.build([body], {own: true, pickShape: true}), [drawn] = set.cars;
-    return {slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, pickShape: drawn.pickShape, cameras: body.descriptor.cameras.list, chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => set.ready(), dispose: () => set.dispose()};
-  };
-  const pending = buildFollowed(first.slot, first.body);
-  pending.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
   const root = new Group();
   /** Stands in for the reflection probe's car while the followed car has no model: never visible, so the probe stays idle. */
   const noCar = new Group(); noCar.visible = false;
@@ -106,14 +97,34 @@ export async function createRaceScene(
   const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
   const standIns = createStandInCars(root, cars.length, object => shell.warm(object));
   /** The other cars, the followed car's included (hidden while followed); `draw` gives them their poses. */
-  const field = createRaceField(shell, sets, root, cars, bodyOf, () => draw(), (slot, car) => standIns.offer(classOf.get(slot) ?? '', car));
+  // The field's models can be ready before the scene draws (the first followed car's): nothing to redraw until `draw` exists.
+  let drawing = false;
+  const field = createRaceField(shell, sets, root, cars, bodyOf, () => { if (drawing) draw(); }, (slot, car) => standIns.offer(classOf.get(slot) ?? '', car));
+  /** A followed car without a model of its own: a grey stand-in, or the field's model of it while its cabin builds. */
+  const bare = (slot: number): FollowedCar => ({slot, car: null, motion: null, parts: null, cabin: null, pickShape: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}});
+  /**
+   * The followed car: the field's full model of it (its body's full models built first when they are not), which is already on the
+   * GPU, with its cabin added. Without a body, or when its body's full models fail, the field draws it as it draws the others.
+   */
+  const buildFollowed = async (slot: number | null, body: LoadedBody | null): Promise<FollowedCar | null> => {
+    if (slot === null) return null;
+    if (!body) return bare(slot);
+    const near = field.near(slot), cabin = await sets.cabin(body, near), drawn = await near;
+    if (!drawn || !cabin) return bare(slot);
+    return {
+      slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, cabin, pickShape: drawn.pickShape, cameras: body.descriptor.cameras.list,
+      chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => cabin.show(), dispose: () => { cabin.dispose(); field.reclaim(slot); },
+    };
+  };
+  const pending = buildFollowed(first.slot, first.body);
+  pending.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
   // The chase camera looks ahead along the followed car's own samples of the window, and the trackside spots stand along them.
   let points: ReplayTrajectoryPoint[] = [], distances: number[] = [], pointsOf: {window: RacePoseWindow; slot: number} | null = null;
   const rigCar = () => ({primary: followed?.car ?? noCar, cameras: followed?.cameras ?? [], chaseLodMultiplier: followed?.chaseLodMultiplier ?? 1, trajectory: {points}, primaryDistances: distances});
   const content = (): SceneContent => ({
     root, reflected: followed?.car ?? noCar,
     beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
-      followed?.parts?.sync();
+      followed?.parts?.sync(); followed?.cabin?.parts.sync();
       field.beforeDraw(camera);
     },
     casters() {
@@ -125,7 +136,7 @@ export async function createRaceScene(
   });
   const setFollowed = (next: FollowedCar | null) => {
     followed?.dispose(); followed = next;
-    if (next?.car) root.add(next.car);
+    if (next?.car) field.lend(next.slot);
     pointsOf = null; points = []; distances = [];
     rig.setLayer(rigCar());
   };
@@ -257,6 +268,7 @@ export async function createRaceScene(
     field.load(from ? places.filter(car => car.slot !== followed?.slot).map(car => ({slot: car.slot, metres: Math.hypot(car.x - from.x, car.z - from.z)})) : []);
     shell.invalidate();
   };
+  drawing = true;
   return {
     time(next, nextWindow, stationM) {
       timeSec = next; shell.station = stationM;

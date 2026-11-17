@@ -27,6 +27,11 @@ export function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, tra
  */
 export const SHADOW_ONLY_LAYER = 1;
 /**
+ * A camera layer no pass draws. The warm-up still compiles and uploads what is in it: a batch waits there until `ready`, and a cabin's
+ * own parts until shown, as a frame drawing them first would link their programs there and then (about 200 ms a material).
+ */
+export const UNSEEN_LAYER = 31;
+/**
  * What a shadow-only batch draws with: the shadow pass swaps it for its depth material (both faces, as the car materials cast), and
  * no other pass draws the batch.
  */
@@ -145,7 +150,7 @@ export async function batchCars(tables: readonly CarParts[], {releaseParsed, tra
       draws: members.length, vertices, indices, material: first.material, name: `car batch ${first.material.name}`,
       castShadow: first.castShadow && !shadowOnly, receiveShadow: first.receiveShadow, frustumCulled: false, perObjectFrustumCulled: !single, matrixAutoUpdate: false,
     });
-    batch.sortObjects = first.material.transparent;
+    batch.sortObjects = first.material.transparent; batch.layers.set(UNSEEN_LAYER);
     const ids = new Map<BufferGeometry, number>();
     for (const geometry of geometries) {
       ids.set(geometry, batch.addGeometry(geometry));
@@ -176,7 +181,7 @@ export async function batchCars(tables: readonly CarParts[], {releaseParsed, tra
       indices: geometries.reduce((sum, geometry) => sum + geometry.index!.count, 0), material: SHADOW_ONLY, name: 'car shadow batch',
       castShadow: true, receiveShadow: false, frustumCulled: false, perObjectFrustumCulled: !single, matrixAutoUpdate: false,
     });
-    batch.layers.set(SHADOW_ONLY_LAYER);
+    batch.layers.set(UNSEEN_LAYER);
     const ids = new Map<BufferGeometry, number>();
     for (const geometry of geometries) {
       ids.set(geometry, batch.addGeometry(copies.get(geometry)!));
@@ -207,7 +212,10 @@ export async function batchCars(tables: readonly CarParts[], {releaseParsed, tra
   }
   return {
     shared, batches,
-    ready() { warmed = true; for (const batch of batches) batch.visible = counts.of(batch) > 0; },
+    ready() {
+      warmed = true;
+      for (const batch of batches) { batch.visible = counts.of(batch) > 0; batch.layers.set(batch.material === SHADOW_ONLY ? SHADOW_ONLY_LAYER : 0); }
+    },
     dispose() {
       for (const table of tables) { table.own = []; table.onShown = () => {}; for (const part of table.parts) part.shadow = null; }
       for (const batch of batches) { batch.removeFromParent(); batch.dispose(); }

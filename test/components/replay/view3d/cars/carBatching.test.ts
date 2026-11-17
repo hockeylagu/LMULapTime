@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BatchedMesh, Box3, BoxGeometry, DataTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Sphere, SphereGeometry, Vector3, type BufferGeometry } from 'three';
 import { layoutOf } from '../../../../../src/components/replay/view3d/batching/batchedParts.js';
-import { batchable, batchCars, SHADOW_ONLY_LAYER } from '../../../../../src/components/replay/view3d/cars/carBatching.js';
+import { batchable, batchCars, SHADOW_ONLY_LAYER, UNSEEN_LAYER } from '../../../../../src/components/replay/view3d/cars/carBatching.js';
 import { buildCarParts, type CarParts } from '../../../../../src/components/replay/view3d/cars/carParts.js';
 import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
 
@@ -144,7 +144,11 @@ describe('batchCars, several cars', () => {
     // Hull, wing, rim and tyre of both cars: every opaque batched part.
     expect(shadow.maxInstanceCount).toBe(8);
     expect(shadow.castShadow).toBe(true);
+    // No pass draws a batch until it is ready: its programs link with the warm-up, not at a draw.
+    expect(set.batches.every(batch => batch.layers.mask === (1 << UNSEEN_LAYER) >>> 0)).toBe(true);
+    set.ready();
     expect(shadow.layers.mask).toBe(1 << SHADOW_ONLY_LAYER);
+    expect(set.batches.find(batch => batch.material === shared.carbon)!.layers.mask).toBe(1);
     expect(Object.keys(shadow.geometry.attributes)).toEqual(['position']);
     for (const material of [shared.carbon, shared.rubber]) expect(set.batches.find(batch => batch.material === material)!.castShadow).toBe(false);
     // The glass keeps its batch's flag: the shadow pass casts nothing for a blended surface.

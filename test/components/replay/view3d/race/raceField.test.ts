@@ -9,7 +9,7 @@ import type { SceneShell } from '../../../../../src/components/replay/view3d/sce
 import { createRaceField } from '../../../../../src/components/replay/view3d/race/raceField.js';
 import { createCarSets } from '../../../../../src/components/replay/view3d/cars/drawnCar.js';
 
-const models = vi.hoisted(() => ({far: new Map<number, unknown>(), near: new Map<number, unknown>(), nearCalls: 0, nearActive: 0, nearPeak: 0}));
+const models = vi.hoisted(() => ({far: new Map<number, unknown>(), near: new Map<number, unknown>(), nearCalls: 0, nearActive: 0, nearPeak: 0, nearFails: false}));
 
 vi.mock('../../../../../src/components/replay/view3d/cars/farCars.js', async () => {
   const three = await import('three');
@@ -35,6 +35,7 @@ vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async (
         models.nearCalls++; models.nearActive++; models.nearPeak = Math.max(models.nearPeak, models.nearActive);
         await new Promise(resolve => setTimeout(resolve, 5));
         models.nearActive--;
+        if (models.nearFails) throw Error('no option part');
         const group = new three.Group();
         group.add(new three.Mesh(new three.BoxGeometry(1, 1, 1), new three.MeshStandardMaterial()));
         group.name = 'near-model';
@@ -87,7 +88,7 @@ function setup(count: number, bodyOf: (slot: number) => Promise<LoadedBody | nul
 }
 
 describe('createRaceField', () => {
-  beforeEach(() => { models.far.clear(); models.near.clear(); models.nearCalls = 0; models.nearActive = 0; models.nearPeak = 0; });
+  beforeEach(() => { models.far.clear(); models.near.clear(); models.nearCalls = 0; models.nearActive = 0; models.nearPeak = 0; models.nearFails = false; });
   afterEach(() => { vi.restoreAllMocks(); });
 
   it('loads a body once for all its cars, and keeps a car without a body as a stand-in', async () => {
@@ -223,6 +224,56 @@ describe('createRaceField', () => {
     expect(nearCar(0)).toBe(first);
     expect(nearCar(0)!.visible).toBe(true);
     expect(models.nearCalls).toBe(2);
+  });
+
+  it('keeps the cars of a body whose full models fail far, and says so in the console', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    models.nearFails = true;
+    const {field, camera, place, farCar, nearCar, ready} = setup(1);
+    await ready([0]);
+    place(0, -15);
+    field.beforeDraw(camera);
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('The full models of oreca failed'), expect.any(Error)));
+    field.beforeDraw(camera);
+    expect([nearCar(0), farCar(0).visible, models.nearCalls]).toEqual([undefined, true, 1]);
+  });
+
+  it("loads a car's full model on request ahead of its body's far models, and leaves it to the followed car until given back", async () => {
+    const {field, camera, place, farCar, nearCar} = setup(2);
+    const drawn = await field.near(1);
+    expect(drawn?.car).toBe(nearCar(1));
+    // Every full model of the body first, its far models after, and no other load meanwhile.
+    expect([field.has(0), models.nearCalls]).toEqual([false, 2]);
+    field.lend(1);
+    await vi.waitFor(() => { expect(field.has(0)).toBe(true); });
+    drawn!.car.visible = true;
+    place(0, -15); place(1, -20);
+    field.beforeDraw(camera);
+    // The field draws car 0 and leaves car 1 as the followed car shows it, its far model hidden.
+    expect([nearCar(0)!.visible, drawn!.car.visible, farCar(1).visible]).toEqual([true, true, false]);
+    drawn!.car.visible = false;
+    field.reclaim(1);
+    field.beforeDraw(camera);
+    expect(nearCar(1)!.visible).toBe(true);
+  });
+
+  it('loads nothing else while a car\'s full model is asked for: the other cars wait for it', async () => {
+    const {field} = setup(2);
+    const pending = field.near(0);
+    // Asked before the followed car's body is even in: a far load started now would build while its full models do.
+    field.load([{slot: 1, metres: 1}]);
+    expect(await pending).not.toBeNull();
+    expect(models.far.size).toBe(0);
+    // Its body's far models come next, every car of it.
+    await vi.waitFor(() => { expect([field.has(0), field.has(1)]).toEqual([true, true]); });
+  });
+
+  it('answers no full model for a car whose body has none to give, nor for a car without a body', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    models.nearFails = true;
+    const {field} = setup(2, async slot => (slot === 1 ? null : body(slot)));
+    expect(await field.near(0)).toBeNull();
+    expect(await field.near(1)).toBeNull();
   });
 
   it('holds the parse of a body from its near build while any of its cars is near', async () => {

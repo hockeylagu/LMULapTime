@@ -101,15 +101,24 @@ export function envelopeParts(car: Object3D): Box3[] {
   return [...cells.values()];
 }
 
-/** Each mesh of a car model's envelope but its contact shadow, with the matrix from the mesh's frame to the envelope's. */
+/**
+ * Each mesh of a car model's envelope at its full level but its contact shadow, with the matrix from the mesh's frame to the
+ * envelope's: the levels drawn from farther away (`extras.lod`) hold the same body, and walking them took a car's build a tenth of a
+ * second more.
+ */
 function eachPart(car: Object3D, visit: (geometry: Mesh['geometry'], matrix: Matrix4) => void): void {
   const envelope = car.getObjectByName('body-envelope');
-  envelope?.updateWorldMatrix(true, true);
-  envelope?.traverse(object => {
+  if (!envelope) return;
+  envelope.updateWorldMatrix(true, true);
+  const walk = (object: Object3D) => {
+    if (((object.userData.lod as {inM: number} | undefined)?.inM ?? 0) > 0) return;
     // The contact shadow lies flat under the body, wider and longer than it.
-    if (!(object instanceof Mesh) || object.name === CONTACT_SHADOW_NAME) return;
-    visit(object.geometry as Mesh['geometry'], toEnvelope.copy(envelope.matrixWorld).invert().multiply(object.matrixWorld));
-  });
+    if (object instanceof Mesh && object.name !== CONTACT_SHADOW_NAME) {
+      visit(object.geometry as Mesh['geometry'], toEnvelope.copy(envelope.matrixWorld).invert().multiply(object.matrixWorld));
+    }
+    for (const child of object.children) walk(child);
+  };
+  walk(envelope);
 }
 
 /** A car model's body bounds in its envelope's frame, over its parts where they hang; a point at the origin without parts. */

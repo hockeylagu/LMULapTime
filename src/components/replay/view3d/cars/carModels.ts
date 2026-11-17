@@ -52,23 +52,27 @@ function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn:
   return lit;
 }
 
+/** A model of the body's exterior, or of its cabin (`CarTemplates.cabin`). */
+type ModelKind = 'body' | 'cabin';
+
 /**
  * Each livery's car models from the scene's parsed bodies: one material per native material and content, the livery's textures
  * loaded first, lamps and glow meshes set up. `shareMaterials` gives every car of a body the same material for the same content
- * (cars drawn many at once); without it each car owns its materials (a ghost, or a reflection probe, changes them). `full`: models
- * drawn at full detail alone, from the body's full level (`CarTemplates.body`).
+ * (cars drawn many at once); without it each car owns its materials (a ghost changes them). A cabin is modelled as a body is.
  */
 export function createCarModels(templates: CarTemplates, carTextures: CarTextures, shading: SceneryShading,
-  {shareMaterials = false, full = false}: {shareMaterials?: boolean; full?: boolean} = {}) {
-  const loadParts = async (car: LoadedBody) => {
-    const template = await templates.body(car, full), appearance = appearanceOf(car);
+  {shareMaterials = false}: {shareMaterials?: boolean} = {}) {
+  const loadParts = async (car: LoadedBody, kind: ModelKind) => {
+    const template = await (kind === 'cabin' ? templates.cabin(car) : templates.body(car)), appearance = appearanceOf(car);
     if (!appearance) throw Error(`The car package has no appearance for ${car.vehicleId}`);
     // Option parts are alternatives between entries (number plates, lights, body panels): this entry shows its own, the rest stay out.
     const shown = new Set(appearance.optionNodes), hidden = new Set<Object3D>();
-    // The full level's file lacks the option and lamp parts of the farther levels alone (`full`): only the whole body must hold them all.
+    // Only a whole body holds every option and lamp part: the exterior lacks the interior file's (an inside windscreen), and a cabin
+    // holds a few parts alone.
+    const partial = kind === 'cabin' || car.resource.interior !== null;
     for (const name of car.descriptor.optionNodes) {
       const node = template.getObjectByName(name);
-      if (!node && full) continue;
+      if (!node && partial) continue;
       if (!node) throw Error(`Car ${car.vehicleId} has no option part ${name}`);
       if (!shown.has(name)) hidden.add(node);
     }
@@ -87,7 +91,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     const glows = new Map(car.descriptor.lamps.map(lamp => [lamp, lampGlow(lamp, car.descriptor.materials)] as const));
     const drawn = car.descriptor.lamps.filter(lamp => lampFrame(lamp, rainFlashes, glows.get(lamp)!) !== null);
     // The GLB loader drops `.`, `:`, `/`, `[` and `]` from node names; lamp nodes are the GLB's own names.
-    if (!full) for (const lamp of [...drawn, ...surfaces]) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
+    if (!partial) for (const lamp of [...drawn, ...surfaces]) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
     const isGlow = (object: Object3D) => {
       if (!(object instanceof Mesh)) return false;
       const list: Material[] = Array.isArray(object.material) ? object.material as Material[] : [object.material as Material];
@@ -134,20 +138,21 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
   /** With `shareMaterials`, the materials of each parsed body, by content: every car of the body draws with the same ones. */
   const sharedMaterials = new WeakMap<Group, Map<string, Material>>(), shared = new WeakSet<Material>();
   /** A livery's parsed model and loaded textures, shared by the instances of that car built while they load (as the parse). */
-  const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
-  const partsOf = (car: LoadedBody) => {
-    let pending = parts.get(car);
+  const parts = {body: new WeakMap<LoadedBody, ReturnType<typeof loadParts>>(), cabin: new WeakMap<LoadedBody, ReturnType<typeof loadParts>>()};
+  const partsOf = (car: LoadedBody, kind: ModelKind) => {
+    const pendings = parts[kind];
+    let pending = pendings.get(car);
     if (!pending) {
-      pending = loadParts(car);
-      parts.set(car, pending);
-      const settled = () => { if (parts.get(car) === pending) parts.delete(car); };
+      pending = loadParts(car, kind);
+      pendings.set(car, pending);
+      const settled = () => { if (pendings.get(car) === pending) pendings.delete(car); };
       pending.then(settled, settled);
     }
     return pending;
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
-  const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths, hiddenNames} = await partsOf(car);
+  const loadModel = async (car: LoadedBody, kind: ModelKind = 'body'): Promise<Group> => {
+    const {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths, hiddenNames} = await partsOf(car, kind);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
       carTextures.copied(copy, original, interiorPaths.get(path) === true);
@@ -203,7 +208,9 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
   };
   /** Whether every car of a body draws with this material (`shareMaterials`): the loader keeps it, a dropped car leaves it. */
   const sharedMaterial = (material: Material) => shared.has(material);
-  return {model: loadModel, car, sharedMaterial};
+  /** The body's cabin parts with their materials (`CarTemplates.cabin`), each naming the car node it hangs under. */
+  const cabin = (body: LoadedBody) => loadModel(body, 'cabin');
+  return {model: loadModel, car, cabin, sharedMaterial};
 }
 
 export type CarModels = ReturnType<typeof createCarModels>;

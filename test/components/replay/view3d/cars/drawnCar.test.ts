@@ -6,6 +6,7 @@ import type { CarTextures } from '../../../../../src/components/replay/view3d/ca
 import type { CarTemplates } from '../../../../../src/components/replay/view3d/cars/carTemplates.js';
 import { createCarSets, createDrawnCars } from '../../../../../src/components/replay/view3d/cars/drawnCar.js';
 import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { setCockpitView } from '../../../../../src/components/replay/view3d/cars/carParts.js';
 import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 
 /** Whether each loader made shares materials; its models are the rig with a cabin part (the interior) and two glass panes. */
@@ -26,7 +27,14 @@ vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async (
   return {
     createCarModels: (_templates: unknown, _textures: unknown, _shading: unknown, {shareMaterials = false} = {}) => {
       loaders.push(shareMaterials);
-      return {model: async () => withParts(), car: async () => make('#38bdf8', false, withParts()), sharedMaterial: () => shareMaterials};
+      // A cabin of two dash panels under the body's root and a part under a node the car leaves out.
+      const cabin = async () => {
+        const parts = new three.Group(), material = new three.MeshStandardMaterial(), geometry = new three.BoxGeometry(1, 1, 1);
+        for (const name of ['dash', 'dash 2']) { const dash = new three.Mesh(geometry, material); dash.name = name; dash.userData.cabinParent = null; parts.add(dash); }
+        const lost = new three.Mesh(geometry, material); lost.name = 'lost'; lost.userData.cabinParent = 'other livery'; parts.add(lost);
+        return parts;
+      };
+      return {model: async () => withParts(), car: async () => make('#38bdf8', false, withParts()), cabin, sharedMaterial: () => shareMaterials};
     },
   };
 });
@@ -85,15 +93,40 @@ describe('createCarSets', () => {
   const body = {vehicleId: 'oreca'} as unknown as LoadedBody;
   const sortedBatches = (car: Group) => batchesIn(car).filter(batch => batch.sortObjects);
 
-  it('builds the own car and the field on one path: glass sorted in its batch, the interior kept only by the own car, its farther levels dropped', async () => {
-    const built = sets(), own = await built.build([body], {own: true}), field = await built.build([body], {own: false});
-    expect(loaders).toEqual([false, true]);
-    expect(own.cars[0].car.getObjectByName('cabin')).toBeDefined();
-    expect(field.cars[0].car.getObjectByName('cabin')).toBeUndefined();
-    expect(own.cars[0].car.getObjectByName('far')).toBeUndefined();
-    expect(field.cars[0].car.getObjectByName('far')).toBeDefined();
-    for (const set of [own, field]) expect(sortedBatches(set.cars[0].car)).toHaveLength(1);
-    own.dispose(); field.dispose();
+  it('builds every car on one path, with shared materials: glass sorted in its batch, every level kept, the interior left out', async () => {
+    const set = await sets().build([body]), [drawn] = set.cars;
+    expect(loaders).toEqual([true, false]);
+    expect(drawn.car.getObjectByName('cabin')).toBeUndefined();
+    expect(drawn.car.getObjectByName('far')).toBeDefined();
+    expect(sortedBatches(drawn.car)).toHaveLength(1);
+    set.dispose();
+  });
+
+  it('adds a cabin to a built car, hidden until shown, and takes it out again to the outside view', async () => {
+    const built = sets(), set = await built.build([body]), [drawn] = set.cars, before = batchesIn(drawn.car).length;
+    const cabin = (await built.cabin(body, Promise.resolve(drawn)))!;
+    expect(drawn.car.getObjectByName('dash')).toBeDefined();
+    expect(drawn.car.getObjectByName('lost')).toBeUndefined();
+    // The dash panels share a material: their batch rides in the car, in no camera's layer until shown.
+    expect(cabin.parts.parts).toHaveLength(2);
+    expect(cabin.parts.own.length).toBeGreaterThan(0);
+    expect(batchesIn(drawn.car)).toHaveLength(before + cabin.parts.own.length);
+    const seen = () => cabin.parts.own.map(batch => batch.layers.isEnabled(0) || batch.layers.isEnabled(1));
+    expect(seen().every(layer => !layer)).toBe(true);
+    cabin.show();
+    expect(seen().every(Boolean)).toBe(true);
+    setCockpitView(drawn.car, 'in');
+    cabin.dispose();
+    expect(drawn.car.getObjectByName('dash')).toBeUndefined();
+    expect(batchesIn(drawn.car)).toHaveLength(before);
+    // The car's own table shows the outside view again.
+    setCockpitView(drawn.car, 'out');
+    expect(drawn.parts.parts.length).toBeGreaterThan(0);
+    set.dispose();
+  });
+
+  it('drops a cabin loaded for a car that has no full model', async () => {
+    expect(await sets().cabin(body, Promise.resolve(null))).toBeNull();
   });
 
   it('keeps the ghost part by part, see-through and without shadows', async () => {

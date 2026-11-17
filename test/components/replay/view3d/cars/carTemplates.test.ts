@@ -14,24 +14,48 @@ function parsed(part: string): {scene: Group} {
 const exterior = new ArrayBuffer(1), interior = new ArrayBuffer(2);
 const body = (vehicleId: string, withInterior: boolean) => ({
   vehicleId,
-  resource: {sha256: 'body', full: {sha256: 'full'}, interior: withInterior ? {sha256: 'cabin'} : null},
-  files: vi.fn(async () => ({bytes: exterior, interiorBytes: withInterior ? interior : null})),
-}) as unknown as LoadedBody & {files: ReturnType<typeof vi.fn>};
+  resource: {sha256: 'body', interior: withInterior ? {sha256: 'cabin'} : null},
+  file: vi.fn(async () => exterior),
+  interiorFile: vi.fn(async () => (withInterior ? interior : null)),
+}) as unknown as LoadedBody & {file: ReturnType<typeof vi.fn>; interiorFile: ReturnType<typeof vi.fn>};
+
+const parts = (model: Group) => model.getObjectByName('chassis')!.children.map(child => child.name);
 
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe('createCarTemplates', () => {
-  it('parses a body once for every livery and loader, joining its interior under the chassis', async () => {
+  it('parses a body once for every livery and loader, without its interior file', async () => {
     const parse = vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async bytes => parsed(bytes === interior ? 'dash' : 'hull') as never);
     const templates = createCarTemplates(), first = body('A', true), second = body('B', true);
     const [a, b] = await Promise.all([templates.body(first), templates.body(second)]);
     expect(a).toBe(b);
-    expect(parse).toHaveBeenCalledTimes(2);
-    expect(second.files).not.toHaveBeenCalled();
-    const chassis = a.getObjectByName('chassis')!;
-    expect(chassis.children.map(child => child.name)).toEqual(['hull', 'dash']);
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(second.file).not.toHaveBeenCalled();
+    expect(first.interiorFile).not.toHaveBeenCalled();
+    expect(parts(a)).toEqual(['hull']);
     // Each part's box in the body's frame, for the contact shadow once its vertices are gone.
     expect(a.getObjectByName('hull')!.userData.footprint).toEqual([-1, -0.5, -2, 1, 0.5, 2]);
+  });
+
+  it("builds a cabin from the exterior's parts marked interior and the interior file's, leaving the parses as they were", async () => {
+    const outside = parsed('hull'), chassis = outside.scene.getObjectByName('chassis')!;
+    // A seat marked interior with a level of it drawn from 20 m, and a mirror marked interior on the body's root.
+    const seat = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial()), farSeat = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
+    seat.name = 'seat'; seat.userData.interior = true; farSeat.name = 'far seat'; farSeat.userData.lod = {inM: 20, outM: null}; seat.add(farSeat); chassis.add(seat);
+    const mirror = new Group(); mirror.name = 'mirror'; mirror.userData.interior = true; outside.scene.add(mirror);
+    vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async bytes => (bytes === interior ? parsed('dash') : outside) as never);
+    const templates = createCarTemplates(), car = body('A', true);
+    templates.hold(car);
+    const whole = await templates.body(car), cabin = await templates.cabin(car);
+    expect(car.file).toHaveBeenCalledTimes(1);
+    expect(car.interiorFile).toHaveBeenCalledTimes(1);
+    expect(cabin.children.map(part => [part.name, part.userData.cabinParent as unknown, part.userData.interior as unknown])).toEqual([
+      ['seat', 'chassis', true], ['mirror', null, true], ['dash', 'chassis', true],
+    ]);
+    expect(cabin.getObjectByName('far seat')).toBeUndefined();
+    expect(cabin.getObjectByName('dash')!.userData.footprint).toEqual([-1, -0.5, -2, 1, 0.5, 2]);
+    expect(parts(whole)).toEqual(['hull', 'seat']);
+    expect(whole.getObjectByName('far seat')).toBeDefined();
   });
 
   it('parses the file again once a parse settles, unless the body is held', async () => {
@@ -48,21 +72,6 @@ describe('createCarTemplates', () => {
     expect(await templates.body(car)).not.toBe(kept);
   });
 
-  it('parses the full level for a car drawn at full detail alone, unless the whole body is held or parsing', async () => {
-    vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async () => parsed('hull') as never);
-    const templates = createCarTemplates(), car = body('A', false);
-    const full = await templates.body(car, true);
-    expect(car.files).toHaveBeenLastCalledWith(true);
-    // Its own parse: the field's cars of the body read the whole exterior.
-    expect(await templates.body(car)).not.toBe(full);
-    expect(car.files).toHaveBeenLastCalledWith(false);
-    templates.hold(car);
-    const whole = await templates.body(car);
-    car.files.mockClear();
-    expect(await templates.body(car, true)).toBe(whole);
-    expect(car.files).not.toHaveBeenCalled();
-  });
-
   it('forgets a failed parse, so the next car tries again', async () => {
     vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockRejectedValueOnce(Error('bad file')).mockResolvedValue(parsed('hull') as never);
     const templates = createCarTemplates();
@@ -72,6 +81,6 @@ describe('createCarTemplates', () => {
 
   it('throws for an interior without a chassis node', async () => {
     vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async bytes => (bytes === interior ? {scene: new Group()} : parsed('hull')) as never);
-    await expect(createCarTemplates().body(body('A', true))).rejects.toThrow(/no chassis node/);
+    await expect(createCarTemplates().cabin(body('A', true))).rejects.toThrow(/no chassis node/);
   });
 });

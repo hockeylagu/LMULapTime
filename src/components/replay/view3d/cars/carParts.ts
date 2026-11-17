@@ -54,40 +54,55 @@ export interface CarParts {
   onShown: (batch: BatchedMesh, change: number) => void;
 }
 
-interface Levels { view: CockpitView; distanceM: number; band: number; thresholds: readonly number[]; changed: boolean }
+/** A car's cockpit view and camera distance, which every part table of the car reads; `version` counts their changes. */
+interface Levels { view: CockpitView; distanceM: number; band: number; thresholds: readonly number[]; version: number }
 
 const levelsOf = new WeakMap<Object3D, Levels>();
+
+/** How many of the sorted `thresholds` a camera distance has passed. */
+function bandOf(thresholds: readonly number[], distanceM: number): number {
+  let band = 0;
+  while (band < thresholds.length && distanceM >= thresholds[band]) band++;
+  return band;
+}
 
 /**
  * The car's part table, built once from its model (a car of `makeCar`, its option parts already chosen). The car leaves the
  * renderer's matrix walk: its parts take their matrices from `sync` alone. The nodes marked with a distance range or a cockpit view
- * stay visible; their parts show by the car's view and camera distance (`setCockpitView`, `setCameraDistance`) instead.
+ * stay visible; their parts show by the car's view and camera distance (`setCockpitView`, `setCameraDistance`) instead. With
+ * `within`, the table holds only the meshes under those nodes (a cabin added to a car that has its table): a car's tables share
+ * its view and distance.
  */
-export function buildCarParts(car: Object3D): CarParts {
+export function buildCarParts(car: Object3D, within?: ReadonlySet<Object3D>): CarParts {
   const anchors: Anchor[] = [{node: car, parent: -1, path: new Matrix4(), frame: new Matrix4(), visible: true}];
   const parts: CarPart[] = [], thresholds = new Set<number>();
-  const walk = (node: Object3D, anchor: number, path: Matrix4, ranges: PartRange[], views: CockpitView[]) => {
+  const walk = (node: Object3D, anchor: number, path: Matrix4, ranges: PartRange[], views: CockpitView[], inside: boolean) => {
     for (const child of node.children) {
+      const taken = inside || !!within?.has(child);
       child.updateMatrix();
       const marked: unknown = child.userData.cockpitView, range = child.userData.lod as PartRange | undefined;
-      const own: CockpitView[] = marked === 'in' || marked === 'out' ? [...views, marked] : views, inside = range ? [...ranges, range] : ranges;
-      if (range) { thresholds.add(range.inM); if (range.outM !== null) thresholds.add(range.outM); }
+      const own: CockpitView[] = marked === 'in' || marked === 'out' ? [...views, marked] : views, inRange = range ? [...ranges, range] : ranges;
+      if (range && taken) { thresholds.add(range.inM); if (range.outM !== null) thresholds.add(range.outM); }
       if ((range || own !== views) && !(child instanceof Mesh)) child.visible = true;
       if (MOVING.test(child.name)) {
         anchors.push({node: child, parent: anchor, path: path.clone(), frame: new Matrix4(), visible: true});
-        walk(child, anchors.length - 1, new Matrix4(), inside, own);
+        walk(child, anchors.length - 1, new Matrix4(), inRange, own, taken);
         continue;
       }
       const through = path.clone().multiply(child.matrix);
-      if (child instanceof Mesh) parts.push({mesh: child as Mesh, anchor, rel: through, ranges: inside, views: own, batch: null, instance: -1, shadow: null, shown: false});
-      walk(child, anchor, through, inside, own);
+      if (child instanceof Mesh && taken) parts.push({mesh: child as Mesh, anchor, rel: through, ranges: inRange, views: own, batch: null, instance: -1, shadow: null, shown: false});
+      walk(child, anchor, through, inRange, own, taken);
     }
   };
-  walk(car, 0, new Matrix4(), [], []);
+  walk(car, 0, new Matrix4(), [], [], !within);
   // Out of the renderer's matrix walk, which runs on each of a frame's render passes: `sync` sets the matrices once per frame.
   car.matrixWorldAutoUpdate = false;
-  const levels: Levels = {view: 'out', distanceM: 0, band: 0, thresholds: [...thresholds].sort((a, b) => a - b), changed: true};
+  const levels: Levels = levelsOf.get(car) ?? {view: 'out', distanceM: 0, band: 0, thresholds: [], version: 0};
   levelsOf.set(car, levels);
+  levels.thresholds = [...new Set([...levels.thresholds, ...thresholds])].sort((a, b) => a - b);
+  levels.band = bandOf(levels.thresholds, levels.distanceM);
+  /** The car's levels as this table last showed them: -1 shows them at the first sync. */
+  let seen = -1;
   const frame = new Matrix4(), placed = new Matrix4(), previous = new Matrix4(), lastWorld = new Matrix4();
   const marksShow = (part: CarPart) => part.views.every(view => view === levels.view)
     && part.ranges.every(range => levels.distanceM >= range.inM && (range.outM === null || levels.distanceM < range.outM));
@@ -99,7 +114,8 @@ export function buildCarParts(car: Object3D): CarParts {
       for (const batch of table.own) batch.matrixWorld.copy(car.matrixWorld);
       const moved = first || !lastWorld.equals(car.matrixWorld);
       lastWorld.copy(car.matrixWorld); first = false;
-      let changed = levels.changed || car.visible !== carVisible;
+      const relevel = seen !== levels.version;
+      let changed = relevel || car.visible !== carVisible;
       carVisible = car.visible;
       for (let index = 1; index < anchors.length; index++) {
         const anchor = anchors[index], node = anchor.node, parent = anchors[anchor.parent];
@@ -111,8 +127,7 @@ export function buildCarParts(car: Object3D): CarParts {
         if (visible !== anchor.visible || !previous.equals(anchor.frame)) changed = true;
         anchor.visible = visible;
       }
-      const relevel = levels.changed;
-      levels.changed = false;
+      seen = levels.version;
       // Only the parts' visibility is read for a car that neither moved nor moved its parts: no matrix products.
       for (const part of parts) {
         if (relevel && (part.ranges.length || part.views.length)) part.mesh.visible = marksShow(part);
@@ -162,7 +177,7 @@ export function placeCarFrame(car: Object3D): void {
 export function setCockpitView(car: Object3D, view: CockpitView): void {
   const levels = levelsOf.get(car);
   if (!levels || levels.view === view) return;
-  levels.view = view; levels.changed = true;
+  levels.view = view; levels.version++;
 }
 
 /**
@@ -174,7 +189,6 @@ export function setCameraDistance(car: Object3D, distanceM: number): void {
   const levels = levelsOf.get(car);
   if (!levels) return;
   levels.distanceM = distanceM;
-  let band = 0;
-  while (band < levels.thresholds.length && distanceM >= levels.thresholds[band]) band++;
-  if (band !== levels.band) { levels.band = band; levels.changed = true; }
+  const band = bandOf(levels.thresholds, distanceM);
+  if (band !== levels.band) { levels.band = band; levels.version++; }
 }

@@ -17,13 +17,18 @@ export interface LapCars {
 }
 
 /**
- * The lap view's content: the lap's car (the own car of `sets`) and its ghost, the racing lines and the ghost clock. Lap objects own their geometry; replacing them cannot release the track's GPU
+ * The lap view's content: the lap's car (a car of `sets` with its cabin, as the race's followed car) and its ghost, the racing
+ * lines and the ghost clock. Lap objects own their geometry; replacing them cannot release the track's GPU
  * buffers.
  */
 export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, sets: CarSets, display: () => DisplayTransform) {
   const buildCars = async (assets: LapCars) => {
-    const [primarySet, ghost] = await Promise.all([sets.build([assets.primary], {own: true}), assets.baseline ? sets.ghost(assets.baseline) : null]);
-    return {primary: primarySet.cars[0], primarySet, ghost};
+    const building = sets.build([assets.primary], {ownMaterials: true});
+    const cabining = sets.cabin(assets.primary, building.then(set => set.cars[0]));
+    cabining.catch(() => {}); // Awaited below, once the car is built: a failure surfaces there.
+    const [primarySet, ghost] = await Promise.all([building, assets.baseline ? sets.ghost(assets.baseline) : null]);
+    const cabin = await cabining.catch((error: unknown) => { primarySet.dispose(); throw error; });
+    return {primary: primarySet.cars[0], primarySet, cabin: cabin!, ghost};
   };
   /** The cars `preload` built for the next load of the same `assets`: a load takes them, so no two layers share a car. */
   const preloaded = new WeakMap<LapCars, ReturnType<typeof buildCars>>();
@@ -70,9 +75,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         if (baselineLine) { baselineLine.material.opacity = baselineOpacity; baselineLine.visible = baselineOpacity > 0; }
       },
       /** Places both cars' parts at their pose, wheels, steering and shown levels: call before each frame is drawn. */
-      syncParts() { cars.primary.parts.sync(); drawnGhost?.parts.sync(); },
+      syncParts() { cars.primary.parts.sync(); cars.cabin.parts.sync(); drawnGhost?.parts.sync(); },
       /** Once the primary car is warmed up: its batches each draw only while one of their parts shows. */
-      ready() { cars.primarySet.ready(); },
+      ready() { cars.primarySet.ready(); cars.cabin.show(); },
       /** Scenery streams in after the lines were draped: re-drape them on the road that is resident now. */
       refreshHeights() {
         primaryMotion.refreshHeights(); ghostMotion?.refreshHeights();
@@ -80,7 +85,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         if (baselineLine && baseline) refreshRacingLine(baselineLine, baseline, origin, colors.baseline, surfaceHeight, BASELINE_LINE.widthM, BASELINE_LINE.liftM);
         if (marks?.missing) showMarks(marks.list);
       },
-      dispose() { root.removeFromParent(); cars.primarySet.dispose(); disposeObjects(root); },
+      dispose() { root.removeFromParent(); cars.cabin.dispose(); cars.primarySet.dispose(); disposeObjects(root); },
     };
   };
   /**
