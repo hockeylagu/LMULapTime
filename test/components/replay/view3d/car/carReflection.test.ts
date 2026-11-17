@@ -68,7 +68,7 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   // A lamp housing, drawn by the surface program: its own program patch runs first, then the reflection uniforms become the car's.
   const lamp = new MeshStandardMaterial(), venueCube = new Texture();
   lamp.onBeforeCompile = shader => { shader.uniforms.surface_albedo = {value: null}; };
-  bindCarSurfaceReflection(lamp);
+  bindCarSurfaceReflection(lamp, true);
   const lampUniforms = () => { const shader = {uniforms: {}, vertexShader: '', fragmentShader: ''}; lamp.onBeforeCompile(shader as never, null as never); return shader.uniforms as Record<string, {value: unknown}>; };
   sceneryReflectionUniforms.surface_reflection.value = venueCube; sceneryReflectionUniforms.surface_reflectionReady.value = 1;
   expect(Object.keys(lampUniforms())).toEqual(['surface_albedo', 'surface_reflection', 'surface_reflectionReady', 'overhead_top', 'overhead_below',
@@ -172,10 +172,10 @@ it('gives a near car the probe: its glass and trim the prefiltered cube, its pai
 });
 
 it("corrects either of the car's surface reads for the scenery overhead, in a program of its own", () => {
-  const compile = (body: string) => {
+  const compile = (body: string, overhead = true) => {
     const material = new MeshStandardMaterial();
     material.onBeforeCompile = () => {}; material.customProgramCacheKey = () => 'standard_x';
-    bindCarSurfaceReflection(material);
+    bindCarSurfaceReflection(material, overhead);
     const shader = {uniforms: {}, vertexShader: '', fragmentShader: `#include <lights_physical_pars_fragment>\n${body}`};
     material.onBeforeCompile(shader as never, null as never);
     return {fragment: shader.fragmentShader, key: material.customProgramCacheKey()};
@@ -190,6 +190,10 @@ it("corrects either of the car's surface reads for the scenery overhead, in a pr
   const glass = compile('vec3 iblRadiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );');
   expect(glass.fragment).toContain('vec3 iblRadiance = carIBLRadiance( geometryViewDir, geometryNormal, material.roughness );');
   expect(glass.fragment).not.toContain('carSurfaceReflection(light');
+  // A material at the texture unit limit reads its car's probe uncorrected, in a program of its own.
+  const cabin = compile(SCENERY_REFLECTION_GLSL, false);
+  expect(cabin.fragment).not.toContain('overheadFix');
+  expect(cabin.key).toBe('standard_x-car-plain');
 });
 
 it('draws the reflection set in place of the scenery three faces a frame, a conversion step riding with them', () => {

@@ -14,6 +14,7 @@ import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
 import { configureCarPaint } from './carPaint.js';
 import { PAINT_MAPS } from './paintLayers.js';
 import { bindCarSurfaceReflection, CAR_SURFACE_OVERHEAD_UNITS } from './carReflection.js';
+import { GUARANTEED_TEXTURE_UNITS } from '../cars/carBatching.js';
 import { bindCockpitOcclusion } from './cockpitOcclusion.js';
 
 const UV_CHANNEL: Record<string, number> = { uv0: 0, uv1: 1, uv2: 2, uv3: 3 };
@@ -135,9 +136,13 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     const loaded: Record<string, Texture> = {};
     for (const [key, map] of Object.entries(surface.maps)) loaded[key] = mapTexture(texture, map!);
     bindSurfaceProgram(material, surface, loaded);
-    bindCarSurfaceReflection(material);
-    // The car batching reads it (carBatching.ts); a cabin volume adds its own (below).
-    material.userData.surfaceTextureUnits = surfaceTextureUnits(surface) + CAR_SURFACE_OVERHEAD_UNITS + (recipe.reflectionOcclusion ? 1 : 0);
+    // A cabin part with nine maps and the cabin volume has no room left for the overhead correction: past the limit its program
+    // fails to link and the part is not drawn.
+    const units = surfaceTextureUnits(surface) + (recipe.reflectionOcclusion ? 1 : 0);
+    const overhead = units + CAR_SURFACE_OVERHEAD_UNITS <= GUARANTEED_TEXTURE_UNITS;
+    bindCarSurfaceReflection(material, overhead);
+    // The car batching reads it (carBatching.ts).
+    material.userData.surfaceTextureUnits = units + (overhead ? CAR_SURFACE_OVERHEAD_UNITS : 0);
     material.addEventListener('dispose', () => { for (const map of Object.values(loaded)) map.dispose(); });
   } else if (path) {
     // Every textured car material and paint has an albedo map; a livery file replaces its texture on the same UV set.

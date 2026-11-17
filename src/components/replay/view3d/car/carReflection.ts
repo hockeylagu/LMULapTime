@@ -97,9 +97,10 @@ const CAR_SURFACE_GLSL = `${SURFACE_UNIFORMS}
 /**
  * Makes a car material drawn by the surface program (lamp housings and covers, wheels, trim) reflect its own car's probe: the
  * program's shared reflection uniforms point at the venue's cube, a view from one place of the circuit. The same rule and
- * values read the car's convolved cube instead; a car without a probe keeps the venue's.
+ * values read the car's convolved cube instead; a car without a probe keeps the venue's. `overhead`: whether it also takes the
+ * overhead correction (`CAR_SURFACE_OVERHEAD_UNITS` more samplers), which a material at the texture unit limit goes without.
  */
-export function bindCarSurfaceReflection(material: MeshStandardMaterial): void {
+export function bindCarSurfaceReflection(material: MeshStandardMaterial, overhead: boolean): void {
   const own: {cube: Texture | null; overhead: CarOverhead | null} = {cube: null, overhead: null}, bound = material.onBeforeCompile.bind(material);
   const cube: IUniform<Texture | null> = {get value() { return own.cube ?? sceneryReflectionUniforms.surface_reflection.value; }};
   const ready: IUniform<number> = {get value() { return own.cube ? 1 : sceneryReflectionUniforms.surface_reflectionReady.value; }};
@@ -107,6 +108,7 @@ export function bindCarSurfaceReflection(material: MeshStandardMaterial): void {
   material.onBeforeCompile = (shader, renderer) => {
     bound(shader, renderer);
     shader.uniforms.surface_reflection = cube; shader.uniforms.surface_reflectionReady = ready;
+    if (!overhead) return;
     // Corrected only while the material reads its own car's probe and the venue's cube stands ready for the sky.
     Object.assign(shader.uniforms, overheadUniforms(() => own.cube && sceneryReflectionUniforms.surface_reflectionReady.value > 0.5 ? own.overhead : null), {
       overhead_sky: sceneryReflectionUniforms.surface_reflection, overhead_skyLodScale: sceneryReflectionUniforms.surface_reflectionLodScale,
@@ -118,7 +120,7 @@ export function bindCarSurfaceReflection(material: MeshStandardMaterial): void {
   };
   // Its program is no longer the scenery's of the same configuration.
   const key = material.customProgramCacheKey.bind(material);
-  material.customProgramCacheKey = () => `${key()}-car`;
+  material.customProgramCacheKey = () => `${key()}-car${overhead ? '' : '-plain'}`;
 }
 
 function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null, overhead: CarOverhead | null): boolean {
