@@ -26,14 +26,14 @@ const stubRenderer = () => {
 const renderCount = (calls: string[]) => calls.filter(call => call.startsWith('render')).length;
 const draw = (shadow: Object3D) => shadow.onBeforeRender(null as never, null as never, null as never, null as never, null as never, null as never);
 /** A car of a body with its shadow added, as the car models do. */
-const carOf = (key: object, baker: ReturnType<typeof createUnderCarBaker>) => {
+const carOf = (key: string, baker: ReturnType<typeof createUnderCarBaker>) => {
   const model = carModel(), shadow = createContactShadow(model, key, baker);
   model.add(shadow);
   return {model, shadow};
 };
 
 it('lays a soft analytic shadow on the car contact plane until its body is baked', () => {
-  const shadow = createContactShadow(carModel(), {}, createUnderCarBaker());
+  const shadow = createContactShadow(carModel(), 'a', createUnderCarBaker());
   expect(shadow.position.y).toBeCloseTo(0.02); expect(shadow.position.x).toBeCloseTo(0); // Model-local, on the lowest point.
   expect(shadow.geometry.parameters.width).toBeCloseTo(3); expect(shadow.geometry.parameters.height).toBeCloseTo(5.6);
   const map = shadow.material.alphaMap!, {data, width, height} = map.image as {data: Uint8Array; width: number; height: number};
@@ -44,11 +44,11 @@ it('lays a soft analytic shadow on the car contact plane until its body is baked
 });
 
 it('refuses a model without measured parts', () => {
-  expect(() => createContactShadow(new Group().add(new Mesh(new BoxGeometry())), {})).toThrow('no measured parts');
+  expect(() => createContactShadow(new Group().add(new Mesh(new BoxGeometry())), 'a')).toThrow('no measured parts');
 });
 
 it('bakes a body once for all its cars, one body per frame, and swaps the baked map in', () => {
-  const baker = createUnderCarBaker(), bodyA = {}, bodyB = {};
+  const baker = createUnderCarBaker(), bodyA = 'a', bodyB = 'b';
   const shadows = [carOf(bodyA, baker).shadow, carOf(bodyA, baker).shadow, carOf(bodyB, baker).shadow];
   const first = stubRenderer(); baker.flush(first.renderer);
   expect(renderCount(first.calls)).toBe(0); // Nothing was about to draw yet.
@@ -67,7 +67,7 @@ it('bakes a body once for all its cars, one body per frame, and swaps the baked 
 });
 
 it('puts the renderer state back and leaves the car untouched after a bake', () => {
-  const baker = createUnderCarBaker(), {model, shadow} = carOf({}, baker), body = model.children[0] as Mesh, material = body.material;
+  const baker = createUnderCarBaker(), {model, shadow} = carOf('a', baker), body = model.children[0] as Mesh, material = body.material;
   draw(shadow);
   const {renderer, calls, color} = stubRenderer();
   baker.flush(renderer);
@@ -76,22 +76,28 @@ it('puts the renderer state back and leaves the car untouched after a bake', () 
   expect(body.material).toBe(material); expect(shadow.visible).toBe(true); expect(body.geometry.attributes.position).toBeDefined();
 });
 
-it('bakes the exterior seen up close whatever is visible now, as proxies in the car frame', () => {
-  const baker = createUnderCarBaker(), {model, shadow} = carOf({}, baker);
-  const inside = new Mesh(new BoxGeometry(), new MeshBasicMaterial()), far = new Mesh(new BoxGeometry(), new MeshBasicMaterial()), nested = new Mesh(new BoxGeometry(), new MeshBasicMaterial());
-  inside.userData.cockpitView = 'in'; far.userData.lod = {inM: 30, outM: null};
+it('bakes the exterior seen up close as built, whatever is visible or batched by the first draw, as proxies in the car frame', () => {
+  const baker = createUnderCarBaker(), model = carModel();
+  const inside = new Mesh(new BoxGeometry(), new MeshBasicMaterial()), cabin = new Mesh(new BoxGeometry(), new MeshBasicMaterial());
+  const far = new Mesh(new BoxGeometry(), new MeshBasicMaterial()), nested = new Mesh(new BoxGeometry(), new MeshBasicMaterial());
+  inside.userData.cockpitView = 'in'; cabin.userData.interior = true; far.userData.lod = {inM: 30, outM: null};
   const group = new Group(); group.userData.lod = {inM: 0, outM: 30}; group.position.set(1, 2, 3); nested.position.set(0, 1, 0); group.add(nested);
-  model.add(inside, far, group); model.visible = false; // The cockpit view hides the exterior: the bake must not depend on it.
+  model.add(inside, cabin, far, group);
+  const shadow = createContactShadow(model, 'a', baker); model.add(shadow);
+  // The cockpit view hides the exterior, and a batch takes a part's vertices: the bake depends on neither.
+  model.visible = false; const body = model.children[0] as Mesh, vertices = body.geometry.attributes.position.count;
+  body.geometry = new BoxGeometry(); body.geometry.deleteAttribute('position');
   draw(shadow);
-  const drawn: Object3D[][] = [], {renderer} = stubRenderer();
-  renderer.render = scene => { drawn.push(scene.children.slice()); };
+  const drawn: Mesh[][] = [], {renderer} = stubRenderer();
+  renderer.render = scene => { drawn.push(scene.children.slice() as Mesh[]); };
   baker.flush(renderer);
-  expect(drawn[0]).toHaveLength(2); // The body and the nested close part: not the 'in' mesh, not the far level, not the shadow quad.
+  expect(drawn[0]).toHaveLength(2); // The body and the nested close part: not the 'in' or cabin mesh, not the far level, not the shadow quad.
+  expect(drawn[0][0].geometry.attributes.position.count).toBe(vertices);
   expect(drawn[0].some(proxy => proxy.matrix.elements[13] === 3)).toBe(true); // Nested: group (1, 2, 3) then its own (0, 1, 0).
 });
 
 it('releases the baked map with the last car of its body', () => {
-  const baker = createUnderCarBaker(), key = {}, a = carOf(key, baker).shadow, b = carOf(key, baker).shadow;
+  const baker = createUnderCarBaker(), key = 'a', a = carOf(key, baker).shadow, b = carOf(key, baker).shadow;
   draw(a); baker.flush(stubRenderer().renderer);
   let disposed = 0; baker.mapOf(key)!.addEventListener('dispose', () => { disposed++; });
   a.material.dispose(); expect(disposed).toBe(0);

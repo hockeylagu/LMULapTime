@@ -1,6 +1,6 @@
 import {
   Box3, Color, DoubleSide, HalfFloatType, LinearFilter, Matrix4, Mesh, NearestFilter, OrthographicCamera, PlaneGeometry, RGBAFormat, Scene, ShaderMaterial, UnsignedByteType, Vector3, Vector4,
-  WebGLRenderTarget, type BufferGeometry, type Camera, type Object3D,
+  WebGLRenderTarget, BufferAttribute, BufferGeometry, type Camera, type Object3D,
 } from 'three';
 
 /** Texels per side of the baked maps, and how much of the car's frame the maps cover beyond its length (half on each end). */
@@ -115,10 +115,13 @@ void main() {
   gl_FragColor = vec4(vec3(1.0 - stored), 1.0);
 }`;
 
-/** Whether a mesh belongs to the exterior seen up close: not a driver-view part and drawn from 0 m, on itself or any ancestor below `model`. */
+/**
+ * Whether a mesh belongs to the exterior seen up close: not a driver-view or cabin part and drawn from 0 m, on itself or any
+ * ancestor below `model`.
+ */
 function isCloseExterior(mesh: Object3D, model: Object3D): boolean {
   for (let node: Object3D | null = mesh; node && node !== model; node = node.parent) {
-    if (node.userData.cockpitView === 'in') return false;
+    if (node.userData.cockpitView === 'in' || node.userData.interior === true) return false;
     const range = node.userData.lod as {inM?: number} | undefined;
     if (range && (range.inM ?? 0) > 0) return false;
   }
@@ -132,13 +135,37 @@ function frameMatrix(mesh: Object3D, model: Object3D): Matrix4 {
   return matrix;
 }
 
+/** A part the height pass draws: its positions (and index) alone, placed in the car's frame. */
+export interface BakePart {
+  readonly geometry: BufferGeometry;
+  readonly matrix: Matrix4;
+}
+
+/**
+ * The parts a bake of `model` draws, copied as the car is built: the bake waits for the car's first draw, and by then the batching
+ * has taken the batched parts' vertices (their meshes keep empty stand-ins). Positions and index only, which the bake releases.
+ */
+export function bakeParts(model: Object3D): BakePart[] {
+  const parts: BakePart[] = [];
+  model.traverse(object => {
+    if (!(object instanceof Mesh) || object.name === CONTACT_SHADOW_NAME || !isCloseExterior(object, model)) return;
+    const source = object.geometry as BufferGeometry, position = source.getAttribute('position'), positions = new Float32Array(position.count * 3);
+    // Read through the attribute: a parsed position can be interleaved or quantized.
+    for (let index = 0; index < position.count; index++) positions.set([position.getX(index), position.getY(index), position.getZ(index)], index * 3);
+    const geometry = new BufferGeometry().setAttribute('position', new BufferAttribute(positions, 3));
+    if (source.index) geometry.setIndex(source.index.clone());
+    parts.push({geometry, matrix: frameMatrix(object, model)});
+  });
+  return parts;
+}
+
 /**
  * Bakes the shade under a car: the exterior parts seen up close, drawn from below into a height map (the lowest surface wins),
- * then an occlusion pass over it. `model` is the car in its own frame and `bounds` its footprint there. The parts are drawn as
- * proxy meshes (shared geometry, placed from their local matrices) so no current visibility or per-frame state matters. Returns
- * the darkness map (the caller owns it); the renderer's target, clear colour, auto clear and viewport are put back.
+ * then an occlusion pass over it. `parts` are the car's (`bakeParts`), in its own frame, and `bounds` its footprint there: no
+ * current visibility or per-frame state matters. Returns the darkness map (the caller owns it, and the parts); the renderer's
+ * target, clear colour, auto clear and viewport are put back.
  */
-export function bakeUnderCar(renderer: BakeRenderer, model: Object3D, bounds: Box3): WebGLRenderTarget {
+export function bakeUnderCar(renderer: BakeRenderer, parts: readonly BakePart[], bounds: Box3): WebGLRenderTarget {
   const {camera, local} = bakeCamera(bounds), {minY, size} = bakeArea(bounds);
   camera.matrixWorldAutoUpdate = false; // The camera lives in the car's frame, which is the proxy scene's world.
   camera.matrixWorld.copy(local); camera.matrixWorldInverse.copy(local).invert();
@@ -151,12 +178,11 @@ export function bakeUnderCar(renderer: BakeRenderer, model: Object3D, bounds: Bo
   });
   const pass = new Mesh(new PlaneGeometry(2, 2), occlusionMaterial); pass.frustumCulled = false;
   const screen = new OrthographicCamera(-1, 1, 1, -1, 0, 1), proxies = new Scene();
-  model.traverse(object => {
-    if (!(object instanceof Mesh) || object.name === CONTACT_SHADOW_NAME || !isCloseExterior(object, model)) return;
-    const proxy = new Mesh(object.geometry as BufferGeometry, heightMaterial);
-    proxy.matrixAutoUpdate = false; proxy.matrix.copy(frameMatrix(object, model)); proxy.matrixWorldNeedsUpdate = true;
+  for (const part of parts) {
+    const proxy = new Mesh(part.geometry, heightMaterial);
+    proxy.matrixAutoUpdate = false; proxy.matrix.copy(part.matrix); proxy.matrixWorldNeedsUpdate = true;
     proxies.add(proxy);
-  });
+  }
   const target = renderer.getRenderTarget(), clearColor = renderer.getClearColor(new Color()), clearAlpha = renderer.getClearAlpha(), autoClear = renderer.autoClear, viewport = renderer.getViewport(new Vector4());
   try {
     renderer.autoClear = true;
@@ -164,7 +190,7 @@ export function bakeUnderCar(renderer: BakeRenderer, model: Object3D, bounds: Bo
     renderer.setRenderTarget(darkness); renderer.render(pass, screen);
   } finally {
     renderer.setRenderTarget(target); renderer.setClearColor(clearColor, clearAlpha); renderer.autoClear = autoClear; renderer.setViewport(viewport);
-    proxies.clear(); heights.dispose(); heightMaterial.dispose(); occlusionMaterial.dispose(); pass.geometry.dispose(); // The parts' geometry is shared: never disposed here.
+    proxies.clear(); heights.dispose(); heightMaterial.dispose(); occlusionMaterial.dispose(); pass.geometry.dispose(); // The parts are the caller's.
   }
   return darkness;
 }
