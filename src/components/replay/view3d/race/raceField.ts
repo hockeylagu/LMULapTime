@@ -1,4 +1,4 @@
-import { Box3, Frustum, Group, Matrix4, Mesh, Quaternion, Sphere, Vector3, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Box3, Frustum, Group, Matrix4, Quaternion, Sphere, Vector3, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import { normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
 import type { RaceReplayCar } from '../../../../../shared/types/replay.js';
 import { RACE_LAMP, RACE_POSE_CHANNEL_COUNT, RACE_POSE_CHANNELS, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
@@ -16,6 +16,7 @@ import { createFarGlows, FAR_GLOW_MAX, type FarGlowCar } from '../cars/farGlows.
 import { attachWheelRigs } from '../cars/wheelGeometry.js';
 import { windowPoints } from './raceTrack.js';
 import { createBlobShadows } from './blobShadows.js';
+import { envelopeBounds } from './carPick.js';
 
 /** Bodies loading their far models at once (each with all its cars), nearest the followed car first; and their full models. */
 const BODY_LOADS = 2, NEAR_LOADS = 1;
@@ -76,7 +77,9 @@ export interface RaceField {
   load(distances: ReadonlyArray<{slot: number; metres: number}>): void;
   /** Places the cars in view for the frame: the nearest few with their full model, wheels and lamps, the others with their far model. */
   beforeDraw(camera: PerspectiveCamera | OrthographicCamera): void;
-  /** Where the cars the last `beforeDraw` drew with their full model are (world): a far model casts no shadow. */
+  /** The car's body bounds in its frame (metres, its far model's), its bottom where it meets the road; null without a model. */
+  bounds(slot: number): Box3 | null;
+  /** Where the cars the last `beforeDraw` drew are (world), far models included: each casts the sun's shadow. */
   casters(): readonly Vector3[];
   refreshHeights(): void;
   dispose(): void;
@@ -84,8 +87,8 @@ export interface RaceField {
 
 /**
  * The race's other cars, by distance from the camera: near (the nearest `NEAR_MAX` inside their body's far distance) as full
- * models with wheels, lamps and shadows; far as the body's far model, still, its contact shadow drawn with the others
- * (`blobShadows`); out of view hidden. The cars of a body share their batches in each tier. Every car of a body loads its far
+ * models with wheels, lamps and their contact shadows; far as the body's far model, still, its contact shadow drawn with the others
+ * (`blobShadows`); both cast and take the sun's shadow, so a car turning near or far keeps it; out of view hidden. The cars of a body share their batches in each tier. Every car of a body loads its far
  * model at once, and its full model with the others of the body the first time one of them turns near; both stay. The nearest far cars' headlights and brake lights glow (`farGlows`).
  * `sets` builds the full models, `root` is the cars' parent; `changed` asks for a redraw. `farModel` sees each car's far model as it
  * is built, before its batching releases the parsed vertices (the stand-ins take their shape from it).
@@ -101,7 +104,7 @@ export function createRaceField(
   const farSets: CarBatchSet[] = [], nearSets: DrawnCars[] = [], bodies = new Set<string>(), fieldBodies: FieldBody[] = [];
   let bodyLoads = 0, nearLoads = 0, disposed = false;
   const view = new Frustum(), viewMatrix = new Matrix4(), bounds = new Sphere(), centre = new Vector3();
-  const glows = createFarGlows(root, shell.carTemplates, shell.carTextures, object => shell.warm(object), changed), glowing: FarGlowCar[] = [];
+  const glows = createFarGlows(root, shell.carTextures, object => shell.warm(object), changed), glowing: FarGlowCar[] = [];
   const blobs = createBlobShadows(root, cars.length, object => shell.warm(object));
   /** A far car's lamps at its pose: braking on any brake pedal, headlights from the lamp flags (the full models' lamps read the same). */
   const glowOf = (car: FieldCar): FarGlowCar => {
@@ -138,17 +141,6 @@ export function createRaceField(
     const rigs = attachWheelRigs(envelope);
     return envelope.position.y + rigs.reduce((sum, rig) => sum + rig.hub.y - rig.radiusM, 0) / rigs.length;
   };
-  /** The far model's bounds in its car's frame (its parts hang at the model origin); a point at the origin without parts. */
-  const boundsOf = (car: Group) => {
-    const box = new Box3();
-    car.getObjectByName('body-envelope')!.traverse(object => {
-      if (!(object instanceof Mesh)) return;
-      const geometry = object.geometry as Mesh['geometry'];
-      if (!geometry.boundingBox) geometry.computeBoundingBox();
-      box.union(geometry.boundingBox!);
-    });
-    return box.isEmpty() ? box.setFromCenterAndSize(new Vector3(), new Vector3()) : box;
-  };
 
   /** The scene's corner note counts the cars asked for and those settled (a model, or a stand-in for good), while any load. */
   let reported = '';
@@ -181,10 +173,11 @@ export function createRaceField(
         return livery ? {livery, car: makeCar(MAP_COLORS.carBody, false, await farLoader.model(livery))} : null;
       }));
       built.forEach((entry, index) => { if (entry) farModel(slots[index], entry.car); });
+      glows.lamps(body, await farLoader.lamps(body));
       const present = built.filter(entry => entry !== null);
       unplaced = present.map(({car}) => car);
-      const boxes = present.map(({car}) => boundsOf(car)), tables = present.map(({car}) => buildCarParts(car));
-      const batches = await batchCars(tables, {releaseParsed: true, transparent: true});
+      const boxes = present.map(({car}) => envelopeBounds(car)), tables = present.map(({car}) => buildCarParts(car));
+      const batches = await batchCars(tables, {releaseParsed: true, transparent: true, shadows: true});
       farSets.push(batches);
       await Promise.all([shell.warm(batches.shared), ...present.map(({car}) => shell.warm(car))]);
       if (disposed) return;
@@ -247,10 +240,18 @@ export function createRaceField(
   const hide = (shape: {car: Group; parts: CarParts} | null) => { if (shape?.car.visible) { shape.car.visible = false; shape.parts.hide(); } };
   /** The cars in view this frame, nearest first. */
   const inView: Array<{car: FieldCar; metres: number}> = [];
-  /** The full models drawn this frame, and their places (`casters`), reused. */
+  /** The cars drawn this frame, and their places (`casters`), reused. */
   const casting: Object3D[] = [], castingAt: Vector3[] = [];
   return {
     has: slot => typeof field.get(slot) === 'object' && field.get(slot) !== null,
+    bounds(slot) {
+      const car = field.get(slot);
+      if (!car || car === 'none') return null;
+      // The tyres' contact once the full models are built, else the far model's lowest point.
+      const box = car.footprint.clone();
+      box.min.y = car.fit.bottomY;
+      return box;
+    },
     pose(slot, pose, window, carIndex) {
       const car = field.get(slot);
       if (!car || car === 'none') return;
@@ -295,7 +296,7 @@ export function createRaceField(
         motion?.setTrack(window, () => ({points: windowPoints(window, carIndex), handlingCalibration: handlingOf.get(slot)}));
         if (shown === car.far && car.fit.window !== window) fitFar(car);
         shell.placeCar(shown.car, car.pose!, motion);
-        if (shown === car.near) casting.push(shown.car);
+        casting.push(shown.car);
         setCameraDistance(shown.car, metres);
         shown.parts.sync();
         if (shown === car.far && metres < FAR_GLOW_M && glowing.length < FAR_GLOW_MAX) glowing.push(glowOf(car));

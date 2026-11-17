@@ -16,7 +16,7 @@ export interface StandInCars {
   offer(carClass: string, car: Group): void;
   /** Starts a frame: no car placed yet. */
   begin(): void;
-  /** Draws a car of `carClass` at `matrix` (its pose, at the car's lowest point) this frame; false while no stand-in is drawable yet. */
+  /** Draws a car of `carClass` at `matrix` (its lowest point: on the road under its pose) this frame; false while no stand-in is drawable yet. */
   place(carClass: string, matrix: Matrix4): boolean;
   /** Ends the frame: each stand-in draws the cars placed on it. */
   end(): void;
@@ -24,7 +24,7 @@ export interface StandInCars {
 }
 
 /**
- * One geometry of a car's body in the car's frame, its lowest point at the car's origin (on the road at its pose): positions and
+ * One geometry of a car's body in the car's frame, its lowest point at the car's origin (placed on the road): positions and
  * indices only, read through each attribute (quantized and interleaved ones included), with normals worked out again.
  */
 export function standInGeometry(car: Group): BufferGeometry {

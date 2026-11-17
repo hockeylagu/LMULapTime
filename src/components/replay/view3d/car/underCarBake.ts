@@ -14,8 +14,6 @@ export const FADE_START_M = 0.1, FADE_SPAN_M = 0.4, OUTPUT_FLOOR = 0.05, OUTPUT_
 /** The name of the quad this bake feeds; the height pass leaves it out. */
 export const CONTACT_SHADOW_NAME = 'contact-shadow';
 
-const HALF_PI = Math.PI / 2;
-
 /** What a bake uses of the renderer (a `WebGLRenderer` satisfies it). */
 export interface BakeRenderer {
   autoClear: boolean;
@@ -55,46 +53,6 @@ export function underCarQuadGeometry(size: number): PlaneGeometry {
   return geometry;
 }
 
-/** The texel's pseudo-random turn of the azimuth set (0 to AZIMUTH_JITTER_RAD); the shader hashes the same way. */
-export function azimuthJitter(column: number, row: number): number {
-  const s = Math.sin(column * 12.9898 + row * 78.233) * 43758.5453;
-  return (s - Math.floor(s)) * AZIMUTH_JITTER_RAD;
-}
-
-/**
- * Reference of the occlusion pass for one texel of a `texels`-square height map `heights` (metres above the contact plane, row
- * major, SKY_HEIGHT_M for open sky) covering `size` metres: the stored value, 1 = open sky (no shadow) down to OUTPUT_FLOOR.
- * `halfX` / `halfZ` are the footprint's half extents about the map's centre. The shader mirrors it step by step.
- */
-export function underCarStored(heights: ArrayLike<number>, texels: number, size: number, column: number, row: number, halfX: number, halfZ: number): number {
-  const metresPerTexel = size / texels, steps = Math.ceil(REACH_M / metresPerTexel), jitter = azimuthJitter(column, row);
-  const heightAt = (c: number, r: number) => c < 0 || r < 0 || c >= texels || r >= texels ? SKY_HEIGHT_M : heights[r * texels + c];
-  const selfSky = heightAt(column, row) - HEIGHT_BIAS_M > SKY_LIMIT_M;
-  let occlusion = 0;
-  for (let a = 0; a < AZIMUTHS; a++) {
-    const azimuth = a / AZIMUTHS * 2 * Math.PI + jitter, dx = Math.cos(azimuth), dy = Math.sin(azimuth);
-    let maxCar = 0, open = selfSky, start = 0, sum = 0;
-    for (let k = 1; k <= steps; k++) {
-      let h = Math.max(0, heightAt(Math.floor(column + 0.5 + dx * k), Math.floor(row + 0.5 + dy * k)) - HEIGHT_BIAS_M);
-      const sky = h > SKY_LIMIT_M;
-      h = sky ? HEIGHT_CAP_M : Math.min(h, HEIGHT_CAP_M);
-      const angle = Math.atan2(k * metresPerTexel, h); // From straight up (0) to the horizon (a quarter turn).
-      if (sky && angle > maxCar) { if (!open) { open = true; start = angle; } }
-      else {
-        if (!sky) maxCar = Math.max(maxCar, angle);
-        if (open) { sum += Math.max(0, angle - start); open = false; }
-      }
-    }
-    if (open) sum += HALF_PI - start;
-    occlusion += Math.min(Math.max(sum / HALF_PI, 0), 1);
-  }
-  occlusion /= AZIMUTHS;
-  const x = Math.abs(((column + 0.5) / texels - 0.5) * size), z = Math.abs(((row + 0.5) / texels - 0.5) * size);
-  const outside = Math.hypot(Math.max(x - halfX, 0), Math.max(z - halfZ, 0));
-  const fade = (Math.min(Math.max(outside - FADE_START_M, 0), 1) / FADE_SPAN_M) ** 2;
-  return Math.min(1, OUTPUT_FLOOR + OUTPUT_GAIN * Math.min(Math.max(occlusion + fade, 0), 1));
-}
-
 /** The height pass: each fragment writes its height above the contact plane (parts are placed in the car's frame, which is the camera's world). */
 export const HEIGHT_VERTEX = /* glsl */ `
 uniform float uMinY;
@@ -107,7 +65,7 @@ export const HEIGHT_FRAGMENT = /* glsl */ `
 varying float vHeight;
 void main() { gl_FragColor = vec4(vHeight, 0.0, 0.0, 1.0); }`;
 
-/** The occlusion pass (mirrors `underCarStored`); writes the shadow's darkness, 1 - stored, to every channel. */
+/** The occlusion pass; writes the shadow's darkness, 1 - stored, to every channel. */
 export const OCCLUSION_VERTEX = /* glsl */ `
 varying vec2 vUv;
 void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;

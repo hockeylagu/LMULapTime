@@ -1,4 +1,5 @@
-import type { BodyDescriptor, BodyResource } from '../../../shared/types/scenes/car.js';
+import { descriptorTexturePath, normalizeVehicleId } from '../../../shared/packageContract/index.js';
+import type { BodyDescriptor, BodyResource, CarAppearance } from '../../../shared/types/scenes/car.js';
 import { fetchBinary, fetchJson } from '../apiClient.js';
 
 /** Content-named body files of the package's `vehicles/` folder: the GLB at `<sha256>.glb`, the descriptor at `bodies/<folder>.json`, textures at `textures/<sha256>.ktx2.zst`. */
@@ -24,6 +25,21 @@ export interface LoadedBody {
   volumes: Map<string, ArrayBuffer>;
   /** The lap's installed VEH id, selecting the appearance (livery) of the shared model. */
   vehicleId: string;
+}
+
+/** The appearance (livery) the body's VEH id selects; undefined when the body has none for it. */
+export function appearanceOf(body: LoadedBody): CarAppearance | undefined {
+  const key = normalizeVehicleId(body.vehicleId);
+  return body.descriptor.appearances.find(row => normalizeVehicleId(row.alias) === key);
+}
+
+/**
+ * The start file of the body's texture at `path` (`textures/<sha256>.ktx2.zst`) and how many of the texture's largest levels it
+ * leaves out (the row states both level counts); undefined for a texture without one.
+ */
+export function startFileOf(body: LoadedBody, path: string): {path: string; skip: number} | undefined {
+  const row = body.resource.textures.find(each => descriptorTexturePath(each.sha256) === path);
+  return row?.start && row.levels !== undefined ? {path: descriptorTexturePath(row.start.sha256), skip: row.levels - row.start.levels} : undefined;
 }
 
 /** The 3D body serving a VEH id. A vehicle without one is an error: the package covers every catalogued vehicle. */

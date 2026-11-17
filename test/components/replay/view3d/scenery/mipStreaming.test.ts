@@ -1,6 +1,7 @@
 import { CompressedTexture, DataTexture, RGBA_BPTC_Format, SRGBColorSpace, type Texture, type WebGLRenderer } from 'three';
 import { expect, it, vi } from 'vitest';
-import { fullPixels, isStreaming, releaseOnUpload, startStreaming, STREAMED_LEVELS, streamTexture, whenUploaded, type MipLevel } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
+import { fullPixels, isStreaming, releaseOnUpload, startStreaming, streamTexture, whenUploaded, type MipLevel } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
+import { focusOf } from '../../../../../src/components/replay/view3d/scenery/textureFocus.js';
 
 const MiB = 1024 * 1024;
 
@@ -38,28 +39,33 @@ function bc7(size: number): CompressedTexture {
 
 const chainBytes = (size: number) => (bc7(size).mipmaps as MipLevel[]).reduce((sum, level) => sum + level.data.byteLength, 0);
 
-it('uploads the reduced levels first, then swaps in a source of the full size with every level, in one step', () => {
-  const gpu = fakeRenderer(), texture = bc7(2048);
-  startStreaming(texture);
-  expect([texture.mipmaps.length, texture.source.data.width, isStreaming(texture), fullPixels(texture)]).toEqual([12 - STREAMED_LEVELS, 512, true, 2048 * 2048]);
+/** How a loader reads the `missing` levels above a start file whose top is `startPx` wide. */
+const above = (startPx: number, missing: number, source = file()) => ({missing, load: async () => (bc7(startPx << missing).mipmaps as MipLevel[]).slice(0, missing), ...source});
+
+it('uploads the reduced levels first, then swaps in a source of the full size with every level, in one step', async () => {
+  const gpu = fakeRenderer(), texture = bc7(512), missing = 2;
+  startStreaming(texture, above(512, missing));
+  expect([texture.mipmaps.length, texture.source.data.width, isStreaming(texture), fullPixels(texture)]).toEqual([10, 512, true, 2048 * 2048]);
   expect(streamTexture(texture, gpu.renderer)).toBe(0); // Not on the GPU yet.
   texture.needsUpdate = true;
   gpu.renderer.initTexture(texture);
   expect(gpu.uploads).toEqual([{sourceWidth: 512, widths: Array.from({length: 10}, (_, i) => 512 >> i), bytes: chainBytes(2048) - 5 * MiB}]);
   const reduced = texture.source, dispose = vi.fn(() => { expect(texture.source).toBe(reduced); }); // The old storage is freed under the old source.
   texture.addEventListener('dispose', dispose);
-  expect(streamTexture(texture, gpu.renderer)).toBe(chainBytes(2048));
+  await vi.waitFor(() => { expect(streamTexture(texture, gpu.renderer)).toBe(chainBytes(2048)); });
   expect([dispose.mock.calls.length, texture.source === reduced, isStreaming(texture)]).toEqual([1, false, false]);
   expect(gpu.uploads[1]).toEqual({sourceWidth: 2048, widths: Array.from({length: 12}, (_, i) => 2048 >> i), bytes: chainBytes(2048)});
+  // It comes into focus from the levels it drew without (textureFocus.ts).
+  expect(focusOf(texture)).toBeGreaterThan(missing - 0.1);
   expect(streamTexture(texture, gpu.renderer)).toBe(0);
 });
 
-it('lets the levels go once the swap is on the GPU, and the loader copy with them', () => {
-  const gpu = fakeRenderer(), texture = bc7(1024), source = file(), full = (texture.mipmaps as MipLevel[]).map(level => [level.width, level.height]);
-  startStreaming(texture, undefined, source);
+it('lets the levels go once the swap is on the GPU, and the loader copy with them', async () => {
+  const gpu = fakeRenderer(), texture = bc7(512), source = file(), full = (bc7(1024).mipmaps as MipLevel[]).map(level => [level.width, level.height]);
+  startStreaming(texture, above(512, 1, source));
   texture.needsUpdate = true; gpu.renderer.initTexture(texture);
   expect([source.drop.mock.calls.length, texture.mipmaps[0].data.byteLength > 0]).toEqual([0, true]);
-  streamTexture(texture, gpu.renderer);
+  await vi.waitFor(() => { expect(streamTexture(texture, gpu.renderer)).toBe(chainBytes(1024)); });
   expect(source.drop).toHaveBeenCalledOnce();
   // Every level keeps its size but holds no data.
   expect((texture.mipmaps as MipLevel[]).map(level => [level.width, level.height, level.data.byteLength])).toEqual(full.map(([width, height]) => [width, height, 0]));
@@ -68,19 +74,25 @@ it('lets the levels go once the swap is on the GPU, and the loader copy with the
   expect(() => { gpu.renderer.initTexture(texture); }).toThrow('uploaded again');
 });
 
-it('swaps a raw texture the same way', () => {
+it('swaps a raw texture the same way', async () => {
   const gpu = fakeRenderer(), levels = Array.from({length: 10}, (_, i) => ({data: new Uint8Array((512 >> i) ** 2 * 4), width: 512 >> i, height: 512 >> i}));
-  const texture: Texture = new DataTexture(null, 512, 512);
-  texture.mipmaps = levels;
-  startStreaming(texture);
+  const texture: Texture = new DataTexture(null, 128, 128);
+  texture.mipmaps = levels.slice(2);
+  startStreaming(texture, {missing: 2, load: async () => levels.slice(0, 2), ...file()});
   texture.needsUpdate = true; gpu.renderer.initTexture(texture);
-  expect(streamTexture(texture, gpu.renderer)).toBe(levels.reduce((sum, level) => sum + level.data.byteLength, 0));
+  await vi.waitFor(() => { expect(streamTexture(texture, gpu.renderer)).toBe(levels.reduce((sum, level) => sum + level.data.byteLength, 0)); });
   expect(gpu.uploads.map(upload => [upload.sourceWidth, upload.widths.length])).toEqual([[128, 8], [512, 10]]);
+});
+
+it('streams nothing for a texture read whole, and leaves one without a loader file as it is', () => {
+  const texture = bc7(2048), source = texture.source;
+  startStreaming(texture);
+  expect([isStreaming(texture), texture.source === source, texture.mipmaps.length, fullPixels(texture)]).toEqual([false, true, 12, 0]);
 });
 
 it('tells a waiting caller when the texture is on the GPU', () => {
   const gpu = fakeRenderer(), texture = bc7(512), early = vi.fn(), late = vi.fn();
-  startStreaming(texture);
+  startStreaming(texture, above(512, 1));
   whenUploaded(texture, early);
   texture.needsUpdate = true; gpu.renderer.initTexture(texture);
   whenUploaded(texture, late);
@@ -144,7 +156,7 @@ it('sharpens a texture whose given size is one level above its start file', asyn
   expect([gpu.uploads[1].widths.slice(0, 2), isStreaming(texture)]).toEqual([[1024, 512], false]);
 });
 
-it('lets a small texture go right after its first upload', () => {
+it('lets a texture read whole go right after its first upload', () => {
   const gpu = fakeRenderer(), texture = bc7(256), source = file();
   releaseOnUpload(texture, source);
   expect([isStreaming(texture), source.drop.mock.calls.length]).toEqual([false, 0]);

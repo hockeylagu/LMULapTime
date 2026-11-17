@@ -6,8 +6,8 @@ const HALF_X = 1, HALF_Z = 2.4;
 
 /**
  * The contact shadow (`contactShadowQuad`) under the race cars that have no own one (far models and grey stand-ins), in one
- * instanced draw: a car turning near trades it for its full model's contact shadow and its sun shadow, so these no longer appear
- * from nothing. Each frame its owner places the cars (`begin`, `place`, `end`); only those draw.
+ * instanced draw: a car turning near trades it for its full model's contact shadow (the sun's shadow both models cast). Each
+ * frame its owner places the cars (`begin`, `place`, `end`); only those draw.
  */
 export interface BlobShadows {
   begin(): void;

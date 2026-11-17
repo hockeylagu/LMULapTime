@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { CubeTexture, MeshPhysicalMaterial, NoColorSpace, ShaderLib, SRGBColorSpace, Texture, WebGLCubeRenderTarget, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
+import { CubeTexture, MeshPhysicalMaterial, NoColorSpace, ShaderLib, SRGBColorSpace, Texture, UniformsUtils, WebGLCubeRenderTarget, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
 import { configureCarPaint, setPaintReflection } from '../../../../../src/components/replay/view3d/car/carPaint.js';
 import { materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarSurface } from '../../../../../shared/types/scenes/car.js';
@@ -19,7 +19,8 @@ const paint = (maps: CarSurface['maps']): CarSurface => ({
 });
 
 function compile(material: MeshPhysicalMaterial): WebGLProgramParametersWithUniforms {
-  const shader = {uniforms: {}, vertexShader: ShaderLib.physical.vertexShader, fragmentShader: ShaderLib.physical.fragmentShader} as unknown as WebGLProgramParametersWithUniforms;
+  // As three compiles it: the program's own uniforms, then the material's hook.
+  const shader = {uniforms: UniformsUtils.clone(ShaderLib.physical.uniforms), vertexShader: ShaderLib.physical.vertexShader, fragmentShader: ShaderLib.physical.fragmentShader} as unknown as WebGLProgramParametersWithUniforms;
   material.onBeforeCompile(shader, null as never);
   return shader;
 }
@@ -31,9 +32,14 @@ it("builds regional layered car paint on three's physical model", () => {
   const shader = compile(material), uniforms = shader.uniforms;
   // Each map decoded by its colour role: the region and AO/spec masks are colour stages, read through sRGB.
   expect([uniforms.paint_region, uniforms.paint_aoSpec, uniforms.paint_carbon].map(uniform => (uniform.value as Texture).colorSpace)).toEqual([SRGBColorSpace, SRGBColorSpace, NoColorSpace]);
-  // Every hook applied: the coat output now carries the lacquer absorption, and both paint maps are sampled.
+  // Every hook applied: the coat output now carries the lacquer absorption, and the livery and both paint maps are sampled, each
+  // fading in as it sharpens (textureFocus.ts).
   expect(shader.fragmentShader).not.toContain('outgoingLight = outgoingLight * ( 1.0 - material.clearcoat * Fcc )');
-  for (const marker of ['texture2D(paint_region, vMapUv)', 'texture2D(paint_aoSpec, vMapUv)', 'roughnessFactor = clamp(paintBaseRoughness', 'reflectedLight.indirectDiffuse *= paintAO']) {
+  for (const marker of ['focusTexture(map, focus_map, vMapUv )', 'focusTexture(paint_region, focus_paint_region, vMapUv)', 'focusTexture(paint_aoSpec, focus_paint_aoSpec, vMapUv)',
+    'roughnessFactor = clamp(paintBaseRoughness', 'reflectedLight.indirectDiffuse *= paintAO',
+    // The coats' rising rays are tested against the scenery over the car, its tops and undersides (car/overheadMap.ts), read
+    // compared and filtered.
+    'uniform sampler2DShadow overhead_top, overhead_below', 'vec4 fix = overheadFix(r);']) {
     expect(shader.fragmentShader).toContain(marker);
   }
   expect(shader.fragmentShader).toContain('material.clearcoatF0 = vec3(paintCoatF0)');

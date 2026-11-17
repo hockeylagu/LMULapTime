@@ -119,16 +119,17 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
   /**
    * During playback, uploads go in per-frame slices of time and of the frame's bytes, which all warm-ups share: a whole chunk or car
    * at once is the stall this avoids. Behind the loading screen nothing is drawn, so long slices only yield a task now and then to
-   * keep the page responsive.
+   * keep the page responsive. Each pause reads whether the scene shows now: a warm-up begun behind the loading screen waits on the
+   * frames once the first one is out, since only a frame pays the bytes off.
    */
   const slice = (): UploadSlice => {
-    const budgetMs = shown ? UPLOAD_SLICE_MS : LOADING_SLICE_MS;
-    const pause = shown ? () => { warmsWait = true; return nextFrame(); } : nextTask;
-    let end = performance.now() + budgetMs;
+    const budgetMs = () => (shown ? UPLOAD_SLICE_MS : LOADING_SLICE_MS);
+    let end = performance.now() + budgetMs();
     return sentBytes => {
       if (shown) frameBytes += sentBytes;
       if (performance.now() < end && (!shown || frameBytes < UPLOAD_BYTES_PER_FRAME)) return undefined;
-      return pause().then(() => { end = performance.now() + budgetMs; });
+      const paused = shown ? (warmsWait = true, nextFrame()) : nextTask();
+      return paused.then(() => { end = performance.now() + budgetMs(); });
     };
   };
   const list = (roots: Object3D | readonly Object3D[]): readonly Object3D[] => (roots instanceof Object3D ? [roots] : roots);

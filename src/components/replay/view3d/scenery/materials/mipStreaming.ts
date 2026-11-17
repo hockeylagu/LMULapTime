@@ -1,17 +1,15 @@
 import { TextureSource, type Texture, type TypedArray, type WebGLRenderer } from 'three';
+import { startFocus } from '../textureFocus.js';
 
 /**
- * Mip streaming: a large scenery texture first draws from its reduced levels (all but the top `STREAMED_LEVELS`, or the levels
- * of its start file) and sharpens later in one step: the texture gets a new source sized to the full image and every level in
- * `mipmaps`, and three, which keys a texture's GPU storage by its source, allocates and uploads the whole chain. Small textures
- * load whole.
+ * Mip streaming: a large texture first draws from its reduced levels (the levels of its start file, which the package gives every
+ * large texture) and sharpens later in one step: the texture gets a new source sized to the full image and every level in
+ * `mipmaps`, and three, which keys a texture's GPU storage by its source, allocates and uploads the whole chain. The programs that
+ * read it then bring it into focus over a moment (`textureFocus.ts`). A texture without a start file loads whole.
  *
  * Once a texture is whole on the GPU its levels are let go (size-only placeholders in `mipmaps`, and the loader's cached copy):
  * the GPU holds them now. A texture is never uploaded again; a lost context ends the scene.
  */
-export const STREAMED_LEVELS = 2;
-const STREAMED_MIN_PX = 512;
-
 export interface MipLevel { data: TypedArray; width: number; height: number }
 /** A texture's file in the loader: `drop` frees the loader's own copy of its levels. */
 export interface LevelFile { drop: () => void }
@@ -29,26 +27,21 @@ let detailRequests = 0;
 const streams = new WeakMap<Texture, Stream>();
 
 /**
- * Makes a large texture start on its reduced levels. With `detail`, the texture holds only those levels and the ones above are
- * fetched when it sharpens. `file` (the detail's by default) is what is let go once the texture is whole; a small texture streams
- * nothing but is let go the same.
+ * Makes a texture read from its start file sharpen later: with `detail`, it holds only the start file's levels and the ones above
+ * are fetched when it sharpens. `file` (the detail's by default) is what is let go once the texture is whole; a texture read whole
+ * (no `detail`) streams nothing but is let go the same (`releaseOnUpload`).
  */
 export function startStreaming(texture: Texture, detail?: DetailLoader, file: LevelFile | undefined = detail): void {
-  const levels = texture.mipmaps as MipLevel[];
-  if (detail) { install(texture, levels, [], detail.missing, file, detail); return; }
-  if (levels.length <= STREAMED_LEVELS || Math.min(levels[0].width, levels[0].height) < STREAMED_MIN_PX) {
-    if (file) releaseOnUpload(texture, file);
-    return;
-  }
-  install(texture, levels.slice(STREAMED_LEVELS), levels.slice(0, STREAMED_LEVELS), STREAMED_LEVELS, file);
+  if (detail) install(texture, detail.missing, file, detail);
+  else if (file) releaseOnUpload(texture, file);
 }
 
 /**
- * A texture too small to stream: its levels go to the GPU at its first upload and are let go right after, so neither the
- * texture nor the loader's cache keeps a copy.
+ * A texture read whole: its levels go to the GPU at its first upload and are let go right after, so neither the texture nor the
+ * loader's cache keeps a copy.
  */
 export function releaseOnUpload(texture: Texture, file: LevelFile): void {
-  install(texture, texture.mipmaps as MipLevel[], [], 0, file);
+  install(texture, 0, file);
 }
 
 /** A source sized to the top of `levels`. */
@@ -61,11 +54,11 @@ function sourceOf(levels: MipLevel[]): TextureSource<unknown> {
  * from; and three skips the upload of a second texture on a shared source) and lets the levels go in `onUpdate`, which three
  * runs after each upload. `missing` top levels stream in later.
  */
-function install(texture: Texture, reduced: MipLevel[], above: MipLevel[], missing: number, file?: LevelFile, detail?: DetailLoader): void {
-  texture.mipmaps = reduced;
+function install(texture: Texture, missing: number, file?: LevelFile, detail?: DetailLoader): void {
+  const reduced = texture.mipmaps as MipLevel[];
   texture.source = sourceOf(reduced);
   // Only the file's `drop` is kept, not the detail loader (its closure holds the fetched levels).
-  const drop = file?.drop, stream: Stream = {reduced, above, missing, onGpu: false, swapping: false, detail};
+  const drop = file?.drop, stream: Stream = {reduced, above: [], missing, onGpu: false, swapping: false, detail};
   let whole = false;
   if (missing) streams.set(texture, stream);
   const release = () => {
@@ -148,5 +141,6 @@ export function streamTexture(texture: Texture, renderer: WebGLRenderer): number
   texture.mipmaps = levels;
   texture.needsUpdate = true;
   renderer.initTexture(texture);
+  startFocus(texture, stream.missing);
   return levels.reduce((sum, level) => sum + level.data.byteLength, 0);
 }

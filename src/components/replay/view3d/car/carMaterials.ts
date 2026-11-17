@@ -1,4 +1,5 @@
-import { DoubleSide, MeshPhysicalMaterial, type Data3DTexture, MeshStandardMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
+import { DoubleSide, MeshPhysicalMaterial, type Data3DTexture, MeshStandardMaterial, NoColorSpace, RepeatWrapping, ShaderChunk, SRGBColorSpace, type Texture } from 'three';
+import { patchTextureFocus } from '../scenery/textureFocus.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { hazeProgram } from '../atmosphere/haze.js';
@@ -10,8 +11,9 @@ import { isUvAnimation } from '../scenery/materials/surfaceAnimation.js';
 import type { SurfaceConfig, SurfaceMap } from '../scenery/materials/surfaceConfig.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
 import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
-import { configureCarPaint, PAINT_MAPS } from './carPaint.js';
-import { bindCarSurfaceReflection } from './carReflection.js';
+import { configureCarPaint } from './carPaint.js';
+import { PAINT_MAPS } from './paintLayers.js';
+import { bindCarSurfaceReflection, CAR_SURFACE_OVERHEAD_UNITS } from './carReflection.js';
 import { bindCockpitOcclusion } from './cockpitOcclusion.js';
 
 const UV_CHANNEL: Record<string, number> = { uv0: 0, uv1: 1, uv2: 2, uv3: 3 };
@@ -135,7 +137,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     bindSurfaceProgram(material, surface, loaded);
     bindCarSurfaceReflection(material);
     // The car batching reads it (carBatching.ts); a cabin volume adds its own (below).
-    material.userData.surfaceTextureUnits = surfaceTextureUnits(surface) + (recipe.reflectionOcclusion ? 1 : 0);
+    material.userData.surfaceTextureUnits = surfaceTextureUnits(surface) + CAR_SURFACE_OVERHEAD_UNITS + (recipe.reflectionOcclusion ? 1 : 0);
     material.addEventListener('dispose', () => { for (const map of Object.values(loaded)) map.dispose(); });
   } else if (path) {
     // Every textured car material and paint has an albedo map; a livery file replaces its texture on the same UV set.
@@ -156,7 +158,12 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   if (config.kind === 'carPaint' && material.map) configureCarPaint(material as MeshPhysicalMaterial, config, texture, shading);
   else if (!surface) {
     // Three's own program otherwise: the same ambient lookup as every other surface of the scene.
-    material.onBeforeCompile = shader => { patchAmbientLookup(shader); };
+    material.onBeforeCompile = shader => {
+      patchAmbientLookup(shader);
+      // Written out: the albedo's lookup fades in as it sharpens.
+      shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', ShaderChunk.map_fragment);
+      patchTextureFocus(shader, ['map']);
+    };
     // three shares a program between materials with the same key: the key names every hook these materials get, the cascade
     // shadow added below included, so no material with other hooks takes this program.
     material.customProgramCacheKey = () => 'lmu-car-ambient-cascade';

@@ -21,6 +21,7 @@ vi.mock('../../../../../src/components/replay/view3d/cars/farCars.js', async () 
         models.far.set(body.vehicleId, group);
         return group;
       },
+      lamps: async () => ({optionNodes: [], lamps: []}),
     }),
   };
 });
@@ -139,8 +140,9 @@ describe('createRaceField', () => {
       expect(nearCar(slot)!.visible).toBe(false);
       expect(farCar(slot).visible).toBe(true);
     }
-    // The six full models cast, where they stand; the far models do not.
-    expect(field.casters().map(at => at.clone())).toEqual([0, 1, 2, 3, 4, 5].map(slot => nearCar(slot)!.getWorldPosition(new Vector3())));
+    // Every drawn car casts where it stands, the far models too: the six full models and the two far ones.
+    const drawn = (slot: number) => (slot < 6 ? nearCar(slot)! : farCar(slot)).getWorldPosition(new Vector3());
+    expect(field.casters().map(at => at.clone())).toEqual([0, 1, 2, 3, 4, 5, 6, 7].map(drawn));
   });
 
   it('fits a far model to the road under its poses: its lowest point on the road', async () => {
@@ -150,6 +152,10 @@ describe('createRaceField', () => {
     field.beforeDraw(camera);
     // The far model's boxes reach 0.5 m below its origin (`BoxGeometry(1, 1, 1)`), the road is at 0 and so are the poses.
     expect(farCar(0).getObjectByName('body-envelope')!.position.y).toBeCloseTo(0.5);
+    // Its body's bounds, from where it meets the road (its lowest point, no full model built) to its top, for picking.
+    const box = field.bounds(0)!;
+    expect([box.min.y, box.max.y]).toEqual([expect.closeTo(-0.5), expect.closeTo(0.5)]);
+    expect(field.bounds(9)).toBeNull();
   });
 
   it('draws a car beyond its far distance as the far model', async () => {

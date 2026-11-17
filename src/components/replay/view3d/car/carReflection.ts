@@ -1,8 +1,9 @@
-import { Box3, CubeCamera, HalfFloatType, LinearMipmapLinearFilter, MeshStandardMaterial, PMREMGenerator, Vector3, WebGLCubeRenderTarget, type IUniform, type Material, type Mesh, type Object3D, type Scene, type Texture, type WebGLRenderer } from 'three';
+import { Box3, CubeCamera, HalfFloatType, LinearMipmapLinearFilter, MeshStandardMaterial, PMREMGenerator, ShaderChunk, Vector3, WebGLCubeRenderTarget, type IUniform, type Material, type Mesh, type Object3D, type Scene, type Texture, type WebGLRenderer } from 'three';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { convolveReflection, type ReflectionCubes } from '../reflectionCube.js';
-import { sceneryReflectionUniforms } from '../scenery/materials/sceneryReflection.js';
+import { SCENERY_REFLECTION_GLSL, sceneryReflectionUniforms } from '../scenery/materials/sceneryReflection.js';
 import { isCarPaint, setPaintReflection } from './carPaint.js';
+import { createOverheadMap, OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
 
 /**
  * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. One face a frame, so a probe renews every eight
@@ -51,8 +52,50 @@ export interface CarReflection {
   dispose(): void;
 }
 
-/** The probe's convolved cube of each car material drawn by the surface program, once its car has one. */
-const surfaceCubes = new WeakMap<Material, {cube: Texture | null}>();
+/** The probe's convolved cube of each car material drawn by the surface program, once its car has one, and what stands over the car. */
+const surfaceCubes = new WeakMap<Material, {cube: Texture | null; overhead: CarOverhead | null}>();
+
+/** The scenery rule's probe read, and the uniforms it follows. */
+const SURFACE_READ = 'vec3 light = surface_reflectionReady > 0.5 ? textureLod(surface_reflection, r, surface_reflectionLodScale * roughness).rgb : radiance;';
+const SURFACE_UNIFORMS = 'uniform float surface_reflectionReady, surface_reflectionLodScale, surface_dielectricF0;';
+/** three's environment read, which the car's other surface-program materials (glass, screens) take from the probe's prefiltered cube. */
+const IBL_READ = 'vec3 iblRadiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );';
+for (const [chunk, line] of [[SCENERY_REFLECTION_GLSL, SURFACE_READ], [SCENERY_REFLECTION_GLSL, SURFACE_UNIFORMS], [ShaderChunk.lights_fragment_maps, IBL_READ]]) {
+  if (!chunk.includes(line)) throw Error(`A reflection lookup changed: the car's overhead correction needs updating (${line})`);
+}
+/** The samplers the overhead correction adds to a car surface-program material: the overhead test's two maps and the venue's cube. */
+export const CAR_SURFACE_OVERHEAD_UNITS = 3;
+
+/**
+ * The overhead correction (car/overheadMap.ts) of either read: where the scenery overhead makes the probe stale, the venue's convolved
+ * cube by the scenery rule stands for the sky, or the probe is read toward that scenery from the face's eye. For three's read a
+ * view-space direction d reads itself as both view and normal.
+ */
+const CAR_OVERHEAD_GLSL = `${OVERHEAD_GLSL}
+  uniform samplerCube overhead_sky; uniform float overhead_skyLodScale;
+  vec3 overheadSky(vec3 r, float roughness) { return textureLod(overhead_sky, r, overhead_skyLodScale * roughness).rgb; }
+  #ifdef USE_ENVMAP
+    vec3 carIBLRadiance(vec3 viewDir, vec3 n, float roughness) {
+      vec3 light = getIBLRadiance(viewDir, n, roughness);
+      vec4 fix = overheadFix(transformDirectionByInverseViewMatrix(reflect(-viewDir, n), viewMatrix));
+      if (fix.w < 0.0) light = mix(light, overheadSky(fix.xyz, roughness), -fix.w);
+      else if (fix.w > 0.0) {
+        vec3 d = normalize((viewMatrix * vec4(fix.xyz, 0.0)).xyz);
+        light = mix(light, getIBLRadiance(d, d, roughness), fix.w);
+      }
+      return light;
+    }
+  #endif
+`;
+const CAR_SURFACE_GLSL = `${SURFACE_UNIFORMS}
+  vec3 carSurfaceReflection(vec3 seen, vec3 r, float roughness) {
+    vec4 fix = overheadFix(r);
+    vec3 light = seen;
+    if (fix.w < 0.0) light = mix(seen, overheadSky(r, roughness), -fix.w);
+    else if (fix.w > 0.0) light = mix(seen, textureLod(surface_reflection, fix.xyz, surface_reflectionLodScale * roughness).rgb, fix.w);
+    return light;
+  }
+`;
 
 /**
  * Makes a car material drawn by the surface program (lamp housings and covers, wheels, trim) reflect its own car's probe: the
@@ -60,19 +103,30 @@ const surfaceCubes = new WeakMap<Material, {cube: Texture | null}>();
  * values read the car's convolved cube instead; a car without a probe keeps the venue's.
  */
 export function bindCarSurfaceReflection(material: MeshStandardMaterial): void {
-  const own: {cube: Texture | null} = {cube: null}, bound = material.onBeforeCompile.bind(material);
+  const own: {cube: Texture | null; overhead: CarOverhead | null} = {cube: null, overhead: null}, bound = material.onBeforeCompile.bind(material);
   const cube: IUniform<Texture | null> = {get value() { return own.cube ?? sceneryReflectionUniforms.surface_reflection.value; }};
   const ready: IUniform<number> = {get value() { return own.cube ? 1 : sceneryReflectionUniforms.surface_reflectionReady.value; }};
   surfaceCubes.set(material, own);
   material.onBeforeCompile = (shader, renderer) => {
     bound(shader, renderer);
     shader.uniforms.surface_reflection = cube; shader.uniforms.surface_reflectionReady = ready;
+    // Corrected only while the material reads its own car's probe and the venue's cube stands ready for the sky.
+    Object.assign(shader.uniforms, overheadUniforms(() => own.cube && sceneryReflectionUniforms.surface_reflectionReady.value > 0.5 ? own.overhead : null), {
+      overhead_sky: sceneryReflectionUniforms.surface_reflection, overhead_skyLodScale: sceneryReflectionUniforms.surface_reflectionLodScale,
+    });
+    const fragment = shader.fragmentShader.replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${CAR_OVERHEAD_GLSL}`);
+    shader.fragmentShader = fragment.includes(SURFACE_READ)
+      ? fragment.replace(SURFACE_UNIFORMS, CAR_SURFACE_GLSL).replace(SURFACE_READ, `${SURFACE_READ}\n    light = carSurfaceReflection(light, r, roughness);`)
+      : fragment.replace(IBL_READ, 'vec3 iblRadiance = carIBLRadiance( geometryViewDir, geometryNormal, material.roughness );');
   };
+  // Its program is no longer the scenery's of the same configuration.
+  const key = material.customProgramCacheKey.bind(material);
+  material.customProgramCacheKey = () => `${key()}-car`;
 }
 
-function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null): boolean {
+function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null, overhead: CarOverhead | null): boolean {
   const own = surfaceCubes.get(material);
-  if (own) own.cube = cubes?.convolved ?? null;
+  if (own) { own.cube = cubes?.convolved ?? null; own.overhead = overhead; }
   return own !== undefined;
 }
 
@@ -96,6 +150,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
   const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
   const prefiltered: WebGLCubeRenderTarget = generator.fromCubemap(target.texture);
+  /** What stands over the scenery around the car, and the shown probe's face eyes: the paint tells where the probe is stale. */
+  const map = createOverheadMap(renderer, scene), overhead: CarOverhead = {map, eyes: new Float32Array(18)}, drawnEyes = new Float32Array(18);
   let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, rested = 0, deferred = false;
   /** The paint of the cars sharing the probe (`share`), until each material is disposed. */
   const sharedPaint = new Set<Material>();
@@ -106,10 +162,10 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   const at = new Vector3(), probed = new Vector3(), box = new Box3(), measure = new Vector3();
   const takeReflection = () => {
     for (const material of materials) {
-      setSurfaceReflection(material, cubes);
-      if (!setPaintReflection(material, cubes) && material.envMap === null) material.envMap = prefiltered.texture;
+      setSurfaceReflection(material, cubes, overhead);
+      if (!setPaintReflection(material, cubes, overhead) && material.envMap === null) material.envMap = prefiltered.texture;
     }
-    for (const paint of sharedPaint) setPaintReflection(paint, cubes);
+    for (const paint of sharedPaint) setPaintReflection(paint, cubes, overhead);
   };
   return {
     setCar(car, nextHidden) {
@@ -132,17 +188,19 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
           if (!(entry instanceof MeshStandardMaterial)) continue;
           if (isCarPaint(entry)) {
             if (!sharedPaint.has(entry)) { sharedPaint.add(entry); entry.addEventListener('dispose', forget); }
-            setPaintReflection(entry, cubes);
+            setPaintReflection(entry, cubes, overhead);
           } else if (entry.envMap === null) entry.envMap = prefiltered.texture;
         }
       });
     },
-    stale() { stale = true; },
+    stale() { stale = true; map.stale(); },
     update(car, busy = false) {
       // A step stacked on a busy frame made it one of the slowest of a race start (a face and a shadow redraw, 2026-11-15).
       const faceDue = (face > 0 || stale || probed.distanceToSquared(car) >= MOVED_M * MOVED_M) && (rested + 1) % FRAMES_PER_FACE === 0;
       if (busy && cubes && !deferred && (pending !== null || faceDue)) { deferred = true; return true; }
       deferred = false;
+      // The map is drawn before the faces it is read with.
+      if (map.update(car, hidden ? [hidden] : [], busy)) takeReflection();
       if (pending === 'prefilter') {
         generator.fromCubemap(target.texture, prefiltered);
         pending = 'convolve';
@@ -151,6 +209,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       if (pending === 'convolve') {
         pending = null;
         cubes = convolveReflection(renderer, target, shading.convolution.kernels, cubes ?? undefined); // Reuses its cube after the first probe.
+        overhead.eyes.set(drawnEyes);
         takeReflection(); // The paint's sharp cube is now the one just drawn.
         target = targets[target === targets[0] ? 1 : 0];
         return true; // The next frame shows the new probe.
@@ -164,6 +223,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       at.copy(car);
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
       camera.position.copy(at); camera.position.y += eyeAbove; camera.updateMatrixWorld();
+      for (let each = face; each < face + FACES_PER_FRAME; each++) camera.position.toArray(drawnEyes, each * 3);
       const previous = renderer.getRenderTarget(), shown = hidden?.visible ?? false;
       try {
         if (hidden) hidden.visible = false;
@@ -182,13 +242,13 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
     },
     dispose() {
       for (const material of materials) {
-        setSurfaceReflection(material, null);
+        setSurfaceReflection(material, null, null);
         if (!setPaintReflection(material, null) && material.envMap === prefiltered.texture) material.envMap = null;
       }
       for (const paint of sharedPaint) { setPaintReflection(paint, null); paint.removeEventListener('dispose', forget); }
       sharedPaint.clear();
       for (const each of targets) each.dispose();
-      prefiltered.dispose(); cubes?.dispose(); generator.dispose();
+      prefiltered.dispose(); cubes?.dispose(); generator.dispose(); map.dispose();
     },
   };
 }

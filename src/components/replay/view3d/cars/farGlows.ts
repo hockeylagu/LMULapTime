@@ -1,10 +1,10 @@
-import { Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, PropertyBinding, type BufferGeometry, type Material, type Object3D } from 'three';
-import { descriptorTexturePath, normalizeVehicleId, type CarLamp } from '../../../../../shared/packageContract/index.js';
-import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import { BufferGeometry, Group, InstancedMesh, type Matrix4, type Material, type Object3D } from 'three';
+import { normalizeVehicleId, type CarLamp } from '../../../../../shared/packageContract/index.js';
+import { appearanceOf, startFileOf, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createLampMaterial, lampGlow } from '../car/carLamps.js';
 import { lampStateFrame } from '../car/lampStates.js';
-import type { CarTemplates } from './carTemplates.js';
 import type { CarTextures } from './carModels.js';
+import type { FarLamps } from './farCars.js';
 
 /** Far cars whose lamps can glow at once: one instance each per glowing lamp. */
 export const FAR_GLOW_MAX = 16;
@@ -20,18 +20,18 @@ export interface FarGlowCar {
 }
 
 export interface FarGlows {
+  /** A body's lamp glow meshes, given once its far model is read and before any of its cars is drawn. */
+  lamps(body: LoadedBody, far: FarLamps): void;
   /** The glowing lamps of these cars (nearest first, at most `FAR_GLOW_MAX`); a body without its glows yet starts loading them. */
   draw(cars: readonly FarGlowCar[]): void;
   dispose(): void;
 }
 
-/** One glowing frame of a lamp on one glow mesh: its instances are the cars showing that frame. */
+/** One glowing frame of a lamp on one part of its glow mesh: its instances are the cars showing that frame. */
 interface GlowFrame {
   lamp: CarLamp & {states: NonNullable<CarLamp['states']>};
   frame: number;
-  /** The mesh in the body's frame. */
-  local: Matrix4;
-  /** The option parts above the mesh: a livery shows it only with all of them. */
+  /** The option parts the triangles belong to: a livery shows them only with all of them. */
   options: string[];
   mesh: InstancedMesh;
 }
@@ -44,25 +44,51 @@ const litFrames = (lamp: CarLamp): number[] => {
 };
 
 /**
- * The headlights and brake lights of the field's far cars, which their far models leave out: each body's glow meshes from its
- * exterior model (single-level lamp nodes), one instanced draw per lamp, glow mesh and lit frame, in the lamp's own glow material
- * (`createLampMaterial`, as a full model draws it) with the frame's start file. A car's instance shows while its state picks that frame (`lampStateFrame`).
- * A body's glows load the first time one of its cars is asked for, one body at a time, from one parse of the body; the glows keep
- * their own copies of the meshes' geometry. `parent` is the far cars' parent; `warm` compiles a body's glows before they show.
+ * A lamp's glow mesh by the option parts its triangles belong to (`_lmu_option` per vertex: 0 always shown, else 1 + the option's
+ * index): one geometry per set of parts, all on the mesh's own vertices.
  */
-export function createFarGlows(parent: Group, templates: CarTemplates, carTextures: CarTextures, warm: (object: Object3D) => Promise<void>, changed: () => void): FarGlows {
+function byOptions(geometry: BufferGeometry, optionNodes: readonly string[]): Array<{options: string[]; geometry: BufferGeometry}> {
+  const option = geometry.getAttribute('_lmu_option'), index = geometry.index;
+  if (!option || !index) throw Error('Far lamp primitive has no _LMU_OPTION or index');
+  const parts = new Map<string, {options: string[]; indices: number[]}>();
+  for (let at = 0; at < index.count; at += 3) {
+    const corners = [index.getX(at), index.getX(at + 1), index.getX(at + 2)];
+    const options = [...new Set(corners.map(vertex => option.getX(vertex)).filter(value => value !== 0))].map(value => {
+      const name = optionNodes[value - 1];
+      if (name === undefined) throw Error(`Far lamp primitive names no option part ${value}`);
+      return name;
+    });
+    const key = options.join('|');
+    let part = parts.get(key);
+    if (!part) { part = {options, indices: []}; parts.set(key, part); }
+    part.indices.push(...corners);
+  }
+  return [...parts.values()].map(({options, indices}) => {
+    const part = new BufferGeometry();
+    for (const [name, attribute] of Object.entries(geometry.attributes)) if (name !== '_lmu_option') part.setAttribute(name, attribute);
+    part.setIndex(indices);
+    return {options, geometry: part};
+  });
+}
+
+/**
+ * The headlights and brake lights of the field's far cars: each body's lamp glow meshes from its far model (`farCars` `lamps`: one
+ * mesh per lamp, in the far model's frame), one instanced draw per lamp, set of option parts and lit frame, in the lamp's own glow
+ * material (`createLampMaterial`, as a full model draws it) with the frame's start file. A car's instance shows while its state
+ * picks that frame (`lampStateFrame`). A body's glows are built the first time one of its cars is asked for, one body at a time:
+ * only its frames' textures load then. `parent` is the far cars' parent; `warm` compiles a body's glows before they show.
+ */
+export function createFarGlows(parent: Group, carTextures: CarTextures, warm: (object: Object3D) => Promise<void>, changed: () => void): FarGlows {
   const group = new Group(); group.name = 'far-glows'; parent.add(group);
-  const bodies = new Map<string, GlowFrame[] | 'loading' | 'failed'>();
-  const unseen = new MeshBasicMaterial({visible: false});
+  const bodies = new Map<string, GlowFrame[] | 'loading' | 'failed'>(), farLamps = new Map<string, FarLamps>();
   let loading = false, disposed = false;
-  const instance = new Matrix4();
-  /** Frees glows: their geometry copies, lamp materials and the materials' texture copies. */
+  /** Frees glows: their geometries (the vertices go with the last of a mesh's parts), lamp materials and the materials' texture copies. */
   const free = (glows: Object3D) => {
     const materials = new Set<Material>();
     glows.traverse(object => {
       if (!(object instanceof InstancedMesh)) return;
       (object.geometry as BufferGeometry).dispose(); object.dispose();
-      for (const material of Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]) if (material !== unseen) materials.add(material);
+      materials.add(object.material as Material);
     });
     for (const material of materials) material.dispose();
   };
@@ -72,43 +98,31 @@ export function createFarGlows(parent: Group, templates: CarTemplates, carTextur
     bodies.set(folder, 'loading'); loading = true;
     const frames: GlowFrame[] = [];
     try {
-      const {lamps, materials} = body.descriptor;
-      const glowing = lamps.flatMap(lamp => {
-        const lit = litFrames(lamp), glow = lit.length ? lampGlow(lamp, materials) : null;
-        return glow && lamp.states ? [{lamp: lamp as GlowFrame['lamp'], glow, lit}] : [];
+      const far = farLamps.get(folder), {lamps, materials} = body.descriptor;
+      if (!far) throw Error(`Car ${folder} has no far lamps yet`);
+      const glowing = far.lamps.flatMap(({lamp: index, geometry}) => {
+        const lamp = lamps[index], lit = litFrames(lamp), glow = lit.length ? lampGlow(lamp, materials) : null;
+        return glow && lamp.states ? [{lamp: lamp as GlowFrame['lamp'], glow, lit, geometry}] : [];
       });
       // A far glow is a few pixels: each frame loads as its start file (the reduced levels) on its own, never sharpened.
-      const starts = new Map(body.resource.textures.flatMap(row => row.start ? [[descriptorTexturePath(row.sha256), descriptorTexturePath(row.start.sha256)] as const] : []));
-      const fileOf = (frame: string) => starts.get(frame) ?? frame;
+      const fileOf = (frame: string) => startFileOf(body, frame)?.path ?? frame;
       const paths = [...new Set(glowing.flatMap(({lamp, lit}) => lit.map(frame => fileOf(lamp.frames[frame]!))))];
-      const [template, loaded] = await Promise.all([templates.body(body), Promise.all(paths.map(path => carTextures.load(path, false, undefined)))]);
+      const loaded = await Promise.all(paths.map(path => carTextures.load(path, undefined)));
       const textures = new Map(paths.map((path, index) => [path, loaded[index]] as const));
-      template.updateWorldMatrix(true, true);
-      const toBody = new Matrix4().copy(template.matrixWorld).invert(), options = new Set(body.descriptor.optionNodes);
-      for (const {lamp, glow, lit} of glowing) {
-        // The GLB loader drops `.`, `:`, `/`, `[` and `]` from node names; lamp nodes are the GLB's own names.
-        const meshes = new Set<Object3D>();
-        for (const name of lamp.nodes) template.getObjectByName(PropertyBinding.sanitizeNodeName(name))?.traverse(object => { if (object.type === 'Mesh') meshes.add(object); });
+      for (const {lamp, glow, lit, geometry} of glowing) {
+        const parts = byOptions(geometry, far.optionNodes);
         for (const frame of lit) {
           const original = textures.get(fileOf(lamp.frames[frame]!))!, texture = original.clone();
           carTextures.copied(texture, original, false);
           const material = createLampMaterial(lamp, glow, texture);
-          let used = false;
-          for (const mesh of meshes) {
-            // Only the mesh's slots of this lamp's material glow; a mesh without one is another lamp's.
-            const {material: list, geometry} = mesh as Mesh<BufferGeometry, Material | Material[]>;
-            const slots = (Array.isArray(list) ? list : [list]).map(slot => slot.name === lamp.material ? material : unseen);
-            if (!slots.includes(material)) continue;
-            used = true;
-            const above: string[] = [];
-            for (let at: Object3D | null = mesh; at && at !== template; at = at.parent) if (options.has(at.name)) above.push(at.name);
-            const drawn = new InstancedMesh(geometry.clone(), Array.isArray(list) ? slots : slots[0], FAR_GLOW_MAX);
+          for (const part of parts) {
+            const drawn = new InstancedMesh(part.geometry, material, FAR_GLOW_MAX);
             // Visible with no instances while it compiles (the compile walks visible objects only); `draw` shows it with its cars.
             drawn.name = `far-glow-${lamp.material}`; drawn.count = 0; drawn.frustumCulled = false;
             drawn.castShadow = false; drawn.receiveShadow = false;
-            frames.push({lamp, frame, local: new Matrix4().multiplyMatrices(toBody, mesh.matrixWorld), options: above, mesh: drawn});
+            frames.push({lamp, frame, options: part.options, mesh: drawn});
           }
-          if (!used) material.dispose();
+          if (!parts.length) material.dispose();
         }
       }
       const shown = new Group(); for (const {mesh} of frames) shown.add(mesh);
@@ -133,25 +147,26 @@ export function createFarGlows(parent: Group, templates: CarTemplates, carTextur
     const key = `${body.resource.folder}:${normalizeVehicleId(body.vehicleId)}`;
     let shown = shownOptions.get(key);
     if (!shown) {
-      const appearance = body.descriptor.appearances.find(row => normalizeVehicleId(row.alias) === normalizeVehicleId(body.vehicleId));
-      shown = new Set(appearance?.optionNodes ?? []);
+      shown = new Set(appearanceOf(body)?.optionNodes ?? []);
       shownOptions.set(key, shown);
     }
     return shown;
   };
 
   return {
+    lamps(body, far) { farLamps.set(body.resource.folder, far); },
     draw(cars) {
       for (const frames of bodies.values()) if (Array.isArray(frames)) for (const entry of frames) entry.mesh.count = 0;
       for (const car of cars.slice(0, FAR_GLOW_MAX)) {
         const frames = bodies.get(car.body.resource.folder);
         if (frames === undefined) { if (!loading) void load(car.body); continue; }
-        if (!Array.isArray(frames)) continue;
+        // Still loading, failed, or a body without a lamp that glows far.
+        if (!Array.isArray(frames) || !frames.length) continue;
         const shown = optionsOf(car.body);
         for (const entry of frames) {
           if (lampStateFrame(entry.lamp.states, car.headlights, car.braking) !== entry.frame) continue;
           if (!entry.options.every(name => shown.has(name))) continue;
-          entry.mesh.setMatrixAt(entry.mesh.count++, instance.multiplyMatrices(car.frame, entry.local));
+          entry.mesh.setMatrixAt(entry.mesh.count++, car.frame);
         }
       }
       for (const frames of bodies.values()) if (Array.isArray(frames)) for (const {mesh} of frames) {
@@ -161,7 +176,7 @@ export function createFarGlows(parent: Group, templates: CarTemplates, carTextur
     },
     dispose() {
       disposed = true;
-      group.removeFromParent(); free(group); unseen.dispose();
+      group.removeFromParent(); free(group);
     },
   };
 }

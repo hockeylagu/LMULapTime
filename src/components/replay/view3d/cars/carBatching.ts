@@ -4,7 +4,7 @@ import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, 
 import type { CarPart, CarParts } from './carParts.js';
 
 /** Texture units every WebGL 2 GPU has: three counts both stages of a program against them. */
-const GUARANTEED_TEXTURE_UNITS = 16;
+export const GUARANTEED_TEXTURE_UNITS = 16;
 
 /**
  * A lit car part whose material and geometry a batch can draw: lamps keep their own draws (switched per frame), and so do glass and

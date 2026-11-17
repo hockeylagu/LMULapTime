@@ -27,20 +27,20 @@ function fixture() {
   };
   const renderer = {getRenderTarget: () => null, setRenderTarget: () => {}, compile: () => {}, compileAsync: () => Promise.resolve(), initTexture, render: () => {}} as unknown as WebGLRenderer;
   const changed = vi.fn(), warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, changed);
-  /** A `size` px texture (1024 by default) streaming from its quarter-size level. */
+  /** A `size` px texture (1024 by default) read from its start file, a quarter of its size: the two levels above come when it sharpens. */
   const texture = (size = 1024) => {
     const levels = Array.from({length: Math.log2(size) + 1}, (_, i) => ({data: new Uint8Array(Math.ceil((size >> i) / 4) ** 2 * 16), width: size >> i, height: size >> i}));
-    const made = new CompressedTexture(levels, size, size, RGBA_BPTC_Format);
-    startStreaming(made);
+    const made = new CompressedTexture(levels.slice(2), size / 4, size / 4, RGBA_BPTC_Format);
+    startStreaming(made, {missing: 2, load: async () => levels.slice(0, 2), drop: () => {}});
     return made;
   };
   const upload = (made: Texture) => { made.needsUpdate = true; renderer.initTexture(made); };
-  /** Runs frames until none is asked for; returns how many ran. */
-  const drain = () => { let ran = 0; while (frames.length && ran < 100) { frame(); ran++; } return ran; };
+  /** Runs frames until none is asked for, the levels a frame asked for arriving before the next; returns how many ran. */
+  const drain = async () => { let ran = 0; while (frames.length && ran < 100) { await settledFrame(); ran++; } return ran; };
   return {warmup, texture, upload, drain, changed, bound};
 }
 
-it('sharpens a queued texture once it is on the GPU, and asks for no frame while it is not', () => {
+it('sharpens a queued texture once it is on the GPU, and asks for no frame while it is not', async () => {
   const {warmup, texture, upload, drain, changed} = fixture(), undrawn = texture();
   try {
     warmup.sharpen(undrawn); warmup.shown();
@@ -49,22 +49,22 @@ it('sharpens a queued texture once it is on the GPU, and asks for no frame while
     upload(undrawn);
     expect(warmup.sharpening()).toEqual({sharp: 0, total: 1});
     expect(frames).toHaveLength(1);
-    expect(drain()).toBeGreaterThan(0);
+    expect(await drain()).toBeGreaterThan(0);
     expect([isStreaming(undrawn), frames.length, changed.mock.calls.length > 0]).toEqual([false, 0, true]); // Sharp, and the loop ended.
     expect(warmup.sharpening()).toEqual({sharp: 1, total: 1});
   } finally { warmup.dispose(); }
 });
 
-it('keeps a held texture on its reduced levels until released, then sharpens it when it is on the GPU', () => {
+it('keeps a held texture on its reduced levels until released, then sharpens it when it is on the GPU', async () => {
   const {warmup, texture, upload, drain} = fixture(), drawn = texture(), undrawn = texture();
   try {
     warmup.hold(drawn); warmup.hold(undrawn); warmup.shown();
     upload(drawn);
-    expect([drain(), isStreaming(drawn)]).toEqual([0, true]);
+    expect([await drain(), isStreaming(drawn)]).toEqual([0, true]);
     warmup.sharpenHeld();
-    drain();
+    await drain();
     expect([isStreaming(drawn), isStreaming(undrawn), frames.length]).toEqual([false, true, 0]);
-    upload(undrawn); drain();
+    upload(undrawn); await drain();
     expect([isStreaming(undrawn), frames.length]).toEqual([false, 0]);
   } finally { warmup.dispose(); }
 });
@@ -81,27 +81,29 @@ it('sharpens the car first, then the scenery nearest the camera, the largest fir
     warmup.sharpen(car);
     bound.length = 0;
     warmup.shown();
-    drain();
+    await drain();
     expect([...new Set(bound)]).toEqual([car, nearLarge, nearSmall, far]); // The order their missing levels were copied in.
     expect([car, far, nearSmall, nearLarge].some(isStreaming)).toBe(false);
-  } finally { warmup.dispose(); drain(); }
+  } finally { warmup.dispose(); await drain(); }
 });
 
-it('swaps whole textures within the frame budget: the first one even if bigger, the frames after it paying off the excess', () => {
+it('swaps whole textures within the frame budget: the first one even if bigger, the frames after it paying off the excess', async () => {
   const {warmup, texture, upload, drain, bound} = fixture(), [big, other, small, smaller] = [texture(2048), texture(2048), texture(512), texture(512)];
   try {
     for (const made of [big, other, small, smaller]) { upload(made); warmup.sharpen(made); }
     bound.length = 0;
     warmup.shown();
+    await settledFrame(); // The frame that asks for the levels above: nothing to send yet.
+    expect(bound).toHaveLength(0);
     frame(); // One frame: the 5.3 MiB swap is over the 2 MiB budget alone, so nothing else goes with it.
     expect(bound).toHaveLength(1);
     frame(); // 3.3 MiB still owed: nothing goes.
     expect(bound).toHaveLength(1);
     frame(); // 1.3 MiB owed, under the budget: the next swap goes.
     expect(bound).toHaveLength(2);
-    drain();
+    await drain();
     expect([big, other, small, smaller].some(isStreaming)).toBe(false);
-  } finally { warmup.dispose(); drain(); }
+  } finally { warmup.dispose(); await drain(); }
 });
 
 it('warms a shown scene within the frame byte budget: the first upload whole, then the next frame', async () => {
@@ -113,6 +115,24 @@ it('warms a shown scene within the frame byte budget: the first upload whole, th
     warmup.shown();
     const done = warmup.warm([card(), card(), card()], new AbortController().signal);
     await vi.waitFor(() => expect(bound).toHaveLength(2)); // 1.5 MiB, then 3 MiB: over the 2 MiB budget, the frame ends.
+    expect(frames).toHaveLength(1);
+    frame(); // 1 MiB still owed, under the budget: the third goes.
+    await vi.waitFor(() => expect(bound).toHaveLength(3));
+    while (frames.length) await settledFrame();
+    await done;
+  } finally { warmup.dispose(); vi.restoreAllMocks(); }
+});
+
+it('moves a warm-up begun behind the loading screen onto the frame budget once the scene shows', async () => {
+  const {warmup, bound} = fixture(), mib = 1024 * 1024;
+  vi.spyOn(performance, 'now').mockReturnValue(0);
+  const card = () => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)}));
+  const cards = [card(), card(), card()];
+  cards[0].material.map!.onUpdate = () => warmup.shown(); // The first frame goes out while the first card uploads.
+  try {
+    const done = warmup.warm(cards, new AbortController().signal);
+    // 1.5 MiB, then 3 MiB counted since the scene shows: over the 2 MiB budget, so it waits for a frame, not for a task.
+    await vi.waitFor(() => expect(bound).toHaveLength(2));
     expect(frames).toHaveLength(1);
     frame(); // 1 MiB still owed, under the budget: the third goes.
     await vi.waitFor(() => expect(bound).toHaveLength(3));

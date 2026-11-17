@@ -1,4 +1,5 @@
 import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import { patchTextureFocus } from '../textureFocus.js';
 import { tyreReadsAxle } from '../../car/tyreSurface.js';
 import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
 import { sceneryClock } from './sceneryClock.js';
@@ -203,6 +204,7 @@ ${shader.fragmentShader}`;
       `);
     }
   }
+  patchTextureFocus(shader, Object.keys(config.maps).map(key => `surface_${key}`));
 }
 
 /** Materials whose configs generate the same GLSL share one compiled program. */

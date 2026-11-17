@@ -1,4 +1,4 @@
-import { Euler, Group, Matrix4, Quaternion, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Box3, Euler, Group, Matrix4, Quaternion, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { RaceReplayCar, ReplayDaylightClock, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
@@ -17,7 +17,7 @@ import { createCarSets } from '../cars/drawnCar.js';
 import { windowPoints } from './raceTrack.js';
 import { createRaceField } from './raceField.js';
 import { createStandInCars } from './standInCars.js';
-import { carsUnder, PICK_BODY_M, PICK_ROOF_M, type DrawnPlace } from './carPick.js';
+import { carsUnder, envelopeBounds, envelopeParts, pickHeights, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
 
 export interface RaceSceneHandle {
   /**
@@ -151,6 +151,19 @@ export async function createRaceScene(
   const orientation = new Quaternion(), euler = new Euler(), target = new Vector3();
   /** Where each car on the track was last drawn: what `pick` looks through. */
   let drawnPlaces: readonly DrawnPlace[] = [];
+  /** Each followed model's body bounds and its parts'. */
+  const followedBodies = new WeakMap<Group, {box: Box3; parts: Box3[]}>();
+  /**
+   * A car's body bounds in its frame (`DrawnPlace.box` before it is put on the road), and its parts' for the followed model (its full
+   * model, drawn large); the field's far model bounds for another car.
+   */
+  const pickShapeOf = (slot: number): {box: Box3; parts?: Box3[]} | null => {
+    const model = slot === followed?.slot ? followed.car : null;
+    if (!model) { const box = field.bounds(slot); return box && {box}; }
+    let body = followedBodies.get(model);
+    if (!body) followedBodies.set(model, body = {box: envelopeBounds(model), parts: envelopeParts(model)});
+    return body;
+  };
   /** The followed car's next pose while it has none (asked once per slot and window). */
   let waiting: {slot: number; fromSec: number; next: NextPose | null} | null = null;
   const waitingPose = (slot: number, current: RacePoseWindow): NextPose | null => {
@@ -231,7 +244,9 @@ export async function createRaceScene(
       }
       if (!shown || model || (drawn && !isFollowed)) continue;
       renderPose(pose, 0, 0, orientation, euler);
-      standIns.place(classOf.get(slot) ?? '', matrix.compose(position.set(pose[0] - origin.x, pose[1] - origin.y, pose[2] - origin.z), orientation, scale));
+      // A stand-in's lowest point is its origin: on the road under the pose (the body's centre, above it).
+      const ground = shell.surfaceHeight({x: pose[0], y: pose[1], z: pose[2]}) ?? pose[1];
+      standIns.place(classOf.get(slot) ?? '', matrix.compose(position.set(pose[0] - origin.x, ground - origin.y, pose[2] - origin.z), orientation, scale));
     }
     standIns.end();
     drawnPlaces = places;
@@ -271,10 +286,15 @@ export async function createRaceScene(
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
     pick(x, y) {
       const canvas = shell.renderer.domElement;
-      const under = carsUnder(drawnPlaces, shell.drawnView, origin, canvas.clientWidth, canvas.clientHeight, x, y);
+      // Each car's box: its body, or the fixed box for a stand-in, on the road under it (a pose is the body's centre, above the road).
+      const places = drawnPlaces.map(car => {
+        const body = pickShapeOf(car.slot), box = placeOnRoad(body?.box ?? PICK_BOX, car.y, shell.surfaceHeight(car)), lift = box.min.y - (body?.box ?? PICK_BOX).min.y;
+        return {...car, box, parts: body?.parts?.map(part => part.clone().translate(new Vector3(0, lift, 0)))};
+      });
+      const under = carsUnder(places, shell.drawnView, origin, canvas.clientWidth, canvas.clientHeight, x, y);
       // Seen if its body or its roof is: a low wall can hide the one and not the other.
       const seen = (car: DrawnPlace, height: number) => shell.sees({x: car.x, y: car.y + height, z: car.z});
-      return under.find(car => seen(car, PICK_BODY_M) || seen(car, PICK_ROOF_M))?.slot ?? null;
+      return under.find(car => pickHeights(car).some(height => seen(car, height)))?.slot ?? null;
     },
     daylight: clock => shell.setDaylight(clock),
     dispose() {

@@ -129,6 +129,14 @@ it('reads the rolling hub and radius of each rig and throws on a car without a c
   expect(() => attachWheelRigs(missing)).toThrow('no wheel rig fr');
 });
 
+it("measures a wheel in its car's frame: a car placed at an angle keeps its radius", () => {
+  // As a race places a full model before its wheels are set up: turned on the circuit, in a mirrored parent.
+  const world = new Group(), car = makeCar('#fff', false, rigModel());
+  world.scale.z = -1; world.add(car);
+  car.position.set(40, 2, -15); car.rotation.set(0.05, 1.1, -0.03);
+  for (const each of attachWheelRigs(car.getObjectByName('body-envelope') as Group)) expect(each.radiusM).toBeCloseTo(0.33);
+});
+
 it('queries road contact once per sample and interpolates wheel travel without per-frame lookups', () => {
   const car = makeCar('#38bdf8', false, rigModel());
   let height: (point: {z: number}) => number | null = () => 0;

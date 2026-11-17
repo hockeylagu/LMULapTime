@@ -1,8 +1,7 @@
 import { BufferGeometry, Mesh, MeshBasicMaterial, PropertyBinding, type Group, type Material, type Object3D, type Texture } from 'three';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
-import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
-import { descriptorTexturePath, normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
+import { appearanceOf, startFileOf, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { carMaterialKey, createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
 import { cockpitVolumeTexture } from '../car/cockpitOcclusion.js';
 import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp } from '../car/carLamps.js';
@@ -14,11 +13,11 @@ import type { CarTemplates } from './carTemplates.js';
 
 /**
  * The scene's car textures. `load` reads a shared texture by its `textures/<sha256>.ktx2.zst` path under the cars folder, from
- * its start file at `start` when the body lists one; `interior` says only the car's interior uses it. `copied` is told of
- * each map's own copy of a texture.
+ * its start file at `start` when the body lists one. `copied` is told of each map's own copy of a texture; `interior` says only
+ * the car's interior uses it.
  */
 export interface CarTextures {
-  load(path: string, interior: boolean, start: {path: string; skip: number} | undefined): Promise<Texture>;
+  load(path: string, start: {path: string; skip: number} | undefined): Promise<Texture>;
   copied(copy: Texture, original: Texture, interior: boolean): void;
 }
 
@@ -60,8 +59,7 @@ function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn:
  */
 export function createCarModels(templates: CarTemplates, carTextures: CarTextures, shading: SceneryShading, {shareMaterials = false}: {shareMaterials?: boolean} = {}) {
   const loadParts = async (car: LoadedBody) => {
-    const template = await templates.body(car), key = normalizeVehicleId(car.vehicleId);
-    const appearance = car.descriptor.appearances.find(row => normalizeVehicleId(row.alias) === key);
+    const template = await templates.body(car), appearance = appearanceOf(car);
     if (!appearance) throw Error(`The car package has no appearance for ${car.vehicleId}`);
     // Option parts are alternatives between entries (number plates, lights, body panels): this entry shows its own, the rest stay out.
     const shown = new Set(appearance.optionNodes), hidden = new Set<Object3D>();
@@ -107,11 +105,8 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
     const frames = new Set(drawn.flatMap(lamp => lampTexturePaths(lamp, rainFlashes, glows.get(lamp)!)));
     for (const frame of frames) paths.set(frame, false);
-    // A start file leaves out the full file's levels above its own (the row states both level counts).
-    const starts = new Map(car.resource.textures.flatMap(row => row.start && row.levels !== undefined
-      ? [[descriptorTexturePath(row.sha256), {path: descriptorTexturePath(row.start.sha256), skip: row.levels - row.start.levels}] as const] : []));
-    const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
-      [path, await carTextures.load(path, interior, frames.has(path) ? undefined : starts.get(path))] as const)));
+    const textures = new Map(await Promise.all([...paths.keys()].map(async path =>
+      [path, await carTextures.load(path, frames.has(path) ? undefined : startFileOf(car, path))] as const)));
     // The cabin volumes, built once a livery; each material samples its own copy of the same source.
     const volumes = new Map(car.resource.volumes.map(row => {
       const path = `volumes/${row.sha256}.bin`, bytes = car.volumes.get(path);

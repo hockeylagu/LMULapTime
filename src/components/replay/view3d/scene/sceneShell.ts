@@ -26,7 +26,8 @@ import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGroun
 import type { StreamView } from '../scenery/residency.js';
 import { createSceneryStream } from '../scenery/sceneryStream.js';
 import { createSceneWarmup } from '../scenery/sceneWarmup.js';
-import { releaseOnUpload, startStreaming } from '../scenery/materials/mipStreaming.js';
+import { startStreaming } from '../scenery/materials/mipStreaming.js';
+import { focusing } from '../scenery/textureFocus.js';
 import { trackCardFacing } from '../scenery/materials/shadowEye.js';
 import { isDriverCamera } from '../camera/driverCameras.js';
 import { isFreeCameraMode, viewMoved } from '../scenery/streamView.js';
@@ -157,9 +158,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   renderer.debug.checkShaderErrors = import.meta.env.DEV;
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, TextureStartFile>(), startOf = (url: string) => carStarts.get(url);
-  // Car textures load at the package's size (it stores outside-only parts small and the liveries larger). The interior's own
-  // textures stay on their start files until a driver camera is used.
-  const carTextureLoader = new CachedKtx2Loader(renderer, {start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
+  // Car textures load at the package's size (it stores outside-only parts small and the liveries larger).
+  const carTextureLoader = new CachedKtx2Loader(renderer, {start: startOf});
   // Until the camera is placed, the clouds are seen from the scene origin.
   let sun = sceneSun(layout, origin.y, daylightClock, [origin.x, 0, origin.z]);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
@@ -242,21 +242,21 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
   const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); interiorTextures.dispose(); exposure.dispose();
+    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose();
     ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
-  // Interior textures stay on their reduced levels until a driver camera is used: only there is their full size seen.
+  // The interior's own copies stay on their reduced levels until a driver camera is used: only there is their full size seen.
   let driverCameraUsed = false;
   const carTextures: CarTextures = {
-    load(path, interior, start) {
+    load(path, start) {
       const url = `${VEHICLE_FILES}${path}`;
       if (start) carStarts.set(url, {url: `${VEHICLE_FILES}${start.path}`, skip: start.skip});
-      return (interior ? interiorTextures : carTextureLoader).loadAsync(url);
+      return carTextureLoader.loadAsync(url);
     },
     copied(copy, original, interior) {
-      const loader = interior ? interiorTextures : carTextureLoader, detail = loader.detail(original);
-      if (!detail) { const file = loader.file(original); if (file) releaseOnUpload(copy, file); return; }
-      startStreaming(copy, detail);
+      const detail = carTextureLoader.detail(original);
+      startStreaming(copy, detail, carTextureLoader.file(original));
+      if (!detail) return; // Read whole: nothing to sharpen.
       if (interior && !driverCameraUsed) warmup.hold(copy); else warmup.sharpen(copy);
     },
   };
@@ -319,6 +319,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       if (seen !== null) seeSun(seen);
       if (meter?.running) invalidate();
       if (environment.update(content.casters())) invalidate();
+      if (focusing()) invalidate(); // A texture just sharpened still coming into focus.
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
       const car = content.reflected;
       if (!probed && car.visible) {
