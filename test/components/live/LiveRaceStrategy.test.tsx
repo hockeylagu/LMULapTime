@@ -28,4 +28,10 @@ describe('race strategy source', () => {
     expect(basisText({ use: 'event', wear: 'event', races: 0 })).toBeNull();
     expect(basisText(undefined)).toBeNull();
   });
+
+  it('omits NO STOP from the heading when the card already shows STOPS NONE', () => {
+    render(<LiveRaceStrategy strategies={PLAN} quali="NEW MEDIUM" />);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('RACE STRATEGY · QUALI ON NEW MED');
+    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('STOPSNONE');
+  });
 });

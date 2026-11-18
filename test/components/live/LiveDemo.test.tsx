@@ -196,7 +196,8 @@ describe('offline live dashboard demo', () => {
     window.location.hash = '#/live?demo=1&scenario=garage-qualifying-sprint&carClass=Hyper';
     render(<LiveDemoPage />);
     const strategy = screen.getByTestId('live-race-strategy');
-    expect(strategy).toHaveTextContent('RACE STRATEGY · NO STOP20 MIN · ~13 LAPS · FROM YOUR LAST 3 RACES');
+    expect(strategy).toHaveTextContent('RACE STRATEGY20 MIN · ~13 LAPS · FROM YOUR LAST 3 RACES');
+    expect(strategy).not.toHaveTextContent('NO STOP');
     expect(strategy).toHaveTextContent('STOPSNONEVE START54%TYRES STARTNEW MEDTREAD AT FLAG~90%');
     expect(strategy).not.toHaveTextContent('TYRES AT STOP');
     expect(strategy).not.toHaveTextContent('NEXT BEST');

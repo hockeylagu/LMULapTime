@@ -65,7 +65,7 @@ export function LiveRaceStrategy({ strategies, quali }: { strategies: LiveRaceSt
     <section aria-label="Race strategy" data-testid="live-race-strategy" className="shrink-0 border-t border-lmu-border pt-3">
       <div className="flex items-baseline gap-8">
         <h2 className="whitespace-nowrap text-[48px] font-bold leading-tight text-lmu-text">
-          RACE STRATEGY · {chosen.name}
+          RACE STRATEGY{chosen.stops > 0 && ` · ${chosen.name}`}
           {quali && <> · QUALI ON <Tyres text={quali} /></>}
         </h2>
         <span className={LABEL}>{strategies.raceMinutes} MIN · ~{strategies.laps} LAPS{basis && ` · ${basis}`}</span>
