@@ -41,13 +41,17 @@ export function createGeometryWarmup(renderer: WebGLRenderer) {
         if (disposed) return;
         if (uploaded.has(geometry)) continue;
         // Counted before the upload: a batch lets its CPU copy go once uploaded (releaseBatchOnUpload).
-        const bytes = geometryBytes(geometry), previous = renderer.getRenderTarget();
+        const bytes = geometryBytes(geometry), previous = renderer.getRenderTarget(), sorted = renderer.sortObjects;
         try {
           probe.geometry = geometry;
           renderer.setRenderTarget(target);
+          // Sorting the lone probe would compute the geometry's bounding sphere for its depth: a pass over every vertex of a
+          // batch's whole buffer, whose sphere nothing else reads (0.24 s of a lap's load, 2026-11-18).
+          renderer.sortObjects = false;
           renderer.render(scene, camera);
           uploaded.add(geometry);
         } finally {
+          renderer.sortObjects = sorted;
           probe.geometry = empty;
           renderer.setRenderTarget(previous);
         }
