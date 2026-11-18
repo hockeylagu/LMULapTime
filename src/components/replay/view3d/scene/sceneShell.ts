@@ -282,11 +282,11 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       if (start) carStarts.set(url, {url: `${VEHICLE_FILES}${start.path}`, skip: start.skip});
       return carTextureLoader.loadAsync(url);
     },
-    copied(copy, original, interior) {
+    copied(copy, original, interior, field) {
       const detail = carTextureLoader.detail(original);
       startStreaming(copy, detail, carTextureLoader.file(original));
       if (!detail) return; // Read whole: nothing to sharpen.
-      if (interior && !driverCameraUsed) warmup.hold(copy); else warmup.sharpen(copy);
+      if (interior && !driverCameraUsed) warmup.hold(copy); else warmup.sharpen(copy, field);
     },
   };
   // The first view's chunks are requested first, so their downloads overlap the lighting set up below: the sky's environment and

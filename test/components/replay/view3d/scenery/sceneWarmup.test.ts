@@ -1,6 +1,7 @@
 import { Box3, CompressedTexture, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, RGBA_BPTC_Format, Scene, Vector3, type Object3D, type Texture, type WebGLRenderer } from 'three';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isStreaming, startStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
+import { trackSurfaceTextures } from '../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
 import { createSceneWarmup } from '../../../../../src/components/replay/view3d/scenery/sceneWarmup.js';
 
 let frames: ((time: number) => void)[] = [], clock = 0;
@@ -69,21 +70,25 @@ it('keeps a held texture on its reduced levels until released, then sharpens it 
   } finally { warmup.dispose(); }
 });
 
-it('sharpens the car first, then the scenery nearest the camera, the largest first within a chunk', async () => {
+it('sharpens the car first, then the scenery nearest the camera, the track surfaces and then the largest first within a band', async () => {
   const {warmup, texture, upload, drain, bound} = fixture(), signal = new AbortController().signal;
-  const [car, far, nearSmall, nearLarge] = [texture(), texture(), texture(512), texture()];
+  const [car, fieldCar, far, nearSmall, nearLarge, road, roadUnder] = [texture(512), texture(), texture(), texture(512), texture(), texture(512), texture()];
+  trackSurfaceTextures.add(road); trackSurfaceTextures.add(roadUnder);
   const chunk = (...maps: Texture[]) => maps.map(map => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map})));
   const box = (x: number) => new Box3(new Vector3(x, 0, 0), new Vector3(x + 10, 1, 10));
   try {
     await warmup.queue(chunk(far), signal, box(500));
-    await warmup.queue(chunk(nearSmall, nearLarge), signal, box(20));
-    for (const made of [far, nearSmall, nearLarge, car]) upload(made);
-    warmup.sharpen(car);
+    await warmup.queue(chunk(roadUnder), signal, box(0));
+    await warmup.queue(chunk(nearSmall, nearLarge, road), signal, box(20));
+    for (const made of [far, nearSmall, nearLarge, road, roadUnder, fieldCar, car]) upload(made);
+    warmup.sharpen(fieldCar, true); warmup.sharpen(car);
     bound.length = 0;
     warmup.shown();
     await drain();
-    expect([...new Set(bound)]).toEqual([car, nearLarge, nearSmall, far]); // The order their missing levels were copied in.
-    expect([car, far, nearSmall, nearLarge].some(isStreaming)).toBe(false);
+    // The order their missing levels were copied in: the car, then the (larger) road under it, the road ahead of the other scenery
+    // as near, another car of the field after the scenery around the camera.
+    expect([...new Set(bound)]).toEqual([car, roadUnder, road, nearLarge, nearSmall, fieldCar, far]);
+    expect([car, fieldCar, far, nearSmall, nearLarge, road, roadUnder].some(isStreaming)).toBe(false);
   } finally { warmup.dispose(); await drain(); }
 });
 

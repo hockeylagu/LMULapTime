@@ -9,6 +9,9 @@ import type { SurfaceTextureSource } from './textureSource.js';
 
 /** The textures a configured surface material samples through its own uniforms (not glTF slots), for GPU warm-up. */
 export const surfaceTextureMaps = new WeakMap<Material, Texture[]>();
+/** The textures of the surfaces a car drives on (road, kerbs and the decals on them): they sharpen first around the camera. */
+export const trackSurfaceTextures = new WeakSet<Texture>();
+const TRACK_SURFACE_KINDS: ReadonlySet<SurfaceConfig['kind']> = new Set(['road', 'kerb', 'roadDecal']);
 
 /** A scenery mesh's material, or null when the mesh holds several (the exporter never writes those). */
 function singleMaterial(mesh: Mesh): MeshStandardMaterial | null {
@@ -43,6 +46,7 @@ export function bindSurfaceProgram(material: MeshStandardMaterial, config: Surfa
   }
   material.userData.surfaceTextures = Object.keys(loaded);
   surfaceTextureMaps.set(material, Object.values(loaded));
+  if (TRACK_SURFACE_KINDS.has(config.kind)) for (const texture of Object.values(loaded)) trackSurfaceTextures.add(texture);
   const adjust = config.parameters.adjust;
   material.roughness = value(adjust, 'roughness');
   material.metalness = value(adjust, 'metalness');

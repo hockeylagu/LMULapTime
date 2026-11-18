@@ -1,6 +1,6 @@
-import { Mesh, Object3D, Vector3, type Box3, type Material, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
+import { Box3, Mesh, Object3D, Vector3, type Material, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
 import { createGeometryWarmup, type UploadSlice } from './geometryWarmup.js';
-import { surfaceTextureMaps } from './materials/configureSurfaceMaterial.js';
+import { surfaceTextureMaps, trackSurfaceTextures } from './materials/configureSurfaceMaterial.js';
 import { fullPixels, isStreaming, streamTexture, whenUploaded } from './materials/mipStreaming.js';
 
 /** Upload slice while the scene shows (a frame each), and behind the loading screen (a task each). */
@@ -13,6 +13,14 @@ const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
  * kept the GPU process behind for a second and a half of 20-50 ms frames.
  */
 const UPLOAD_BYTES_PER_FRAME = 2 * 1024 * 1024;
+/**
+ * Textures sharpen by bands of camera distance, metres, the largest first within a band: what covers the most of the view near the
+ * camera first. Within a band the surfaces the cars drive on lead the rest of the scenery: a chunk's parts merge each material's
+ * meshes, so tents and power lines across the chunk sat as near as the road (the road under the car came 136th of 419 on a cold
+ * load, 7.5 s after the first). The car the cameras ride on is in the first band with the road around it (its 76 textures ahead of
+ * everything kept the road blurred 4 s more, 2026-11-17), a car of the race's field at `FIELD_CAR_RANK_M`.
+ */
+const BAND_M = 10, FIELD_CAR_RANK_M = 30;
 
 /** The bytes a texture's upload sends: its levels' data, else its image's pixels (four bytes each). */
 function textureBytes(texture: Texture): number {
@@ -45,13 +53,16 @@ export interface SceneWarmup {
   /**
    * As `warm`, with the uploads one call after another: chunks that arrive together compile together and upload in turn. A chunk
    * comes with the scenery batches it created, which draw outside its root, and its world box (`where`): its textures sharpen
-   * in order of the camera's distance to the nearest box that uses them.
+   * in order of the camera's distance to the nearest of its parts that use them (the chunk's box for a texture none places).
    */
   queue(roots: Object3D | readonly Object3D[], signal: AbortSignal, where?: Box3): Promise<void>;
   /** The first frame is out: warm-ups upload in per-frame slices from now on, and the reduced textures start sharpening. */
   shown(): void;
-  /** Queues a car texture to sharpen, ahead of the scenery. */
-  sharpen(texture: Texture): void;
+  /**
+   * Queues a car texture to sharpen: the car the cameras ride on (and the lap's ghost) ahead of everything; a car of the race's
+   * field (`field`) after the scenery around the camera (`FIELD_CAR_RANK_M`), before the scenery further away.
+   */
+  sharpen(texture: Texture, field?: boolean): void;
   /** Keeps a streamed texture on its reduced levels until `sharpenHeld`. */
   hold(texture: Texture): void;
   /** Sharpens the held textures from now on, ahead of the rest. */
@@ -72,7 +83,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
   const nextTask = () => new Promise<void>(resolve => { setTimeout(resolve, 0); });
   const geometryWarmup = createGeometryWarmup(renderer);
   const sent = new WeakSet<Texture>();
-  const held = new Set<Texture>(), cars = new WeakSet<Texture>(), places = new WeakMap<Texture, Box3[]>(), eye = new Vector3();
+  const held = new Set<Texture>(), cars = new WeakSet<Texture>(), fieldCars = new WeakSet<Texture>(), places = new WeakMap<Texture, Box3[]>(), eye = new Vector3();
   const blurry = new Set<Texture>();
   let shown = false, disposed = false, sharpening = false, warming = Promise.resolve(), sharp = 0;
   /**
@@ -80,9 +91,17 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
    * budget frame's wait while one is asked for, and whether a warm-up waits on it.
    */
   let frameBytes = 0, budgetFrame: Promise<void> | null = null, warmsWait = false;
-  /** Car textures first (-1), then by the camera's distance to the nearest chunk using the texture; unplaced ones last. */
-  const distance = (texture: Texture) => cars.has(texture) ? -1
-    : (places.get(texture) ?? []).reduce((nearest, box) => Math.min(nearest, box.distanceToPoint(eye)), Infinity);
+  /**
+   * A texture's rank: its distance band (`BAND_M`), the track surfaces and cars ahead of the other scenery of the band. The ridden
+   * car's comes before every band (the car, then the road under it), a field car's at `FIELD_CAR_RANK_M`, the scenery's by the
+   * camera's distance to the nearest place using it; unplaced ones last.
+   */
+  const band = (texture: Texture) => {
+    if (cars.has(texture)) return -1;
+    const metres = fieldCars.has(texture) ? FIELD_CAR_RANK_M
+      : (places.get(texture) ?? []).reduce((nearest, box) => Math.min(nearest, box.distanceToPoint(eye)), Infinity);
+    return Math.floor(metres / BAND_M) * 2 + (fieldCars.has(texture) || trackSurfaceTextures.has(texture) ? 0 : 1);
+  };
   const sharpen = () => {
     sharpening = false;
     if (disposed) return;
@@ -92,8 +111,8 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     // Still paying off an upload: no order to build (a distance per blurry texture) for a frame that sends nothing.
     if (frameBytes >= budget) { sharpening = true; void nextFrame(); return; }
     camera.getWorldPosition(eye);
-    const order = [...blurry].map(texture => ({texture, distance: distance(texture), pixels: fullPixels(texture)}))
-      .sort((a, b) => a.distance - b.distance || b.pixels - a.pixels);
+    const order = [...blurry].map(texture => ({texture, band: band(texture), pixels: fullPixels(texture)}))
+      .sort((a, b) => a.band - b.band || b.pixels - a.pixels);
     for (const {texture} of order) {
       if (frameBytes >= budget) break;
       const bytes = streamTexture(texture, renderer);
@@ -146,12 +165,24 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     // 0.3-1 s of uploads one after the other, 2026-11-17); a failed link rejects at the end.
     compiled.catch(() => {});
     const textures = new Set<Texture>();
+    /**
+     * Where a chunk's textures are used: the parts' boxes drawn with each, joined (a chunk's box holds far more than its road: the
+     * camera sat inside the boxes of 212 textures' chunks). A material's batch spans the circuit: its parts place its textures.
+     */
+    const used = new Map<Texture, Box3>();
+    const use = (texture: Texture, object: Mesh) => {
+      textures.add(texture);
+      const bounds = object.geometry.boundingBox;
+      if (!where || !bounds || (object as Mesh & {isBatchedMesh?: boolean}).isBatchedMesh) return;
+      const box = bounds.clone().applyMatrix4(object.matrixWorld), joined = used.get(texture);
+      if (joined) joined.union(box); else used.set(texture, box);
+    };
     for (const root of roots) root.traverse(object => {
       if (!(object instanceof Mesh)) return;
-      const own = (object as Mesh).material, materials: Material[] = Array.isArray(own) ? own : [own];
+      const mesh = object as Mesh, own = mesh.material, materials: Material[] = Array.isArray(own) ? own : [own];
       for (const material of materials) {
-        for (const value of Object.values(material as unknown as Record<string, unknown>)) if (value && (value as Texture).isTexture) textures.add(value as Texture);
-        for (const texture of surfaceTextureMaps.get(material) ?? []) textures.add(texture);
+        for (const value of Object.values(material as unknown as Record<string, unknown>)) if (value && (value as Texture).isTexture) use(value as Texture, mesh);
+        for (const texture of surfaceTextureMaps.get(material) ?? []) use(texture, mesh);
       }
     });
     const next = slice();
@@ -171,7 +202,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     await compiled;
     for (const texture of textures) {
       if (!isStreaming(texture)) continue;
-      if (where) places.set(texture, [...places.get(texture) ?? [], where]);
+      if (where) places.set(texture, [...places.get(texture) ?? [], used.get(texture) ?? where]);
       if (!held.has(texture)) blurry.add(texture);
     }
     startSharpen();
@@ -188,7 +219,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     },
     shown() { shown = true; startSharpen(); },
     // A texture nothing has drawn yet is not on the GPU: it joins the queue at its first upload, so the queue can empty.
-    sharpen(texture) { cars.add(texture); whenUploaded(texture, () => { blurry.add(texture); startSharpen(); }); },
+    sharpen(texture, field = false) { (field ? fieldCars : cars).add(texture); whenUploaded(texture, () => { blurry.add(texture); startSharpen(); }); },
     hold(texture) {
       held.add(texture);
       const release = () => {

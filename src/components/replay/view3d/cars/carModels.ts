@@ -14,11 +14,11 @@ import type { CarTemplates } from './carTemplates.js';
 /**
  * The scene's car textures. `load` reads a shared texture by its `textures/<sha256>.ktx2.zst` path under the cars folder, from
  * its start file at `start` when the body lists one. `copied` is told of each map's own copy of a texture; `interior` says only
- * the car's interior uses it.
+ * the car's interior uses it; `field` that a car of the race's field draws it (not the car the cameras ride on, nor the ghost).
  */
 export interface CarTextures {
   load(path: string, start: {path: string; skip: number} | undefined): Promise<Texture>;
-  copied(copy: Texture, original: Texture, interior: boolean): void;
+  copied(copy: Texture, original: Texture, interior: boolean, field: boolean): void;
 }
 
 /** Whether a lamp lights with the rain light: a rain lamp, or a pit lamp whose light a rain lamp also lists (same material and a node). */
@@ -155,7 +155,8 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     const {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths, hiddenNames} = await partsOf(car, kind);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
-      carTextures.copied(copy, original, interiorPaths.get(path) === true);
+      // Shared materials are the field's (`shareMaterials`); the car the cameras ride on and the ghost own theirs.
+      carTextures.copied(copy, original, interiorPaths.get(path) === true, shareMaterials);
       return copy;
     };
     const volumeOf = (path: string) => {
@@ -212,5 +213,3 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
   const cabin = (body: LoadedBody) => loadModel(body, 'cabin');
   return {model: loadModel, car, cabin, sharedMaterial};
 }
-
-export type CarModels = ReturnType<typeof createCarModels>;

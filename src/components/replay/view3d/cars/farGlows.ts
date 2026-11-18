@@ -113,7 +113,7 @@ export function createFarGlows(parent: Group, carTextures: CarTextures, warm: (o
         const parts = byOptions(geometry, far.optionNodes);
         for (const frame of lit) {
           const original = textures.get(fileOf(lamp.frames[frame]!))!, texture = original.clone();
-          carTextures.copied(texture, original, false);
+          carTextures.copied(texture, original, false, true);
           const material = createLampMaterial(lamp, glow, texture);
           for (const part of parts) {
             const drawn = new InstancedMesh(part.geometry, material, FAR_GLOW_MAX);
