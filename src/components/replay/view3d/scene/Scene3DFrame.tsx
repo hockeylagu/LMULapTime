@@ -106,7 +106,7 @@ export function Scene3DFrame({
         </MapControlsOverlay>
         {overlays}
         {state?.ready && <Replay3DStreaming progress={state.progress} className={streamingClassName} />}
-        {!state?.ready && <Replay3DLoading progress={state?.progress} error={state?.error} onRetry={onRetry} />}
+        {!state?.ready && (!state?.shown || state.error) && <Replay3DLoading progress={state?.progress} error={state?.error} onRetry={onRetry} />}
       </div>
       {bottom}
     </div>

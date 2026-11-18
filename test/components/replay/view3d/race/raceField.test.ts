@@ -108,6 +108,38 @@ describe('createRaceField', () => {
     expect(bodyOfSpy.mock.calls.length).toBe(before);
   });
 
+  it('loads a body again after a load the race view cut off, where a failed one leaves stand-ins', async () => {
+    // The field outlives the race view (kept for the next one): its body loads abort as the view leaves.
+    // The view leaves between the body's load and its cars' liveries.
+    let leaving = true, calls = 0;
+    const {field, bodyOfSpy} = setup(2, async slot => {
+      if (leaving && calls++ > 0) throw new DOMException('The race view is unmounted', 'AbortError');
+      return body(slot);
+    });
+    field.load([{slot: 0, metres: 10}]);
+    await vi.waitFor(() => expect(bodyOfSpy.mock.calls.length).toBeGreaterThan(1));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect([field.has(0), field.has(1)]).toEqual([false, false]);
+    leaving = false;
+    field.load([{slot: 0, metres: 10}]);
+    await vi.waitFor(() => expect([field.has(0), field.has(1)]).toEqual([true, true]));
+  });
+
+  it('keeps the cars of a body whose liveries fail as stand-ins', async () => {
+    let calls = 0;
+    const {field, bodyOfSpy} = setup(2, async slot => {
+      if (calls++ > 0) throw Error('No livery');
+      return body(slot);
+    });
+    field.load([{slot: 0, metres: 10}]);
+    await vi.waitFor(() => expect(bodyOfSpy.mock.calls.length).toBeGreaterThan(1));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const before = bodyOfSpy.mock.calls.length;
+    field.load([{slot: 0, metres: 10}]);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect([field.has(0), bodyOfSpy.mock.calls.length]).toEqual([false, before]);
+  });
+
   it("counts the cars asked for and those settled for the scene's corner note, a car without a body included", async () => {
     const {field, report} = setup(3, async slot => (slot === 2 ? null : body(slot)));
     field.load([{slot: 0, metres: 10}, {slot: 2, metres: 20}]);

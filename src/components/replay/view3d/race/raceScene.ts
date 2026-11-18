@@ -8,15 +8,14 @@ import { disposeObjects } from '../scene/disposeObjects.js';
 import type { SceneLoadProgress } from '../scene/loadProgress.js';
 import type { CameraMode } from '../camera/cameraModes.js';
 import { isDriverCamera } from '../camera/driverCameras.js';
-import type { RenderPose } from '../scene/replayPose.js';
-import { nativeToScene } from '../scene/sceneFrame.js';
+import { nativeToScene, type RenderPose } from '../scene/replayPose.js';
 import type { SceneContent, SceneShell } from '../scene/sceneShell.js';
 import type { CarParts } from '../cars/carParts.js';
 import type { CarMotion } from '../cars/carMotion.js';
-import { createCarSets, type Cabin } from '../cars/drawnCar.js';
+import { createCarSets, type Cabin, type CarSets, type DrivenCar } from '../cars/drawnCar.js';
 import { windowPoints } from './raceTrack.js';
-import { createRaceField } from './raceField.js';
-import { createStandInCars } from './standInCars.js';
+import { createRaceField, type RaceField } from './raceField.js';
+import { createStandInCars, type StandInCars } from './standInCars.js';
 import { carSpans, carsUnder, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
 
 export interface RaceSceneHandle {
@@ -57,7 +56,39 @@ interface FollowedCar {
   chaseLodMultiplier: number;
   /** Once warmed up: its batches each draw only while one of their parts shows. */
   ready(): void;
+  /** Whether it is the field's full model of the car (`RaceField.lend`), not a car of its own. */
+  lent: boolean;
   dispose(): void;
+}
+
+/**
+ * The race's cars, all but the followed one's own model: the field, the stand-ins and the root they hang from. A race view leaves
+ * them on its shell; the next race view of the same session (its overview's cars) takes them, its redraw and body loads in `hooks`.
+ */
+interface RaceCars {
+  cars: readonly RaceReplayCar[];
+  sets: CarSets;
+  root: Group;
+  standIns: StandInCars;
+  field: RaceField;
+  hooks: {changed: () => void; bodyOf: (slot: number) => Promise<LoadedBody | null>};
+}
+/** By shell: freed by the next race of another session, or with the shell's renderer (its GPU context lost). */
+const keptRaceCars = new WeakMap<SceneShell, RaceCars>();
+
+function newRaceCars(shell: SceneShell, layout: SceneryLayoutResource, cars: readonly RaceReplayCar[]): RaceCars {
+  const sets = createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight);
+  const root = new Group(), hooks: RaceCars['hooks'] = {changed: () => {}, bodyOf: () => Promise.resolve(null)};
+  /** A car still loading draws as the grey far model of the first car of its class loaded (of any class until then), nothing before any. */
+  const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
+  const standIns = createStandInCars(root, cars.length, object => shell.warm(object));
+  /** The other cars, the followed car's included (hidden while followed); the scene's `draw` gives them their poses. */
+  const field = createRaceField(shell, sets, root, cars, slot => hooks.bodyOf(slot), () => hooks.changed(), (slot, car) => standIns.offer(classOf.get(slot) ?? '', car));
+  return {cars, sets, root, standIns, field, hooks};
+}
+
+function disposeRaceCars({root, standIns, field}: RaceCars): void {
+  field.dispose(); standIns.dispose(); root.removeFromParent(); disposeObjects(root);
 }
 
 /** A race pose (channel order) as the lap view's render pose: native position and the body's yaw, pitch and roll. */
@@ -87,21 +118,32 @@ export async function createRaceScene(
   shell.setDaylight(first.daylight);
   const {rig, origin} = shell;
   const handlingOf = new Map(cars.map(car => [car.slot, car.handling]));
-  const sets = createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight);
-  const root = new Group();
+  // The race's cars a race view of this session left on the shell show again as they were (lap ↔ race): nothing loads twice.
+  const kept = keptRaceCars.get(shell);
+  keptRaceCars.delete(shell);
+  if (kept && kept.cars !== cars) disposeRaceCars(kept);
+  const raceCars = kept?.cars === cars ? kept : newRaceCars(shell, layout, cars);
+  const {sets, root, standIns, field, hooks} = raceCars;
   /** Stands in for the reflection probe's car while the followed car has no model: never visible, so the probe stays idle. */
   const noCar = new Group(); noCar.visible = false;
   const followedCentre = new Vector3();
   let followed: FollowedCar | null = null;
-  /** A car still loading draws as the grey far model of the first car of its class loaded (of any class until then), nothing before any. */
   const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
-  const standIns = createStandInCars(root, cars.length, object => shell.warm(object));
-  /** The other cars, the followed car's included (hidden while followed); `draw` gives them their poses. */
   // The field's models can be ready before the scene draws (the first followed car's): nothing to redraw until `draw` exists.
   let drawing = false;
-  const field = createRaceField(shell, sets, root, cars, bodyOf, () => { if (drawing) draw(); }, (slot, car) => standIns.offer(classOf.get(slot) ?? '', car));
+  hooks.changed = () => { if (drawing) draw(); };
+  hooks.bodyOf = bodyOf;
   /** A followed car without a model of its own: a grey stand-in, or the field's model of it while its cabin builds. */
-  const bare = (slot: number): FollowedCar => ({slot, car: null, motion: null, parts: null, cabin: null, pickShape: null, cameras: [], chaseLodMultiplier: 1, ready() {}, dispose() {}});
+  const bare = (slot: number): FollowedCar => ({slot, car: null, motion: null, parts: null, cabin: null, pickShape: null, cameras: [], chaseLodMultiplier: 1, ready() {}, lent: false, dispose() {}});
+  /** A followed car of its own (`DrivenCar`): the lap view's car, or the first followed one; it stays with the shell when let go. */
+  const ownFollowed = (slot: number, own: DrivenCar): FollowedCar => {
+    root.add(own.drawn.car);
+    return {
+      slot, car: own.drawn.car, motion: own.drawn.motion, parts: own.drawn.parts, cabin: own.cabin, pickShape: own.drawn.pickShape,
+      cameras: own.body.descriptor.cameras.list, chaseLodMultiplier: own.body.descriptor.cameras.chase.lodMultiplier, ready: () => own.show(),
+      lent: false, dispose: () => shell.keptCar.keep(own),
+    };
+  };
   /**
    * The followed car: the field's full model of it (its body's full models built first when they are not), which is already on the
    * GPU, with its cabin added. Without a body, or when its body's full models fail, the field draws it as it draws the others.
@@ -109,18 +151,29 @@ export async function createRaceScene(
   const buildFollowed = async (slot: number | null, body: LoadedBody | null): Promise<FollowedCar | null> => {
     if (slot === null) return null;
     if (!body) return bare(slot);
+    const own = shell.keptCar.take(body);
+    if (own) return ownFollowed(slot, own);
     const near = field.near(slot), cabin = await sets.cabin(body, near), drawn = await near;
     if (!drawn || !cabin) return bare(slot);
     const built: FollowedCar = {
       slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, cabin, pickShape: drawn.pickShape, cameras: body.descriptor.cameras.list,
-      chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => cabin.show(),
+      chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => cabin.show(), lent: true,
       // A build dropped as stale leaves the model to the followed car of the same slot, which still draws it.
       dispose: () => { cabin.dispose(); if (followed === built || followed?.slot !== slot) field.reclaim(slot); },
     };
     return built;
   };
-  const pending = buildFollowed(first.slot, first.body);
-  pending.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
+  // A shell that already shows the circuit (the lap view left it) shows the race at once, the followed car standing in until the view
+  // follows it (`follow`, once the scene is ready); a new shell starts with the followed car built.
+  // The first followed car is built on its own, as the lap's car: the lap view takes it as it is.
+  const firstOwn = async (slot: number | null, body: LoadedBody | null): Promise<FollowedCar | null> => {
+    if (slot === null) return null;
+    if (!body) return bare(slot);
+    const own = shell.keptCar.take(body) ?? await sets.driven(body);
+    return ownFollowed(slot, own);
+  };
+  const pending = shell.started ? null : firstOwn(first.slot, first.body);
+  pending?.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
   // The chase camera looks ahead along the followed car's own samples of the window, and the trackside spots stand along them.
   let points: ReplayTrajectoryPoint[] = [], distances: number[] = [], pointsOf: {window: RacePoseWindow; slot: number} | null = null;
   const rigCar = () => ({primary: followed?.car ?? noCar, cameras: followed?.cameras ?? [], chaseLodMultiplier: followed?.chaseLodMultiplier ?? 1, trajectory: {points}, primaryDistances: distances});
@@ -135,28 +188,33 @@ export async function createRaceScene(
       return followed?.car?.visible ? [...near, followed.car.getWorldPosition(followedCentre)] : near;
     },
     refreshHeights() { followed?.motion?.refreshHeights(); field.refreshHeights(); },
-    dispose() { followed?.dispose(); field.dispose(); standIns.dispose(); disposeObjects(root); },
+    dispose() {
+      followed?.dispose();
+      // Kept for the next race view: a load the leaving view cuts off leaves its cars to load again (`createRaceField`).
+      hooks.changed = () => {};
+      root.removeFromParent(); keptRaceCars.set(shell, raceCars);
+    },
   });
   const setFollowed = (next: FollowedCar | null) => {
     followed?.dispose(); followed = next;
-    if (next?.car) field.lend(next.slot);
+    if (next?.lent) field.lend(next.slot);
     pointsOf = null; points = []; distances = [];
     rig.setLayer(rigCar());
   };
   try {
     if (shell.started) {
-      // The shell already shows the circuit (the lap view left it): the race's cars take its place, the camera placed afresh.
-      const firstCar = await pending;
-      rig.unplace(); setFollowed(firstCar);
-      if (firstCar?.car) { shell.reflectCar(firstCar.car); await shell.warm(firstCar.car); }
-      shell.report({shaders: 1});
+      // The shell already shows the circuit (the lap view left it): the race's cars take its place, the camera placed afresh on the
+      // followed car's stand-in.
+      // The lap view's car, when it is the followed one's, shows as it is; another stands in until the view follows it.
+      const own = first.slot === null || !first.body ? null : shell.keptCar.take(first.body);
+      rig.unplace(); setFollowed(first.slot === null ? null : own ? ownFollowed(first.slot, own) : bare(first.slot));
+      shell.report({cars: 1, shaders: 1});
       if (!shell.isAttached(host)) throw new DOMException('The race view left', 'AbortError');
       shell.show(content());
-      firstCar?.ready();
     } else {
       await shell.lit;
       await shell.underView();
-      const firstCar = await pending;
+      const firstCar = await pending!;
       setFollowed(firstCar);
       // Warmed as it will be drawn, by its own reflection (as the lap's car): its programs then link once.
       if (firstCar?.car) { shell.reflectCar(firstCar.car); await shell.warm(firstCar.car); }
@@ -238,27 +296,26 @@ export async function createRaceScene(
       // The window sample the pose lies after: the wheels and lamps read the car's samples there.
       const sample = (at - samples.fromSec) * samples.hz, index = Math.max(0, Math.min(Math.floor(sample), samples.count - 2));
       const fraction = Math.max(0, Math.min(1, sample - index));
-      if (shown) places.push({slot, x: pose[0], y: pose[1], z: pose[2], rotX: pose[3], rotY: pose[4], rotZ: pose[5]});
+      const placed = shown ? renderPose(pose, index, fraction, orientation, euler) : null;
+      if (placed) places.push({slot, x: pose[0], y: pose[1], z: pose[2], rotX: pose[3], rotY: pose[4], rotZ: pose[5]});
       // The field draws every car but a followed one with its own model.
-      field.pose(slot, shown && !model ? renderPose(pose, index, fraction, orientation, euler) : null, samples, carIndex);
+      field.pose(slot, placed && !model ? placed : null, samples, carIndex);
       if (model) {
-        model.visible = shown;
-        if (shown) {
+        model.visible = Boolean(placed);
+        if (placed) {
           const motion = followed!.motion;
           motion?.setTrack(samples, () => ({points: windowPoints(samples, carIndex), handlingCalibration: handlingOf.get(slot)}));
-          shell.placeCar(model, renderPose(pose, index, fraction, orientation, euler), motion);
+          shell.placeCar(model, placed, motion);
         }
       }
       // After its model is placed: the driver cameras sit on the car's body as it is this frame, not as it was the last one.
-      if (shown && isFollowed) {
+      if (placed && isFollowed) {
         followedAt = {x: pose[0], z: pose[2]};
-        const placed = renderPose(pose, index, fraction, orientation, euler);
         followedPoints(samples, carIndex);
         const stationM = distances[index] + ((distances[index + 1] ?? distances[index]) - distances[index]) * fraction;
         rig.follow({target: target.set(...nativeToScene(placed, origin)), yaw: placed.yaw ?? 0, timeSec, stationM, index, fraction});
       }
-      if (!shown || model || field.has(slot)) continue;
-      renderPose(pose, 0, 0, orientation, euler);
+      if (!placed || model || field.has(slot)) continue;
       // A stand-in's lowest point is its origin: on the road under the pose (the body's centre, above it).
       const ground = shell.surfaceHeight({x: pose[0], y: pose[1], z: pose[2]}) ?? pose[1];
       standIns.place(classOf.get(slot) ?? '', matrix.compose(position.set(pose[0] - origin.x, ground - origin.y, pose[2] - origin.z), orientation, scale));

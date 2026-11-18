@@ -6,6 +6,7 @@ import { createRealRoadSurface } from '../scenery/realRoad.js';
 import type { RenderPose } from './replayPose.js';
 import type { CarTextures } from '../cars/carModels.js';
 import { createCarTemplates, type CarTemplates } from '../cars/carTemplates.js';
+import { createKeptCar, type KeptCar } from '../cars/keptCar.js';
 import { disposeObjects } from './disposeObjects.js';
 import { updateShownMatrices } from './shownMatrices.js';
 import { exposureType, followsCar, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
@@ -90,6 +91,8 @@ export interface SceneShell {
   readonly carTextures: CarTextures;
   /** The scene's parsed bodies, shared by every car loader of the scene. */
   readonly carTemplates: CarTemplates;
+  /** The driven car the last view left, for the next view driving the same car. */
+  readonly keptCar: KeptCar;
   /** Resolves once the environment and the car reflection exist: content programs compile against them. */
   readonly lit: Promise<void>;
   /** Resolves once the chunks under the first view are resident: content draped on the road waits for it. */
@@ -321,8 +324,10 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
   /** What waits for the next frame to be drawn (`afterFrame`). */
   const afterFrames: Array<{run: () => void; fail: (error: Error) => void}> = [];
+  const NO_CASTERS: readonly Vector3[] = [];
   const draw = (frameTime?: number) => {
-    if (disposed || !content) return;
+    // A started shell between views (the next one took the canvas, its content still building) draws the scenery alone.
+    if (disposed || (!content && !started)) return;
     // First, while this frame has issued no draws: the fetch waits for every command before it.
     exposure.collect();
     if (frameTime !== undefined) frameHook?.(frameTime);
@@ -345,18 +350,18 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       // A new primary car brings its own game cameras, whose shadow keys may differ.
       environment.setShadowCascades(shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null);
       underCarBaker.flush(renderer); // Bakes at most one car body's under-car shade per frame; every car of that body then shows it.
-      content.beforeDraw(camera);
+      content?.beforeDraw(camera);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);
       // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.
       const seen = meter?.step(cloudEye()) ?? null;
       if (seen !== null) seeSun(seen);
       if (meter?.running) invalidate();
-      if (environment.update(content.casters())) invalidate();
+      if (environment.update(content?.casters() ?? NO_CASTERS)) invalidate();
       if (focusing()) invalidate(); // A texture just sharpened still coming into focus.
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
-      const car = content.reflected;
-      if (!probed && car.visible) {
+      const car = content?.reflected;
+      if (!probed && car?.visible) {
         probed = true; car.getWorldPosition(probeCentre);
         for (let pass = 0; pass < CAR_REFLECTION_STEPS && reflection.update(probeCentre); pass++);
       }
@@ -364,7 +369,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       drawnView = camera instanceof PerspectiveCamera ? drawnCameras.perspective.copy(camera, false) : drawnCameras.orthographic.copy(camera, false);
       for (const waiting of afterFrames.splice(0)) waiting.run();
       // The car's reflection probe renders three faces after the frame (car/carReflection.ts), around the body's centre.
-      if (car.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
+      if (car?.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);
@@ -400,12 +405,14 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     observer.observe(host);
     viewportWidth = 0; viewportHeight = 0; resize();
   };
+  const keptCar = createKeptCar();
   const shell: SceneShell = {
-    renderer, scene, rig, origin, get drawnView() { return drawnView; }, get drawnSize() { return {width: viewportWidth, height: viewportHeight}; }, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(),
+    renderer, scene, rig, origin, get drawnView() { return drawnView; }, get drawnSize() { return {width: viewportWidth, height: viewportHeight}; }, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(), keptCar,
     get started() { return started; },
     get broken() { return broken; },
     attach(next, nextListener) {
-      if (host) shell.detach(host);
+      // The same element again (the view took the canvas early, then built its content) keeps the canvas where it is.
+      if (host && host !== next) shell.detach(host);
       host = next; listener = nextListener;
       if (started) {
         mount();
@@ -504,7 +511,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost); document.removeEventListener('visibilitychange', invalidate);
       // The stream takes its chunks out first (the chunk loader frees them) with their batches, then the content and sky go with the scene.
-      stream.dispose(); batches.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose(); convolution.dispose();
+      stream.dispose(); batches.dispose(); keptCar.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose(); convolution.dispose();
       cleanup(); renderer.domElement.remove();
     },
   };

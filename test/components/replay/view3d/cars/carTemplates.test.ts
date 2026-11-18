@@ -72,6 +72,23 @@ describe('createCarTemplates', () => {
     expect(await templates.body(car)).not.toBe(kept);
   });
 
+  it("keeps the parses of the car the cameras ride on until another car's cabin, so the next view builds it without a parse", async () => {
+    const parse = vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async bytes => parsed(bytes === interior ? 'dash' : 'hull') as never);
+    const templates = createCarTemplates(), car = body('A', true);
+    await templates.cabin(car);
+    expect(parse).toHaveBeenCalledTimes(2);
+    // The next view's car of that body: its exterior and its cabin from the kept parses.
+    const kept = await templates.body(car);
+    await templates.cabin(car);
+    expect(await templates.body(car)).toBe(kept);
+    expect(parse).toHaveBeenCalledTimes(2);
+    // Another car takes the cameras: the first one's parses go.
+    const other = {...body('B', false), resource: {sha256: 'other', interior: null}} as unknown as LoadedBody;
+    await templates.cabin(other);
+    expect(await templates.body(car)).not.toBe(kept);
+    expect(parse).toHaveBeenCalledTimes(4);
+  });
+
   it('forgets a failed parse, so the next car tries again', async () => {
     vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockRejectedValueOnce(Error('bad file')).mockResolvedValue(parsed('hull') as never);
     const templates = createCarTemplates();

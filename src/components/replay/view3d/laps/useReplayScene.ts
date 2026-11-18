@@ -78,12 +78,12 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
     if (selected.trajectory.dataPluginRevision && layout.packageRevision !== selected.trajectory.dataPluginRevision) throw Error('3D scene and lap package revisions differ. Reload the recording with its matching package.');
     signal.throwIfAborted();
     const firstView = {kind: 'lap' as const, lapDistanceM: lapFirstStation(selected.trajectory, layout)};
-    const shell = shells.acquire(layout, {daylightClock: selected.trajectory.daylightClock, firstView});
-    try {
-      return await createReplayScene(shell, container, layout, selected.trajectory, selected.baseline, fail, {primary: primary!, baseline: comparison}, colorBy, showProgress);
-    } catch (error) { shell.detach(container); shells.discardUnstarted(shell); throw error; }
+    return shells.startWith(layout, {daylightClock: selected.trajectory.daylightClock, firstView}, container, shell =>
+      createReplayScene(shell, container, layout, selected.trajectory, selected.baseline, fail, {primary: primary!, baseline: comparison}, colorBy, showProgress));
   };
   const {scene, ready, state, setState} = useSceneHost<ReplaySceneHandle, Extra>({host, key, errorMessage: 'Unable to load 3D scene', create,
+    // Coming from the race on this circuit, its scene shows at once while the lap's cars build.
+    showEarly: (container, listener) => shells.attachShown(trajectory.layoutKey, container, listener),
     onCreated: handle => { handle.mode(mode); handle.beforeFrame(frameTime => liveCursor.current?.tick(frameTime)); }});
   const drawCursor = useEffectEvent(() => {
     const position = cursor?.getSnapshot();

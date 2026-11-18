@@ -311,10 +311,11 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   handle.cursor(2, 0); draw();
   expect(host.firstChild).toBe(canvas); expect(gpu.constructed).toHaveBeenCalledOnce(); expect(gpu.dispose).not.toHaveBeenCalled();
   expect(scene.getObjectByName('road__OPAQUE')).toBe(road); expect(scene.environment).toBe(lightingEnvironment);
-  // The car's body draws from its batch: its own stand-in (bounds, no vertices) goes with it, and the lap's materials are released.
+  // The car's body draws from its batch (its stand-in has bounds, no vertices). The old lap's car stays with the shell, for the next
+  // lap or view driving it.
   expect(oldBody.geometry.attributes.position).toBeUndefined();
-  expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).toHaveBeenCalled(); expect(materialDispose).toHaveBeenCalled();
-  expect(oldLayer.parent).toBeNull();
+  expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).not.toHaveBeenCalled(); expect(materialDispose).not.toHaveBeenCalled();
+  expect([oldLayer.parent, oldCar.parent]).toEqual([null, null]);
   expect(lastSceneRender()[1]).toBe(camera); expect(camera.position).toEqual(eye); expect(camera.zoom).toBe(zoom);
   const layer = world.children.at(-1)!;
   expect(layer.children[0].position.x).toBeCloseTo(7); expect(layer.children[1].visible).toBe(true);
@@ -322,11 +323,14 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   expect(await handle.updateLaps(next, null, assets)).toBe(true); handle.cursor(2, 0);
   expect(world.children.at(-1)!.children).toHaveLength(3);
   expect(world.children.at(-1)!.children[1].visible).toBe(false);
+  // The next lap of the same car takes the kept one as it is.
+  expect(world.children.at(-1)!.children[0]).toBe(oldCar); expect(carDispose).not.toHaveBeenCalled();
   // The view leaving keeps the shell for the next one; the shell going frees it all.
   handle.dispose(); expect(host.childNodes).toHaveLength(0); expect(gpu.dispose).not.toHaveBeenCalled();
   for (const shell of shells.splice(0)) shell.dispose();
   expect(scene.environment).toBeNull();
   expect(roadDispose).toHaveBeenCalledOnce(); expect(gpu.dispose).toHaveBeenCalledOnce(); expect(host.childNodes).toHaveLength(0);
+  expect(carDispose).toHaveBeenCalled(); expect(materialDispose).toHaveBeenCalled();
 });
 
 it('places the ghost at the same distance, the same lap time, or the same time since marker A', async () => {

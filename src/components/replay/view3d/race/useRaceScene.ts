@@ -97,14 +97,14 @@ export function useRaceScene({host, overview, clock, poses, followSlot, progress
     revision.current = layout.packageRevision;
     if (body && body.resource.packageRevision !== layout.packageRevision) throw Error('Body package revision differs from the 3D scene');
     const daylight = raceDaylightClock(overview, clock.getState().timeSec);
-    const shell = shells.acquire(layout, {daylightClock: daylight, firstView: {kind: 'free', x: place.x, z: place.z}});
-    try {
-      return await createRaceScene(shell, container, layout, overview.cars, {slot: followSlot, body, daylight}, slot => bodyOf(slot),
-        (slot, timeSec) => poses.nextPose(slot, timeSec), fail, showProgress);
-    } catch (error) { shell.detach(container); shells.discardUnstarted(shell); throw error; }
+    return shells.startWith(layout, {daylightClock: daylight, firstView: {kind: 'free', x: place.x, z: place.z}}, container, shell =>
+      createRaceScene(shell, container, layout, overview.cars, {slot: followSlot, body, daylight}, slot => bodyOf(slot),
+        (slot, timeSec) => poses.nextPose(slot, timeSec), fail, showProgress));
   };
   // The scene waits for the first pose window: its scenery streams first around the followed car.
+  // Coming from the lap view on this circuit, its scene shows at once while the race's cars build.
   const {scene, state, setState} = useSceneHost<RaceSceneHandle>({host, key, enabled: window !== null, errorMessage: 'Unable to load the 3D race scene', create,
+    showEarly: (container, listener) => shells.attachShown(overview.layoutKey, container, listener),
     onCreated: handle => {
       handle.mode(mode); drawScene(handle, clock, poses, progress, followSlot);
       setState(current => ({key, ready: true, progress: current?.key === key ? current.progress : undefined}));

@@ -3,6 +3,7 @@ import { normalizeVehicleId } from '../../../../../shared/packageContract/index.
 import type { RaceReplayCar } from '../../../../../shared/types/replay.js';
 import { RACE_LAMP, RACE_POSE_CHANNEL_COUNT, RACE_POSE_CHANNELS, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import { isAbortError } from '../../../../api/apiClient.js';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
 import type { RenderPose } from '../scene/replayPose.js';
@@ -174,7 +175,8 @@ export function createRaceField(
   const loadBody = async (slot: number) => {
     let slots = [slot];
     // Far cars built but not yet in the field: a load that fails or outlives the field frees them.
-    let unplaced: Group[] = [];
+    /** The body this load claimed (`bodies`), and whether the race view cut it off. */
+    let unplaced: Group[] = [], loading: string | null = null, aborted = false;
     bodyLoads++;
     try {
       const body = await bodyOf(slot);
@@ -182,7 +184,7 @@ export function createRaceField(
       // A body already loading covers this car: that load settles it.
       if (bodies.has(body.resource.folder)) { slots = []; return; }
       const folder = body.resource.folder;
-      bodies.add(folder);
+      bodies.add(folder); loading = folder;
       slots = carsOf(body);
       for (const each of slots) if (!field.get(each)) field.set(each, null);
       // The body's far file is parsed for this load alone: once its cars are batched, nothing holds the parsed vertices.
@@ -218,12 +220,14 @@ export function createRaceField(
       });
       unplaced = [];
       changed();
-    } catch {
-      // The cars that cannot load stay stand-ins (below).
+    } catch (error) {
+      // The cars that cannot load stay stand-ins (below); a load the race view cut off as it left loads again for the next one.
+      aborted = isAbortError(error);
     } finally {
       for (const car of unplaced) { car.removeFromParent(); disposeObjects(car); }
       bodyLoads--;
-      for (const each of slots) if (field.get(each) === null) field.set(each, 'none');
+      if (aborted && loading !== null) bodies.delete(loading);
+      for (const each of slots) if (field.get(each) === null) { if (aborted) field.delete(each); else field.set(each, 'none'); }
       if (!disposed) reportLoads();
     }
   };
@@ -259,9 +263,11 @@ export function createRaceField(
       if (shared) root.add(shared);
       set.ready();
     } catch (error) {
+      set?.dispose();
+      // Cut off by the race view leaving: the next one builds them again.
+      if (isAbortError(error)) { nearBuilds.delete(folder); return false; }
       // The cars stay far, for the rest of the race: said in the console, or a package error only shows as far models up close.
       console.warn(`[raceField] The full models of ${folder} failed; its cars stay far:`, error);
-      set?.dispose();
       return false;
     } finally { nearLoads--; }
     // Once built: what the cars do with their models from here on is not the build's failure.

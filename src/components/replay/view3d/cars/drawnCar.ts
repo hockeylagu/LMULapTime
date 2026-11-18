@@ -87,6 +87,22 @@ export interface Cabin {
 }
 
 /**
+ * The car the cameras ride on, built on its own with its cabin, its materials its own: the lap's car, the race's first followed car.
+ * Free of any view, the shell keeps it between views (`keptCar.ts`).
+ */
+export interface DrivenCar {
+  body: LoadedBody;
+  drawn: DrawnCar;
+  set: DrawnCars;
+  cabin: Cabin;
+  /** Whether `show` ran: until then its batches and cabin draw nothing (a view that left while it built never showed it). */
+  readonly shown: boolean;
+  /** Draws its batches and its cabin, once warm. */
+  show(): void;
+  dispose(): void;
+}
+
+/**
  * Every car of a scene drawn with its full model. `build` is the one path for every car (the lap's car, the race's near cars, a set
  * per body), drawn without the parts marked interior: the car the cameras ride on (the lap's, the race's followed one, which is the
  * field's model of it) adds them with `cabin`. The race's cars of a body share their materials; the lap's car owns its own, which
@@ -97,7 +113,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
   const models = createCarModels(templates, carTextures, shading, {shareMaterials: true});
   /** The lap's car, the cabins and the ghost, each with materials of its own (the ghost changes them). */
   const ownModels = createCarModels(templates, carTextures, shading);
-  return {
+  const sets = {
     /**
      * The cars of `bodies` (liveries of one body) drawn together. `ownMaterials`: the cars' materials their own, freed with them (the
      * lap's car).
@@ -152,6 +168,21 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
         },
       };
     },
+    /** `body`'s car on its own with its cabin (`DrivenCar`). */
+    async driven(body: LoadedBody): Promise<DrivenCar> {
+      const building = sets.build([body], {ownMaterials: true});
+      const cabining = sets.cabin(body, building.then(set => set.cars[0]));
+      cabining.catch(() => {}); // Awaited below, once the car is built: a failure surfaces there.
+      const set = await building;
+      const cabin = await cabining.catch((error: unknown) => { set.dispose(); throw error; });
+      // A built car always gets its cabin (`cabin` is null only without a car).
+      let shown = false;
+      return {
+        body, drawn: set.cars[0], set, cabin: cabin!, get shown() { return shown; },
+        show() { set.ready(); cabin!.show(); shown = true; },
+        dispose() { cabin!.dispose(); set.dispose(); },
+      };
+    },
     /** The lap's ghost: see-through, without shadows; disposed with its parent (`disposeObjects`). */
     async ghost(body: LoadedBody): Promise<DrawnCar> {
       const ghost = makeCar(TELEMETRY_COLORS.baseline, true, await ownModels.model(body));
@@ -159,6 +190,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
       return (await createDrawnCars([ghost], surfaceHeight, {batched: false})).cars[0];
     },
   };
+  return sets;
 }
 
 export type CarSets = ReturnType<typeof createCarSets>;

@@ -54,7 +54,8 @@ export interface CarTemplates {
   /**
    * What the driver cameras add to the car closest to them (the lap's, the race's followed one): the exterior's parts marked
    * interior, which every car leaves out, and the interior file's, at their full level. Each part, a copy, names the car node it
-   * hangs under (`userData.cabinParent`, null for the body's root) and is marked interior.
+   * hangs under (`userData.cabinParent`, null for the body's root) and is marked interior. The car's exterior and interior parses
+   * stay until another car takes the cameras: switching between the lap view and the race, the same car builds without a parse.
    */
   cabin(car: LoadedBody): Promise<Group>;
   /** Keeps the body's exterior parse (parsing it if no parse is held or pending) until `release`: the next car of the body builds from it. */
@@ -71,6 +72,8 @@ export interface CarTemplates {
  */
 export function createCarTemplates(): CarTemplates {
   const parses = new Map<string, Promise<Group>>(), held = new Map<string, Promise<Group>>();
+  /** The parses of the car the cameras ride on (its exterior, and its interior file's when it has one), by file. */
+  let ridden = new Map<string, Promise<Group>>();
   /** The pending parse of the file named `sha256`, shared until it settles. */
   const shared = (sha256: string, bytes: () => Promise<ArrayBuffer | null>): Promise<Group> => {
     let pending = parses.get(sha256);
@@ -82,17 +85,22 @@ export function createCarTemplates(): CarTemplates {
         return model;
       });
       parses.set(sha256, pending);
+      const failed = pending;
+      failed.catch(() => { if (ridden.get(sha256) === failed) ridden.delete(sha256); });
       const settled = () => { if (parses.get(sha256) === pending) parses.delete(sha256); };
       pending.then(settled, settled);
     }
     return pending;
   };
-  const body = (car: LoadedBody) => held.get(car.resource.sha256) ?? shared(car.resource.sha256, () => car.file());
+  const parse = (sha256: string, bytes: () => Promise<ArrayBuffer | null>) => ridden.get(sha256) ?? shared(sha256, bytes);
+  const body = (car: LoadedBody) => held.get(car.resource.sha256) ?? parse(car.resource.sha256, () => car.file());
   return {
     body,
     async cabin(car) {
       const {interior} = car.resource;
-      const [exterior, inside] = await Promise.all([body(car), interior ? shared(interior.sha256, () => car.interiorFile()) : null]);
+      const exteriorParse = body(car), insideParse = interior ? parse(interior.sha256, () => car.interiorFile()) : null;
+      ridden = new Map([[car.resource.sha256, exteriorParse], ...(interior && insideParse ? [[interior.sha256, insideParse] as const] : [])]);
+      const [exterior, inside] = await Promise.all([exteriorParse, insideParse]);
       const cabin = new Group(), add = (node: Object3D, parent: string | null) => {
         const copy = closeCopy(node);
         copy.userData.cabinParent = parent; copy.userData.interior = true;

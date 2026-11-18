@@ -333,7 +333,8 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   view failed before it started is dropped), the replay inspector page providing it (`SceneShellsContext`); a view attaches its
   element (`attach`: only the canvas and its resize observer move), starts the shell or shows its content in place of the last
   view's (`show`, the camera placed afresh by `rig.unplace`), and leaving detaches and disposes only its own content, so a
-  race ↔ lap switch keeps one WebGL context, the scenery, textures, shadows and parsed bodies. `laps/replayScene.ts` is the shell with the lap
+  race ↔ lap switch keeps one WebGL context, the scenery, textures, shadows and parsed bodies; on a started shell the race shows at once,
+  its followed car a stand-in until `follow` builds it. `laps/replayScene.ts` is the shell with the lap
   layer (the lap view; `ReplaySceneHandle`), `race/raceScene.ts` the shell with every car of a session (the race replay; the
   followed car the field's full model of it, lent to it (`RaceField.near` builds its body's full models first when they are not,
   ahead of every other load: its body's far models and the other bodies' start after; `lend`/`reclaim`), with its cabin added for the driver cameras; `race/raceField.ts` draws every other car by tier:
@@ -360,11 +361,14 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   one with its own materials) and a body's near cars (one set sharing the body's materials), every level kept, the parts marked
   interior dropped; glass and decals sorted in their batch; `cabin` adds the body's cabin to the car the cameras ride on (the lap's,
   the race's followed field car): its own part table and batches riding in the car, each part under a hidden holder until shown, at
-  the car's distance 0 its full level shows; `ghost` the lap's ghost part by part. `createDrawnCars` under it: part
+  the car's distance 0 its full level shows; `driven` the car the cameras ride on built on its own with its cabin (the lap's car, the
+  race's first followed car); `ghost` the lap's ghost part by part. `keptCar.ts`: the shell's `keptCar`, the driven car the last view
+  or lap let go, which the next one driving the same entry takes as it is (lap ↔ race shows the car at once, nothing rebuilt; one car
+  at most). `createDrawnCars` under it: part
   tables, motion, batches shared by the set, solid parts casting from one shadow-only batch on `SHADOW_ONLY_LAYER`),
   `carTemplates.ts` the scene's parsed bodies (the shell's `carTemplates`: the exterior GLB for every car; `cabin` the exterior's
   outermost parts marked interior and the interior GLB's chassis parts at their full level, each naming the car node it hangs under;
-  a parse shared by the builds asking while it is pending, then dropped, unless held: the race holds the exteriors of the bodies with cars near the camera, so following one parses only its interior), `carModels.ts` each livery's model, or cabin, from them (materials by content, lamps and glow, textures from start files;
+  a parse shared by the builds asking while it is pending, then dropped, unless held: the race holds the exteriors of the bodies with cars near the camera, so following one parses only its interior; the car the cameras ride on (the last `cabin`) keeps its exterior and interior parses, so a lap ↔ race switch builds it without a parse), `carModels.ts` each livery's model, or cabin, from them (materials by content, lamps and glow, textures from start files;
   `shareMaterials` for cars drawn many at once, whose dropped models leave the shared materials), plus the wheel files
   (`wheelGeometry.ts`, `wheelAnimation.ts`, `wheelMotion.ts`: each wheel turns by the replay's recorded angular speed, else the
   car's travel over the wheel radius) and `sceneObjects.ts` (`makeCar`). `src/api/vehicles/bodyStore.ts`

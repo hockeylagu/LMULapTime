@@ -66,7 +66,7 @@ export async function createReplayScene(
   shell.setDaylight(trajectory.daylightClock);
   const {rig, origin} = shell;
   shell.station = firstStation;
-  const loadLaps = createLapLayerLoader(origin, shell.surfaceHeight, createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight), () => shell.exposureDisplay());
+  const loadLaps = createLapLayerLoader(origin, shell.surfaceHeight, createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight), shell.keptCar, () => shell.exposureDisplay());
   const carsBuilt = loadLaps.preload(cars); // The cars load and build alongside the scenery; only draping waits for the ground.
   carsBuilt.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces from the load below.
   // The cars compile and upload in turn with the chunks, lit as they will be drawn: the first car by its own reflection.
