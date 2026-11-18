@@ -34,7 +34,8 @@ Compare only like with like: same driver, car, layout and dry conditions.
   Deterministic; never AI.
 - History starts with the next built debrief. Older sessions join only when their debrief is opened (about 4 s from
   the stored replays); no background backfill.
-- Corner numbers come from the layout's corner map, so they are stable between sessions. A track or patch grip change
+- Corner numbers come from the layout's fixed centre-line segments ([corner insight](CORNER_INSIGHT.md), layer 1), so
+  they are stable between sessions. A track or patch grip change
   can move times too: always show the earlier session's date.
 
 The unmerged `debrief-first` worktree listed this as item 7 (saved focus corners) but did not start it; its

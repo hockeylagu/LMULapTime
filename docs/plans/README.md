@@ -157,6 +157,10 @@ items and the open code-review findings.
 
 ## Unstarted proposals
 
+- [Corner insight](proposed/CORNER_INSIGHT.md): an always-on card for the corner the car is in, against its own race
+  and its class; corners as fixed centre-line segments plus driving sequences detected per lap; passes computed on demand
+  for both lap and race views, built once per session into a disposable cache (on demand measured at ~45 s on Le Mans).
+  The Consistency panel and the debrief move onto the same passes. Plan accepted; step one (official turns) done.
 - [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
   driver decisions first (Crew Chief overlap, voice, naming).
 - [Live wetness projection](proposed/LIVE_WETNESS_PROJECTION.md): when the track will reach the next wetness step,
@@ -165,4 +169,5 @@ items and the open code-review findings.
 - [Debrief corner tracking](proposed/DEBRIEF_CORNER_TRACKING.md): each debrief corner against the driver's own
   previous session at the layout (corner time and cues), to see whether a habit is being corrected.
 - [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
-  before revisiting prepared views or grouped columns.
+  before revisiting prepared views or grouped columns. One pattern for a car over time: the native lap cache in the
+  replay's codec, race positions and poses derived from the laps on demand, any stored derived result disposable.
