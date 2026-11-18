@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { BoxGeometry, Color, Group, Mesh, MeshBasicMaterial, Vector4, type Camera, type Object3D, type WebGLRenderTarget } from 'three';
+import { BoxGeometry, Color, Group, Mesh, MeshBasicMaterial, ShaderLib, Vector4, type Camera, type Object3D, type WebGLRenderTarget } from 'three';
 import { createContactShadow, createUnderCarBaker } from '../../../../../src/components/replay/view3d/car/carContactShadow.js';
 import type { BakeRenderer } from '../../../../../src/components/replay/view3d/car/underCarBake.js';
 
@@ -41,6 +41,14 @@ it('lays a soft analytic shadow on the car contact plane until its body is baked
   expect(at(width >> 1, height >> 1)).toBe(Math.round(255 * 0.6));
   expect(at(0, 0)).toBe(0);
   expect(shadow.castShadow).toBe(false); expect(shadow.material).toBeInstanceOf(MeshBasicMaterial);
+});
+
+it("keeps a quarter of its darkening where the sun reaches the road, all of it past the sun's shadows", () => {
+  const {material} = createContactShadow(carModel(), 'a', createUnderCarBaker());
+  const shader = {uniforms: {}, vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader};
+  material.onBeforeCompile(shader as never, null as never);
+  expect(shader.fragmentShader).toContain('diffuseColor.a *= mix( 1.0 - 0.75 * sunLit, 1.0, beyond );');
+  expect(shader.fragmentShader.indexOf('sunLit = surfaceCascadeShadow')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <alphamap_fragment>'));
 });
 
 it('refuses a model without measured parts', () => {

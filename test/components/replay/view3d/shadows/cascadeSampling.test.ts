@@ -2,7 +2,7 @@ import { DepthTexture, Matrix4, ShaderLib, Vector4 } from 'three';
 import { afterEach, describe, expect, it } from 'vitest';
 import { patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { readSurfaceConfig, type SurfaceConfig } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
-import { cascadeShadowUniforms, holdCascadeShadows, patchCascadeShadow, sampleCascadeShadows } from '../../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
+import { cascadeShadowUniforms, holdCascadeShadows, patchCascadeShadow, patchCascadeShadowLookup, sampleCascadeShadows } from '../../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { shadowCascadeLayout } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 import { surface } from '../scenery/surfaceFixture.js';
@@ -95,5 +95,16 @@ describe('cascade shadow sampling', () => {
     expect(shader.uniforms.surface_cascadeCount).toBe(cascadeShadowUniforms.surface_cascadeCount);
     const bare = {uniforms: {}, vertexShader: '', fragmentShader: ''} as unknown as Parameters<typeof patchCascadeShadow>[0];
     expect(() => patchCascadeShadow(bare, 0.5)).toThrow(/to take the cascade shadow/);
+  });
+
+  it("gives an unlit program the sun's light fraction at the fragment's world position, instanced or not", () => {
+    const shader = {uniforms: {}, vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader} as unknown as Parameters<typeof patchCascadeShadowLookup>[0];
+    patchCascadeShadowLookup(shader);
+    expect(shader.vertexShader.indexOf('cascadeWorld = instanceMatrix * cascadeWorld;')).toBeGreaterThan(shader.vertexShader.indexOf('#include <worldpos_vertex>'));
+    expect(shader.vertexShader).toContain('vCascadeViewDepth = - mvPosition.z;');
+    expect(shader.fragmentShader.indexOf('float surfaceCascadeShadow(')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <common>'));
+    expect(shader.uniforms.surface_cascadeAtlas).toBe(cascadeShadowUniforms.surface_cascadeAtlas);
+    const bare = {uniforms: {}, vertexShader: '', fragmentShader: ''} as unknown as Parameters<typeof patchCascadeShadowLookup>[0];
+    expect(() => patchCascadeShadowLookup(bare)).toThrow(/to take the cascade lookup/);
   });
 });

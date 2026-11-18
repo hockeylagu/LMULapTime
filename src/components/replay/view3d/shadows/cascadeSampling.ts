@@ -125,6 +125,36 @@ const CASCADE_SHADOW_FRAGMENT_PARS = `
   }
 `;
 
+/**
+ * Gives an unlit program (three's basic material, instanced or not) the sun's light fraction at each fragment:
+ * `surfaceCascadeShadow(vCascadeViewDepth)`, looked up at the fragment's world position (no normal offset), 1 outside the cascades.
+ * The caller uses it after `#include <common>` of the fragment program.
+ */
+export function patchCascadeShadowLookup(shader: WebGLProgramParametersWithUniforms): void {
+  const replace = (source: string, from: string, to: string) => {
+    if (!source.includes(from)) throw Error(`The shader has no ${from} to take the cascade lookup`);
+    return source.replace(from, () => to);
+  };
+  shader.vertexShader = replace(replace(shader.vertexShader, '#include <common>', `#include <common>
+  varying vec3 vCascadePosition;
+  varying float vCascadeViewDepth;`), '#include <worldpos_vertex>', `#include <worldpos_vertex>
+  {
+    vec4 cascadeWorld = vec4( transformed, 1.0 );
+    #ifdef USE_BATCHING
+      cascadeWorld = batchingMatrix * cascadeWorld;
+    #endif
+    #ifdef USE_INSTANCING
+      cascadeWorld = instanceMatrix * cascadeWorld;
+    #endif
+    vCascadePosition = ( modelMatrix * cascadeWorld ).xyz;
+    vCascadeViewDepth = - mvPosition.z;
+  }`);
+  shader.fragmentShader = replace(shader.fragmentShader, '#include <common>', `#include <common>
+  varying float vCascadeViewDepth;
+${CASCADE_SHADOW_FRAGMENT_PARS}`);
+  Object.assign(shader.uniforms, cascadeShadowUniforms);
+}
+
 /** Where three's light loop has the sun's light (the only directional light) for a fragment, before applying it. */
 const SUN_LIGHT_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
 

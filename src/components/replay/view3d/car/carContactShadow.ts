@@ -1,10 +1,14 @@
 import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, Vector3, type Object3D, type WebGLRenderTarget } from 'three';
 import { hazeProgram } from '../atmosphere/haze.js';
+import { patchCascadeShadowLookup } from '../shadows/cascadeSampling.js';
 import { bakeArea, bakeParts, bakeUnderCar, underCarQuadGeometry, CONTACT_SHADOW_NAME, type BakePart, type BakeRenderer } from './underCarBake.js';
 
 /** How far the darkening spreads beyond the body, its strength under the body, and the lift that keeps it off the road. */
 export const CONTACT_SHADOW_SPREAD_M = 0.5, CONTACT_SHADOW_LIFT_M = 0.02;
 const STRENGTH = 0.6, CORNER_M = 0.3, TEXELS_PER_M = 24;
+/** The share of its darkening the shade keeps where the sun reaches the road: the sky's share of the light, which the car still hides. */
+const SUN_LIT_SHARE = 0.25;
+const ALPHA_MAP = '#include <alphamap_fragment>';
 /** Drawn after the road and before the racing line (renderOrder 2), which stays readable over it. */
 export const CONTACT_SHADOW_ORDER = 1;
 
@@ -29,6 +33,20 @@ export function contactShadowQuad(halfX: number, halfZ: number): {geometry: Plan
   const alpha = new DataTexture(data, width, height, RGBAFormat);
   alpha.magFilter = LinearFilter; alpha.minFilter = LinearFilter; alpha.needsUpdate = true;
   const material = new MeshBasicMaterial({color: 0x000000, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4});
+  // The shade under the car takes the sky's light: where the sun reaches the road (under an overhang, around the body) it keeps
+  // SUN_LIT_SHARE of its darkening. Without sun shadows (none, or past their fade), the shade grounds the car whole, as before.
+  material.onBeforeCompile = shader => {
+    patchCascadeShadowLookup(shader);
+    if (!shader.fragmentShader.includes(ALPHA_MAP)) throw Error('The contact shadow program has no alpha map to fade in the sun');
+    shader.fragmentShader = shader.fragmentShader.replace(ALPHA_MAP, () => `${ALPHA_MAP}
+    {
+      float sunLit = surfaceCascadeShadow( vCascadeViewDepth );
+      float beyond = surface_cascadeCount > 0
+        ? clamp( ( vCascadeViewDepth - surface_cascadeFade.x ) / ( surface_cascadeFade.y - surface_cascadeFade.x ), 0.0, 1.0 ) : 1.0;
+      diffuseColor.a *= mix( 1.0 - ${(1 - SUN_LIT_SHARE).toFixed(2)} * sunLit, 1.0, beyond );
+    }`);
+  };
+  material.customProgramCacheKey = () => 'lmu-contact-shadow';
   hazeProgram(material);
   material.addEventListener('dispose', () => { alpha.dispose(); });
   return {geometry: new PlaneGeometry(sizeX, sizeZ).rotateX(-Math.PI / 2), material};
