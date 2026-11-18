@@ -198,6 +198,7 @@ describe('GPS map display layers', () => {
       'Start / finish line',
       'Sector markers',
       'Turns',
+      'Official turns',
       'Centerline guide',
       'Braking markers',
     ]);

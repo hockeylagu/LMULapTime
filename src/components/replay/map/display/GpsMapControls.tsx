@@ -50,7 +50,7 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
         runoff: RUNOFF_GROUP.some(key => surfaces?.[key]?.length),
         pit: Boolean(surfaces?.pit?.length), otherRoad: Boolean(surfaces?.otherRoad?.length),
         brakeMarkers: Boolean(geometry?.brakeMarkers?.length),
-        centerline: center.length > 0, sectors: Boolean(hasSectors), turns: Boolean(hasTurns) }}
+        centerline: center.length > 0, officialTurns: center.length > 0, sectors: Boolean(hasSectors), turns: Boolean(hasTurns) }}
       hasRaisedKerbs={Boolean(surfaces?.raisedKerb?.length)}
       runoffKinds={RUNOFF_GROUP.filter(key => surfaces?.[key]?.length)}
       onFitTrack={() => fit(active)} onFitVisible={() => fit([...active,

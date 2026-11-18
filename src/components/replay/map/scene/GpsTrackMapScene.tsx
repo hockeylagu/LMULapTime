@@ -11,6 +11,7 @@ import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { buildRibbonIndex } from './cornerRibbonClearance.js';
 import { GpsSectorMarkers } from './GpsSectorMarkers.js';
+import { GpsOfficialTurns } from './GpsOfficialTurns.js';
 import { GpsMapBackground } from '../display/GpsMapBackground.js';
 import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
 import { useTrackMarkerPlacement } from '../display/useTrackMarkerPlacement.js';
@@ -169,6 +170,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
             viewBox={cullViewBox}
           />
 
+          {layers.officialTurns && <GpsOfficialTurns geometry={effectiveGeometry} centerSvg={centerlineSvgPoints} markerScale={markerScale} />}
           {layers.sectors && <GpsSectorMarkers markers={placedSectors} markerScale={markerScale} obstacles={markerObstacles} />}
           {layers.startFinish && <GpsStartFinishLine placement={placedStart}
             svgPoints={svgPoints} zoomLevel={zoomLevel} markerScale={markerScale}

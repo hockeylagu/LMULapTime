@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { GpsTrackSurfaceLayers } from '../../../../../src/components/replay/map/scene/GpsTrackSurfaceLayers.js';
+import { DEFAULT_MAP_LAYERS } from '../../../../../src/components/replay/map/display/mapLayers.js';
 import type { TrackMapSurfaces } from '../../../../../shared/types/trackGeometry.js';
 
 describe('GpsTrackSurfaceLayers', () => {
@@ -13,9 +14,7 @@ describe('GpsTrackSurfaceLayers', () => {
     const raised = container.querySelector('[data-surface="raisedKerb"]');
     expect(raised).not.toBeNull();
     expect(raised?.getAttribute('fill')).not.toBe(ordinary?.getAttribute('fill'));
-    rerender(<svg><GpsTrackSurfaceLayers {...props} layers={{ road: true, kerb: false, brakeMarkers: false,
-      brakeDistance: true, brakeAds: true, brakeDigi: true, pit: false, centerline: false, runoff: false,
-      otherRoad: false, apron: false, gravel: false, grass: false, sectors: true, turns: true, startFinish: true }} /></svg>);
+    rerender(<svg><GpsTrackSurfaceLayers {...props} layers={{ ...DEFAULT_MAP_LAYERS, kerb: false }} /></svg>);
     expect(container.querySelector('[data-surface="kerb"]')).toBeNull();
     expect(container.querySelector('[data-surface="raisedKerb"]')).toBeNull();
   });
@@ -24,9 +23,7 @@ describe('GpsTrackSurfaceLayers', () => {
     const surfaces: TrackMapSurfaces = { road: [], kerb: [[[[0, 0], [10, 0], [10, 1], [0, 0]]]],
       otherRoadKerb: [[[[0, 5], [3, 5], [3, 6], [0, 5]]]], runoff: [] };
     const props = { surfaces, bounds: { minX: 0, minZ: 0, spanX: 10, spanZ: 10 }, viewBoxSize: 100, padding: 10 };
-    const layers = { road: true, kerb: true, brakeMarkers: false, brakeDistance: true, brakeAds: true, brakeDigi: true,
-      pit: false, centerline: false, runoff: false, otherRoad: false, apron: false, gravel: false, grass: false,
-      sectors: true, turns: true, startFinish: true };
+    const layers = DEFAULT_MAP_LAYERS;
     const { container, rerender } = render(<svg><GpsTrackSurfaceLayers {...props} layers={layers} /></svg>);
     expect(container.querySelector('[data-surface="otherRoadKerb"]')).toBeNull();
     rerender(<svg><GpsTrackSurfaceLayers {...props} layers={{ ...layers, otherRoad: true }} /></svg>);
