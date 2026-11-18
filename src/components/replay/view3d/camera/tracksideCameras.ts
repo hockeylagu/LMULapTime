@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
-import { nativeToScene } from '../scene/sceneFrame.js';
+import { nativeToScene } from '../scene/replayPose.js';
 
 /** TV-style spots: one every SPACING_M along the lap, set OFFSET_M beside the line and HEIGHT_M up. */
 const SPACING_M = 160, OFFSET_M = 18, HEIGHT_M = 6, LEAD_M = 70;

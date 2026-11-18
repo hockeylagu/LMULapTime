@@ -2,6 +2,14 @@ import { Euler, Quaternion } from 'three';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { findIndexAtDistance } from '../../../../utils/lapAlignment.js';
 
+/** The game is left-handed Y-up; Three.js is right-handed. Stored data stays native. */
+export function nativeToScene(
+  point: {x: number; y: number; z: number},
+  origin: {x: number; y: number; z: number},
+): [number, number, number] {
+  return [point.x - origin.x, point.y - origin.y, origin.z - point.z];
+}
+
 export interface RenderPose { x: number; y: number; z: number; yaw?: number; orientation?: Quaternion; index: number; fraction: number }
 
 export function isContinuousPose(a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint | undefined): b is ReplayTrajectoryPoint {

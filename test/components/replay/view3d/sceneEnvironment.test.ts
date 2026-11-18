@@ -1,11 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
-import { addSceneEnvironment, sceneLighting, sceneSun, sunSeenFrom, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { addSceneEnvironment, sceneLighting, sceneSun, solarPosition, sunSeenFrom, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { hazeProgram } from '../../../../src/components/replay/view3d/atmosphere/haze.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { SUN_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
-import { solarPosition } from '../../../../src/components/replay/view3d/solarPosition.js';
 import { cascadeShadowUniforms } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { crownSun } from '../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 

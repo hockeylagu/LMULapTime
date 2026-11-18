@@ -1,5 +1,11 @@
 import { Vector2, type IUniform } from 'three';
-import { sceneryClock } from './sceneryClock.js';
+
+/**
+ * The replay's time in seconds, which every animated surface reads (digital flags blink by it): the scene shell sets it before each
+ * frame from the pose the camera follows, so animations pause and scrub with the replay, as the reference animates them by game
+ * time.
+ */
+export const sceneryClock = { value: 0 };
 
 /**
  * UV-animated surface maps (`maps.<role>.uvAnimation`, the pipeline's docs/SCENE_PACKAGE.md): LED boards, screens, fountains and

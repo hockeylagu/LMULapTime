@@ -7,7 +7,7 @@ import { appearanceOf, startFileOf, type LoadedBody } from '../../../../api/vehi
 import { PAINT_LAYERS, PAINT_MAPS, paintLayers } from '../car/paintLayers.js';
 import type { CarTextures } from './carModels.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
-import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
+import { patchAmbientLookup } from '../scenery/materials/patchSurfaceShader.js';
 import { hazeProgram } from '../atmosphere/haze.js';
 import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
 

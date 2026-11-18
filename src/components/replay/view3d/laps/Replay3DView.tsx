@@ -18,8 +18,8 @@ import {
   type MapColorMode,
 } from '../../map/replayMapUtils.js';
 import { useReplayScene } from './useReplayScene.js';
-import { Scene3DFrame } from '../scene/Scene3DFrame.js';
-import { carLockedCamera, followsCar, type CameraMode } from '../camera/cameraModes.js';
+import { cameraActions, Scene3DFrame } from '../scene/Scene3DFrame.js';
+import { type CameraMode } from '../camera/cameraModes.js';
 import { useGpsMapShortcuts } from '../../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
 import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../../inspector/ghostSyncContext.js';
@@ -98,11 +98,10 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
     return buildContinuousSvgPath(svgPoints);
   }, [trackGeometry, trajectory.bounds, svgPoints]);
 
+  const cam = cameraActions(scene, mode, setMode, 'follow');
   useGpsMapShortcuts({isExpanded, containerRef: map, points: trajectory.points, currentIndex, onSelectIndex,
-    onZoomIn: () => scene.current?.zoom(1), onZoomOut: () => scene.current?.zoom(-1), onResetZoom: () => scene.current?.reset(),
-    onPan: (horizontal, vertical) => { if (carLockedCamera(mode)) setMode('orbit'); scene.current?.pan(horizontal, vertical); },
-    onCenter: () => scene.current?.center(),
-    onToggleFollow: () => setMode(value => followsCar(value) ? 'orbit' : 'follow'),
+    onZoomIn: cam.onZoomIn, onZoomOut: cam.onZoomOut, onResetZoom: cam.onReset,
+    onPan: cam.onPan, onCenter: cam.onCenter, onToggleFollow: cam.onToggleFollow,
     onCycleGhostSync: baseline ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode, ghostSync.markerDistM !== null)) : undefined,
     onToggleMarker: () => toggleGhostMarker(ghostSync, primaryDists[activeIndex] ?? 0),
     onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded(), onToggleView: onReturnTo2D});

@@ -2,10 +2,8 @@ import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type W
 import { patchTextureFocus } from '../textureFocus.js';
 import { tyreReadsAxle } from '../../car/tyreSurface.js';
 import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
-import { sceneryClock } from './sceneryClock.js';
 import { readsDayLight, sceneDayLight } from '../../scene/dayLight.js';
-import { uvShiftUniform } from './surfaceAnimation.js';
-import { patchAmbientLookup } from './ambientLookup.js';
+import { sceneryClock, uvShiftUniform } from './surfaceAnimation.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
 import { glslNumber, list, surfaceAlphaCut, value } from './shaderContext.js';
 import { REFLECTING_KINDS, SCENERY_REFLECTION_GLSL, SCENERY_REFLECTION_INPUTS, sceneryReflectionUniforms } from './sceneryReflection.js';
@@ -16,6 +14,15 @@ import { REALROAD_VERTEX_DECLARATIONS, REALROAD_VERTEX_MAIN, realRoadUniforms } 
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
 const hasTranslucency = (config: SurfaceConfig) => !!config.flags.translucency;
+
+const IRRADIANCE_LOOKUP = 'getIBLIrradiance( geometryNormal )';
+const HALVED_LOOKUP = 'getIBLIrradiance( transformDirection( inverseTransformDirection( geometryNormal, viewMatrix ) * vec3( 1.0, 0.5, 1.0 ), viewMatrix ) )';
+if (!ShaderChunk.lights_fragment_maps.includes(IRRADIANCE_LOOKUP)) throw Error('three.js lights_fragment_maps changed: the ambient lookup needs updating');
+
+/** Replaces three's environment include in a program with the halved-height irradiance lookup (shared by scenery and cars). */
+export function patchAmbientLookup(shader: { fragmentShader: string }): void {
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', ShaderChunk.lights_fragment_maps.replace(IRRADIANCE_LOOKUP, HALVED_LOOKUP));
+}
 
 /**
  * Turns a camera-facing card about its pivot toward `eye` (a world position in GLSL), and its normal with it: the authored normal

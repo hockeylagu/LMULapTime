@@ -3,8 +3,7 @@ import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/s
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
 import { ghostDistanceAt, type GhostSyncMode } from '../../map/ghostSync.js';
-import { sampleRenderPose, sampleStationPose } from '../scene/replayPose.js';
-import { nativeToScene } from '../scene/sceneFrame.js';
+import { nativeToScene, sampleRenderPose, sampleStationPose } from '../scene/replayPose.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './lapLayer.js';
 import type { DrivingMark } from './drivingMarks.js';
 import { createCarSets } from '../cars/drawnCar.js';

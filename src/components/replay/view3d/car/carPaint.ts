@@ -4,7 +4,7 @@ import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { SUN_UNIT } from '../atmosphere/sunSamples.js';
 import type { ReflectionCubes } from '../reflectionCube.js';
-import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
+import { patchAmbientLookup } from '../scenery/materials/patchSurfaceShader.js';
 import { OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
 import { PAINT_LAYERS, paintLayers } from './paintLayers.js';
 

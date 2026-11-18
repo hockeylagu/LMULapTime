@@ -3,7 +3,7 @@ import { patchTextureFocus } from '../scenery/textureFocus.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { hazeProgram } from '../atmosphere/haze.js';
-import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
+import { patchAmbientLookup } from '../scenery/materials/patchSurfaceShader.js';
 import { bindSurfaceProgram } from '../scenery/materials/configureSurfaceMaterial.js';
 import { REFLECTING_KINDS } from '../scenery/materials/sceneryReflection.js';
 import { surfaceTextureUnits } from '../scenery/materials/shaderParts.js';

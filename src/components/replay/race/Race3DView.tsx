@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { RaceReplayCar, RaceReplayOverview, RaceReplayProgress } from '../../../../shared/types/index.js';
-import { carLockedCamera, followsCar, type CameraMode } from '../view3d/camera/cameraModes.js';
-import { NARROW_SCENE_BESIDE_CONTROLS, Scene3DFrame } from '../view3d/scene/Scene3DFrame.js';
+import { type CameraMode } from '../view3d/camera/cameraModes.js';
+import { cameraActions, NARROW_SCENE_BESIDE_CONTROLS, Scene3DFrame } from '../view3d/scene/Scene3DFrame.js';
 import { useRaceScene } from '../view3d/race/useRaceScene.js';
 import { RaceCarHover } from '../view3d/race/RaceCarHover.js';
 import { RaceLapTiming } from './RaceLapTiming.js';
@@ -35,10 +35,10 @@ export default function Race3DView({ overview, index, clock, poses, followSlot, 
   const cars = useMemo(() => new Map<number, RaceReplayCar>(overview.cars.map(car => [car.slot, car])), [overview.cars]);
   const totalLaps = useMemo(() => raceLapCount(overview), [overview]);
   // The race map's keys move the camera: a pan hands a camera locked on the car over to free orbit, as in the lap view.
+  const cam = cameraActions(scene, mode, setMode, 'chase');
   useRaceMapKeys({
-    zoomIn: () => scene.current?.zoom(1), zoomOut: () => scene.current?.zoom(-1), resetPanZoom: () => scene.current?.reset(),
-    centerOnCar: () => scene.current?.center(), setFollowCar: () => setMode(value => (followsCar(value) ? 'orbit' : 'chase')),
-    panBy: (horizontal, vertical) => { if (carLockedCamera(mode)) setMode('orbit'); scene.current?.pan(horizontal, vertical); },
+    zoomIn: cam.onZoomIn, zoomOut: cam.onZoomOut, resetPanZoom: cam.onReset,
+    centerOnCar: cam.onCenter, setFollowCar: cam.onToggleFollow, panBy: cam.onPan,
   }, onToggleView, active);
 
   return (

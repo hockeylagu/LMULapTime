@@ -1,13 +1,12 @@
 import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, LinearMipmapLinearFilter, MathUtils, Mesh, MeshBasicMaterial, NoToneMapping, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
 import { dayShare, sceneDayLight } from './scene/dayLight.js';
-import { nativeToScene } from './scene/sceneFrame.js';
+import { nativeToScene } from './scene/replayPose.js';
 import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
 import { holdCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
 import { shadowCameraOf, shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';
 import type { CarCamera } from '../../../../shared/types/scenes/car.js';
 import type { SceneryDaylight, SceneryLayout } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
-import { solarPosition } from './solarPosition.js';
 import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze, type SkyConditions } from './atmosphere/skyDome.js';
 import { createHaze } from './atmosphere/haze.js';
 import { cloudCoverage, cloudSheets, sunVisibility, type CloudEye, type CloudSheet } from './atmosphere/clouds.js';
@@ -19,6 +18,23 @@ import { integrationTexture, setSceneryReflection } from './scenery/materials/sc
 
 /** The sun direction without a layout's daylight: midday, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js). */
 const DAYLIGHT = Object.freeze({elevationDeg: 55, azimuthDeg: 45});
+
+/** Sun elevation and compass bearing at a place and local clock time (NOAA fractional-year approximation). */
+export function solarPosition(latitudeDeg: number, longitudeDeg: number, date: string, minuteOfDay: number, utcOffsetHours: number): {elevationDeg: number; bearingDeg: number} {
+  const [year, month, day] = date.split('-').map(Number);
+  const dayOfYear = Math.round((Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 1)) / 86_400_000) + 1;
+  const gamma = 2 * Math.PI / 365 * (dayOfYear - 1 + (minuteOfDay / 60 - 12) / 24);
+  const equationOfTimeMin = 229.18 * (0.000075 + 0.001868 * Math.cos(gamma) - 0.032077 * Math.sin(gamma) - 0.014615 * Math.cos(2 * gamma) - 0.040849 * Math.sin(2 * gamma));
+  const declination = 0.006918 - 0.399912 * Math.cos(gamma) + 0.070257 * Math.sin(gamma) - 0.006758 * Math.cos(2 * gamma)
+    + 0.000907 * Math.sin(2 * gamma) - 0.002697 * Math.cos(3 * gamma) + 0.001480 * Math.sin(3 * gamma);
+  const solarTimeMin = minuteOfDay + equationOfTimeMin + 4 * longitudeDeg - 60 * utcOffsetHours;
+  const hourAngle = (solarTimeMin / 4 - 180) * Math.PI / 180, latitude = latitudeDeg * Math.PI / 180;
+  const cosZenith = Math.min(1, Math.max(-1, Math.sin(latitude) * Math.sin(declination) + Math.cos(latitude) * Math.cos(declination) * Math.cos(hourAngle)));
+  const zenith = Math.acos(cosZenith);
+  const cosFromNorth = Math.min(1, Math.max(-1, (Math.sin(declination) - Math.sin(latitude) * cosZenith) / (Math.cos(latitude) * Math.sin(zenith))));
+  const fromNorthDeg = Math.acos(cosFromNorth) * 180 / Math.PI;
+  return {elevationDeg: 90 - zenith * 180 / Math.PI, bearingDeg: hourAngle > 0 ? 360 - fromNorthDeg : fromNorthDeg};
+}
 const SKY_RADIUS_M = 12000, ENVIRONMENT_GROUND_Y = -0.5;
 /** Mean reflectance of the ground around a circuit (grass, asphalt, concrete) for the bounce light of the first environment. */
 const GROUND_ALBEDO = 0.2;

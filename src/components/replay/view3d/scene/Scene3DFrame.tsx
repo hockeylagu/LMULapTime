@@ -1,7 +1,7 @@
 import { useEffect, type Dispatch, type ReactNode, type RefObject, type SetStateAction } from 'react';
 import { MapViewSwitchButton } from '../../map/display/MapViewSwitchButton.js';
 import { MapControlsOverlay } from '../../map/MapControlsOverlay.js';
-import { CameraModeControl, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
+import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
 import { Replay3DLoading, Replay3DStreaming } from './Replay3DLoading.js';
 import type { SceneHostState } from './useSceneHost.js';
 
@@ -13,11 +13,32 @@ const NARROW_SCENE_CONTROLS = '@max-[600px]:flex-col @max-[600px]:gap-1 @max-[60
 /** A panel under the controls' row (the race timing) moves beside their column in a narrow scene. */
 export const NARROW_SCENE_BESIDE_CONTROLS = '@max-[600px]:top-2 @max-[600px]:right-[58px]';
 
-/** The camera moves the frame's buttons make on a scene (lap and race scenes both have them). */
+/** The camera moves the frame's buttons and shortcuts make on a scene (lap and race scenes both have them). */
 interface CameraControls {
   zoom(direction: number): void;
   reset(): void;
   center(): void;
+  pan?(horizontal: number, vertical: number): void;
+}
+
+/** Shared camera actions for `Scene3DFrame` and the lap/race keyboard shortcuts. */
+export function cameraActions(
+  scene: RefObject<CameraControls | null>,
+  mode: CameraMode,
+  onModeChange: Dispatch<SetStateAction<CameraMode>>,
+  followMode: CameraMode,
+) {
+  return {
+    onZoomIn: () => scene.current?.zoom(1),
+    onZoomOut: () => scene.current?.zoom(-1),
+    onReset: () => scene.current?.reset(),
+    onCenter: () => scene.current?.center(),
+    onPan: (horizontal: number, vertical: number) => {
+      if (carLockedCamera(mode)) onModeChange('orbit');
+      scene.current?.pan?.(horizontal, vertical);
+    },
+    onToggleFollow: () => onModeChange(value => (followsCar(value) ? 'orbit' : followMode)),
+  };
 }
 
 interface Props {
@@ -65,6 +86,7 @@ export function Scene3DFrame({
 }: Props) {
   useCameraModeShortcuts(surface, onModeChange);
   useEffect(() => { if (active) surface.current?.focus({preventScroll: true}); }, [active, surface]);
+  const actions = cameraActions(scene, mode, onModeChange, followMode);
   return (
     <div ref={surface} data-replay-surface="map" data-replay-view="3d" data-map-expanded={expanded ? '' : undefined} tabIndex={0} aria-label={ariaLabel}
       className={`relative flex flex-col overflow-hidden bg-lmu-deep outline-none ${className}`}>
@@ -73,9 +95,9 @@ export function Scene3DFrame({
         <div ref={host} tabIndex={0} onPointerDown={event => event.currentTarget.focus({preventScroll: true})}
           aria-label={hostLabel} className="relative w-full h-full outline-none" />
         {children}
-        <MapControlsOverlay onZoomIn={() => scene.current?.zoom(1)} onZoomOut={() => scene.current?.zoom(-1)} onReset={() => scene.current?.reset()}
-          followCar={followsCar(mode)} onToggleFollowCar={() => onModeChange(value => (followsCar(value) ? 'orbit' : followMode))}
-          onCenterCar={() => scene.current?.center()} isPlaying={isPlaying} onTogglePlay={onTogglePlay}
+        <MapControlsOverlay onZoomIn={actions.onZoomIn} onZoomOut={actions.onZoomOut} onReset={actions.onReset}
+          followCar={followsCar(mode)} onToggleFollowCar={actions.onToggleFollow}
+          onCenterCar={actions.onCenter} isPlaying={isPlaying} onTogglePlay={onTogglePlay}
           orientation="horizontal" className={`top-2 right-3 bottom-auto ${NARROW_SCENE_CONTROLS}`}>
           <CameraModeControl mode={mode} onChange={onModeChange} />
           {controlsBefore}
