@@ -44,19 +44,54 @@ export function fetchRaceProgress(sessionId: string, init?: RequestInit): Promis
   return fetchJson<RaceReplayProgress>(`/api/session/${encodeURIComponent(sessionId)}/race/progress`, init);
 }
 
-/** The last session's overview: the lap view asks for it ahead, so the race opens on it without a loading page. */
-let lastOverview: {sessionId: string; request: Promise<RaceReplayOverview>; value: RaceReplayOverview | null} | null = null;
+/**
+ * The last session's overview: the lap view asks for it ahead, so the race opens on it without a loading page. `users`: the callers
+ * still waiting on it; the request stops once none is.
+ */
+let lastOverview: {
+  sessionId: string; request: Promise<RaceReplayOverview>; value: RaceReplayOverview | null; controller: AbortController; users: number;
+} | null = null;
 
 /**
  * Every car of the session replay on the replay clock: cars, laps and running order (poses come in windows). Asked once per
- * session (the last one): callers share the request, and a failed one is asked again.
+ * session (the last one): callers share the request, and a failed one is asked again. `signal` stops this caller's wait; the
+ * request itself stops when every caller stopped before it arrived.
  */
-export function fetchRaceOverview(sessionId: string): Promise<RaceReplayOverview> {
-  if (lastOverview?.sessionId === sessionId) return lastOverview.request;
-  const entry: NonNullable<typeof lastOverview> = {sessionId, request: fetchJson<RaceReplayOverview>(`/api/session/${encodeURIComponent(sessionId)}/race`), value: null};
-  lastOverview = entry;
-  entry.request.then(value => { entry.value = value; }, () => { if (lastOverview === entry) lastOverview = null; });
-  return entry.request;
+export function fetchRaceOverview(sessionId: string, signal: AbortSignal): Promise<RaceReplayOverview> {
+  if (signal.aborted) return Promise.reject(signal.reason as Error);
+  let entry = lastOverview?.sessionId === sessionId ? lastOverview : null;
+  if (!entry) {
+    const controller = new AbortController();
+    const made: NonNullable<typeof lastOverview> = {
+      sessionId, controller, users: 0, value: null,
+      request: fetchJson<RaceReplayOverview>(`/api/session/${encodeURIComponent(sessionId)}/race`, {signal: controller.signal}),
+    };
+    made.request.then(value => { made.value = value; }, () => { if (lastOverview === made) lastOverview = null; });
+    lastOverview = entry = made;
+  }
+  const shared = entry;
+  shared.users++;
+  return new Promise((resolve, reject) => {
+    /** Whether this caller still counts among the users: it stops once, by its signal or by the answer. */
+    let waiting = true;
+    const stop = () => {
+      if (!waiting) return;
+      waiting = false; shared.users--;
+      reject(signal.reason as Error);
+      // Checked a task later: a caller taking over in the same render (the lap view's ask ahead to the race view) is counted by then.
+      setTimeout(() => {
+        if (shared.users > 0 || shared.value !== null) return;
+        shared.controller.abort();
+        if (lastOverview === shared) lastOverview = null;
+      }, 0);
+    };
+    signal.addEventListener('abort', stop, {once: true});
+    const settled = () => {
+      signal.removeEventListener('abort', stop);
+      if (waiting) { waiting = false; shared.users--; }
+    };
+    shared.request.finally(settled).then(resolve, reject);
+  });
 }
 
 /** The session's overview if it has arrived (`fetchRaceOverview`), else null. */

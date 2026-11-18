@@ -103,11 +103,13 @@ export const ReplayInspectorPage: React.FC = () => {
   const ahead3d = view === '3d';
   useEffect(() => {
     if (!sessionId || isRace) return;
+    // Leaving the session stops the ask; switching to its race hands it over (`fetchRaceOverview`).
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      fetchRaceOverview(sessionId).catch(() => {});
+      fetchRaceOverview(sessionId, controller.signal).catch(() => {});
       if (ahead3d) loadRace3DView().catch(() => {});
     }, OVERVIEW_AHEAD_MS);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [sessionId, isRace, ahead3d]);
 
   if (!sessionId) return null;

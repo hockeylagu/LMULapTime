@@ -49,14 +49,15 @@ export const RaceReplayView: React.FC<RaceReplayViewProps> = (props) => {
   const [attempt, setAttempt] = useState(0);
   // The 3D view's code loads beside the overview: coming from the lap view in 3D, no loading card waits for it.
   useEffect(() => { if (view === '3d') loadRace3DView().catch(() => {}); /* A failed load surfaces from the lazy view. */ }, [view]);
+  // Asked even when the first render had it: an overview that arrives between the first render and this effect only shows from
+  // here, as one the session changed to (the request is shared, so a fetched one costs nothing more).
   useEffect(() => {
-    if (lastRaceOverview(sessionId)) return;
-    let active = true;
-    fetchRaceOverview(sessionId).then(
-      overview => { if (active) setState({ sessionId, overview }); },
-      (error: unknown) => { if (active && !isAbortError(error)) setState({ sessionId, error: apiErrorMessage(error, 'The race replay could not load') }); },
+    const controller = new AbortController();
+    fetchRaceOverview(sessionId, controller.signal).then(
+      overview => setState(current => (current?.sessionId === sessionId && current.overview === overview ? current : { sessionId, overview })),
+      (error: unknown) => { if (!isAbortError(error)) setState({ sessionId, error: apiErrorMessage(error, 'The race replay could not load') }); },
     );
-    return () => { active = false; };
+    return () => controller.abort();
   }, [sessionId, attempt]);
   const current = state?.sessionId === sessionId ? state : null;
   // The replay's metadata names the track, the conditions and each car's model in the header; the race shows without it.
@@ -71,7 +72,8 @@ export const RaceReplayView: React.FC<RaceReplayViewProps> = (props) => {
     fetchSessionTelemetryMetadata(sessionId, { signal: controller.signal }).then(value => setMetadata({ sessionId, value }), () => {});
     return () => controller.abort();
   }, [sessionId]);
-  const replayMetadata = metadata?.sessionId === sessionId ? metadata.value : null;
+  // The cache covers a session changed to whose metadata the lap view already fetched (the effect above skips it).
+  const replayMetadata = metadata?.sessionId === sessionId ? metadata.value : lastSessionTelemetryMetadata(sessionId);
 
   return (
     <div className="flex h-screen min-w-[1480px] flex-col bg-lmu-bg text-lmu-text">
