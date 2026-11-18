@@ -1,5 +1,5 @@
 import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { ReplayPlaybackCursorContext } from './replayPlaybackCursor.js';
 import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
@@ -11,6 +11,7 @@ import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
+import { RaceModeContext } from '../race/raceModeContext.js';
 import { useConsistencyLapSelection } from './useConsistencyLapSelection.js';
 
 export interface ReplayInspectorContentProps {
@@ -28,6 +29,8 @@ export interface ReplayInspectorContentProps {
   initialBaselineLapOrdinal?: number | null;
   /** Back from the race replay: the lap last shown comes back without loading. */
   resumeShownLap?: boolean;
+  /** From the race replay: the lap clock the cursor opens at. */
+  initialLapSec?: number | null;
   /** A corner to open on the Corners tab once the lap (and its comparison lap) are loaded. */
   initialCornerNumber?: number | null;
   isExpanded?: boolean;
@@ -49,12 +52,14 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   initialBaselineLapOrdinal,
   initialCornerNumber,
   resumeShownLap,
+  initialLapSec,
   isExpanded,
   onToggleExpanded,
   view: controlledView,
   onViewChange,
 }) => {
   const {
+    cursorLapSec,
     metadata,
     trajectory,
     selectedDriverSlot,
@@ -114,6 +119,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     initialBaselineDriverOrdinal,
     initialBaselineLapOrdinal,
     resumeShownLap,
+    initialLapSec,
   });
 
   const [uncontrolledView, setUncontrolledView] = useState<'2d' | '3d'>('2d');
@@ -216,10 +222,14 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     setPickedCorner({ trajectory, baselineTrajectory, number });
   }, [trajectory, baselineTrajectory, selectedCornerNumber]);
 
+  // The header's Session button opens the race replay at the cursor's moment of the lap.
+  const openRace = useContext(RaceModeContext);
+  const openRaceAtCursor = useMemo(() => openRace && ((slot: number | null, lapNumber: number | null) => openRace(slot, lapNumber, cursorLapSec())),
+    [openRace, cursorLapSec]);
   if (!isOpen) return null;
 
   return (
-    <ReplayPlaybackCursorContext.Provider value={playbackCursor}>
+    <ReplayPlaybackCursorContext.Provider value={playbackCursor}><RaceModeContext.Provider value={openRaceAtCursor}>
     <ReplayInspectorModalBody
       onClose={onClose}
       sessionId={activeSessionId} metadata={metadata}
@@ -284,6 +294,6 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       view={activeView}
       onChangeView={handleViewChange}
     />
-    </ReplayPlaybackCursorContext.Provider>
+    </RaceModeContext.Provider></ReplayPlaybackCursorContext.Provider>
   );
 };

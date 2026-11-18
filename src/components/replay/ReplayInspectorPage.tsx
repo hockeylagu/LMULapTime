@@ -5,8 +5,12 @@ import { ReplayInspectorContent } from './inspector/ReplayInspectorContent.js';
 import { GhostSyncContext, type GhostSyncState } from './inspector/ghostSyncContext.js';
 import { parseGhostSyncMode } from './map/ghostSync.js';
 import { RaceReplayView } from './race/RaceReplayView.js';
-import { RaceModeContext } from './race/raceModeContext.js';
+import { fetchRaceOverview } from '../../api/replayApi.js';
+import { loadRace3DView, RaceModeContext } from './race/raceModeContext.js';
 import { SceneShellsContext, useSharedSceneShells } from './view3d/scene/sceneShells.js';
+
+/** How long after the lap view opens the session replay's overview is asked for (about 0.2 s of server work, 80 KB). */
+const OVERVIEW_AHEAD_MS = 1000;
 
 /** A finite number from a URL value, or null. */
 const numberParam = (value: string | null): number | null => {
@@ -43,8 +47,11 @@ export const ReplayInspectorPage: React.FC = () => {
   const internalDepthRef = useRef(0);
   // Leaving the race replay, the lap view comes back on the lap it showed instead of loading it again.
   const [fromRace, setFromRace] = useState(false);
-  const openRace = useCallback((slot: number | null, lapNumber: number | null) => {
+  // Seconds into the lap the other mode opens at: the lap view's cursor for the race, the race clock for the lap view.
+  const [handoffLapSec, setHandoffLapSec] = useState<number | null>(null);
+  const openRace = useCallback((slot: number | null, lapNumber: number | null, lapSec?: number | null) => {
     internalDepthRef.current += 1;
+    setHandoffLapSec(lapSec ?? null);
     setSearchParams(
       (prev) => applySearchParamUpdates(prev || searchParams, {
         mode: 'race', car: slot === null ? null : String(slot), lap: lapNumber === null ? null : String(lapNumber), t: null,
@@ -53,7 +60,7 @@ export const ReplayInspectorPage: React.FC = () => {
   }, [searchParams, setSearchParams]);
 
   const closeRace = useCallback(() => {
-    setFromRace(true);
+    setFromRace(true); setHandoffLapSec(null);
     const currentIdx = readHistoryIdx();
     const canPopToLap = (currentIdx !== null && entryHistoryIdx !== null && currentIdx > entryHistoryIdx)
       || internalDepthRef.current > 0;
@@ -91,6 +98,18 @@ export const ReplayInspectorPage: React.FC = () => {
     }
   }, [navigate, pathname, sessionId, viewParam, searchParams, setSearchParams]);
 
+  // The session replay's overview (and in 3D its 3D code) loads once the lap view has had its own requests: the race then opens
+  // without a loading page or card. A failure surfaces in the race, which asks again.
+  const ahead3d = view === '3d';
+  useEffect(() => {
+    if (!sessionId || isRace) return;
+    const timer = window.setTimeout(() => {
+      fetchRaceOverview(sessionId).catch(() => {});
+      if (ahead3d) loadRace3DView().catch(() => {});
+    }, OVERVIEW_AHEAD_MS);
+    return () => window.clearTimeout(timer);
+  }, [sessionId, isRace, ahead3d]);
+
   if (!sessionId) return null;
 
   if (isRace) {
@@ -101,9 +120,12 @@ export const ReplayInspectorPage: React.FC = () => {
         initialTimeSec={numberParam(searchParams.get('t'))}
         initialSlot={numberParam(searchParams.get('car'))}
         initialLapNumber={numberParam(searchParams.get('lap'))}
+        initialLapSec={handoffLapSec}
+        view={view}
+        onViewChange={newView => updateSearchParams(searchParams, setSearchParams, { view: newView })}
         onClose={closeRace}
-        onOpenLap={(driver, lap) => {
-          setFromRace(true);
+        onOpenLap={(driver, lap, lapSec) => {
+          setFromRace(true); setHandoffLapSec(lapSec);
           updateSearchParams(searchParams, setSearchParams, {
             mode: null, t: null, car: null, lap: null, driverOrdinal: String(driver), lapOrdinal: String(lap),
             baselineSessionId: null, baselineDriverOrdinal: null, baselineLapOrdinal: null,
@@ -144,6 +166,7 @@ export const ReplayInspectorPage: React.FC = () => {
         initialBaselineLapOrdinal={Number.isInteger(baselineLapOrdinal) && baselineLapOrdinal >= 0 ? baselineLapOrdinal : undefined}
         initialCornerNumber={corner ? parseInt(corner, 10) : undefined}
         resumeShownLap={fromRace}
+        initialLapSec={handoffLapSec}
         isExpanded={fullscreen === 'true' || fullscreen === '1'}
         onToggleExpanded={(expanded) => updateSearchParams(searchParams, setSearchParams, { fullscreen: expanded })}
         view={view}

@@ -12,7 +12,7 @@ import { fetchSessionTelemetry, fetchSessionTelemetryMetadata } from '../../../a
 import { CompareLapFilter } from './compare/ReplayCompareLapPicker.js';
 import { replayCompareScope } from './compare/compareLapsQuery.js';
 import { DEFAULT_COMPARE_CONTROLS, type CompareLapControls } from './compare/compareLapControls.js';
-import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
+import { advancePlaybackClock, PlaybackClock, playbackClockAt, playbackIndexAt } from './replayPlaybackClock.js';
 import { createPlaybackCursor } from './replayPlaybackCursor.js';
 import { PLAYBACK_SPEEDS, steppedPlaybackSpeed, type ReplayFullscreenControls } from './replayFullscreenControls.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
@@ -30,6 +30,8 @@ export interface UseReplayInspectorDataProps {
   initialBaselineLapOrdinal?: number | null;
   /** Back from the race replay: the lap last shown, if it is the asked one, shows again without loading. */
   resumeShownLap?: boolean;
+  /** From the race replay: the lap clock (seconds into the asked lap) the cursor opens at. */
+  initialLapSec?: number | null;
 }
 
 /** The lap the lap view last showed; the race replay replaces the lap view, which comes back on it. */
@@ -56,6 +58,7 @@ export function useReplayInspectorData({
   initialBaselineDriverOrdinal,
   initialBaselineLapOrdinal,
   resumeShownLap = false,
+  initialLapSec = null,
 }: UseReplayInspectorDataProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [resumed] = useState(() => resumeShownLap && lastShownLap?.sessionId === sessionId
@@ -102,6 +105,20 @@ export function useReplayInspectorData({
     currentIndexRef.current = index;
     setCurrentIndexState(index);
   }, [playbackCursor]);
+  // The asked lap, once shown, puts the cursor at the race replay's moment (once).
+  const pendingLapSecRef = useRef(initialLapSec);
+  useEffect(() => {
+    const at = pendingLapSecRef.current;
+    if (at === null || !trajectory?.points.length || trajectory.driverOrdinal !== (initialDriverOrdinal ?? 0)
+      || trajectory.lapOrdinal !== (initialLapOrdinal ?? 0)) return;
+    pendingLapSecRef.current = null;
+    setCurrentIndex(playbackIndexAt(trajectory.points, at));
+  }, [trajectory, initialDriverOrdinal, initialLapOrdinal, setCurrentIndex]);
+  /** The lap clock under the cursor (the playing clock's, else the shown sample's), for the race replay to open at. */
+  const shownPointsRef = useRef(trajectory?.points);
+  shownPointsRef.current = trajectory?.points;
+  const cursorLapSec = useCallback(() => playbackCursor.getSnapshot()?.timeSec
+    ?? shownPointsRef.current?.[currentIndexRef.current]?.timeSec ?? null, [playbackCursor]);
   const markerDistRef = useRef<number | null>(null);
   markerDistRef.current = useGhostSync().markerDistM;
   const markerDistances = useMemo(() => (trajectory ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []), [trajectory]);
@@ -704,7 +721,7 @@ export function useReplayInspectorData({
   }), [primaryLaps, primaryLapNumber, isPrimaryLoading, error, isCompareMode, baselineLapNumber, isBaselineLoading, comparableBaselineError, playbackSpeed]);
 
   return {
-    metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,
+    cursorLapSec, metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,
     isLoading, isTrajLoading, error, handleRetryLoad, isCompareMode, handleToggleCompare,
     handleSwapBaseline, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineSessionId, setBaselineSessionId,
     baselineLapNumber, setBaselineLapNumber, baselineDriverOrdinal, baselineLapOrdinal, baselineDriverName, setBaselineDriverName,

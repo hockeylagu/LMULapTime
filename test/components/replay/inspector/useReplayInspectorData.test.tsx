@@ -252,6 +252,24 @@ describe('useReplayInspectorData session locators', () => {
     expect(params.get('baselineLapOrdinal')).toBe('4');
   });
 
+  it("opens from the race replay at its moment of the lap, and gives the race the cursor's lap time", async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = requestUrl(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response({ ...trajectory, driverOrdinal: 0, lapOrdinal: 0, pointsCount: 101,
+        points: Array.from({ length: 101 }, (_, index) => ({ x: index, y: 0, z: 0, timeSec: index / 10 })),
+      });
+    });
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true, sessionId: 'session-1', initialDriverOrdinal: 0, initialLapOrdinal: 0, initialLapSec: 4.25,
+    }), { wrapper });
+    await waitFor(() => expect(result.current.currentIndex).toBe(42));
+    expect(result.current.cursorLapSec()).toBeCloseTo(4.2);
+    act(() => result.current.setCurrentIndex(70));
+    expect(result.current.cursorLapSec()).toBeCloseTo(7);
+  });
+
   it('samples React playback updates while keeping the cursor exact and synchronizing on pause', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);

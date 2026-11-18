@@ -17,6 +17,7 @@ interface MockInspectorProps {
   isExpanded?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
   onViewChange?: (view: '2d' | '3d') => void;
+  initialLapSec?: number | null;
   onClose: () => void;
   onLocatorChange: (driverOrdinal: number, lapOrdinal: number) => void;
 }
@@ -35,12 +36,14 @@ vi.mock('../../../../src/components/replay/inspector/ReplayInspectorContent.js',
         <span data-testid="baseline-lap">{props.initialBaselineLapOrdinal ?? 'none'}</span>
         <span data-testid="corner">{props.initialCornerNumber ?? 'none'}</span>
         <span data-testid="view-mode">{props.view ?? 'none'}</span>
+        <span data-testid="lap-sec">{props.initialLapSec ?? 'none'}</span>
         <button type="button" aria-pressed={props.isExpanded}
           onClick={() => props.onToggleExpanded?.(!props.isExpanded)}>Fullscreen</button>
         <button type="button" onClick={() => props.onLocatorChange(2, 8)}>Change locator</button>
         <button type="button" onClick={() => props.onViewChange?.('3d')}>Switch to 3D</button>
         <button type="button" onClick={() => props.onViewChange?.('2d')}>Switch to 2D</button>
         <button type="button" onClick={() => openRace?.(3, 7)}>Open Race</button>
+        <button type="button" onClick={() => openRace?.(3, 7, 12.5)}>Open Race at cursor</button>
         <button type="button" onClick={props.onClose}>Close</button>
       </div>
     );
@@ -48,10 +51,14 @@ vi.mock('../../../../src/components/replay/inspector/ReplayInspectorContent.js',
 }));
 
 vi.mock('../../../../src/components/replay/race/RaceReplayView.js', () => ({
-  RaceReplayView: (props: { onClose: () => void; onOpenLap: (driver: number, lap: number) => void }): ReactNode => (
+  RaceReplayView: (props: { onClose: () => void; onOpenLap: (driver: number, lap: number, lapSec: number) => void; view: '2d' | '3d';
+    onViewChange: (view: '2d' | '3d') => void; initialLapSec?: number | null }): ReactNode => (
     <div data-testid="mock-race">
+      <span data-testid="race-view">{props.view}</span>
+      <span data-testid="race-lap-sec">{props.initialLapSec ?? 'none'}</span>
       <button type="button" onClick={props.onClose}>Race Back</button>
-      <button type="button" onClick={() => props.onOpenLap(4, 9)}>Open Lap</button>
+      <button type="button" onClick={() => props.onOpenLap(4, 9, 20)}>Open Lap</button>
+      <button type="button" onClick={() => props.onViewChange('2d')}>Race 2D</button>
     </div>
   ),
 }));
@@ -168,6 +175,26 @@ describe('ReplayInspectorPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Race Back' }));
     await waitFor(() => expect(screen.getAllByTestId('mock-inspector').length).toBeGreaterThan(0));
     expect(window.location.hash).not.toContain('mode=race');
+  });
+
+  it('keeps the 3D view and the moment between the lap view and the race, both ways', async () => {
+    window.location.hash = '#/telemetry?sessionId=session-1&view=3d&driverOrdinal=1&lapOrdinal=4';
+    render(<ReplayInspectorPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Race at cursor' }));
+    await waitFor(() => expect(screen.getByTestId('mock-race')).toBeInTheDocument());
+    expect(screen.getByTestId('race-view')).toHaveTextContent('3d');
+    expect(screen.getByTestId('race-lap-sec')).toHaveTextContent('12.5');
+    fireEvent.click(screen.getByRole('button', { name: 'Open Lap' }));
+    await waitFor(() => expect(screen.getByTestId('mock-inspector')).toBeInTheDocument());
+    expect(screen.getByTestId('view-mode')).toHaveTextContent('3d');
+    expect(screen.getByTestId('lap-sec')).toHaveTextContent('20');
+    expect(screen.getByTestId('lap-ordinal')).toHaveTextContent('9');
+    // The race's own 2D/3D switch is the shared one.
+    fireEvent.click(screen.getByRole('button', { name: 'Open Race' }));
+    await waitFor(() => expect(screen.getByTestId('mock-race')).toBeInTheDocument());
+    expect(screen.getByTestId('race-lap-sec')).toHaveTextContent('none');
+    fireEvent.click(screen.getByRole('button', { name: 'Race 2D' }));
+    await waitFor(() => expect(window.location.hash).toContain('view=2d'));
   });
 
   it('falls back to the session page when Telemetry is opened with no prior history', async () => {

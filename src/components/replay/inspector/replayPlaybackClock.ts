@@ -35,6 +35,18 @@ export function playbackSampleFraction(points: ReplayTrajectoryPoint[], clock: P
   return span > 0 ? Math.max(0, Math.min(1, (clock.timeSec - start) / span)) : 0;
 }
 
+/** The sample shown at lap clock `timeSec`: the last at or before it (the first before the lap's first, the last past its end). */
+export function playbackIndexAt(points: ReplayTrajectoryPoint[], timeSec: number): number {
+  const timed = isTimed(points);
+  let lo = 0, hi = Math.max(0, points.length - 1);
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (sampleTime(points, mid, timed) <= timeSec) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
 /** Starts the clock at a sample (play pressed, or the user moved the cursor while playing). */
 export function playbackClockAt(points: ReplayTrajectoryPoint[], index: number): PlaybackClock {
   const i = Math.max(0, Math.min(points.length - 1, index));

@@ -44,9 +44,24 @@ export function fetchRaceProgress(sessionId: string, init?: RequestInit): Promis
   return fetchJson<RaceReplayProgress>(`/api/session/${encodeURIComponent(sessionId)}/race/progress`, init);
 }
 
-/** Every car of the session replay on the replay clock: cars, laps and running order (poses come in windows). */
-export function fetchRaceOverview(sessionId: string, init?: RequestInit): Promise<RaceReplayOverview> {
-  return fetchJson<RaceReplayOverview>(`/api/session/${encodeURIComponent(sessionId)}/race`, init);
+/** The last session's overview: the lap view asks for it ahead, so the race opens on it without a loading page. */
+let lastOverview: {sessionId: string; request: Promise<RaceReplayOverview>; value: RaceReplayOverview | null} | null = null;
+
+/**
+ * Every car of the session replay on the replay clock: cars, laps and running order (poses come in windows). Asked once per
+ * session (the last one): callers share the request, and a failed one is asked again.
+ */
+export function fetchRaceOverview(sessionId: string): Promise<RaceReplayOverview> {
+  if (lastOverview?.sessionId === sessionId) return lastOverview.request;
+  const entry: NonNullable<typeof lastOverview> = {sessionId, request: fetchJson<RaceReplayOverview>(`/api/session/${encodeURIComponent(sessionId)}/race`), value: null};
+  lastOverview = entry;
+  entry.request.then(value => { entry.value = value; }, () => { if (lastOverview === entry) lastOverview = null; });
+  return entry.request;
+}
+
+/** The session's overview if it has arrived (`fetchRaceOverview`), else null. */
+export function lastRaceOverview(sessionId: string): RaceReplayOverview | null {
+  return lastOverview?.sessionId === sessionId ? lastOverview.value : null;
 }
 
 /** Pose window `index` (from index × windowSec seconds) of every car of the session replay. */

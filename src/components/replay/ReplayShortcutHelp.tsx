@@ -15,7 +15,7 @@ const shortcuts = [
   ['Home / End', 'Lap start / end'], ['+ / −', 'Zoom around the cursor'],
   ['0 / R / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],
   ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['V', 'Ghost sync: distance / time (/ from A with a marker)'], ['Minimap drag', 'Pan camera to circuit sector'],
-  ['M', 'Toggle fullscreen map'], ['E', 'Switch to the 3D view'], ['T', 'Hide / show fullscreen trace'],
+  ['M', 'Toggle fullscreen map'], ['E', 'Switch to the 3D view'], ['T', 'Hide / show fullscreen trace'], ['L', 'Session replay at the cursor\'s moment'],
   ['W / A / S / D', 'Pan map up / left / down / right'],
   ['Esc', 'Exit fullscreen / cancel gesture / close help'], ['?', 'Show shortcuts'],
 ];
@@ -27,7 +27,7 @@ const shortcuts3d = [
   ['W / A / S / D', 'Pan camera up / left / down / right'], ['C', 'Center on car, keep zoom'],
   ['F', 'Toggle follow car'], ['V', 'Ghost sync: distance / time (/ from A with a marker)'],
   ['X', 'Marker A at the car: ghost runs from A (again: clear)'], ['Backspace', 'Back to marker A and play'], ['0 / R', 'Reset camera'], ['M', 'Toggle fullscreen map'], ['E', 'Back to the 2D map'],
-  ['Esc', 'Exit fullscreen / close help'], ['?', 'Show shortcuts'],
+  ['L', 'Session replay at the cursor\'s moment'], ['Esc', 'Exit fullscreen / close help'], ['?', 'Show shortcuts'],
 ];
 
 const shortcutsRace = [
@@ -35,7 +35,7 @@ const shortcutsRace = [
   [', / .', 'Slower / faster playback (1× to 16×)'], ['Home / End', 'Session start / end'],
   ['+ / −', 'Zoom map'], ['0 / R / dbl-click', 'Show the whole circuit'], ['C', 'Center map on the followed car, keep zoom'],
   ['F', 'Toggle follow car'], ['W / A / S / D', 'Pan map up / left / down / right'],
-  ['E', 'Switch to the 3D view'], ['Click a car or row', 'Follow that car'], ['?', 'Show shortcuts'],
+  ['E', 'Switch to the 3D view'], ['L', 'The followed car\'s lap in the lap view, at this moment'], ['Click a car or row', 'Follow that car'], ['?', 'Show shortcuts'],
 ];
 const shortcutsRace3d = [
   ...CAMERA_MODES.map(option => [option.shortcut, `${option.label} camera`]),
@@ -44,7 +44,7 @@ const shortcutsRace3d = [
   [', / .', 'Slower / faster playback (1× to 16×)'], ['Home / End', 'Session start / end'],
   ['W / A / S / D', 'Pan camera up / left / down / right'], ['C', 'Center on the followed car, keep zoom'],
   ['F', 'Toggle follow car'], ['0 / R', 'Reset camera'], ['E', 'Back to the 2D map'],
-  ['Click a row', 'Follow that car'], ['?', 'Show shortcuts'],
+  ['L', 'The followed car\'s lap in the lap view, at this moment'], ['Click a row', 'Follow that car'], ['?', 'Show shortcuts'],
 ];
 type ShortcutView = 'telemetry' | '3d' | 'race' | 'race3d';
 const SHORTCUTS: Record<ShortcutView, string[][]> = { telemetry: shortcuts, '3d': shortcuts3d, race: shortcutsRace, race3d: shortcutsRace3d };

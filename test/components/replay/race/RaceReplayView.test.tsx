@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RaceReplayView } from '../../../../src/components/replay/race/RaceReplayView.js';
 import { initialRaceTime, lapAt } from '../../../../src/components/replay/race/raceLaps.js';
@@ -6,7 +7,7 @@ import { fetchRaceOverview, fetchRacePoseWindow } from '../../../../src/api/repl
 import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
 import type { RaceReplayOverview } from '../../../../shared/types/index.js';
 
-vi.mock('../../../../src/api/replayApi.js', () => ({ fetchRaceOverview: vi.fn(), fetchRacePoseWindow: vi.fn(), fetchRaceProgress: vi.fn(() => Promise.reject(Error('No centreline'))),
+vi.mock('../../../../src/api/replayApi.js', () => ({ fetchRaceOverview: vi.fn(), fetchRacePoseWindow: vi.fn(), lastRaceOverview: vi.fn(() => null),fetchRaceProgress: vi.fn(() => Promise.reject(Error('No centreline'))),
   fetchSessionTelemetryMetadata: vi.fn(() => Promise.reject(Error('No metadata'))),
   lastSessionTelemetryMetadata: vi.fn(() => null) }));
 // The 3D view needs WebGL: a stand-in shows which car it follows and switches back.
@@ -83,8 +84,13 @@ describe('RaceReplayView', () => {
     expect(screen.queryByRole('button', { name: /Skip to start/ })).toBeNull();
   });
 
-  const view = (props: Partial<React.ComponentProps<typeof RaceReplayView>> = {}) => render(
-    <RaceReplayView sessionId="s1" onClose={vi.fn()} onOpenLap={vi.fn()} onStateChange={vi.fn()} initialTimeSec={30} {...props} />);
+  /** The race view with its 2D/3D view held as the page holds it (the URL's `view`). */
+  function Held(props: Partial<React.ComponentProps<typeof RaceReplayView>>) {
+    const [shown, setShown] = useState<'2d' | '3d'>(props.view ?? '2d');
+    return <RaceReplayView sessionId="s1" onClose={vi.fn()} onOpenLap={vi.fn()} onStateChange={vi.fn()} initialTimeSec={30} {...props}
+      view={shown} onViewChange={next => { setShown(next); props.onViewChange?.(next); }} />;
+  }
+  const view = (props: Partial<React.ComponentProps<typeof RaceReplayView>> = {}) => render(<Held {...props} />);
 
   it('shows every car on the map and in the standings, following the player', async () => {
     view();
@@ -142,10 +148,16 @@ describe('RaceReplayView', () => {
     view({ onOpenLap, onStateChange, initialTimeSec: 130 });
     await waitFor(() => expect(document.querySelectorAll('[data-race-car]')).toHaveLength(2));
     fireEvent.click(screen.getByRole('button', { name: /Lap view/ }));
-    expect(onOpenLap).toHaveBeenCalledWith(3, 1);
+    expect(onOpenLap).toHaveBeenCalledWith(3, 1, 30); // 30 s into the lap, which starts at 100 s.
+    // L does the same from anywhere on the page.
+    fireEvent.keyDown(document.body, { key: 'l' });
+    expect(onOpenLap).toHaveBeenCalledTimes(2);
 
     fireEvent.click(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Bea/ }));
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Lap view/ }).disabled).toBe(true);
+    // Nor with a car whose lap the view cannot open.
+    fireEvent.keyDown(document.body, { key: 'l' });
+    expect(onOpenLap).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(onStateChange).toHaveBeenLastCalledWith(130, 2));
   });
 
@@ -264,11 +276,14 @@ describe('race replay locators', () => {
     expect(initialRaceTime(overview, 42, 1, 2)).toBe(42);
     expect(initialRaceTime(overview, null, 1, 2)).toBe(100);
     expect(initialRaceTime(overview, null, 9, 9)).toBe(0);
+    // The lap view's cursor: seconds into the lap, kept within it.
+    expect(initialRaceTime(overview, null, 1, 2, 12.5)).toBe(112.5);
+    expect(initialRaceTime(overview, null, 1, 2, -0.01)).toBe(100);
   });
 
   it('finds the lap a session driver is on', () => {
-    expect(lapAt(overview, 1, 150)).toEqual({ driverOrdinal: 3, lapOrdinal: 1, lapNumber: 2 });
-    expect(lapAt(overview, 1, 500)).toEqual({ driverOrdinal: 3, lapOrdinal: 1, lapNumber: 2 });
+    expect(lapAt(overview, 1, 150)).toEqual({ driverOrdinal: 3, lapOrdinal: 1, lapNumber: 2, startSec: 100 });
+    expect(lapAt(overview, 1, 500)).toEqual({ driverOrdinal: 3, lapOrdinal: 1, lapNumber: 2, startSec: 100 });
     expect(lapAt(overview, 2, 50)).toBeNull();
   });
 });

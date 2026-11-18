@@ -5,6 +5,7 @@ import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { ReplayHeaderShell } from '../inspector/ReplayHeaderShell.js';
 import { RACE_SPEEDS, type RaceClock } from './raceClock.js';
 import { lapAt } from './raceLaps.js';
+import { MODE_SWITCH_KEY, useModeSwitchKey } from './raceModeContext.js';
 
 interface Props {
   onClose: () => void;
@@ -13,7 +14,8 @@ interface Props {
   clock?: RaceClock;
   followSlot?: number | null;
   onFollow?: (slot: number) => void;
-  onOpenLap?: (driverOrdinal: number, lapOrdinal: number) => void;
+  /** Opens a lap in the lap view, `lapSec` seconds into it (the clock's moment). */
+  onOpenLap?: (driverOrdinal: number, lapOrdinal: number, lapSec: number) => void;
 }
 
 const IDLE = () => () => {};
@@ -32,15 +34,17 @@ export const RaceReplayHeader: React.FC<Props> = ({ onClose, metadata, overview,
   const canOpenLap = Boolean(followed?.sessionDriverOrdinal !== undefined && followed?.sessionLapOrdinals);
   const openLap = () => {
     if (!overview || !clock || !onOpenLap) return;
-    const lap = lapAt(overview, followSlot, clock.getState().timeSec);
-    if (lap) onOpenLap(lap.driverOrdinal, lap.lapOrdinal);
+    const timeSec = clock.getState().timeSec, lap = lapAt(overview, followSlot, timeSec);
+    if (lap) onOpenLap(lap.driverOrdinal, lap.lapOrdinal, timeSec - lap.startSec);
   };
+  useModeSwitchKey(overview && canOpenLap ? openLap : null);
   return (
     <ReplayHeaderShell
       onClose={onClose} metadata={metadata} trajectory={null}
       titleActions={overview && (
         <button type="button" onClick={openLap} disabled={!canOpenLap}
-          title={canOpenLap ? `Open ${followed!.name}'s lap at this time in the lap view` : 'Select a car of this session to open its lap'}
+          title={canOpenLap ? `Open ${followed!.name}'s lap at this time in the lap view (${MODE_SWITCH_KEY})` : 'Select a car of this session to open its lap'}
+          aria-keyshortcuts={MODE_SWITCH_KEY}
           className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-lmu-border bg-lmu-bg px-2.5 text-xs text-lmu-text-soft hover:bg-lmu-card disabled:opacity-40 ${FOCUS_RING}`}>
           <Flag aria-hidden="true" className="h-3.5 w-3.5 text-lmu-accent-text" />Lap view
         </button>

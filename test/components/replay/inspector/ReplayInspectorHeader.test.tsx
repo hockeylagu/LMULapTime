@@ -5,6 +5,7 @@ import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
 import { DEFAULT_COMPARE_CONTROLS } from '../../../../src/components/replay/inspector/compare/compareLapControls.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { openSelect, selectedValue } from '../../../helpers/selectControl.js';
+import { RaceModeContext } from '../../../../src/components/replay/race/raceModeContext.js';
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorTitle.js', () => ({ ReplayInspectorTitle: () => null }));
 
@@ -21,6 +22,19 @@ const props: ReplayInspectorHeaderProps = {
 };
 
 describe('ReplayInspectorHeader', () => {
+  it('opens the session replay with L (the Session button), not while the lap loads', () => {
+    const openRace = vi.fn();
+    const shown = (isLoading: boolean) => <RaceModeContext.Provider value={openRace}><ReplayInspectorHeader {...props} isLoading={isLoading} /></RaceModeContext.Provider>;
+    const { rerender } = render(shown(true));
+    fireEvent.keyDown(document.body, { key: 'l' });
+    expect(openRace).not.toHaveBeenCalled();
+    rerender(shown(false));
+    fireEvent.keyDown(document.body, { key: 'L', repeat: true });
+    fireEvent.keyDown(document.body, { key: 'l', ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: 'l' });
+    expect(openRace.mock.calls).toEqual([[14, null]]);
+  });
+
   it('navigates the available lap numbers rather than assuming consecutive laps', () => {
     const onSelectLap = vi.fn();
     const trajectory: ReplayTrajectoryData = { replayName: 'test.Vcr', pointsCount: 0,
