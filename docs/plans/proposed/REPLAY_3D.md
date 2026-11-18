@@ -68,6 +68,7 @@ states run to run (stand chunk in the cached far cascade or not); the 10-view su
 | Clouds and exposure | World-fixed cloud layer, sun visibility from the camera; meter −ln(1 − Y709(mean tone-mapped)) / E and the package's law; cloud sun dimming on |
 | Road surface | Assumed rubber 51 on every element; the replay's own surface state is decoded (`server/replay/decode/replaySurface.ts`) but needs a replay cache step (v11, with rainLight; user "not now"); never add a .Vcr file read in the meantime |
 | Lamps | Headlight, brake and 4 Hz pit flash from the replay; disc glow parked (`docs/local/parked-disc-glow`) until a proven temperature mapping |
+| Race timeline | The ticks are the followed (selected) car's laps, so they stop where it retires; never the leader's (user, 2026-11-17) |
 
 ## Rejected or parked, with the reason
 
@@ -141,11 +142,4 @@ a car: the user said "not now"; don't re-offer.
 ### Race replay
 
 - Pose rate check: 10 Hz windows with interpolation against 20 Hz.
-- Timeline ticks stop when the followed car retires: race (leader) laps too? (asked, unanswered).
 - Labels over cars, flags and weather overlays: later.
-
-### Code review of 2026-11-15 (origin/main...main), not fixed
-
-The warm-up livelock it found is fixed (a slice picks its pause per call from whether the scene shows).
-
-- `race/raceScene.ts` pick projects with the canvas size while the pointer is measured against the host's rect.

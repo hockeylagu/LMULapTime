@@ -80,6 +80,11 @@ export interface SceneShell {
    * for) and the matrices it drew with. What is under the pointer is what that frame showed.
    */
   readonly drawnView: DrawnCamera;
+  /**
+   * The size, CSS pixels, of the host the frame was drawn for: the box a pointer is measured in (from the host's top left corner),
+   * as `pointerRay`, `surfaceWithin` and a pick's projection read it.
+   */
+  readonly drawnSize: {width: number; height: number};
   readonly surfaceHeight: SurfaceHeight;
   /** Car textures: from start files, sharpened (the interior's only once a driver camera is used). */
   readonly carTextures: CarTextures;
@@ -128,7 +133,7 @@ export interface SceneShell {
    * the shell is disposed first.
    */
   afterFrame<T>(read: () => T | Promise<T>): Promise<T>;
-  /** The ray from the last frame's camera (`drawnView`) through a point of the canvas (CSS pixels from its top left corner), in scene coordinates. */
+  /** The ray from the last frame's camera (`drawnView`) through a point of the host (`drawnSize`), in scene coordinates. */
   pointerRay(x: number, y: number): Ray;
   /**
    * Which of `spans` (stretches of `pointerRay(x, y)`) holds the nearest surface the last frame's camera draws there: the first such
@@ -396,7 +401,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     viewportWidth = 0; viewportHeight = 0; resize();
   };
   const shell: SceneShell = {
-    renderer, scene, rig, origin, get drawnView() { return drawnView; }, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(),
+    renderer, scene, rig, origin, get drawnView() { return drawnView; }, get drawnSize() { return {width: viewportWidth, height: viewportHeight}; }, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(),
     get started() { return started; },
     get broken() { return broken; },
     attach(next, nextListener) {
@@ -465,14 +470,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
         schedule();
       });
     },
-    pointerRay(x, y) {
-      const canvas = renderer.domElement;
-      return pointer.ray(drawnView, x, y, canvas.clientWidth, canvas.clientHeight);
-    },
-    surfaceWithin(x, y, spans) {
-      const canvas = renderer.domElement;
-      return pointer.within(scene, drawnView, x, y, canvas.clientWidth, canvas.clientHeight, spans);
-    },
+    pointerRay: (x, y) => pointer.ray(drawnView, x, y, viewportWidth, viewportHeight),
+    surfaceWithin: (x, y, spans) => pointer.within(scene, drawnView, x, y, viewportWidth, viewportHeight, spans),
     placeCar(car, pose, motion) {
       car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
       if (pose.orientation) car.quaternion.copy(pose.orientation); else car.quaternion.identity();

@@ -305,13 +305,12 @@ export async function createRaceScene(
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
     // Right after a frame: the cars where that frame drew them, as the pointer sees them.
     pick: (x, y) => shell.afterFrame(() => {
-      const canvas = shell.renderer.domElement;
       // Each car's box: its body, or the fixed box for a stand-in, on the road under it (a pose is the body's centre, above the road).
       const places = drawnPlaces.map(car => {
         const body = pickShapeOf(car.slot), box = placeOnRoad(body?.box ?? PICK_BOX, car.y, shell.surfaceHeight(car)), lift = box.min.y - (body?.box ?? PICK_BOX).min.y;
         return {...car, box, parts: body?.parts?.map(part => part.clone().translate(new Vector3(0, lift, 0)))};
       });
-      const under = carsUnder(places, shell.drawnView, origin, canvas.clientWidth, canvas.clientHeight, x, y);
+      const {width, height} = shell.drawnSize, under = carsUnder(places, shell.drawnView, origin, width, height, x, y);
       const spans = carSpans(under, origin, shell.pointerRay(x, y));
       if (!spans.length) return null;
       // The car whose surface the frame draws under the pointer: the GPU tells which car's stretch of the ray holds it.
