@@ -73,7 +73,10 @@ interface RaceCars {
   field: RaceField;
   hooks: {changed: () => void; bodyOf: (slot: number) => Promise<LoadedBody | null>};
 }
-/** By shell: freed by the next race of another session, or with the shell's renderer (its GPU context lost). */
+/**
+ * By shell: one race's field at most, freed by the next race of another session, or with the shell (the replay page left, or the
+ * circuit changed: its renderer drops the GPU context).
+ */
 const keptRaceCars = new WeakMap<SceneShell, RaceCars>();
 
 function newRaceCars(shell: SceneShell, layout: SceneryLayoutResource, cars: readonly RaceReplayCar[]): RaceCars {
