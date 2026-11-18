@@ -31,7 +31,7 @@ const shortcuts3d = [
 ];
 
 const shortcutsRace = [
-  ['Space', 'Play / pause'], ['← / →', 'Back / forward 5 seconds'], ['Shift + ← / →', 'Back / forward 30 seconds'],
+  ['Space', 'Play / pause'], ['← / →', 'Back / forward 5 seconds'], ['Shift + ← / →', 'Back / forward 30 seconds'], ['Ctrl + ← / →', 'Back / forward 1 second'],
   [', / .', 'Slower / faster playback (1× to 16×)'], ['Home / End', 'Session start / end'],
   ['+ / −', 'Zoom map'], ['0 / R / dbl-click', 'Show the whole circuit'], ['C', 'Center map on the followed car, keep zoom'],
   ['F', 'Toggle follow car'], ['W / A / S / D', 'Pan map up / left / down / right'],
@@ -40,7 +40,7 @@ const shortcutsRace = [
 const shortcutsRace3d = [
   ...CAMERA_MODES.map(option => [option.shortcut, `${option.label} camera`]),
   ['Drag / right drag', 'Orbit / pan camera'], ['Wheel / + / −', 'Zoom camera'],
-  ['Space', 'Play / pause'], ['← / →', 'Back / forward 5 seconds'], ['Shift + ← / →', 'Back / forward 30 seconds'],
+  ['Space', 'Play / pause'], ['← / →', 'Back / forward 5 seconds'], ['Shift + ← / →', 'Back / forward 30 seconds'], ['Ctrl + ← / →', 'Back / forward 1 second'],
   [', / .', 'Slower / faster playback (1× to 16×)'], ['Home / End', 'Session start / end'],
   ['W / A / S / D', 'Pan camera up / left / down / right'], ['C', 'Center on the followed car, keep zoom'],
   ['F', 'Toggle follow car'], ['0 / R', 'Reset camera'], ['E', 'Back to the 2D map'],

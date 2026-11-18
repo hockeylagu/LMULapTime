@@ -157,6 +157,11 @@ describe('RaceReplayView', () => {
     expect((slider as HTMLInputElement).value).toBe('95');
     act(() => { fireEvent.keyDown(window, { key: 'ArrowRight' }); });
     expect((slider as HTMLInputElement).value).toBe('100');
+    // Ctrl steps 1 s; Ctrl with another key stays the browser's.
+    act(() => { fireEvent.keyDown(window, { key: 'ArrowLeft', ctrlKey: true }); });
+    expect((slider as HTMLInputElement).value).toBe('99');
+    act(() => { fireEvent.keyDown(window, { key: 'End', ctrlKey: true }); });
+    expect((slider as HTMLInputElement).value).toBe('99');
     act(() => { fireEvent.keyDown(window, { key: ' ' }); });
     expect(screen.getByRole('button', { name: 'Pause (Space)' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '4x' }));
@@ -197,12 +202,17 @@ describe('RaceReplayView', () => {
     view();
     const incidents = await screen.findByRole('combobox', { name: 'Incidents of the followed car' });
     expect(incidents.textContent).toContain('Incidents (2)');
+    incidents.focus();
     fireEvent.click(incidents);
     const options = screen.getAllByRole('option');
     expect(options.map(option => option.textContent)).toEqual(['Pit stop20.0 s stopped0:30.0', 'ContactBea0:50.0']);
     fireEvent.click(options[1]);
     const slider = screen.getAllByLabelText('Session time').find(element => element.tagName === 'INPUT')!;
-    expect((slider as HTMLInputElement).value).toBe('47');
+    expect((slider as HTMLInputElement).value).toBe('45');
+    // The picker lets focus go: the replay's arrows step the clock at once.
+    expect(document.activeElement).not.toBe(incidents);
+    act(() => { fireEvent.keyDown(document.activeElement ?? window, { key: 'ArrowRight' }); });
+    expect((slider as HTMLInputElement).value).toBe('50');
   });
 
   it('shows the tooltip of a car on the map while its car or standings row is under the pointer', async () => {

@@ -2,21 +2,23 @@ import { useEffect, useEffectEvent } from 'react';
 import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 import { RACE_SPEEDS, type RaceClock } from './raceClock.js';
 
-/** Seconds an arrow key moves the clock; Shift moves it further. */
+/** Seconds an arrow key moves the clock; Shift moves it further, Ctrl less. */
 const SEEK_SEC = 5;
 const SEEK_FAR_SEC = 30;
+const SEEK_NEAR_SEC = 1;
 
-/** Space plays or pauses the race replay; Left and Right step the clock, Home and End jump to its ends, comma and period change the speed. */
+/** Space plays or pauses the race replay; Left and Right step the clock (Shift further, Ctrl less), Home and End jump to its ends, comma and period change the speed. */
 export function useRaceReplayKeys(clock: RaceClock): void {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (replayShortcutBlocked(event)) return;
+      const arrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
+      if (replayShortcutBlocked(event, arrow)) return;
       if (event.key === ' ' && !event.repeat) {
         event.preventDefault();
         clock.setPlaying(!clock.getState().playing);
-      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      } else if (arrow) {
         event.preventDefault();
-        const step = (event.shiftKey ? SEEK_FAR_SEC : SEEK_SEC) * (event.key === 'ArrowLeft' ? -1 : 1);
+        const step = (event.ctrlKey ? SEEK_NEAR_SEC : event.shiftKey ? SEEK_FAR_SEC : SEEK_SEC) * (event.key === 'ArrowLeft' ? -1 : 1);
         clock.seek(clock.getState().timeSec + step);
       } else if (event.key === 'Home' || event.key === 'End') {
         event.preventDefault();

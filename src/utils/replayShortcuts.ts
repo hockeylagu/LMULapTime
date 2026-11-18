@@ -26,9 +26,9 @@ function pointerFocusedButton(element: Element | null): boolean {
   return element !== null && element === pointerButton && document.activeElement === element;
 }
 
-/** Keep analysis shortcuts out of native controls, typing, browser commands and dialogs. */
-export function replayShortcutBlocked(event: KeyboardEvent): boolean {
-  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return true;
+/** Keep analysis shortcuts out of native controls, typing, browser commands and dialogs. `withCtrl`: a Ctrl shortcut of the replay's own. */
+export function replayShortcutBlocked(event: KeyboardEvent, withCtrl = false): boolean {
+  if (event.defaultPrevented || (event.ctrlKey && !withCtrl) || event.metaKey || event.altKey) return true;
   const target = event.target instanceof Element ? event.target : null;
   const control = target?.closest('input, textarea, select, button, a, [contenteditable="true"], [role="textbox"], details[open]') ?? null;
   if (control && !pointerFocusedButton(control)) return true;

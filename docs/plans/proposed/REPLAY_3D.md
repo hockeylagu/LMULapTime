@@ -108,7 +108,7 @@ a car: the user said "not now"; don't re-offer.
   on top (`laps/drivingMarks.ts`, drawn through the line meshes' colour path in `racingLine.ts`). The comparison lap's slowest
   point is its own (`baselineMinDistM`), picked as the primary lap's. No labels: the bar shows the corner's time. Only the
   picked corner, the user's call over every corner.
-- **Incident replays**: the race view's incident pick already lands 3 s before; it would add a camera on both cars and slow motion.
+- **Incident replays**: the race view's incident pick already lands 5 s before; it would add a camera on both cars and slow motion.
 
 ### Fidelity
 

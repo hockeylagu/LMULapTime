@@ -5,7 +5,7 @@ import { Select } from '../../common/dropdown/Select.js';
 import { incidentsOf, incidentText } from './raceEventText.js';
 
 /** A pick lands this long before the incident, so it plays in. */
-export const INCIDENT_LEAD_IN_SEC = 3;
+export const INCIDENT_LEAD_IN_SEC = 5;
 
 interface Props {
   events: RaceReplayEvent[];
@@ -27,6 +27,10 @@ export const RaceIncidentSelect: React.FC<Props> = ({ events, cars, followSlot, 
     <Select<number> aria-label="Incidents of the followed car" value={null} size="compact" align="end"
       className="w-40" panelClassName="w-80" disabled={!options.length} options={options}
       placeholder={options.length ? `Incidents (${options.length})` : 'No incidents'}
-      onChange={i => onSeek(Math.max(startSec, incidents[i].timeSec - INCIDENT_LEAD_IN_SEC))} />
+      onChange={i => {
+        onSeek(Math.max(startSec, incidents[i].timeSec - INCIDENT_LEAD_IN_SEC));
+        // The replay's keys (Space, arrows) work at once after a pick, not the picker's.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      }} />
   );
 };
