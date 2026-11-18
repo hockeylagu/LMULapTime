@@ -9,11 +9,16 @@ vi.mock('../../../../../src/components/replay/race/RaceCarTooltip.js', () => ({
   RaceCarTooltip: ({ slot }: { slot: number }) => <div data-testid="tooltip">car {slot}</div>,
 }));
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-/** A host of 1000 by 600 pixels, a scene picking `slot` (its answer a step later, as the pixel read), and a clock whose ticks the test sends. */
+/**
+ * A host of 1000 by 600 pixels, a scene picking `slot` (its answer a step later, as the pixel read), and a clock whose ticks the test
+ * sends, each `afterMs` (the time the page reads) after the last.
+ */
 function setup(active = true) {
   const host = createRef<HTMLDivElement>(), listeners = new Set<() => void>();
+  let nowMs = 1000;
+  vi.spyOn(performance, 'now').mockImplementation(() => nowMs);
   let slot: number | null = 7;
   const pick = vi.fn((_x: number, _y: number) => Promise.resolve(slot));
   const clock = { subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); } } as unknown as RaceClock;
@@ -29,7 +34,7 @@ function setup(active = true) {
   return {
     view, pick, element, tooltip: () => screen.queryByTestId('tooltip'),
     setSlot: (next: number | null) => { slot = next; },
-    tick: () => act(() => listeners.forEach(listener => listener())),
+    tick: (afterMs = 200) => { nowMs += afterMs; act(() => listeners.forEach(listener => listener())); },
   };
 }
 
@@ -47,7 +52,10 @@ describe('RaceCarHover', () => {
     expect(tooltip()!.parentElement).toHaveStyle({ left: '54px', top: '44px' });
     setSlot(3); tick(); await settle();
     expect(tooltip()).toHaveTextContent('car 3');
-    setSlot(null); tick(); await settle();
+    // A pointer at rest looks again about 5 times a second as the cars move, not on every tick.
+    setSlot(null); tick(50); await settle();
+    expect(tooltip()).toHaveTextContent('car 3');
+    tick(150); await settle();
     expect(tooltip()).toBeNull();
   });
 

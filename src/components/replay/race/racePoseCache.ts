@@ -35,17 +35,21 @@ export interface NextPose { window: RacePoseWindow; carIndex: number; timeSec: n
 export function createRacePoseCache(windowSec: number, fetchWindow: FetchWindow, onChange: () => void) {
   const windows = new Map<number, RacePoseWindow>();
   const loading = new Map<number, AbortController>();
+  /** The fetches `loading` holds, for `read` to share. */
+  const pending = new Map<number, Promise<RacePoseWindow>>();
   const failed = new Map<number, string>();
 
   const load = (index: number) => {
     if (index < 0 || windows.has(index) || loading.has(index) || failed.has(index)) return;
     const controller = new AbortController();
     loading.set(index, controller);
-    fetchWindow(index, controller.signal).then(
+    const fetching = fetchWindow(index, controller.signal);
+    pending.set(index, fetching);
+    fetching.then(
       (window) => { windows.set(index, window); },
       (error: unknown) => { if (!controller.signal.aborted) failed.set(index, error instanceof Error ? error.message : String(error)); },
     ).finally(() => {
-      if (loading.get(index) === controller) loading.delete(index);
+      if (loading.get(index) === controller) { loading.delete(index); pending.delete(index); }
       if (!controller.signal.aborted) onChange();
     });
   };
@@ -54,7 +58,7 @@ export function createRacePoseCache(windowSec: number, fetchWindow: FetchWindow,
     const far = [...windows.keys()].sort((a, b) => Math.abs(b - current) - Math.abs(a - current));
     while (windows.size > KEEP_WINDOWS && far.length) windows.delete(far.shift()!);
     for (const [index, controller] of loading) {
-      if (index < current - 1 || index > current + 1) { controller.abort(); loading.delete(index); }
+      if (index < current - 1 || index > current + 1) { controller.abort(); loading.delete(index); pending.delete(index); }
     }
   };
 
@@ -95,11 +99,22 @@ export function createRacePoseCache(windowSec: number, fetchWindow: FetchWindow,
       evict(index);
       return windows.get(index) ?? null;
     },
+    /**
+     * Window `index`, kept, loading or fetched now, and kept once fetched (`windowAt` drops it when far from the clock): the race
+     * start search reads through the cache, so the windows it reads are fetched once.
+     */
+    read: async (index: number, signal: AbortSignal): Promise<RacePoseWindow> => {
+      const kept = windows.get(index) ?? await pending.get(index)?.catch(() => null);
+      if (kept) return kept;
+      const window = await fetchWindow(index, signal);
+      windows.set(index, window);
+      return window;
+    },
     /** Why the window holding `timeSec` could not load, if it failed. */
     errorAt: (timeSec: number) => failed.get(Math.max(0, Math.floor(timeSec / windowSec))) ?? null,
     isLoading: (timeSec: number) => loading.has(Math.max(0, Math.floor(timeSec / windowSec))),
     retry: () => { failed.clear(); onChange(); },
-    dispose: () => { loading.forEach(controller => controller.abort()); loading.clear(); windows.clear(); },
+    dispose: () => { loading.forEach(controller => controller.abort()); loading.clear(); pending.clear(); windows.clear(); },
   };
 }
 

@@ -35,7 +35,9 @@ describe('texture focus', () => {
     expect(fragment.indexOf('vec4 focusTexture(')).toBeLessThan(fragment.indexOf('vec3 n()'));
     const uniforms = shader.uniforms as Record<string, {value: unknown}>;
     expect(uniforms.focus_map.value).toBe(0);
-    startFocus(texture, 2);
+    // Read at the time of the frame being drawn (`focusing`).
+    startFocus(texture, 2, 10_000);
+    focusing(10_000);
     expect(uniforms.focus_map.value).toBeGreaterThan(1.9);
     expect(uniforms.focus_surface_normal.value).toBe(0);
   });

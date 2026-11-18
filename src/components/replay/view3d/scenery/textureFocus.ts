@@ -10,6 +10,8 @@ export const FOCUS_MS = 400;
 const fades = new WeakMap<Texture, {levels: number; startMs: number}>();
 /** When the last fade begun ends: frames are drawn until then. */
 let endMs = -Infinity;
+/** The frame being drawn's time (`focusing`): every draw of the frame reads its focus at it, not the clock per draw. */
+let frameMs = -Infinity;
 
 /** The texture just sharpened, `levels` levels above those it drew from: it fades in from how it looked. */
 export function startFocus(texture: Texture, levels: number, nowMs = performance.now()): void {
@@ -27,8 +29,9 @@ export function focusOf(texture: unknown, nowMs = performance.now()): number {
   return fade.levels * (1 - Math.max(0, t) ** 2 * (3 - 2 * Math.max(0, t)));
 }
 
-/** Whether a texture is still coming into focus: the scene draws another frame. */
+/** Whether a texture is still coming into focus: the scene draws another frame. Called once per frame, before it draws: its time. */
 export function focusing(nowMs = performance.now()): boolean {
+  frameMs = nowMs;
   return nowMs < endMs;
 }
 
@@ -72,6 +75,6 @@ export function patchTextureFocus(shader: {fragmentShader: string; uniforms: Rec
   shader.fragmentShader = shader.fragmentShader.replace(COMMON, () => `${COMMON}\n${declarations}\n${FOCUS_GLSL}`);
   for (const name of read) {
     const sampler = shader.uniforms[name];
-    shader.uniforms[`focus_${name}`] = {get value() { return focusOf(sampler.value); }};
+    shader.uniforms[`focus_${name}`] = {get value() { return frameMs < endMs ? focusOf(sampler.value, frameMs) : 0; }};
   }
 }

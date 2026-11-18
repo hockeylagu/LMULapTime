@@ -25,6 +25,8 @@ interface Hover {
 
 /** Pixels between the pointer and the tooltip, and the room the tooltip needs right of and below the pointer (else it goes the other side). */
 const OFFSET_PX = 14, ROOM_X_PX = 280, ROOM_Y_PX = 100;
+/** The shortest wait between two looks the clock asks for (about 5 a second). */
+const TICK_LOOK_MS = 200;
 
 /**
  * The race map's tooltip for the car of the 3D race view under the pointer, beside the pointer. The car is looked for again as the
@@ -71,7 +73,14 @@ export function RaceCarHover({ host, scene, clock, index, active }: Props) {
     const leave = () => { pointer = null; look(); };
     element.addEventListener('pointermove', move);
     element.addEventListener('pointerleave', leave);
-    const unsubscribe = clock.subscribe(look);
+    // A pointer at rest re-looks as the clock moves the cars at most every TICK_LOOK_MS: each look draws the scene again.
+    let tickLook = 0;
+    const unsubscribe = clock.subscribe(() => {
+      const now = performance.now();
+      if (now - tickLook < TICK_LOOK_MS) return;
+      tickLook = now;
+      look();
+    });
     return () => {
       live = false;
       element.removeEventListener('pointermove', move);

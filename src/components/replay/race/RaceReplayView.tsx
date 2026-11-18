@@ -113,10 +113,9 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
   useEffect(() => {
     if (isNonRaceSession(overview.sessionType)) return;
     const controller = new AbortController();
-    findRaceStartSec(overview.windowSec, overview.startSec, followSlot, (window, signal) => fetchRacePoseWindow(sessionId, window, { signal }),
-      controller.signal).then(sec => setRaceStart({ slot: followSlot, sec }), () => {});
+    findRaceStartSec(overview.windowSec, overview.startSec, followSlot, poses.read, controller.signal).then(sec => setRaceStart({ slot: followSlot, sec }), () => {});
     return () => controller.abort();
-  }, [sessionId, overview, followSlot]);
+  }, [poses, overview, followSlot]);
   const raceStartSec = raceStart?.slot === followSlot ? raceStart.sec : null;
   const index = useMemo(() => indexRaceStandings(overview, progress), [overview, progress]);
   const carsBySlot = useMemo(() => new Map(overview.cars.map(car => [car.slot, car])), [overview]);
