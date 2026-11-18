@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RaceReplayView } from '../../../../src/components/replay/race/RaceReplayView.js';
+import { loadRace3DView } from '../../../../src/components/replay/race/raceModeContext.js';
 import { initialRaceTime, lapAt } from '../../../../src/components/replay/race/raceLaps.js';
 import { fetchRaceOverview, fetchRacePoseWindow } from '../../../../src/api/replayApi.js';
 import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
@@ -46,6 +47,9 @@ function poseWindow(index: number): RacePoseWindow {
 }
 
 describe('RaceReplayView', () => {
+  // The 3D view's code loaded first, as the lap view loads it ahead: imported lazily, its stand-in took over a second when other
+  // test files ran beside this one.
+  beforeAll(async () => { await loadRace3DView(); });
   beforeEach(() => {
     vi.mocked(fetchRaceOverview).mockResolvedValue(overview);
     vi.mocked(fetchRacePoseWindow).mockImplementation((_session, index) => Promise.resolve(poseWindow(index)));
