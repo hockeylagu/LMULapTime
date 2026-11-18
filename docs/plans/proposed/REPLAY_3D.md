@@ -66,7 +66,7 @@ states run to run (stand chunk in the cached far cascade or not); the 10-view su
 | Far shadow cascade | Cached; not redrawn when a chunk joins (Silverstone garages lighter or darker by load order, accepted) |
 | Race field | Nearest 6 in view as full models (kept once built, for smooth traversal; parsed bodies not released), the rest as the body's far model, which casts and takes the sun's shadow too (the shadow does not pop at the tier switch, 2026-11-16); steering on full models only; far lamps for the nearest 16 within 300 m; ghost drawn part by part |
 | Clouds and exposure | World-fixed cloud layer, sun visibility from the camera; meter −ln(1 − Y709(mean tone-mapped)) / E and the package's law; cloud sun dimming on |
-| Road surface | Assumed rubber 51 on every element; the replay's own surface state is decoded (`server/replay/decode/replaySurface.ts`) but needs a replay cache step (v11, with rainLight; user "not now"); never add a .Vcr file read in the meantime |
+| Road surface | Assumed rubber 51 on every element; the replay's own surface state (`docs/VCR_FORMAT.md` §4.21; its decoder, removed unused, is in 7fdc0455) needs a replay cache step (v11, with rainLight; user "not now"); never add a .Vcr file read in the meantime |
 | Lamps | Headlight, brake and 4 Hz pit flash from the replay; disc glow parked (`docs/local/parked-disc-glow`) until a proven temperature mapping |
 | Race timeline | The ticks are the followed (selected) car's laps, so they stop where it retires; never the leader's (user, 2026-11-17) |
 

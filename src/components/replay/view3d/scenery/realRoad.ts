@@ -6,8 +6,8 @@ import { REALROAD_NONE } from '../../../../../shared/packageContract/scenery.js'
  * (`_lmu_realroad`), the layout's table maps the point to a surface element, and the element's state gives its rubber and loose
  * material. The table is applied here into each vertex's own two bytes (`surfaceRealRoad`, rubber and loose material as fractions of
  * full). An attribute rather than a texture: a texture unit more would keep the roads with the most maps out of their batches
- * (`sceneryBatches.ts`). Water is not drawn. The state drawn is the assumed one: the replay's own (docs/VCR_FORMAT.md §4.21,
- * `server/replay/decode/replaySurface.ts`) waits for a replay cache step that is not planned yet.
+ * (`sceneryBatches.ts`). Water is not drawn. The state drawn is the assumed one: the replay's own (docs/VCR_FORMAT.md §4.21) waits
+ * for a replay cache step that is not planned yet.
  */
 
 /** The package's per-vertex point (float, -1 for none). */
