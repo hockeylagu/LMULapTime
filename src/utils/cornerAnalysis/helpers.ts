@@ -259,8 +259,9 @@ export function slowestDistInRange(points: ReplayTrajectoryPoint[], dists: numbe
   let slowest: number | undefined, minV = Infinity;
   for (let i = 0; i < points.length; i++) {
     if (!(dists[i] >= fromDist && dists[i] <= toDist)) continue;
-    const v = points[i].speedKmh || 0;
-    if (v <= minV) { minV = v; slowest = dists[i]; }
+    // A sample without a speed is a gap in the data, not a stop.
+    const v = points[i].speedKmh;
+    if (v !== undefined && Number.isFinite(v) && v <= minV) { minV = v; slowest = dists[i]; }
   }
   return slowest;
 }

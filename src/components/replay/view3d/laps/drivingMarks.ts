@@ -84,7 +84,8 @@ export function drivingMarksGeometry(marks: DrivingMark[], laps: {primary: Marke
 /** The marks as one mesh in the line colours (`makeDataMesh`), drawn over both lines. */
 export function makeDrivingMarks(marks: DrivingMark[], laps: {primary: MarkedLap; baseline: MarkedLap | null}, origin: Vector3,
   surfaceHeight: SurfaceHeight, display: () => DisplayTransform) {
-  const {geometry, colors, missing} = drivingMarksGeometry(marks, laps, origin, surfaceHeight);  const mesh = makeDataMesh(geometry, colors, display, 4);
+  const {geometry, colors, missing} = drivingMarksGeometry(marks, laps, origin, surfaceHeight);
+  const mesh = makeDataMesh(geometry, colors, display, 4);
   mesh.name = 'driving-marks';
   return {mesh, missing};
 }

@@ -111,10 +111,13 @@ export async function createRaceScene(
     if (!body) return bare(slot);
     const near = field.near(slot), cabin = await sets.cabin(body, near), drawn = await near;
     if (!drawn || !cabin) return bare(slot);
-    return {
+    const built: FollowedCar = {
       slot, car: drawn.car, motion: drawn.motion, parts: drawn.parts, cabin, pickShape: drawn.pickShape, cameras: body.descriptor.cameras.list,
-      chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => cabin.show(), dispose: () => { cabin.dispose(); field.reclaim(slot); },
+      chaseLodMultiplier: body.descriptor.cameras.chase.lodMultiplier, ready: () => cabin.show(),
+      // A build dropped as stale leaves the model to the followed car of the same slot, which still draws it.
+      dispose: () => { cabin.dispose(); if (followed === built || followed?.slot !== slot) field.reclaim(slot); },
     };
+    return built;
   };
   const pending = buildFollowed(first.slot, first.body);
   pending.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces below.
@@ -166,7 +169,6 @@ export async function createRaceScene(
   const orientation = new Quaternion(), euler = new Euler(), target = new Vector3();
   /** Where each car on the track was last drawn: what `pick` looks through. */
   let drawnPlaces: readonly DrawnPlace[] = [];
-  /** Each followed model's body bounds and its parts'. */
   /**
    * A car's body bounds in its frame (`DrawnPlace.box` before it is put on the road), and its parts' for the followed model (its full
    * model, drawn large); the field's far model bounds for another car.
