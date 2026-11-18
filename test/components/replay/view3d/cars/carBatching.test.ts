@@ -117,7 +117,9 @@ describe('batchCars, several cars', () => {
     const carbon = batches.find(batch => batch.material === shared.carbon)!, rubber = batches.find(batch => batch.material === shared.rubber)!;
     expect(carbon.maxInstanceCount).toBe(6);
     expect(rubber.maxInstanceCount).toBe(2);
-    expect(carbon.perObjectFrustumCulled).toBe(true);
+    // The caller culls each car whole: a shared batch draws every part it shows (the shadow-only batch still culls per part).
+    expect(carbon.perObjectFrustumCulled).toBe(false);
+    expect(batches.find(batch => batch.name === 'car shadow batch')!.perObjectFrustumCulled).toBe(true);
     a.table.sync(); b.table.sync();
     for (const item of [a, b]) for (const mesh of [item.hull, item.wing, item.rim]) {
       const frame = new Matrix4().multiply(mesh === item.rim ? item.spin.matrix : new Matrix4()).multiply(mesh.matrix);

@@ -139,13 +139,14 @@ export async function batchCars(tables: readonly CarParts[]): Promise<CarBatchSe
     const geometries = [...new Set(members.map(part => part.mesh.geometry))];
     const vertices = geometries.reduce((sum, geometry) => sum + geometry.attributes.position.count, 0);
     const indices = geometries.reduce((sum, geometry) => sum + (geometry.index?.count ?? 0), 0);
-    // The caller culls a car as a whole. A field spreads round the lap: a shared batch draws in each pass (main view, each shadow
-    // cascade) the parts inside it. A car's own batch draws in the car's frame, which its table sets (`sync`).
+    // The caller culls a car as a whole, so a batch draws every part it shows: culling each part again in every pass (main view,
+    // each shadow cascade, the reflection faces) cost more, the batch's draw list re-uploaded per pass, than the few parts it left out.
+    // A car's own batch draws in the car's frame, which its table sets (`sync`).
     const shadowOnly = first.castShadow && castsSolid(first.material) && geometries.every(geometry => geometry.index);
     if (shadowOnly) casting.push(...members);
     const batch = createBatch({
       draws: members.length, vertices, indices, material: first.material, name: `car batch ${first.material.name}`,
-      castShadow: first.castShadow && !shadowOnly, receiveShadow: first.receiveShadow, frustumCulled: false, perObjectFrustumCulled: !single, matrixAutoUpdate: false,
+      castShadow: first.castShadow && !shadowOnly, receiveShadow: first.receiveShadow, frustumCulled: false, matrixAutoUpdate: false,
     });
     batch.sortObjects = first.material.transparent; batch.layers.set(UNSEEN_LAYER);
     const ids = new Map<BufferGeometry, number>();
