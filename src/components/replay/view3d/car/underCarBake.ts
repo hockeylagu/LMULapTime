@@ -1,6 +1,6 @@
 import {
   Box3, Color, DoubleSide, HalfFloatType, LinearFilter, Matrix4, Mesh, NearestFilter, OrthographicCamera, PlaneGeometry, RGBAFormat, Scene, ShaderMaterial, UnsignedByteType, Vector3, Vector4,
-  WebGLRenderTarget, BufferAttribute, BufferGeometry, type Camera, type Object3D,
+  WebGLRenderTarget, BufferAttribute, BufferGeometry, type Camera, type Object3D, type WebGLRenderer,
 } from 'three';
 
 /** Texels per side of the baked maps, and how much of the car's frame the maps cover beyond its length (half on each end). */
@@ -160,6 +160,32 @@ export function bakeParts(model: Object3D): BakePart[] {
 }
 
 /**
+ * The two passes' materials and the occlusion quad, shared by every bake: a program stays linked while a material uses it, so each
+ * links once per renderer (`linkUnderCarBake`), not at every body's bake (the occlusion program's loops take 0.1-0.2 s to link).
+ * Each bake sets the uniforms.
+ */
+const heightMaterial = new ShaderMaterial({vertexShader: HEIGHT_VERTEX, fragmentShader: HEIGHT_FRAGMENT, side: DoubleSide, uniforms: {uMinY: {value: 0}}});
+const occlusionMaterial = new ShaderMaterial({
+  vertexShader: OCCLUSION_VERTEX, fragmentShader: OCCLUSION_FRAGMENT, depthTest: false, depthWrite: false,
+  uniforms: {uHeights: {value: null}, uTexels: {value: BAKE_TEXELS}, uSize: {value: 0}, uHalfX: {value: 0}, uHalfZ: {value: 0}},
+});
+const pass = new Mesh(new PlaneGeometry(2, 2), occlusionMaterial), screen = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+pass.frustumCulled = false;
+
+/**
+ * Links the bake's two programs off the main thread: the first bake comes with the first frame, which would otherwise wait on
+ * both links. Both passes draw to render targets (linear output), as here.
+ */
+export function linkUnderCarBake(renderer: WebGLRenderer): Promise<void> {
+  const scene = new Scene(), proxy = new Mesh(new PlaneGeometry(1, 1), heightMaterial), target = new WebGLRenderTarget(1, 1), previous = renderer.getRenderTarget();
+  proxy.frustumCulled = false; scene.add(proxy, pass.clone());
+  renderer.setRenderTarget(target);
+  const ready = renderer.compileAsync(scene, screen);
+  renderer.setRenderTarget(previous);
+  return ready.then(() => {}).finally(() => { proxy.geometry.dispose(); target.dispose(); });
+}
+
+/**
  * Bakes the shade under a car: the exterior parts seen up close, drawn from below into a height map (the lowest surface wins),
  * then an occlusion pass over it. `parts` are the car's (`bakeParts`), in its own frame, and `bounds` its footprint there: no
  * current visibility or per-frame state matters. Returns the darkness map (the caller owns it, and the parts); the renderer's
@@ -171,13 +197,11 @@ export function bakeUnderCar(renderer: BakeRenderer, parts: readonly BakePart[],
   camera.matrixWorld.copy(local); camera.matrixWorldInverse.copy(local).invert();
   const heights = new WebGLRenderTarget(BAKE_TEXELS, BAKE_TEXELS, {type: HalfFloatType, format: RGBAFormat, minFilter: NearestFilter, magFilter: NearestFilter, depthBuffer: true});
   const darkness = new WebGLRenderTarget(BAKE_TEXELS, BAKE_TEXELS, {type: UnsignedByteType, format: RGBAFormat, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: false});
-  const heightMaterial = new ShaderMaterial({vertexShader: HEIGHT_VERTEX, fragmentShader: HEIGHT_FRAGMENT, side: DoubleSide, uniforms: {uMinY: {value: minY}}});
-  const occlusionMaterial = new ShaderMaterial({
-    vertexShader: OCCLUSION_VERTEX, fragmentShader: OCCLUSION_FRAGMENT, depthTest: false, depthWrite: false,
-    uniforms: {uHeights: {value: heights.texture}, uTexels: {value: BAKE_TEXELS}, uSize: {value: size}, uHalfX: {value: (bounds.max.x - bounds.min.x) / 2}, uHalfZ: {value: (bounds.max.z - bounds.min.z) / 2}},
-  });
-  const pass = new Mesh(new PlaneGeometry(2, 2), occlusionMaterial); pass.frustumCulled = false;
-  const screen = new OrthographicCamera(-1, 1, 1, -1, 0, 1), proxies = new Scene();
+  heightMaterial.uniforms.uMinY.value = minY;
+  const occlusion = occlusionMaterial.uniforms;
+  occlusion.uHeights.value = heights.texture; occlusion.uSize.value = size;
+  occlusion.uHalfX.value = (bounds.max.x - bounds.min.x) / 2; occlusion.uHalfZ.value = (bounds.max.z - bounds.min.z) / 2;
+  const proxies = new Scene();
   for (const part of parts) {
     const proxy = new Mesh(part.geometry, heightMaterial);
     proxy.matrixAutoUpdate = false; proxy.matrix.copy(part.matrix); proxy.matrixWorldNeedsUpdate = true;
@@ -190,7 +214,7 @@ export function bakeUnderCar(renderer: BakeRenderer, parts: readonly BakePart[],
     renderer.setRenderTarget(darkness); renderer.render(pass, screen);
   } finally {
     renderer.setRenderTarget(target); renderer.setClearColor(clearColor, clearAlpha); renderer.autoClear = autoClear; renderer.setViewport(viewport);
-    proxies.clear(); heights.dispose(); heightMaterial.dispose(); occlusionMaterial.dispose(); pass.geometry.dispose(); // The parts are the caller's.
+    proxies.clear(); heights.dispose(); occlusion.uHeights.value = null; // The parts are the caller's; the materials stay linked.
   }
   return darkness;
 }

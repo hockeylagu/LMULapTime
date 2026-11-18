@@ -19,6 +19,7 @@ import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
 import { createPointerSurface, type DrawnCamera, type RaySpan } from './pointerSurface.js';
 import { underCarBaker } from '../car/carContactShadow.js';
+import { linkUnderCarBake } from '../car/underCarBake.js';
 import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
@@ -449,9 +450,9 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       };
       freezeScenery();
       show(first); environment.setCamera(rig.camera);
-      // The first view's chunks are warm: this compiles and uploads the content, behind the loading screen. The exposure passes
-      // and the reflection convolution link meanwhile: each would otherwise link at its first draw.
-      await Promise.all([warmup.warm(scene, new AbortController().signal), exposure.link(), convolution.ready]);
+      // The first view's chunks are warm: this compiles and uploads the content, behind the loading screen. The exposure passes,
+      // the reflection convolution and the under-car bake link meanwhile: each would otherwise link at its first draw.
+      await Promise.all([warmup.warm(scene, new AbortController().signal), exposure.link(), convolution.ready, linkUnderCarBake(renderer)]);
       report({shaders: 1}); loading = false;
       // The scenery around the first view is resident and compiled: capture the venue's light for the scene's environment.
       environment.captureVenue();
