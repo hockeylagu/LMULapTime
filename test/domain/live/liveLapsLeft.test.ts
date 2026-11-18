@@ -44,6 +44,15 @@ describe('laps left', () => {
     // A slow last lap (start, pit or incident) is not its pace: the estimate stands.
     expect(computeLapsLeft(session, player, { ...leader, lastLapTime: 120 }, null, own)).toEqual({ laps: 1, estimated: true });
   });
+  it('keeps the leader on its estimate after its start lap', () => {
+    // Sebring School race 2026-11-17 (19 laps run) at 201.7 s, just after the player's lap 1: the leader's lap 2 from
+    // 195.8 s after a 69.15 s start lap, estimate 64 s, clock end 1327. Its start lap as its pace read 19 left, one too many.
+    const session = { kind: 'race' as const, endSeconds: 1327, elapsedSeconds: 201.7, gamePhase: 5 };
+    const leader = vehicleReading({ id: 1, vehicleClass: 'GT3', lapStartEt: 195.8, estimatedLapTime: 64, lastLapTime: 69.15, totalLaps: 1 });
+    const player = vehicleReading({ id: 7, vehicleClass: 'GT3', lapStartEt: 201.6, estimatedLapTime: 65.5, totalLaps: 1 });
+    const own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, lapFraction: 0.002 };
+    expect(computeLapsLeft(session, player, leader, leader, own)).toEqual({ laps: 18, estimated: true });
+  });
   it('delays the flag by the stop the leader still makes', () => {
     // Le Mans race 2026-10-23 on lap 11: the leader on lap 12 from 2501 s at 209.4 s, no stop yet; everyone ran 17.
     const session = { kind: 'race' as const, endSeconds: 3789, elapsedSeconds: 2520, gamePhase: 5 };
