@@ -334,11 +334,14 @@ export function lapClockToReplay(index: CornerInsightIndex, slot: number, lapNum
 
 /**
  * The card of a lap view, which shows one lap: its passes only, so a sample just short of the line (the lap's first)
- * shows the lap's first turn, not the previous lap's last.
+ * shows the lap's first turn, not the previous lap's last, and one past the line its last turn, not the next lap's
+ * first. A lap without passes has no card.
  */
 export function lapInsightAt(index: CornerInsightIndex, slot: number, lapNumber: number, timeSec: number, compareLap?: CompareLap | null): CornerInsight | null {
-  const first = index.passes.get(slot)?.find(pass => pass.lapNumber === lapNumber);
-  return cornerInsightAt(index, slot, first ? Math.max(timeSec, first.entrySec) : timeSec, compareLap);
+  const own = index.passes.get(slot)?.filter(pass => pass.lapNumber === lapNumber) ?? [];
+  if (!own.length) return null;
+  const clamped = Math.min(Math.max(timeSec, own[0].entrySec), own[own.length - 1].entrySec);
+  return cornerInsightAt(index, slot, clamped, compareLap);
 }
 
 const minus = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);

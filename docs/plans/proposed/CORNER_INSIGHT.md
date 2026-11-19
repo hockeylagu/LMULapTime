@@ -21,7 +21,7 @@ plain queries between laps.
   - Where: that gain split at the slowest point, entry and exit.
   - How: what that faster car does differently in its usual pass (brake point, minimum speed, throttle point).
   - The corner's strip over the session: a cell per lap against the median, the current lap outlined, pit stops as
-    dividers. A click moves the race view's clock to that pass, or opens that lap in the lap view (at its start).
+    dividers. A click moves the race view's clock to that pass, or opens that lap in the lap view at the turn's entry.
 - Which passes set "usual" (the median, gains and the class's best), one rule for every session type (driver,
   2026-11-18): racing laps in the same conditions (wet with wet), read from the parser's stored lap flags. Left out:
   lap 1, in and out laps, invalid laps, laps tagged non-representative for `'contact'` or `'offPace'`. Laps tagged

@@ -46,9 +46,9 @@ const vsUsual = <span className="font-sans text-lmu-muted"> vs usual</span>;
  * where in the corner it is (entry or exit), and what the faster car does differently. The two numbers lead; the gain reads
  * below as labelled values and a sentence.
  */
-function Body({ insight, versusMode, onPick }: { insight: CornerInsight; versusMode: boolean; onPick?: (cell: StripCell) => void }) {
+function Body({ insight, versusMode, versusNote, onPick }: { insight: CornerInsight; versusMode: boolean; versusNote?: string | null; onPick?: (cell: StripCell) => void }) {
   const { time, minSpeed, gain, best } = insight;
-  if (versusMode) return <VersusBody insight={insight} onPick={onPick} />;
+  if (versusMode) return <VersusBody insight={insight} note={versusNote} onPick={onPick} />;
   const usual = insight.usualSec === null ? 'no usual yet: it needs 3 laps that count through this turn'
     : `Usual ${seconds(insight.usualSec)} s${insight.spreadSec === null ? '' : ` ±${seconds(insight.spreadSec)}`}${best ? `, best ${seconds(best.timeSec)} s on lap ${best.lapNumber}` : ''}`;
   const rival = gain ? `${gain.carNumber ? `#${gain.carNumber} ` : ''}${gain.name}` : '';
@@ -93,7 +93,7 @@ function Body({ insight, versusMode, onPick }: { insight: CornerInsight; versusM
 const whoText = (versus: Versus) => `${versus.carNumber ? `#${versus.carNumber} ` : ''}L${versus.lapNumber}`;
 
 /** The compare mode: this pass against the compare lap's pass through the turn, with where and how the gap is made. */
-function VersusBody({ insight, onPick }: { insight: CornerInsight; onPick?: (cell: StripCell) => void }) {
+function VersusBody({ insight, note, onPick }: { insight: CornerInsight; note?: string | null; onPick?: (cell: StripCell) => void }) {
   const { time, minSpeed, versus } = insight;
   const vs = versus && <span className="font-sans text-lmu-muted"> vs {whoText(versus)}</span>;
   return (
@@ -110,7 +110,7 @@ function VersusBody({ insight, onPick }: { insight: CornerInsight; onPick?: (cel
         </Stat>
       </dl>
       <dl className="mx-3 mt-2 space-y-1 border-t border-lmu-border pt-2 pb-2.5 text-xs">
-        {!versus ? <p className="text-lmu-muted">The compare lap has no time through this turn.</p> : <>
+        {!versus ? <p className="text-lmu-muted">{note ?? 'The compare lap has no time through this turn.'}</p> : <>
           <div className="flex items-baseline gap-2" title={`The compare lap's time through this turn: ${versus.name}, lap ${versus.lapNumber}`}>
             <dt className={LABEL}>Compare</dt>
             <dd className="truncate"><span className="font-mono tabular-nums text-lmu-text">{seconds(versus.timeSec)} s</span>
@@ -153,6 +153,8 @@ interface Props {
   onPick?: (cell: StripCell) => void;
   /** With a compare lap: whether the card measures against it (true) or the usual; undefined without one (no switch). */
   versusMode?: boolean;
+  /** Why the compare lap has no pass in any turn (its passes load, or its session has none); null when it has them. */
+  versusNote?: string | null;
   className?: string;
 }
 
@@ -161,7 +163,7 @@ interface Props {
  * against its usual and the class's fastest, and the turn's strip over the session. The whole pass shows from the
  * turn's entry; fixed size, a value the pass lacks shows "–" or "none".
  */
-export const CornerInsightCard: React.FC<Props> = ({ insight, reason, loading, onPick, versusMode, className = '' }) => {
+export const CornerInsightCard: React.FC<Props> = ({ insight, reason, loading, onPick, versusMode, versusNote, className = '' }) => {
   const heading = insight ? turnDisplayName(insight.turn) : 'Corner';
   const marks = insight ? marksText(insight.marks, insight.counts) : '';
   return (
@@ -175,7 +177,7 @@ export const CornerInsightCard: React.FC<Props> = ({ insight, reason, loading, o
         <button type="button" onClick={toggleCornerCard} aria-label="Close corner card" title="Close corner card (K)"
           className={`rounded p-0.5 text-lmu-muted hover:bg-lmu-raised/70 hover:text-lmu-text ${FOCUS_RING}`}><X className="h-3.5 w-3.5" /></button>
       </header>
-      {insight ? <Body insight={insight} versusMode={Boolean(versusMode)} onPick={onPick} /> : (
+      {insight ? <Body insight={insight} versusMode={Boolean(versusMode)} versusNote={versusNote} onPick={onPick} /> : (
         <p role={reason ? 'note' : 'status'} className="px-3 py-3 text-xs text-lmu-muted">
           {reason ?? (loading ? 'Loading the corner times…' : 'The car has not reached a turn yet.')}
         </p>

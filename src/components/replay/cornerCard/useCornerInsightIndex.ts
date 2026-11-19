@@ -25,9 +25,9 @@ function loadSession(sessionId: string): Promise<Loaded> {
   if (inFlight) return inFlight;
   const request = fetchSessionCornerPasses(sessionId).then(
     (response): Loaded => {
-      const entry = response.available
-        ? { sessionId, index: indexCornerInsight(response), reason: null }
-        : { sessionId, index: null, reason: response.reason };
+      // Passes not built yet are not kept either: ingestion can build them while the app runs.
+      if (!response.available) return { sessionId, index: null, reason: response.reason };
+      const entry = { sessionId, index: indexCornerInsight(response), reason: null };
       kept = [entry, ...kept.filter(other => other.sessionId !== sessionId)].slice(0, KEPT);
       return entry;
     },

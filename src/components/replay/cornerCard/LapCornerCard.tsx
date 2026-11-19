@@ -28,7 +28,10 @@ export const LapCornerCard: React.FC<Props> = ({ trajectory, baseline, timeSec, 
   const { sessionId, driverSlot: slot, currentLap: lapNumber } = trajectory;
   const { index, reason, loading } = useCornerInsightIndex(shown ? sessionId : null);
   const versusMode = baseline ? compareOn : undefined;
-  const baseIndex = useCornerInsightIndex(shown && versusMode ? baseline?.sessionId : null).index;
+  const base = useCornerInsightIndex(shown && versusMode ? baseline?.sessionId : null);
+  const baseIndex = base.index;
+  // Why no turn has a compare time: its passes still load, or its session has none.
+  const versusNote = base.loading ? "Loading the compare lap's corner times…" : base.reason && `The compare lap: ${base.reason}`;
   const baseSlot = baseline?.driverSlot, baseLap = baseline?.currentLap;
   const compareLap = useMemo(() => (versusMode && baseIndex && baseSlot !== undefined && baseLap !== undefined
     ? { index: baseIndex, slot: baseSlot, lapNumber: baseLap } : null), [versusMode, baseIndex, baseSlot, baseLap]);
@@ -54,5 +57,6 @@ export const LapCornerCard: React.FC<Props> = ({ trajectory, baseline, timeSec, 
     const lapStartSec = index && slot !== undefined ? lapClockToReplay(index, slot, cell.lapNumber, 0) : null;
     choice.onSelect(cell.lapNumber, lapStartSec === null ? undefined : { replaySec: cell.entrySec, lapStartSec });
   });
-  return <CornerInsightCard insight={insight} reason={why} loading={loading} onPick={onPick} versusMode={versusMode} className={className} />;
+  return <CornerInsightCard insight={insight} reason={why} loading={loading} onPick={onPick} versusMode={versusMode}
+    versusNote={versusNote} className={className} />;
 };

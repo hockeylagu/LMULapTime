@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchSessionCornerPasses } from '../../../../src/api/replayApi.js';
 import { LapCornerCard } from '../../../../src/components/replay/cornerCard/LapCornerCard.js';
@@ -74,6 +74,21 @@ describe('LapCornerCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Usual' }));
     expect(screen.queryByText('#7 L5')).not.toBeInTheDocument();
     expect(screen.getAllByText('vs usual').length).toBeGreaterThan(0);
+  });
+
+  it('says the compare lap is loading, then why its session has no corner times, asking again on the next mount', async () => {
+    setCornerCardCompare(true);
+    let answer!: (passes: SessionCornerPasses) => void;
+    vi.mocked(fetchSessionCornerPasses).mockImplementation(sessionId => (sessionId === 's2'
+      ? new Promise(resolve => { answer = resolve; }) : Promise.resolve(PASSES)));
+    const baseline = { sessionId: 's2', driverSlot: 2, currentLap: 5 } as unknown as ReplayTrajectoryData;
+    const view = render(<LapCornerCard trajectory={TRAJECTORY} baseline={baseline} timeSec={402} active />);
+    expect(await screen.findByText("Loading the compare lap's corner times…")).toBeInTheDocument();
+    await act(async () => answer({ available: false, reason: 'Corner times are not built.' }));
+    expect(screen.getByText('The compare lap: Corner times are not built.')).toBeInTheDocument();
+    view.unmount();
+    render(<LapCornerCard trajectory={TRAJECTORY} baseline={baseline} timeSec={402} active />);
+    await waitFor(() => expect(vi.mocked(fetchSessionCornerPasses).mock.calls.filter(([id]) => id === 's2')).toHaveLength(2));
   });
 
   it('has no switch without a compare lap', async () => {

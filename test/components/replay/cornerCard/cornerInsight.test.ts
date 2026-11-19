@@ -155,4 +155,11 @@ describe('currentPass and lapClockToReplay', () => {
     expect(lapInsightAt(index, 1, 5, 505)).toMatchObject({ lapNumber: 5, turn: { id: 1 } });
     expect(lapInsightAt(index, 1, 5, 515)).toMatchObject({ lapNumber: 5, turn: { id: 2 } });
   });
+
+  it('keeps a sample past the line on the lap\'s last turn, and shows no card for a lap without passes', () => {
+    const index = race();
+    // Lap 6's T1 enters at 610 s; lap 4 ends with T1 (entered 410 s).
+    expect(lapInsightAt(index, 1, 4, 612)).toMatchObject({ lapNumber: 4, turn: { id: 1 } });
+    expect(lapInsightAt(index, 1, 9, 905)).toBeNull();
+  });
 });
