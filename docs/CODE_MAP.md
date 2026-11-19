@@ -478,7 +478,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 ### UI Follow-ups
 - **Standings sorting vs class position**: Session standings emphasize class position while sorting and gains currently use overall results. Reconcile intended behavior in `SessionRaceStandings.tsx` and `SessionRaceStandingsRow.tsx`.
 - **Keyboard navigation**: Complete keyboard focus containment and Escape restoration for session detail dialogs and fullscreen replay map (`SessionRulesModal.tsx`, `useMapFullscreenFocus.ts`: the map fills the screen under the replay header, following its height while open, `ReplayShortcutHelp.tsx`).
-- **Corner comparison apex sampling**: Main's corner comparison samples baseline speed at apex. The separate `corner-map` branch contains mapped/hybrid implementations; see [`docs/plans/CORNER_COMPARISON_REWORK.md`](plans/CORNER_COMPARISON_REWORK.md).
+- **Corner comparison apex sampling**: `computeLapSegmentComparisons` reads the baseline's minimum speed at the primary lap's slowest point (`segmentComparisons.ts`), at or above the baseline's own minimum; `baselineMinDistM` already finds the baseline's own slowest point.
 
 ### File Size Limits Watchlist
 Counted 2026-11-15.

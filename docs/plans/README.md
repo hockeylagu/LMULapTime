@@ -3,14 +3,17 @@
 Reviewed 2026-10-25 against source, Git and existing observations; no new real-game acceptance was run.
 Current implementation belongs in [CODE_MAP](../CODE_MAP.md), not in completed delivery plans.
 
-## Corner comparison
+## Corner technique metrics
 
-[Corner-map design](CORNER_COMPARISON_REWORK.md) remains a substantial unfinished plan on the
-separate `corner-map` worktree. On 2026-11-15 its tip is `eeed3fe1` (2026-10-26), 58 commits not on main. Read that
-worktree's current handoff before continuing; do not restart completed metric/map phases or infer
-visual acceptance from implemented code. Remaining work includes M2 metric/sequence revalidation,
-M3 inspector acceptance and shared consumer integration. Preserve the separate `debrief-first`
-worktree; its overlap has not been assessed here.
+The old corner-map design is superseded by the turn sequences (each class's map per layout). Its unmerged local
+branch `corner-map` (`eeed3fe1`, not pushed; worktree removed 2026-11-19) is kept only to port its per-corner technique
+catalogue (`shared/types/cornerTechnique.ts` there): brake shape, gears, throttle ramp and lifts, coasting, steering
+corrections, ABS/TC time per corner, and each metric's "same" band and noise-checked useful difference. Its design
+doc (`docs/plans/CORNER_COMPARISON_REWORK.md` on that branch, §9 validation, §11 coaching) holds the rule to keep: a
+computed metric ships only once its lap-to-lap noise sits below the difference worth telling the driver; one that
+cannot is left out with a reason, never shown as a guess. Port onto the sequence windows, on replay laps at full
+rate, with ISO 8855 signs (the branch predates them). Preserve the separate `debrief-first` worktree; its overlap has
+not been assessed here.
 
 ## Live dashboard and learning
 
