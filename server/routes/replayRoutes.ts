@@ -8,9 +8,10 @@ import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
-import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { RaceReplayService } from '../traffic/raceReplayService.js';
-import { getReplayLapBlobs } from '../core/replay/dbRacePositionStore.js';
+import { getReplayLapBlobs, getReplayLapSignature } from '../core/replay/dbReplayLapRows.js';
+import { cornerPassLaps, readSessionCornerPasses } from '../corners/sessionCornerPasses.js';
+import { raceDistancesFromPasses } from '../traffic/raceDistances.js';
 import { getReplayStoredSignature } from '../core/replay/dbReplayIngestStore.js';
 import { getDriverEvents, getReplayLaps, getReplayRunningOrder } from '../core/replay/dbReplayLapStore.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
@@ -31,7 +32,6 @@ export function createReplayRouter(context: ServerContext): Router {
     context.currentParser,
     telemetryService
   );
-  const trafficService = new RaceTrafficService(context.sessionDb);
   const db = () => context.sessionDb.getDb();
   const raceService = new RaceReplayService({
     getReplaySignature: filename => getReplayStoredSignature(db(), filename),
@@ -190,18 +190,32 @@ export function createReplayRouter(context: ServerContext): Router {
     }
   });
 
-  router.get('/session/:sessionId/race/progress', async (req, res) => {
+  /** The replay's cars as the corner passes name them. */
+  const replayPassCars = (replay: NonNullable<ReturnType<typeof sessionReplayMetadata>>) => replay.composed.drivers.flatMap(driver =>
+    typeof driver.slot === 'number' ? [{
+      slot: driver.slot, name: driver.name, carClass: driver.carClass, carNumber: driver.carNumber, sessionDriverOrdinal: driver.sessionDriverOrdinal,
+    }] : []);
+  /** The session replay's corner passes (every car's, or one driver's), as the corner-passes route serves them. */
+  const sessionCornerPasses = (replay: NonNullable<ReturnType<typeof sessionReplayMetadata>>, slot?: number) => {
+    const cars = replayPassCars(replay);
+    const sessionLaps = new Map(replay.session.drivers.map(driver => [driver.driverOrdinal, driver.laps]));
+    return readSessionCornerPasses({
+      getReplayLapSignature: filename => getReplayLapSignature(db(), filename),
+      getCornerPassBuild: filename => context.sessionDb.getCornerPassBuild(filename),
+      listCornerPasses: filename => context.sessionDb.listCornerPasses(filename),
+      listCornerPassLaps: filename => cornerPassLaps(getReplayLaps(db(), filename), cars, ordinal => sessionLaps.get(ordinal)),
+      listContacts: filename => getDriverEvents(db(), filename).flatMap(event => event.kind === 'contact' ? [{ slot: event.driverSlot, timeSec: event.timeSec }] : []),
+    }, replay.replayName, cars, slot);
+  };
+
+  // Every car's distance along the track once a second (the race view's live gaps), from the corner passes.
+  router.get('/session/:sessionId/race/distances', (req, res) => {
     try {
       const replay = sessionReplayMetadata(req.params.sessionId);
       if (!replay) return res.status(404).json({ error: 'Session replay is unavailable' });
-      const { metadata, replayName, session } = replay;
-      // The layout as the traffic route resolves it, so both read the same stored index.
-      const progress = await trafficService.getRaceProgress(replayName, {
-        trackVenue: session.trackVenue || metadata.trackName, trackCourse: session.trackCourse || metadata.trackCourse,
-        sceneDesc: metadata.sceneDesc, trackLengthMeters: session.trackLengthMeters,
-      });
-      if ('reason' in progress) return res.status(404).json({ error: progress.reason });
-      res.json(progress);
+      const passes = sessionCornerPasses(replay);
+      if (!passes.available) return res.status(404).json({ error: passes.reason });
+      res.json(raceDistancesFromPasses(passes));
     } catch (error: unknown) {
       res.status(404).json({ error: error instanceof Error ? error.message : 'Race progress unavailable' });
     }
@@ -227,29 +241,21 @@ export function createReplayRouter(context: ServerContext): Router {
     }
   });
 
-  router.get('/session/:sessionId/traffic', async (req, res) => {
+  router.get('/session/:sessionId/corner-passes', (req, res) => {
+    let driverOrdinal: number | undefined;
     try {
-      const session = readReplaySessionContext(context.sessionDb.getDb(), req.params.sessionId, 'none');
-      const replayName = session?.matchingReplayFile?.name;
-      if (!session || !replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
-      const filePath = path.join(context.replaysDir, replayName);
-      const playerName = context.currentParser.configuredPlayerName;
-      const driverName = queryString(req.query.driverName) || playerName;
-      const driverSlot = context.replayRecordings.resolveDriverSlot(filePath, replayName, driverName, playerName);
-      if (driverSlot === undefined) return res.status(404).json({ error: `Driver "${driverName}" is not in this session replay` });
-      const metadata = context.replayRecordings.getMetadata(filePath, replayName, playerName);
-      res.json(await trafficService.getDriverTraffic({
-        replayName,
-        driverSlot,
-        replayDrivers: metadata.drivers.flatMap(driver => typeof driver.slot === 'number'
-          ? [{ slot: driver.slot, name: driver.name, carClass: driver.carClass }] : []),
-        session,
-        sceneDesc: metadata.sceneDesc,
-        trackVenue: metadata.trackName,
-        trackCourse: metadata.trackCourse,
-      }));
+      driverOrdinal = parseBoundedInteger(req.query.driverOrdinal, 'driverOrdinal', 0, 128);
     } catch (error: unknown) {
-      res.status(404).json({ error: error instanceof Error ? error.message : 'Session traffic unavailable' });
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid driverOrdinal' });
+    }
+    try {
+      const replay = sessionReplayMetadata(req.params.sessionId);
+      if (!replay) return res.status(404).json({ error: 'Session replay is unavailable' });
+      const slot = driverOrdinal === undefined ? undefined : replayPassCars(replay).find(car => car.sessionDriverOrdinal === driverOrdinal)?.slot;
+      if (driverOrdinal !== undefined && slot === undefined) return res.status(404).json({ error: 'The driver is not in this session replay' });
+      res.json(sessionCornerPasses(replay, slot));
+    } catch (error: unknown) {
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Corner passes unavailable' });
     }
   });
 

@@ -1,7 +1,7 @@
 export type { PitService } from './pitStops.js';
 
 export type {
-  LapTraffic, ReplayLapTraffic, ReplayTrafficResponse, TrafficCar, TrafficGap, TrafficSpell, TrafficSpellKind,
+  LapTraffic, TrafficCar, TrafficGap, TrafficSpell, TrafficSpellKind,
 } from './raceTraffic.js';
 
 export type {

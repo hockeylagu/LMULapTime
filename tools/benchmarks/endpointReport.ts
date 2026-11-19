@@ -47,7 +47,7 @@ export function renderReport(run: BenchmarkRun, previous?: BenchmarkRun): string
     `Dataset: ${Object.entries(run.dataset).map(([name, count]) => `${count.toLocaleString('en-US')} ${name}`).join(', ')}. Snapshot: ${run.datasetHash.slice(0, 12)}.`, '',
     `${run.environment.cpu}; Node ${run.environment.node}; ${run.environment.platform}/${run.environment.architecture}.`, '',
     `Real local HTTP through production Express routers; full response-body receipt included. First request is measured separately; median/p95 use ${run.samples} subsequent sequential requests. First request is **not** a cold OS/disk-cache measurement. Browser rendering is excluded.`, '',
-    'Each run uses a temporary database snapshot with scans and external refreshes disabled. GET cache/rival writes affect that snapshot only. Original replay files are not decoded. Traffic may build an index on the first request.', '',
+    'Each run uses a temporary database snapshot with scans and external refreshes disabled. GET cache/rival writes affect that snapshot only. Original replay files are not decoded.', '',
     previous ? comparable ? `Compared with ${localTime(previous.timestamp)}. Regression flag: median increases by both >20% and >5 ms; rerun to confirm noise.`
       : `Previous run ${localTime(previous.timestamp)} is not directly comparable: ${reasons.join('; ')}. Deltas are withheld.` : 'First recorded run; no previous baseline.', '',
     '| Endpoint / scenario | First ms | Median ms | p95 ms | KB | Change |', '|---|---:|---:|---:|---:|---|',

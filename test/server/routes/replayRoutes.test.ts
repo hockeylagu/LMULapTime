@@ -12,7 +12,6 @@ import type { DetailedSession } from '../../../shared/types/index.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 import { session as sessionFixture, driver, lap } from '../core/sessionRows/builders.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
-import { RaceTrafficService } from '../../../server/traffic/raceTrafficService.js';
 import { RaceReplayService } from '../../../server/traffic/raceReplayService.js';
 import type { RaceReplayOverview, ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { setLiveCaptureMatch, upsertLiveCapture } from '../../../server/core/live/dbLiveCaptureStore.js';
@@ -108,11 +107,9 @@ describe('session telemetry routes', () => {
     expect(noSession.status).toBe(404);
   });
 
-  it('serves a trajectory through compact timing context and traffic without lap histories', async () => {
+  it('serves a trajectory through compact timing context without lap histories', async () => {
     const getTrajectory = vi.spyOn(ReplayTrajectoryService.prototype, 'getTrajectory')
       .mockResolvedValue({ points: [], pointsCount: 0 } as unknown as ReplayTrajectoryData);
-    const traffic = vi.spyOn(RaceTrafficService.prototype, 'getDriverTraffic')
-      .mockResolvedValue({ available: true, laps: [] });
     const alias = await request(app).get('/api/session/session-1.xml/telemetry?driverOrdinal=0&lapOrdinal=0&source=vcr');
     expect(alias.status).toBe(404);
     const trajectory = await request(app).get('/api/session/session-1/telemetry?driverOrdinal=0&lapOrdinal=0&source=vcr');
@@ -120,10 +117,17 @@ describe('session telemetry routes', () => {
     expect(getTrajectory.mock.calls[0][0]).toMatchObject({ driverOrdinal: 0, lapOrdinal: 0, allowDuckDb: false,
       session: { id: 'session-1', drivers: [{ name: 'Route Driver', laps: [{ lapNumber: 1, lapOrdinal: 0 }] }] } });
     expect(getTrajectory.mock.calls[0][0].session.drivers[0].laps[0]).not.toHaveProperty('topSpeed');
-    const response = await request(app).get('/api/session/session-1/traffic');
-    expect(response.status).toBe(200);
-    expect(traffic.mock.calls[0][0].session?.drivers[0]).toMatchObject({ name: 'Route Driver', carClass: 'GT3', laps: [] });
     expect(getSessionById).not.toHaveBeenCalled();
+  });
+
+  it('serves the session corner passes for a driver of the replay, or says why there are none', async () => {
+    const unbuilt = await request(app).get('/api/session/session-1/corner-passes?driverOrdinal=0');
+    expect(unbuilt.status).toBe(200);
+    expect(unbuilt.body).toEqual({ available: false, reason: 'Corner times are not built for this replay yet.' });
+    expect((await request(app).get('/api/session/session-1/corner-passes')).body).toMatchObject({ available: false });
+    expect((await request(app).get('/api/session/session-1/corner-passes?driverOrdinal=5')).status).toBe(404);
+    expect((await request(app).get('/api/session/session-1/corner-passes?driverOrdinal=x')).status).toBe(400);
+    expect((await request(app).get('/api/session/missing/corner-passes')).status).toBe(404);
   });
 
   it('serves the race replay overview with the session drivers, and its pose windows as binary', async () => {
@@ -158,19 +162,11 @@ describe('session telemetry routes', () => {
     expect((await request(app).get('/api/session/missing/race/poses?window=0')).status).toBe(404);
   });
 
-  it('serves the race progress for live gaps, or says why there is none', async () => {
-    const progress = { fromSec: 0, hz: 1, trackLengthM: 1000, cars: [{ slot: 0, distances: [0, 50, null] }] };
-    const getRaceProgress = vi.spyOn(RaceTrafficService.prototype, 'getRaceProgress').mockResolvedValueOnce(progress);
-    const served = await request(app).get('/api/session/session-1/race/progress');
-    expect(served.status).toBe(200);
-    expect(served.body).toEqual(progress);
-    expect(getRaceProgress.mock.calls[0][0]).toBe('Route_Test_P1.Vcr');
-
-    getRaceProgress.mockResolvedValueOnce({ reason: 'This layout has no track centreline to place the cars on.' });
-    const none = await request(app).get('/api/session/session-1/race/progress');
+  it('serves the race progress from the corner passes, or says why there is none', async () => {
+    const none = await request(app).get('/api/session/session-1/race/distances');
     expect(none.status).toBe(404);
-    expect(none.body).toEqual({ error: 'This layout has no track centreline to place the cars on.' });
-    expect((await request(app).get('/api/session/missing/race/progress')).status).toBe(404);
+    expect(none.body).toEqual({ error: 'Corner times are not built for this replay yet.' });
+    expect((await request(app).get('/api/session/missing/race/distances')).status).toBe(404);
   });
 
   it('does not expose replay-name telemetry routes', async () => {

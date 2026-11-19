@@ -20,6 +20,8 @@ export interface ReplayAsyncSyncOptions {
   /** Called after all metadata is discovered, before any trajectory decode. */
   onMetadataReady?: () => Set<string> | Promise<Set<string>>;
   onReplayState?: (job: ReplayIngestJob) => void;
+  /** Called once a replay's decoded laps are stored, to build what derives from them (corner passes). */
+  onReplayStored?: (filename: string, metadata: ReplayMetadata) => Promise<void>;
 }
 
 export interface ReplaySyncHost {
@@ -387,6 +389,11 @@ export async function* syncReplaysAsyncIterator(
           const error = failure.code ? Object.assign(new Error(failure.message), { code: failure.code }) : new ReplayDecodeError(failure.message);
           recordDriverFailure(host, filename, filePath, failure.driverSlotKey, mtimeMs, fileSizeBytes, error);
           if (failure.isPrimary && failure.driverSlotKey !== -1) recordDriverFailure(host, filename, filePath, -1, mtimeMs, fileSizeBytes, error);
+        }
+        if (trajectoryCached && options.onReplayStored) {
+          yield { processed: index, total: queue.length, currentFile: filename, stage: 'Building corner passes', filePercent: 97 };
+          // oxlint-disable-next-line eslint/no-await-in-loop -- Each replay's passes build on one worker after its own laps are stored.
+          await options.onReplayStored(filename, metadata);
         }
         yield { processed: index, total: queue.length, currentFile: filename, stage: 'Finished replay drivers', filePercent: 100 };
       }

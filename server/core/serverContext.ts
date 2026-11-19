@@ -24,6 +24,7 @@ import { replaceCachedLastUpdateDiff } from '../benchmarks/referenceLaptimes.js'
 import { BENCHMARK_IMPACT_RULE, enrichBenchmarkDiffWithCompactImpact } from '../benchmarks/benchmarkImpact.js';
 import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
 import { startYieldSlice } from './yieldSlice.js';
+import { refreshReplayCornerPasses } from '../corners/cornerPassService.js';
 
 /** When the replay links were last reconciled (cache_metadata): later changes are the next candidates. */
 const REPLAY_LINKS_RECONCILED_AT = 'replay_links_reconciled_at';
@@ -364,6 +365,14 @@ export class ServerContext {
         return typeof this.sessionDb.getStoredRecordingNames === 'function' ? this.sessionDb.getStoredRecordingNames() : new Set<string>();
       },
       onReplayState: job => { this.replayJobs.set(job.name, job); },
+      onReplayStored: async (filename, metadata) => {
+        try {
+          const outcome = await refreshReplayCornerPasses(this.sessionDb, filename, metadata);
+          if (outcome.status === 'skipped') console.log(`Corner passes not built for ${filename}: ${outcome.reason}`);
+        } catch (error) {
+          console.error(`Corner passes failed for ${filename}:`, error);
+        }
+      },
     });
     pumpScanInBackground(iterator, this.replayScanStatus, outcome => {
       void (async () => {

@@ -51,11 +51,11 @@ import {
 } from './replay/dbReplayTrajectoryStore.js';
 import {
   ReplayLapRow,
-  getRacePositions,
   getReplayLapSignature,
   listReplayLapRows,
-  saveRacePositions,
-} from './replay/dbRacePositionStore.js';
+} from './replay/dbReplayLapRows.js';
+import { getCornerPassBuild, listCornerPasses, replaceCornerPasses, type CornerPassBuild } from './replay/dbCornerPassStore.js';
+import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 import type { StoredReplayFileInfo } from './replay/replayStorageTypes.js';
 import {
   getAllStoredReplayFiles,
@@ -317,7 +317,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return hasValidReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtimeMs, fileSizeBytes, filePath, expectedDriverSlot);
   }
 
-  /** Which stored laps a replay's race positions index is built from (see dbRacePositionStore). */
+  /** Which stored laps a replay's derived rows (corner passes) are built from (see dbReplayLapRows). */
   public getReplayLapSignature(filename: string): string | null {
     return getReplayLapSignature(this.db, filename);
   }
@@ -326,12 +326,16 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return listReplayLapRows(this.db, filename);
   }
 
-  public getRacePositions<T>(filename: string, signature: string): T | null {
-    return getRacePositions<T>(this.db, filename, signature);
+  public getCornerPassBuild(filename: string): CornerPassBuild | null {
+    return getCornerPassBuild(this.db, filename);
   }
 
-  public saveRacePositions(filename: string, signature: string, positions: unknown): void {
-    saveRacePositions(this.db, filename, signature, positions);
+  public replaceCornerPasses(filename: string, build: Omit<CornerPassBuild, 'passCount'>, passes: CornerPass[]): void {
+    replaceCornerPasses(this.db, filename, build, passes);
+  }
+
+  public listCornerPasses(filename: string): CornerPass[] {
+    return listCornerPasses(this.db, filename);
   }
 
   public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, trajectory: ReplayTrajectoryData, filePath?: string): void {

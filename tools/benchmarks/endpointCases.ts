@@ -5,7 +5,7 @@ import type { BenchmarkCase } from './endpointInventory.js';
 export interface BenchmarkCohort {
   boards: Array<{ layout: string; carClass: string }>;
   sessions: string[];
-  telemetry?: { sessionId: string; driverOrdinal: number; lapOrdinal: number; driverName: string };
+  telemetry?: { sessionId: string; driverOrdinal: number; lapOrdinal: number };
   diffId?: number;
 }
 
@@ -37,7 +37,7 @@ export function discoverCohort(store: SessionDatabase): BenchmarkCohort {
         WHERE t.matched_session_id=l.session_id AND c.lap_number=l.lap_number) DESC,l.lap_time,l.lap_ordinal LIMIT 1`)
       .get(candidate.recording_name, driver.slot, candidate.id, candidate.driver_ordinal) as { lap_ordinal: number } | undefined;
     if (lap) {
-      telemetry = { sessionId: candidate.id, driverOrdinal: candidate.driver_ordinal, lapOrdinal: lap.lap_ordinal, driverName: candidate.driver_name };
+      telemetry = { sessionId: candidate.id, driverOrdinal: candidate.driver_ordinal, lapOrdinal: lap.lap_ordinal };
       break;
     }
   }
@@ -110,10 +110,11 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   for (const source of ['auto', 'vcr']) {
     add(`telemetry-${source}`, '/api/session/:sessionId/telemetry', locator ? `${base}/telemetry?driverOrdinal=${locator.driverOrdinal}&lapOrdinal=${locator.lapOrdinal}&pointSpacingM=2${source === 'vcr' ? '&source=vcr' : ''}` : undefined);
   }
-  add('traffic', '/api/session/:sessionId/traffic', locator ? `${base}/traffic?driverName=${encodeURIComponent(locator.driverName)}` : undefined);
+  // Every car's passes: what the session debrief reads.
+  add('corner-passes', '/api/session/:sessionId/corner-passes', base ? `${base}/corner-passes` : undefined);
   add('race-overview', '/api/session/:sessionId/race', base ? `${base}/race` : undefined);
   // The first window: the server resamples its laps on a worker the first time, then serves it from memory.
   add('race-poses', '/api/session/:sessionId/race/poses', base ? `${base}/race/poses?window=0` : undefined);
-  add('race-progress', '/api/session/:sessionId/race/progress', base ? `${base}/race/progress` : undefined);
+  add('race-distances', '/api/session/:sessionId/race/distances', base ? `${base}/race/distances` : undefined);
   return cases;
 }

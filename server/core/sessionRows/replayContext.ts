@@ -1,7 +1,8 @@
 import type { Database } from 'better-sqlite3';
 import type { ReplayContextDriver, ReplaySessionContext, ReplayTimingLap } from '../../replay/replayServiceTypes.js';
 import { unpackFields, type Row } from './fields.js';
-import { DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, LAP_FIELDS, RECORDING_FIELDS } from './specs.js';
+import { group } from './reader.js';
+import { CONDITION_FIELDS, DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, LAP_FIELDS, RECORDING_FIELDS } from './specs.js';
 
 const driverFields = [...DRIVER_DICTIONARY_FIELDS, ...DRIVER_FIELDS].filter(field =>
   ['name', 'carType', 'carClass', 'bestLapTime', 'isPlayer', 'finishStatus'].includes(field.prop));
@@ -30,13 +31,16 @@ export function readReplaySessionContext(
   const playerDriver = playerOrdinal === undefined ? undefined : drivers.find(driver => driver.driverOrdinal === playerOrdinal);
   if (laps !== 'none' && drivers.length) {
     const ordinals = laps === 'all' ? null : [...new Set([laps, ...(playerDriver ? [playerDriver.driverOrdinal] : [])])];
-    const lapRows = db.prepare(`SELECT driver_ordinal,lap_ordinal,${lapFields.map(field => field.col).join(',')}
+    const lapRows = db.prepare(`SELECT driver_ordinal,lap_ordinal,${[...lapFields, ...CONDITION_FIELDS].map(field => field.col).join(',')}
       FROM session_laps WHERE session_id=? ${ordinals ? 'AND driver_ordinal IN (SELECT value FROM json_each(?))' : ''}
       ORDER BY driver_ordinal,lap_ordinal`).all(...(ordinals ? [id, JSON.stringify(ordinals)] : [id])) as Row[];
     const byOrdinal = new Map(drivers.map(driver => [driver.driverOrdinal, driver]));
-    for (const lap of lapRows) byOrdinal.get(lap.driver_ordinal as number)?.laps.push({
-      ...unpackFields(lap, lapFields), lapOrdinal: lap.lap_ordinal,
-    } as ReplayTimingLap);
+    for (const lap of lapRows) {
+      const conditions = group(lap, CONDITION_FIELDS);
+      byOrdinal.get(lap.driver_ordinal as number)?.laps.push({
+        ...unpackFields(lap, lapFields), lapOrdinal: lap.lap_ordinal, ...(conditions ? { conditions } : {}),
+      } as ReplayTimingLap);
+    }
   }
   const recording = db.prepare('SELECT * FROM session_recordings WHERE session_id=?').get(id) as Row | undefined;
   return {

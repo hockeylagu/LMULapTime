@@ -2,7 +2,7 @@ import type { RaceReplayCar, RaceReplayDaylight, RaceReplayLap, RaceReplayOvervi
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { buildRaceEvents, type StoredDriverEvent } from '../../shared/domain/raceReplay/raceEvents.js';
 import { encodeRacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
-import type { ReplayLapRow } from '../core/replay/dbRacePositionStore.js';
+import type { ReplayLapRow } from '../core/replay/dbReplayLapRows.js';
 import type { ReplayLapFactRow } from '../core/replay/dbReplayLapStore.js';
 import { assembleRacePoseWindow, RACE_POSE_HZ, RACE_POSE_WINDOW_SEC, type LapPoses } from './racePoses.js';
 import { resampleLapsInWorker, type KeyedLapPoses } from './racePosesWorkerClient.js';

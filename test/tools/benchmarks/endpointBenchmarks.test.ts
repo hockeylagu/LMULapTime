@@ -48,7 +48,7 @@ describe('endpoint benchmark coverage and comparisons', () => {
       const fixture = session([driver('Opponent', [lap(1)]), driver('Player', [lap(1)])]);
       db.upsertSession(fixture, fixture.filePath, 1, 1);
       const cases = benchmarkCases({ boards: [], sessions: [], telemetry: {
-        sessionId: fixture.id, driverOrdinal: 1, lapOrdinal: 0, driverName: 'Player',
+        sessionId: fixture.id, driverOrdinal: 1, lapOrdinal: 0,
       } }, db);
       expect(cases.find(item => item.id === 'personal-best-player')?.url).toBe(`/api/session/${fixture.id}/personal-best/1`);
       expect(cases.find(item => item.id === 'personal-best-opponent')?.url).toBe(`/api/session/${fixture.id}/personal-best/0`);

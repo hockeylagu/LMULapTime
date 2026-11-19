@@ -1,4 +1,5 @@
-import type { RaceReplayOverview, RaceReplayProgress, ReplayMetadata, ReplayTrafficResponse, ReplayTrajectoryData } from '../../shared/types/index.js';
+import type { RaceReplayOverview, RaceReplayProgress, ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
+import type { SessionCornerPasses } from '../../shared/types/corners/cornerPasses.js';
 import { apiErrorMessage, fetchBinary, fetchJson, isAbortError } from './apiClient.js';
 import { decodeRacePoseWindow, type RacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
 import { fetchLiveLapEvidence } from './liveEvidenceApi.js';
@@ -40,8 +41,8 @@ export function lastSessionTelemetryMetadata(sessionId: string): ReplayMetadata 
 }
 
 /** Every car's distance along the track once a second (race sessions with a track centreline), for live gaps. */
-export function fetchRaceProgress(sessionId: string, init?: RequestInit): Promise<RaceReplayProgress> {
-  return fetchJson<RaceReplayProgress>(`/api/session/${encodeURIComponent(sessionId)}/race/progress`, init);
+export function fetchRaceDistances(sessionId: string, init?: RequestInit): Promise<RaceReplayProgress> {
+  return fetchJson<RaceReplayProgress>(`/api/session/${encodeURIComponent(sessionId)}/race/distances`, init);
 }
 
 /**
@@ -122,6 +123,8 @@ async function fetchLiveFusedTelemetry(sessionId: string, request: SessionTeleme
   }
 }
 
-export function fetchSessionTraffic(sessionId: string, driverName: string, init?: RequestInit): Promise<ReplayTrafficResponse> {
-  return fetchJson<ReplayTrafficResponse>(`/api/session/${encodeURIComponent(sessionId)}/traffic?driverName=${encodeURIComponent(driverName)}`, init);
+/** A session's corner passes (server/corners/), the driver's only when `driverOrdinal` is given. */
+export function fetchSessionCornerPasses(sessionId: string, driverOrdinal?: number, init?: RequestInit): Promise<SessionCornerPasses> {
+  const query = driverOrdinal === undefined ? '' : `?driverOrdinal=${driverOrdinal}`;
+  return fetchJson<SessionCornerPasses>(`/api/session/${encodeURIComponent(sessionId)}/corner-passes${query}`, init);
 }

@@ -23,7 +23,7 @@ export type TrafficSpellKind = 'battle' | 'lapping' | 'beingLapped' | 'multiclas
 
 /**
  * A spell during a lap with another car right in front of (or, in a battle, right behind) the
- * driver, from every car's position in the replay. Where is the driver's own station (metres
+ * driver, from the closest cars of the driver's corner passes. Where is the driver's own station (metres
  * from the timing line), so it lines up with the corners of the driver's lap.
  */
 export interface TrafficSpell {
@@ -38,21 +38,6 @@ export interface TrafficSpell {
   endStationM: number;
   /** The closest the other car was, in seconds at the driver's speed. */
   closestGapSec: number;
-}
-
-/** A driver's traffic spells lap by lap, for one replay. */
-export interface ReplayLapTraffic {
-  lapNumber: number;
-  spells: TrafficSpell[];
-}
-
-/** GET /api/replays/:name/traffic: unavailable when the replay or the layout's centreline is missing. */
-export interface ReplayTrafficResponse {
-  available: boolean;
-  /** Station frame of every traffic spell; matches the served replay projection revision. */
-  projectionRevision?: string;
-  reason?: string;
-  laps: ReplayLapTraffic[];
 }
 
 /**

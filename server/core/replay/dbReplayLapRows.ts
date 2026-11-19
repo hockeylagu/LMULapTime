@@ -1,11 +1,6 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { compressJson, decompressJson } from '../dbCache.js';
 
-/**
- * The race positions index of a replay (server/traffic/racePositions.ts) is built from the
- * replay's stored laps, so it is only valid for the laps it was built from: `signature` records
- * them (how many rows, when last written) together with the index version and layout.
- */
+/** A replay's stored lap row (replay_trajectories), still compressed: what the corner passes and race poses are built from. */
 export interface ReplayLapRow {
   slot: number;
   lapNumber: number;
@@ -35,22 +30,4 @@ export function getReplayLapBlobs(db: DatabaseType, filename: string, laps: Read
     const row = statement.get(filename, lap.slot, lap.lapNumber) as { trajectory_br: Buffer } | undefined;
     return row ? [{ slot: lap.slot, lapNumber: lap.lapNumber, blob: row.trajectory_br }] : [];
   });
-}
-
-export function getRacePositions<T>(db: DatabaseType, filename: string, signature: string): T | null {
-  const row = db.prepare(
-    'SELECT positions_br FROM replay_race_positions WHERE filename = ? AND signature = ?'
-  ).get(filename, signature) as { positions_br: Buffer } | undefined;
-  return row ? decompressJson<T>(row.positions_br) : null;
-}
-
-export function saveRacePositions(db: DatabaseType, filename: string, signature: string, positions: unknown): void {
-  db.prepare(`
-    INSERT INTO replay_race_positions (filename, signature, positions_br, updated_at)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(filename) DO UPDATE SET
-      signature = excluded.signature,
-      positions_br = excluded.positions_br,
-      updated_at = excluded.updated_at
-  `).run(filename, signature, compressJson(positions), Date.now());
 }

@@ -300,13 +300,39 @@ export function initDbSchema(db: DatabaseType): void {
     );
 
 
-    -- Every car's low-rate track position through a replay, built from its stored laps (the
-    -- signature says which), to find who was close to whom and where.
-    CREATE TABLE IF NOT EXISTS replay_race_positions (
+    -- Corner passes (server/corners/cornerPasses.ts): every car's time and cues through each turn
+    -- segment of each lap, built from the stored laps, disposable. Integers keep the row lean:
+    -- times in ms on the replay clock (the slowest point and the exit from the entry), distances from the
+    -- start line in decimetres, speeds in 0.1 km/h, traffic as the closest car's slot and gap in ms at this car's speed.
+    CREATE TABLE IF NOT EXISTS replay_corner_passes (
+      filename TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      lap_number INTEGER NOT NULL,
+      segment INTEGER NOT NULL,
+      entry_ms INTEGER NOT NULL,
+      min_speed_after_ms INTEGER,
+      duration_ms INTEGER NOT NULL,
+      entry_speed_dkmh INTEGER,
+      min_speed_dkmh INTEGER,
+      exit_speed_dkmh INTEGER,
+      min_speed_dm INTEGER,
+      brake_dm INTEGER,
+      turn_in_dm INTEGER,
+      throttle_dm INTEGER,
+      ahead_slot INTEGER,
+      ahead_gap_ms INTEGER,
+      behind_slot INTEGER,
+      behind_gap_ms INTEGER,
+      PRIMARY KEY (filename, driver_slot, lap_number, segment)
+    ) WITHOUT ROWID;
+
+    -- Which build a replay's corner passes come from: missing or another version_key = not built.
+    CREATE TABLE IF NOT EXISTS replay_corner_pass_builds (
       filename TEXT PRIMARY KEY,
-      signature TEXT NOT NULL,
-      positions_br BLOB NOT NULL,
-      updated_at INTEGER NOT NULL
+      version_key TEXT NOT NULL,
+      layout_key TEXT NOT NULL,
+      pass_count INTEGER NOT NULL,
+      built_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS replay_trajectory_defaults (

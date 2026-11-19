@@ -1,5 +1,5 @@
 import { decodeLapColumns, type LapColumn, type LapValue, type StoredLapColumns } from '../core/replay/lapColumnsCodec.js';
-import { RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, RACE_STEPPED_CHANNELS, type RacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
+import { RACE_AID, RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, RACE_STEPPED_CHANNELS, type RacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
 
 /** Race replay pose samples per second, and seconds per window the client fetches. */
 export const RACE_POSE_HZ = 10;
@@ -20,13 +20,14 @@ interface StoredLap extends StoredLapColumns {
   constants?: Record<string, LapValue>;
 }
 
-/** The stored lap columns the channels read: most by their own name, the lamp flags and the per-corner channels from theirs. */
-const LAMP_KEYS = ['headlights', 'pitLimiter', 'rainLight'] as const;
+/** The stored lap columns the channels read: most by their own name, the flag sets and the per-corner channels from theirs. */
+const FLAGS: Partial<Record<string, Record<string, number>>> = { lamps: RACE_LAMP, aids: RACE_AID };
+const FLAG_KEYS = Object.values(FLAGS).flatMap(flags => Object.keys(flags ?? {}));
 /** Per-corner channels: the stored four-value column each reads, and its corner. */
 const CORNERS: Partial<Record<string, [column: string, corner: number]>> = Object.fromEntries((['FL', 'FR', 'RL', 'RR'] as const).flatMap((name, corner) => [
   [`defl${name}`, ['suspensionDeflections', corner]], [`spin${name}`, ['wheelAngularSpeeds', corner]],
 ]));
-const KEYS = ['timeSec', ...RACE_POSE_CHANNELS.filter(key => key !== 'lamps' && !CORNERS[key]), ...LAMP_KEYS,
+const KEYS = ['timeSec', ...RACE_POSE_CHANNELS.filter(key => !FLAGS[key] && !CORNERS[key]), ...FLAG_KEYS,
   'suspensionDeflections', 'wheelAngularSpeeds', 'inGarage', 'isTeleport'];
 const ANGLE = new Set(['rotX', 'rotY', 'rotZ']);
 const IN_PIT = RACE_POSE_CHANNELS.indexOf('inPit');
@@ -42,11 +43,14 @@ export function resampleLapPoses(blob: Uint8Array, hz = RACE_POSE_HZ): LapPoses 
   const stored = decodeLapColumns<StoredLap>(blob, KEYS);
   const time = channel(stored, 'timeSec');
   // Each channel as a column of numbers (or flags) over the stored samples.
-  const lampColumns = LAMP_KEYS.map(key => channel(stored, key));
   const values: LapColumn[] = RACE_POSE_CHANNELS.map(key => {
     const corner = CORNERS[key];
     if (corner) return channel(stored, corner[0]).map(value => (Array.isArray(value) ? value[corner[1]] : null));
-    if (key === 'lamps') return lampColumns[0].map((_, i) => LAMP_KEYS.reduce((bits, name, k) => bits | (lampColumns[k][i] === true ? RACE_LAMP[name] : 0), 0));
+    const flags = FLAGS[key];
+    if (flags) {
+      const columns = Object.entries(flags).map(([name, bit]) => [channel(stored, name), bit] as const);
+      return columns[0][0].map((_, i) => columns.reduce((bits, [column, bit]) => bits | (column[i] === true ? bit : 0), 0));
+    }
     return channel(stored, key);
   });
   const garage = channel(stored, 'inGarage');
