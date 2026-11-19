@@ -201,6 +201,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             isExpanded={isExpanded}
             onToggleExpanded={handleToggleExpanded}
             onToggleView={() => handleToggleView('3d')}
+            cornerCardTrajectory={trajectory}
+            cornerCardBaseline={isCompareMode ? baselineTrajectory : null}
           />
         </div>
       </div>

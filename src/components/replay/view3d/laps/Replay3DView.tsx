@@ -27,6 +27,8 @@ import { nextGhostSyncMode } from '../../map/ghostSync.js';
 import type { CornerSegmentComparison } from '../../../../utils/cornerAnalysis/types.js';
 import { useCornerFocus } from './useCornerFocus.js';
 import { CornerFocusBar } from './CornerFocusBar.js';
+import { CornerCardButton, CORNER_CARD_UNDER_FULLSCREEN_MINIMAP, CORNER_CARD_UNDER_MINIMAP } from '../../cornerCard/CornerInsightCard.js';
+import { LapCornerCard } from '../../cornerCard/LapCornerCard.js';
 
 interface Props {
   trajectory: ReplayTrajectoryData;
@@ -111,9 +113,9 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   return (
     <Scene3DFrame surface={map} host={host} scene={scene} state={state} mode={mode} onModeChange={setMode} followMode="follow"
       onRetry={() => setRetry(value => value + 1)} onToggleView={onReturnTo2D} active={active} expanded={isExpanded}
-      isPlaying={isPlaying} onTogglePlay={onTogglePlay} streamingClassName={isExpanded && effectiveShowFriction ? 'bottom-48' : 'bottom-2'}
+      streamingClassName={isExpanded && effectiveShowFriction ? 'bottom-48' : 'bottom-2'}
       className="w-full h-full min-h-[360px] [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen"
-      controlsBefore={<ReplayShortcutHelp view="3d" />} controlsAfter={<MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded} />}
+      controlsBefore={<><CornerCardButton /><ReplayShortcutHelp view="3d" /></>} controlsAfter={<MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded} />}
       top={!isExpanded && (
         <div data-testid="replay-3d-toolbar" title={sources} className="flex items-start justify-between px-2 py-1 gap-2 shrink-0 text-xs border-b border-lmu-border bg-lmu-deep">
           <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy} hasBaseline={Boolean(baseline)}
@@ -151,6 +153,11 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
       <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_24px_rgba(6,9,16,0.35)]" />
       <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
         className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
+      {/* A scene under 640 px (the page's embedded view) has no room beside the card: it hides there (driver, 2026-11-18). */}
+      <div className="@container pointer-events-none absolute inset-0">
+        <LapCornerCard trajectory={trajectory} baseline={baseline} timeSec={activePrimaryPoint?.timeSec} active={active}
+          className={`pointer-events-auto @max-[640px]:hidden ${isExpanded ? CORNER_CARD_UNDER_FULLSCREEN_MINIMAP : CORNER_CARD_UNDER_MINIMAP}`} />
+      </div>
     </Scene3DFrame>
   );
 }

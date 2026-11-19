@@ -7,6 +7,7 @@ import { MapLayersControl, type PedalPointsControl } from './MapLayersControl.js
 import { MapFullscreenButton } from './MapFullscreenButton.js';
 import { MapViewSwitchButton } from './MapViewSwitchButton.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
+import { CornerCardButton } from '../../cornerCard/CornerInsightCard.js';
 import { RUNOFF_GROUP, visibleSurfacePoints, type MapLayers } from './mapLayers.js';
 import { projectedPointBounds } from './useMapLayers.js';
 
@@ -19,11 +20,8 @@ interface Props {
   bounds: TrackBoundaryGeometry['bounds'];
   left: Point[]; right: Point[]; center: Point[]; trajectory: Point[];
   orientation: 'vertical' | 'horizontal';
-  isPlaying?: boolean;
-  onTogglePlay?: () => void;
   isExpanded?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
-  showPlayPause?: boolean;
   hasSectors?: boolean;
   hasTurns?: boolean;
   pedalPoints?: PedalPointsControl;
@@ -32,18 +30,19 @@ interface Props {
   shortcuts?: 'telemetry' | 'race';
   /** False where the map already fills the page (the race replay). */
   fullscreen?: boolean;
+  /** The corner card's button, where the map shows the card. */
+  cornerCard?: boolean;
 }
 
 export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geometry,
-  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause, hasSectors, hasTurns, pedalPoints, onToggleView, shortcuts = 'telemetry', fullscreen = true }) => {
+  bounds, left, right, center, trajectory, orientation, isExpanded, onToggleExpanded, hasSectors, hasTurns, pedalPoints, onToggleView, shortcuts = 'telemetry', fullscreen = true, cornerCard = false }) => {
   const surfaces = geometry?.surfaces;
   const fit = (points: Point[]) => { const rectangle = projectedPointBounds(points); if (rectangle) camera.fitBounds(rectangle); };
   const active = left.length && right.length ? [...left, ...right] : trajectory;
-  const shouldShowPlayPause = showPlayPause ?? Boolean(isExpanded);
+  // No play here: playback lives in the replay header, shown over fullscreen too (driver, 2026-11-18).
   return <MapControlsOverlay onZoomIn={camera.zoomIn} onZoomOut={camera.zoomOut} onReset={camera.resetPanZoom}
     zoomDisplay={`${Number(camera.zoomLevel.toFixed(1))}x`} followCar={camera.followCar}
     onToggleFollowCar={() => camera.setFollowCar(value => !value)} onCenterCar={camera.centerOnCar}
-    isPlaying={isPlaying} onTogglePlay={shouldShowPlayPause ? onTogglePlay : undefined}
     orientation={orientation} className="top-2 right-3 bottom-auto">
     <MapLayersControl layers={layers} onChange={onChange} pedalPoints={pedalPoints}
       available={{ road: true, kerb: Boolean(surfaces?.kerb.length || surfaces?.raisedKerb?.length),
@@ -56,6 +55,7 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
       onFitTrack={() => fit(active)} onFitVisible={() => fit([...active,
         ...projectBoundaryPoints(visibleSurfacePoints(surfaces,
           { ...layers, road: Boolean(surfaces) && layers.road, kerb: Boolean(surfaces) && layers.kerb }), bounds, 800, 60)])} />
+    {cornerCard && <CornerCardButton />}
     <ReplayShortcutHelp view={shortcuts} />
     {onToggleView && <MapViewSwitchButton view="2d" onToggleView={onToggleView} />}
     {fullscreen && <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={onToggleExpanded} />}

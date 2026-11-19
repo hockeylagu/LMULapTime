@@ -68,6 +68,10 @@ export interface GpsTrackMapProps {
   isExpanded?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
   onToggleView?: () => void;
+  /** The shown lap, for the corner card on the fullscreen map; none, no card. */
+  cornerCardTrajectory?: ReplayTrajectoryData;
+  /** The compare lap, for the corner card's compare mode. */
+  cornerCardBaseline?: ReplayTrajectoryData | null;
 }
 
 export interface PedalMarkerPoint {

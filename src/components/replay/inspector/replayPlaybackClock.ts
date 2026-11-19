@@ -35,6 +35,12 @@ export function playbackSampleFraction(points: ReplayTrajectoryPoint[], clock: P
   return span > 0 ? Math.max(0, Math.min(1, (clock.timeSec - start) / span)) : 0;
 }
 
+/** The first sample at or after lap clock `timeSec` (the last one before it may still be in the previous turn), else the last. */
+export function landingIndex(points: ReplayTrajectoryPoint[], timeSec: number): number {
+  const at = playbackIndexAt(points, timeSec);
+  return sampleTime(points, at, isTimed(points)) < timeSec ? Math.min(at + 1, points.length - 1) : at;
+}
+
 /** The sample shown at lap clock `timeSec`: the last at or before it (the first before the lap's first, the last past its end). */
 export function playbackIndexAt(points: ReplayTrajectoryPoint[], timeSec: number): number {
   const timed = isTimed(points);

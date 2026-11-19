@@ -140,6 +140,8 @@ it('selects every configured camera mode and leaves chart keys, controls and mod
   fireEvent.keyDown(screen.getByRole('button', {name: '3D camera'}), {key: '2'});
   const input = document.createElement('input'); map.append(input); fireEvent.keyDown(input, {key: '2'});
   expect(scene.mode).not.toHaveBeenCalled();
+  // Nothing focused (after a view switch): the page's keys are the camera's.
+  fireEvent.keyDown(document.body, {key: '2'}); expect(scene.mode).toHaveBeenLastCalledWith('chase');
 });
 
 it('handles Space once with the inspector listener, ignores held Space, controls, typing and browser modifiers', async () => {
@@ -188,9 +190,9 @@ it('passes the fetched scenery layout to the scene and draws no focus outline on
   expect(map.className).not.toContain('focus-visible:outline-2');
 });
 
-it('supports floating map controls overlay buttons (zoom, center, follow, reset, play/pause, switch to 2D)', async () => {
+it('supports floating map controls overlay buttons (zoom, center, follow, reset, switch to 2D), leaving play to the header', async () => {
   const onReturnTo2D = vi.fn();
-  const {onTogglePlay} = await setup(onReturnTo2D);
+  await setup(onReturnTo2D);
   expect(screen.getByTestId('map-controls-overlay')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', {name: 'Zoom in'}));
@@ -208,8 +210,7 @@ it('supports floating map controls overlay buttons (zoom, center, follow, reset,
   fireEvent.click(screen.getByRole('button', {name: 'Reset zoom and pan'}));
   expect(scene.reset).toHaveBeenCalledOnce();
 
-  fireEvent.click(screen.getByRole('button', {name: 'Play'}));
-  expect(onTogglePlay).toHaveBeenCalledOnce();
+  expect(within(screen.getByTestId('map-controls-overlay')).queryByRole('button', {name: 'Play'})).not.toBeInTheDocument();
 
   const switchBtn = screen.getByRole('button', {name: 'Switch to 2D view'});
   expect(switchBtn).toBeInTheDocument();

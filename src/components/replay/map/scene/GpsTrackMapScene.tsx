@@ -31,6 +31,8 @@ import { useGpsSceneDynamics } from './useGpsSceneDynamics.js';
 import { useGpsSceneCameraFocus } from './useGpsSceneCameraFocus.js';
 import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../../inspector/ghostSyncContext.js';
 import { nextGhostSyncMode } from '../ghostSync.js';
+import { CORNER_CARD_UNDER_FULLSCREEN_MINIMAP } from '../../cornerCard/CornerInsightCard.js';
+import { LapCornerCard } from '../../cornerCard/LapCornerCard.js';
 
 // Stable when Turns is hidden, so marker memos do not recompute on every frame.
 const NO_CORNER_MARKERS: ReturnType<typeof computeDispersedCornerMarkers> = [];
@@ -142,9 +144,11 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
           center={centerlineSvgPoints} trajectory={svgPoints} hasSectors={sectorMarkers.length > 0} hasTurns={cornerMarkers.length > 0}
           pedalPoints={onTogglePedalMarkers ? { visible: showPedalMarkers, available: Boolean(pedalMarkers?.length), onToggle: onTogglePedalMarkers } : undefined}
           orientation={controlsOrientation ?? (isExpanded ? 'horizontal' : 'vertical')}
-          isPlaying={isPlaying} onTogglePlay={onTogglePlay} isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded}
-          onToggleView={props.onToggleView} />
+          isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded}
+          onToggleView={props.onToggleView} cornerCard={isExpanded && Boolean(props.cornerCardTrajectory)} />
       )}
+      {isExpanded && props.cornerCardTrajectory && <LapCornerCard trajectory={props.cornerCardTrajectory} baseline={props.cornerCardBaseline}
+        timeSec={currentPrimaryPoint?.timeSec} active className={CORNER_CARD_UNDER_FULLSCREEN_MINIMAP} />}
 
       {showMinimap && (
         <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD}

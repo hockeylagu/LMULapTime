@@ -9,11 +9,14 @@ import { RaceMinimap } from './RaceMinimap.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
 import { useRaceMapKeys } from './useRaceReplayControls.js';
 import { raceLapCount } from './raceLaps.js';
+import { CornerCardButton, CORNER_CARD_UNDER_FULLSCREEN_MINIMAP } from '../cornerCard/CornerInsightCard.js';
+import { RaceCornerCard } from '../cornerCard/RaceCornerCard.js';
 import type { RaceClock } from './raceClock.js';
 import type { RacePoseCache } from './racePoseCache.js';
 import type { RaceStandingsIndex } from './raceStandings.js';
 
 interface Props {
+  sessionId: string;
   overview: RaceReplayOverview;
   /** The standings the hovered car's tooltip reads. */
   index: RaceStandingsIndex;
@@ -28,7 +31,7 @@ interface Props {
 }
 
 /** The race replay in 3D: the cameras ride on the followed car (its full model), the other cars draw by distance (grey stand-ins while they load). */
-export default function Race3DView({ overview, index, clock, poses, followSlot, progress, onToggleView, className = '', active = true }: Props) {
+export default function Race3DView({ sessionId, overview, index, clock, poses, followSlot, progress, onToggleView, className = '', active = true }: Props) {
   const map = useRef<HTMLDivElement>(null), host = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<CameraMode>('chase'), [retry, setRetry] = useState(0);
   const { scene, state } = useRaceScene({ host, overview, clock, poses, followSlot, progress, mode, retry });
@@ -44,10 +47,11 @@ export default function Race3DView({ overview, index, clock, poses, followSlot, 
   return (
     <Scene3DFrame surface={map} host={host} scene={scene} state={state} mode={mode} onModeChange={setMode} followMode="chase"
       onRetry={() => setRetry(value => value + 1)} onToggleView={onToggleView} active={active} ariaLabel="Race 3D view" hostLabel="3D track. Drag to orbit, scroll to zoom." className={className}
-      controlsBefore={<ReplayShortcutHelp view="race3d" enabled={active} />}>
-      {/* As the lap view's 3D page: the minimap top left, the camera controls top right with the timing under them, 14 px apart
-          (beside them once they stand in a column). */}
+      controlsBefore={<><CornerCardButton /><ReplayShortcutHelp view="race3d" enabled={active} /></>}>
+      {/* As the lap view's 3D page: the minimap top left with the corner card under it, the camera controls top right with the
+          timing under them, 14 px apart (beside them once they stand in a column). */}
       <RaceMinimap overview={overview} clock={clock} poses={poses} followSlot={followSlot} />
+      <RaceCornerCard sessionId={sessionId} clock={clock} followSlot={followSlot} active={active} className={CORNER_CARD_UNDER_FULLSCREEN_MINIMAP} />
       <RaceLapTiming clock={clock} car={followSlot === null ? undefined : cars.get(followSlot)} laps={overview.laps}
         totalLaps={totalLaps} className={`absolute right-3 top-16 z-10 ${NARROW_SCENE_BESIDE_CONTROLS}`} />
       <RaceCarHover host={host} scene={scene} clock={clock} index={index} active={active} />

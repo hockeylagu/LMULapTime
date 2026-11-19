@@ -13,6 +13,7 @@ import { GpsBrakeMarkers } from '../map/display/GpsBrakeMarkers.js';
 import { projectSectorMarkers, useTrackMarkerPlacement } from '../map/display/useTrackMarkerPlacement.js';
 import { buildRibbonIndex } from '../map/scene/cornerRibbonClearance.js';
 import { GpsSectorMarkers } from '../map/scene/GpsSectorMarkers.js';
+import { GpsOfficialTurns } from '../map/scene/GpsOfficialTurns.js';
 import { GpsStartFinishLine } from '../map/scene/GpsStartFinishLine.js';
 import { FOCUS_RING, SURFACE_FOCUS_RING } from '../../common/buttonStyles.js';
 import { RaceCarMarkers, type RaceCarPosition } from './RaceCarMarkers.js';
@@ -23,6 +24,7 @@ import { isOutAt, type RaceStandingsIndex } from './raceStandings.js';
 import type { RaceClock } from './raceClock.js';
 import type { RacePoseCache } from './racePoseCache.js';
 import { useRaceMapKeys } from './useRaceReplayControls.js';
+import { RaceCornerCard } from '../cornerCard/RaceCornerCard.js';
 
 const VIEWBOX_SIZE = 800;
 const PADDING = 60;
@@ -72,6 +74,7 @@ export function racePositionsAt(window: RacePoseWindow | null, timeSec: number, 
 }
 
 interface Props {
+  sessionId: string;
   overview: RaceReplayOverview;
   index: RaceStandingsIndex;
   clock: RaceClock;
@@ -89,7 +92,7 @@ interface Props {
 }
 
 /** The race map: the circuit and every car on the session clock, following the selected car. */
-export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, followSlot, trackRequest = 0, hoverSlot, onFollow, onHover, onToggleView, className = '' }) => {
+export const RaceMapScene: React.FC<Props> = ({ sessionId, overview, index, clock, poses, followSlot, trackRequest = 0, hoverSlot, onFollow, onHover, onToggleView, className = '' }) => {
   const { timeSec } = useSyncExternalStore(clock.subscribe, clock.getState);
   const { trackGeometry } = useTrackBoundaryGeometry({ layoutKey: overview.layoutKey, trackVenue: overview.trackVenue, trackCourse: overview.trackCourse });
   const { layers, changeLayers } = useMapLayers();
@@ -171,6 +174,7 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
                 left={svg.left} right={svg.right} center={svg.center} pathD="" />
               {furniture.placedBrakes.length ? <GpsBrakeMarkers placement={furniture.placedBrakes} markerScale={markerScale}
                 startFinishGate={furniture.placedStart?.gate} timingGates={furniture.sectorGates} obstacles={furniture.markerObstacles} /> : null}
+              {layers.officialTurns && <GpsOfficialTurns geometry={trackGeometry} centerSvg={svg.center} markerScale={markerScale} />}
               {layers.sectors && <GpsSectorMarkers markers={furniture.placedSectors} markerScale={markerScale} obstacles={furniture.markerObstacles} />}
               {layers.startFinish && <GpsStartFinishLine placement={furniture.placedStart} svgPoints={NO_POINTS} zoomLevel={zoomLevel}
                 markerScale={markerScale} gateLeftSvg={gates?.gateLeftSvg} gateRightSvg={gates?.gateRightSvg} />}
@@ -194,8 +198,9 @@ export const RaceMapScene: React.FC<Props> = ({ overview, index, clock, poses, f
         {bounds && (
           <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={trackGeometry} bounds={bounds}
             left={svg.left} right={svg.right} center={svg.center} trajectory={[]} orientation="horizontal"
-            hasSectors={sectorMarkers.length > 0} showPlayPause={false} shortcuts="race" fullscreen={false} onToggleView={onToggleView} />
+            hasSectors={sectorMarkers.length > 0} shortcuts="race" fullscreen={false} onToggleView={onToggleView} cornerCard />
         )}
+        <RaceCornerCard sessionId={sessionId} clock={clock} followSlot={followSlot} active className="left-3 top-3" />
       </div>
     </div>
   );

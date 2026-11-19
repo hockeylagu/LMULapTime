@@ -1,5 +1,5 @@
 import { useState, useEffect, useEffectEvent, useRef, useMemo, useCallback } from 'react';
-import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { useReplayKeys } from '../../../utils/replayShortcuts.js';
 import { useSearchParams } from 'react-router';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
@@ -12,9 +12,9 @@ import { fetchSessionTelemetry, fetchSessionTelemetryMetadata } from '../../../a
 import { CompareLapFilter } from './compare/ReplayCompareLapPicker.js';
 import { replayCompareScope } from './compare/compareLapsQuery.js';
 import { DEFAULT_COMPARE_CONTROLS, type CompareLapControls } from './compare/compareLapControls.js';
-import { advancePlaybackClock, PlaybackClock, playbackClockAt, playbackIndexAt } from './replayPlaybackClock.js';
+import { advancePlaybackClock, landingIndex, PlaybackClock, playbackClockAt, playbackIndexAt } from './replayPlaybackClock.js';
 import { createPlaybackCursor } from './replayPlaybackCursor.js';
-import { PLAYBACK_SPEEDS, steppedPlaybackSpeed, type ReplayFullscreenControls } from './replayFullscreenControls.js';
+import { PLAYBACK_SPEEDS, steppedPlaybackSpeed, type LapLanding, type ReplayFullscreenControls } from './replayFullscreenControls.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
 import { useGhostSync } from './ghostSyncContext.js';
 
@@ -114,6 +114,16 @@ export function useReplayInspectorData({
     pendingLapSecRef.current = null;
     setCurrentIndex(playbackIndexAt(trajectory.points, at));
   }, [trajectory, initialDriverOrdinal, initialLapOrdinal, setCurrentIndex]);
+  // A lap opened at a moment (a corner card's strip: the turn's entry), placed in the same update that shows that lap
+  // of that driver, so the car never flashes at the start line. Any load that ends otherwise (failed, another lap or
+  // driver) drops it, so a later load of that lap number cannot pick it up.
+  const pendingLandingRef = useRef<(LapLanding & { lapNumber: number; driverOrdinal: number }) | null>(null);
+  const landIn = (shown: ReplayTrajectoryData) => {
+    const landing = pendingLandingRef.current;
+    pendingLandingRef.current = null;
+    if (!landing || shown.currentLap !== landing.lapNumber || (shown.driverOrdinal ?? landing.driverOrdinal) !== landing.driverOrdinal) return;
+    setCurrentIndex(landingIndex(shown.points, shown.timeReference === 'lap' ? landing.replaySec - landing.lapStartSec : landing.replaySec));
+  };
   /** The lap clock under the cursor (the playing clock's, else the shown sample's), for the race replay to open at. */
   const shownPointsRef = useRef(trajectory?.points);
   shownPointsRef.current = trajectory?.points;
@@ -122,27 +132,18 @@ export function useReplayInspectorData({
   const markerDistRef = useRef<number | null>(null);
   markerDistRef.current = useGhostSync().markerDistM;
   const markerDistances = useMemo(() => (trajectory ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []), [trajectory]);
-  useEffect(() => {
-    if (!isOpen || !trajectory?.points.length) return;
-    const handle = (event: KeyboardEvent) => {
-      if (event.repeat || replayShortcutBlocked(event) || !isReplaySurfaceTarget(event)) return;
-      if (event.key === ' ') { event.preventDefault(); setIsPlaying(playing => !playing); return; }
-      // Backspace: both cars back to marker A and play again (watch the same corner twice).
-      if (event.key === 'Backspace') {
-        if (markerDistRef.current === null || !markerDistances.length) return;
-        event.preventDefault();
-        setCurrentIndex(findIndexAtDistance(markerDistances, markerDistRef.current));
-        setIsPlaying(true);
-        return;
-      }
-      // , / . step the playback speed (also < / > with Shift), playing or paused.
-      if (event.key.length !== 1 || !',.<>'.includes(event.key)) return;
-      event.preventDefault();
-      setPlaybackSpeed(speed => steppedPlaybackSpeed(event.key, speed) ?? speed);
-    };
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, [isOpen, trajectory, markerDistances, setCurrentIndex]);
+  // , / . step the playback speed (also < / > with Shift), playing or paused.
+  const stepSpeed = (event: KeyboardEvent) => setPlaybackSpeed(speed => steppedPlaybackSpeed(event.key, speed) ?? speed);
+  useReplayKeys({
+    ' ': () => setIsPlaying(playing => !playing),
+    // Backspace: both cars back to marker A and play again (watch the same corner twice).
+    Backspace: () => {
+      if (markerDistRef.current === null || !markerDistances.length) return false;
+      setCurrentIndex(findIndexAtDistance(markerDistances, markerDistRef.current));
+      setIsPlaying(true);
+    },
+    ',': stepSpeed, '.': stepSpeed, '<': stepSpeed, '>': stepSpeed,
+  }, 'replay', isOpen && Boolean(trajectory?.points.length));
   const trajectoryRequestIdRef = useRef(0);
   const trajectoryControllerRef = useRef<AbortController | null>(null);
   const lastTrajectoryRequestRef = useRef<{ lap: number; slot: number | null; resolution: TelemetryResolution; source: 'duckdb' | 'vcr' } | null>(null);
@@ -468,6 +469,7 @@ export function useReplayInspectorData({
       (trajectory ? undefined : initialLapOrdinal ?? 0);
     if (lapOrdinal === undefined) {
       setError('This lap has no session telemetry locator');
+      pendingLandingRef.current = null;
       setIsTrajLoading(false);
       return;
     }
@@ -501,6 +503,7 @@ export function useReplayInspectorData({
             start: indexAtPreviousPosition(range.start), end: indexAtPreviousPosition(range.end),
           } : null);
         }
+        landIn(trajData);
         setTrajectory(previous => ({
           ...trajData,
           duckdbRawPointsCount: trajData.duckdbRawPointsCount ?? previous?.duckdbRawPointsCount,
@@ -514,6 +517,7 @@ export function useReplayInspectorData({
       })
       .catch((err: unknown) => {
         if (requestId !== trajectoryRequestIdRef.current || isAbortError(err)) return;
+        pendingLandingRef.current = null;
         // The lap on screen stays; say why the requested one is not shown.
         setSelectedDriverSlot(trajectory?.driverSlot ?? null);
         setError(`Could not load lap ${targetLap}: ${apiErrorMessage(err, 'request failed')}`);
@@ -541,8 +545,10 @@ export function useReplayInspectorData({
     fetchTrajectory(trajectory?.currentLap, slot);
   };
 
-  const handleSelectLap = (lapNumber: number) => {
-    setIsPlaying(false); setCurrentIndex(0); setChartZoomRange(null);
+  const handleSelectLap = (lapNumber: number, landAt?: LapLanding) => {
+    pendingLandingRef.current = landAt ? { lapNumber, driverOrdinal: selectedDriverOrdinal, ...landAt } : null;
+    // Opened at a moment, the car stays where it is (the same turn) until the lap lands there.
+    setIsPlaying(false); setCurrentIndex(landAt ? currentIndexRef.current : 0); setChartZoomRange(null);
     fetchTrajectory(lapNumber, selectedDriverSlot);
   };
 
@@ -710,15 +716,18 @@ export function useReplayInspectorData({
     onOpenBaselinePicker: () => lapActionsRef.current.handleToggleCompare(),
     onRemoveBaseline: () => lapActionsRef.current.handleRemoveCompare(),
     primary: {
-      laps: primaryLaps, lapNumber: primaryLapNumber, onSelect: lap => lapActionsRef.current.handleSelectLap(lap),
+      laps: primaryLaps, lapNumber: primaryLapNumber, onSelect: (lap, landAt) => lapActionsRef.current.handleSelectLap(lap, landAt),
       isLoading: isPrimaryLoading, error, onRetry: () => lapActionsRef.current.handleRetryLoad(),
     },
     baseline: isCompareMode ? {
       lapNumber: baselineLapNumber, isLoading: isBaselineLoading, error: comparableBaselineError,
       onRetry: () => lapActionsRef.current.handleRetryBaseline(),
     } : undefined,
-    playback: { speed: playbackSpeed, speeds: PLAYBACK_SPEEDS, onChangeSpeed: speed => lapActionsRef.current.setPlaybackSpeed(speed) },
-  }), [primaryLaps, primaryLapNumber, isPrimaryLoading, error, isCompareMode, baselineLapNumber, isBaselineLoading, comparableBaselineError, playbackSpeed]);
+    playback: {
+      speed: playbackSpeed, speeds: PLAYBACK_SPEEDS, onChangeSpeed: speed => lapActionsRef.current.setPlaybackSpeed(speed),
+      isPlaying, onTogglePlay: () => setIsPlaying(playing => !playing),
+    },
+  }), [primaryLaps, primaryLapNumber, isPrimaryLoading, error, isCompareMode, baselineLapNumber, isBaselineLoading, comparableBaselineError, playbackSpeed, isPlaying]);
 
   return {
     cursorLapSec, metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,

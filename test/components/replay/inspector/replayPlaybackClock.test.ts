@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { advancePlaybackClock, playbackClockAt, playbackIndexAt, playbackSampleFraction } from '../../../../src/components/replay/inspector/replayPlaybackClock.js';
+import { advancePlaybackClock, landingIndex, playbackClockAt, playbackIndexAt, playbackSampleFraction } from '../../../../src/components/replay/inspector/replayPlaybackClock.js';
 import { steppedPlaybackSpeed } from '../../../../src/components/replay/inspector/replayFullscreenControls.js';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
@@ -71,6 +71,13 @@ describe('playback speed shortcuts', () => {
     expect(steppedPlaybackSpeed('<', 0.25)).toBeNull();
     expect(steppedPlaybackSpeed('.', 2)).toBeNull();
     expect(steppedPlaybackSpeed('x', 1)).toBeNull();
+  });
+});
+
+describe('landingIndex', () => {
+  it('lands on the first sample at or after the moment, the last past the lap', () => {
+    const points = [at(0), at(0.5), at(1.2), at(2)];
+    expect([landingIndex(points, 0.6), landingIndex(points, 1.2), landingIndex(points, -1), landingIndex(points, 9)]).toEqual([2, 2, 0, 3]);
   });
 });
 
