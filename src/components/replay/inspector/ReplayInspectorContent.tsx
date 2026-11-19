@@ -6,7 +6,6 @@ import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/segmentComparisons.js';
-import { filterCornerConsistencyStats } from '../../../utils/cornerConsistency.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
@@ -88,9 +87,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     setCurrentIndex,
     isPlaying,
     setIsPlaying,
-    playbackSpeed,
     playbackCursor,
-    setPlaybackSpeed,
     chartZoomRange,
     setChartZoomRange,
     telemetryResolution,
@@ -158,15 +155,18 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     [trajectory, excludedConsistencyLaps]
   );
 
-  const { cornerStats: rawCornerConsistencyStats, isLoading: isCornerConsistencyLoading } =
-    useCornerConsistency(
-      (activeTab === 'corners' && cornerSubView === 'consistency') || (activeTab === 'ai-report' && isCompareMode),
-      activeSessionId, metadata, selectedDriverSlot, trajectory
-    );
+  const primaryDists = useMemo(
+    () => (trajectory?.points ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []),
+    [trajectory]
+  );
 
-  const cornerConsistencyStats = useMemo(
-    () => filterCornerConsistencyStats(rawCornerConsistencyStats, excludedConsistencyLaps),
-    [rawCornerConsistencyStats, excludedConsistencyLaps]
+  // The official turns' stats, placed on the displayed lap: where each apex is, and the corner detected there.
+  const cornerPlacement = useMemo(() => ({ dists: primaryDists, corners: cornerSegments }), [primaryDists, cornerSegments]);
+  const {
+    cornerStats: cornerConsistencyStats, isLoading: isCornerConsistencyLoading, unavailableReason: cornerConsistencyUnavailableReason,
+  } = useCornerConsistency(
+    (activeTab === 'corners' && cornerSubView === 'consistency') || (activeTab === 'ai-report' && isCompareMode),
+    activeSessionId, metadata, selectedDriverSlot, trajectory, excludedConsistencyLaps, cornerPlacement
   );
 
   const bestSectors = useMemo(() => {
@@ -181,11 +181,6 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     });
     return { s1, s2, s3 };
   }, [trajectory]);
-
-  const primaryDists = useMemo(
-    () => (trajectory?.points ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []),
-    [trajectory]
-  );
 
   // The corner picked belongs to the laps it was picked on: other laps show none selected.
   const [pickedCorner, setPickedCorner] = useState<{ trajectory: typeof trajectory; baselineTrajectory: typeof baselineTrajectory; number: number | null } | null>(null);
@@ -253,7 +248,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       handleSelectCompareLap={handleSelectCompareLap} isBaselineLoading={isBaselineLoading}
       baselineError={baselineError}
       setCurrentIndex={setCurrentIndex} isPlaying={isPlaying} setIsPlaying={setIsPlaying}
-      playbackSpeed={playbackSpeed} setPlaybackSpeed={setPlaybackSpeed}
+     
       chartZoomRange={chartZoomRange} setChartZoomRange={setChartZoomRange}
       telemetryResolution={telemetryResolution} handleChangeResolution={handleChangeResolution}
       handleSelectDriver={handleSelectDriver} handleSelectLap={handleSelectLap}
@@ -272,6 +267,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       consistencyStats={consistencyStats}
       cornerConsistencyStats={cornerConsistencyStats}
       isCornerConsistencyLoading={isCornerConsistencyLoading}
+      cornerConsistencyUnavailableReason={cornerConsistencyUnavailableReason}
       availableConsistencyLaps={availableConsistencyLaps}
       excludedConsistencyLaps={excludedConsistencyLaps}
       toggleConsistencyLap={toggleConsistencyLap}

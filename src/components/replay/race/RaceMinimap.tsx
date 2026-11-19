@@ -17,7 +17,10 @@ interface Props {
   followSlot: number | null;
 }
 
-/** The 3D view's minimap: the circuit with every car in its class colour, the followed one as the lap view's car marker. */
+/**
+ * The 3D view's minimap: the circuit with every car in its class colour, the followed one as the lap view's car marker. A full
+ * page like the lap view's fullscreen 3D, so the same size as its minimap there.
+ */
 export const RaceMinimap: React.FC<Props> = ({ overview, clock, poses, followSlot }) => {
   const { timeSec } = useSyncExternalStore(clock.subscribe, clock.getState);
   const { trackGeometry } = useTrackBoundaryGeometry({ layoutKey: overview.layoutKey, trackVenue: overview.trackVenue, trackCourse: overview.trackCourse });
@@ -38,6 +41,6 @@ export const RaceMinimap: React.FC<Props> = ({ overview, clock, poses, followSlo
   const cars = positions.filter(position => position !== followed).map(position => ({
     key: position.slot, sx: position.sx, sy: position.sy, color: raceClassTone(classes.get(position.slot)).hex, dimmed: pitted.has(position.slot),
   }));
-  return <GpsCircuitMinimap trackBoundaryPathD={pathD} currentPos={followed} cars={cars}
+  return <GpsCircuitMinimap trackBoundaryPathD={pathD} currentPos={followed} cars={cars} isExpanded
     className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />;
 };

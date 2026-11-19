@@ -53,7 +53,7 @@ describe('telemetry chart navigation', () => {
     expect(navigation().isZoomed).toBe(false);
   });
 
-  it('pans without seeking and handles keys only in the chart, respecting controls and dialogs', () => {
+  it('pans without seeking and handles keys in the chart or the unfocused page, respecting controls and dialogs', () => {
     const { chart, flush, navigation, select } = setup();
     fireEvent.keyDown(chart, { key: '+' }); flush();
     const before = navigation().viewStart;
@@ -62,10 +62,11 @@ describe('telemetry chart navigation', () => {
     fireEvent.pointerUp(chart, { pointerId: 1 });
     expect(navigation().viewStart).toBeGreaterThan(before);
     expect(select).not.toHaveBeenCalled();
-    fireEvent.keyDown(document.body, { key: 'Home' });
     fireEvent.keyDown(screen.getByLabelText('Typing'), { key: 'Home' });
     fireEvent.keyDown(screen.getByRole('button'), { key: 'Home' });
     expect(select).not.toHaveBeenCalled();
+    // Nothing focused: the page's keys are the chart's.
+    fireEvent.keyDown(document.body, { key: 'Home' }); expect(select).toHaveBeenLastCalledWith(0);
     fireEvent.keyDown(chart, { key: 'Home' }); expect(select).toHaveBeenLastCalledWith(0);
     fireEvent.keyDown(chart, { key: 'End' }); expect(select).toHaveBeenLastCalledWith(99);
     fireEvent.keyDown(chart, { key: 'ArrowRight', shiftKey: true }); expect(select).toHaveBeenLastCalledWith(55);

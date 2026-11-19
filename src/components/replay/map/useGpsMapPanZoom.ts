@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useEffectEvent, useMemo } from 'react';
-import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { useReplayKeys } from '../../../utils/replayShortcuts.js';
 import type { MapView } from './hudClearView.js';
 
 export interface UseGpsMapPanZoomOptions {
@@ -369,19 +369,7 @@ export function useGpsMapPanZoom({
       ? currentPosRef.current : { sx: viewBoxSize / 2 + panOffsetRef.current.x, sy: viewBoxSize / 2 + panOffsetRef.current.y };
     panTo(center.sx + horizontal * visibleSize * 0.1, center.sy + vertical * visibleSize * 0.1);
   };
-  const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
-  keyHandlerRef.current = event => {
-    if (replayShortcutBlocked(event) || !isReplaySurfaceTarget(event) || event.repeat) return;
-    if (event.key.toLowerCase() === 'c') { event.preventDefault(); centerOnCar(); }
-    else if (event.key.toLowerCase() === 'f') {
-      event.preventDefault(); handleSetFollowCar(!followCarRef.current);
-    }
-  };
-  useEffect(() => {
-    const handle = (event: KeyboardEvent) => keyHandlerRef.current(event);
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, []);
+  useReplayKeys({ c: centerOnCar, f: () => handleSetFollowCar(!followCarRef.current) }, 'replay');
 
   const zoomIn = () =>
     setZoomLevel(z => {

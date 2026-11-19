@@ -17,8 +17,7 @@ const props: ReplayInspectorHeaderProps = {
   baselineDriverName: 'Compared Driver', isComparePickerOpen: false, onCloseComparePicker: vi.fn(),
   availableCompareLaps: [], compareLapFilter: 'player', compareControls: DEFAULT_COMPARE_CONTROLS, compareCarTypes: [], onChangeCompareControls: vi.fn(), isCompareLapsLoading: false,
   onChangeCompareLapFilter: vi.fn(), onSelectCompareLap: vi.fn(), isBaselineLoading: false,
-  isTrajLoading: false, isPlaying: false, onTogglePlay: vi.fn(),
-  onRewind: vi.fn(), playbackSpeed: 1, onSelectPlaybackSpeed: vi.fn(), formatLapTime: sec => String(sec),
+  isTrajLoading: false, formatLapTime: sec => String(sec),
 };
 
 describe('ReplayInspectorHeader', () => {
@@ -66,11 +65,11 @@ describe('ReplayInspectorHeader', () => {
     expect(screen.getByRole('button', { name: /vs\s*Compared Driver L3/ })).toHaveStyle({ color: TELEMETRY_COLORS.baseline });
   });
 
-  it('shows baseline loading without a lap time and prevents swapping or playback', () => {
+  it('shows baseline loading without a lap time and prevents swapping; playback is not in the header', () => {
     render(<ReplayInspectorHeader {...props} isTrajLoading isBaselineLoading />);
     expect(screen.getByRole('combobox', { name: 'Select Driver' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Swap comparison laps' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /vs\s*Compared Driver L3\s*Loading/ })).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Loading…')).toBeInTheDocument();
   });

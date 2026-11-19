@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { placeTurns } from '../../../../../shared/domain/circuitTurns/placeTurns.js';
 import { LAYOUT_TURN_LISTS } from '../../../../../shared/domain/circuitTurns/turnLists.js';
+import { describeTurn } from '../../../../../shared/domain/circuitTurns/turnLabel.js';
 import type { TrackBoundaryGeometry } from '../../../../../shared/types/trackGeometry.js';
 import { LMU_COLORS, MAP_COLORS } from '../../../../utils/themeColors.js';
 
@@ -59,12 +60,7 @@ export function projectOfficialTurns(geometry: TrackBoundaryGeometry | null | un
     let length = Math.hypot(ox, oy);
     if (length < 1e-6) { const { along } = at(turn.apexM); ox = -along.sy; oy = along.sx; length = 1; }
     const outside = { sx: ox / length, sy: oy / length };
-    const number = turn.number === undefined ? undefined : `${turn.number}${turn.suffix ?? ''}`;
-    const label = number !== undefined ? `T${number}` : turn.name ?? '';
-    const title = [number !== undefined ? `Turn ${number}` : null, turn.name,
-      turn.numberSource === 'filled' ? 'number filled in order' : turn.numberSource === 'series' ? 'series numbering' : null]
-      .filter(Boolean).join(' · ');
-    return { id: turn.id, label, title, filled: turn.numberSource === 'filled', apex, outside };
+    return { id: turn.id, ...describeTurn(turn), apex, outside };
   });
   const ticks = turns.filter(turn => turn.startM > 0).map(turn => {
     const { point, along } = at(turn.startM);
@@ -92,10 +88,11 @@ export function GpsOfficialTurns({ geometry, centerSvg, markerScale }: {
       const reach = BADGE_OFFSET + halfWidth * Math.abs(mark.outside.sx) + 8 * Math.abs(mark.outside.sy);
       const x = mark.apex.sx + mark.outside.sx * reach * markerScale, y = mark.apex.sy + mark.outside.sy * reach * markerScale;
       return <g key={mark.id} data-testid="official-turn" data-filled={mark.filled ? '' : undefined}>
-        <title>{mark.title}</title>
         <line x1={mark.apex.sx} y1={mark.apex.sy} x2={x} y2={y} stroke={color} strokeWidth="1" strokeDasharray="2 2"
           vectorEffect="non-scaling-stroke" />
-        <g transform={`translate(${x}, ${y}) scale(${markerScale})`}>
+        {/* Only the badge takes the pointer, for its tooltip; presses still reach the map (pan, zoom). */}
+        <g transform={`translate(${x}, ${y}) scale(${markerScale})`} className="pointer-events-auto cursor-help">
+          <title>{mark.title}</title>
           <rect x={-halfWidth} y="-8" width={halfWidth * 2} height="16" rx="3" fill={MAP_COLORS.markerBg} stroke={color}
             strokeDasharray={mark.filled ? '3 2' : undefined} />
           <text textAnchor="middle" dominantBaseline="central" fill={LMU_COLORS.text} fontSize="10"

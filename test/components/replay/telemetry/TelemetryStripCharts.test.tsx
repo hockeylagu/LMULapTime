@@ -182,7 +182,7 @@ describe('TelemetryStripCharts', () => {
     expect(screen.getByText(/\+1\.0s \(Slower\)/i)).toBeInTheDocument();
   });
 
-  it('allows toggling between Scrub and Zoom Range interaction modes', () => {
+  it('toggles Zoom range on and off (dragging moves the cursor while it is off)', () => {
     render(
       <TelemetryStripCharts
         points={mockPoints}
@@ -191,23 +191,12 @@ describe('TelemetryStripCharts', () => {
       />
     );
 
-    const scrubBtn = screen.getByRole('button', { name: /Move cursor/i });
     const zoomBtn = screen.getByRole('button', { name: /zoom range/i });
-
-    expect(scrubBtn).toBeInTheDocument();
-    expect(zoomBtn).toBeInTheDocument();
-
-    // Default is scrub mode
-    expect(scrubBtn).toHaveAttribute('aria-pressed', 'true');
-
-    // Switch to Zoom Range
+    expect(zoomBtn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(zoomBtn);
     expect(zoomBtn).toHaveAttribute('aria-pressed', 'true');
-    expect(scrubBtn).toHaveAttribute('aria-pressed', 'false');
-
-    // Switch back to Scrub
-    fireEvent.click(scrubBtn);
-    expect(scrubBtn).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(zoomBtn);
+    expect(zoomBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('allows selecting a range via drag in Zoom mode and zooming the charts', () => {

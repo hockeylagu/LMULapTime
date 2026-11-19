@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { GpsTrackMapScene } from '../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { projectTrajectoryPoints } from '../../../../src/components/replay/map/replayMapUtils.js';
 import { computeCumulativeDistances } from '../../../../src/utils/lapAlignment.js';
@@ -379,7 +379,7 @@ describe('GpsTrackMapScene', () => {
     expect(onSelectIndex).toHaveBeenCalledWith(1);
   });
 
-  it('shows play/pause button in full screen map and handles toggling playback', () => {
+  it('keeps play out of the map toolbar, in full screen too', () => {
     const onTogglePlay = vi.fn();
     const { container, rerender } = render(
       <GpsTrackMapScene
@@ -401,28 +401,10 @@ describe('GpsTrackMapScene', () => {
     const map = container.querySelector('[data-replay-surface="map"]');
     expect(map).toHaveAttribute('data-map-expanded');
 
-    // In full screen view, play button is visible
-    const playButton = screen.getByRole('button', { name: 'Play' });
-    expect(playButton).toBeInTheDocument();
-
-    fireEvent.click(playButton);
-    expect(onTogglePlay).toHaveBeenCalledTimes(1);
-
-    // When playing in full screen, pause button is visible
-    rerender(
-      <GpsTrackMapScene
-        points={mockPoints}
-        bounds={mockBounds}
-        currentIndex={0}
-        isPlaying={true}
-        onTogglePlay={onTogglePlay}
-      />
-    );
-
-    const pauseButton = screen.getByRole('button', { name: 'Pause' });
-    expect(pauseButton).toBeInTheDocument();
-    fireEvent.click(pauseButton);
-    expect(onTogglePlay).toHaveBeenCalledTimes(2);
+    // Nor in full screen: the replay header plays there, the toolbar keeps to the map.
+    expect(within(screen.getByTestId('map-controls-overlay')).queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+    rerender(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} isPlaying={true} onTogglePlay={onTogglePlay} />);
+    expect(within(screen.getByTestId('map-controls-overlay')).queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument();
   });
 
   it('closes fullscreen from the top-right close button and restores the map focus', () => {

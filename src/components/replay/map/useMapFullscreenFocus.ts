@@ -1,6 +1,12 @@
 import { useEffect, useEffectEvent } from 'react';
 
-/** Isolate an in-place expanded map without remounting its playback/camera state. */
+/** The fullscreen map's z-index (its `data-map-expanded` classes); the replay header stands just above it. */
+const OVER_EXPANDED_MAP = '1001';
+
+/**
+ * Isolate an in-place expanded map without remounting its playback/camera state. The replay header stays usable above it, as
+ * in the race replay (driver, 2026-11-18): the map fills the screen under the header, which joins the map's focus loop.
+ */
 export function useMapFullscreenFocus(
   active: boolean,
   buttonRef: React.RefObject<HTMLButtonElement | null>,
@@ -20,10 +26,25 @@ export function useMapFullscreenFocus(
     map.setAttribute('role', 'dialog');
     map.setAttribute('aria-modal', 'true');
     if (previousTabIndex === null) map.tabIndex = -1;
+    const header = document.querySelector<HTMLElement>('[data-replay-header]');
+    const previousHeaderZ = header?.style.zIndex ?? '';
+    const { top: previousTop, height: previousHeight } = map.style;
+    // The map starts under the header, following it when its height changes (it wraps on a narrower window).
+    const fitUnderHeader = () => {
+      if (!header) return;
+      const top = header.getBoundingClientRect().bottom;
+      map.style.top = `${top}px`;
+      map.style.height = `calc(100dvh - ${top}px)`;
+    };
+    fitUnderHeader();
+    if (header) header.style.zIndex = OVER_EXPANDED_MAP;
+    const headerSize = header && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fitUnderHeader) : null;
+    if (header) headerSize?.observe(header);
+    const inLayer = (node: Node | null) => Boolean(node && (map.contains(node) || header?.contains(node)));
     const siblings: Array<{ node: HTMLElement; inert: boolean }> = [];
     for (let branch: HTMLElement = map; branch.parentElement; branch = branch.parentElement) {
       for (const node of branch.parentElement.children) {
-        if (node instanceof HTMLElement && node !== branch) {
+        if (node instanceof HTMLElement && node !== branch && node !== header) {
           siblings.push({ node, inert: node.inert });
           node.inert = true;
         }
@@ -37,9 +58,9 @@ export function useMapFullscreenFocus(
     // Help is body-portaled above this map. Its own focus/Escape handling owns that layer.
     const hasNestedDialog = () => [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
       .some(dialog => dialog !== map && !map.contains(dialog));
-    const controls = () => [...map.querySelectorAll<HTMLElement>(
-      'button:not(:disabled), a[href], select:not(:disabled), input:not(:disabled), [tabindex="0"]',
-    )].filter(node => !node.closest('[inert]'));
+    const focusable = 'button:not(:disabled), a[href], select:not(:disabled), input:not(:disabled), [tabindex="0"]';
+    const controls = () => [...header?.querySelectorAll<HTMLElement>(focusable) ?? [], ...map.querySelectorAll<HTMLElement>(focusable)]
+      .filter(node => !node.closest('[inert]'));
     map.focus({ preventScroll: true });
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || hasNestedDialog()) return;
@@ -50,7 +71,7 @@ export function useMapFullscreenFocus(
         const items = controls();
         const first = items[0] ?? map;
         const last = items[items.length - 1] ?? map;
-        if (!map.contains(document.activeElement) || document.activeElement === map
+        if (!inLayer(document.activeElement) || document.activeElement === map
           || (event.shiftKey && document.activeElement === first)
           || (!event.shiftKey && document.activeElement === last)) {
           event.preventDefault();
@@ -59,7 +80,7 @@ export function useMapFullscreenFocus(
       }
     };
     const onFocus = (event: FocusEvent) => {
-      if (!hasNestedDialog() && event.target instanceof Node && !map.contains(event.target)) {
+      if (!hasNestedDialog() && event.target instanceof Node && !inLayer(event.target)) {
         map.focus({ preventScroll: true });
       }
     };
@@ -75,6 +96,10 @@ export function useMapFullscreenFocus(
       if (previousModal === null) map.removeAttribute('aria-modal'); else map.setAttribute('aria-modal', previousModal);
       if (previousTabIndex === null) map.removeAttribute('tabindex');
       map.removeAttribute('data-map-expanded');
+      headerSize?.disconnect();
+      map.style.top = previousTop;
+      map.style.height = previousHeight;
+      if (header) header.style.zIndex = previousHeaderZ;
       // Entered from its own button: land on the (focusable) map instead, since shortcuts ignore
       // keys on buttons and M could not re-expand it from there.
       const restore = previousFocus === button && previousTabIndex !== null ? map : previousFocus;

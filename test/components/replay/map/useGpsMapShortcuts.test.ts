@@ -255,7 +255,7 @@ describe('useGpsMapShortcuts target scoping', () => {
     cleanup();
   });
 
-  it('toggles fullscreen with M from the chart or map, ignoring typing, modifiers, repeat and inert maps', () => {
+  it('toggles fullscreen with M from the chart, map or unfocused page, ignoring typing, modifiers, repeat and inert maps', () => {
     const map = document.createElement('div'); map.dataset.replaySurface = 'map';
     const chart = document.createElement('div'); chart.dataset.replaySurface = 'chart';
     const select = document.createElement('select'); map.append(select);
@@ -264,13 +264,14 @@ describe('useGpsMapShortcuts target scoping', () => {
     renderHook(() => useGpsMapShortcuts({ isExpanded: false, containerRef: { current: map }, points: pts, currentIndex: 1,
       onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetZoom: vi.fn(), onToggleExpanded }));
     const key = (el: Element, init: KeyboardEventInit) => el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
-    key(chart, { key: 'm', ctrlKey: true }); key(chart, { key: 'm', repeat: true }); key(select, { key: 'm' }); key(document.body, { key: 'm' });
+    key(chart, { key: 'm', ctrlKey: true }); key(chart, { key: 'm', repeat: true }); key(select, { key: 'm' });
     expect(onToggleExpanded).not.toHaveBeenCalled();
-    key(chart, { key: 'm' }); key(map, { key: 'M' });
-    expect(onToggleExpanded).toHaveBeenCalledTimes(2);
+    // Nothing focused (after a view switch or a fresh load): the page's keys are the replay's.
+    key(chart, { key: 'm' }); key(map, { key: 'M' }); key(document.body, { key: 'm' });
+    expect(onToggleExpanded).toHaveBeenCalledTimes(3);
     map.setAttribute('inert', '');
     key(chart, { key: 'm' });
-    expect(onToggleExpanded).toHaveBeenCalledTimes(2);
+    expect(onToggleExpanded).toHaveBeenCalledTimes(3);
     map.remove(); chart.remove();
   });
 
@@ -285,7 +286,23 @@ describe('useGpsMapShortcuts target scoping', () => {
     expect(onCycleGhostSync).toHaveBeenCalledOnce();
   });
 
-  it('switches 2D / 3D with E from the chart or map, and drops marker A with X on the map', () => {
+  it('takes the map keys from an unfocused page but leaves the chart its keys', () => {
+    const map = document.createElement('div'); map.dataset.replaySurface = 'map';
+    document.body.append(map);
+    const onZoomIn = vi.fn(); const onToggleGForce = vi.fn(); const onPan = vi.fn(); const onSelectIndex = vi.fn();
+    renderHook(() => useGpsMapShortcuts({ isExpanded: false, containerRef: { current: map }, points: pts, currentIndex: 1,
+      onZoomIn, onZoomOut: vi.fn(), onResetZoom: vi.fn(), onToggleGForce, onPan, onSelectIndex }));
+    const key = (init: KeyboardEventInit) => document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+    key({ key: 'g' }); key({ key: 'w' });
+    expect(onToggleGForce).toHaveBeenCalledOnce(); expect(onPan).toHaveBeenCalledWith(0, -1);
+    key({ key: '+' }); key({ key: 'ArrowLeft' });
+    expect(onZoomIn).not.toHaveBeenCalled(); expect(onSelectIndex).not.toHaveBeenCalled();
+    map.setAttribute('hidden', ''); key({ key: 'g' });
+    expect(onToggleGForce).toHaveBeenCalledOnce();
+    map.remove();
+  });
+
+  it('switches 2D / 3D with E from the chart, map or unfocused page, and drops marker A with X on the map', () => {
     const map = document.createElement('div'); map.dataset.replaySurface = 'map';
     const chart = document.createElement('div'); chart.dataset.replaySurface = 'chart';
     document.body.append(map, chart);
@@ -294,7 +311,7 @@ describe('useGpsMapShortcuts target scoping', () => {
       onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetZoom: vi.fn(), onToggleView, onToggleMarker }));
     const key = (el: Element, init: KeyboardEventInit) => el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
     key(chart, { key: 'e' }); key(map, { key: 'E' }); key(map, { key: 'e', repeat: true }); key(document.body, { key: 'e' });
-    expect(onToggleView).toHaveBeenCalledTimes(2);
+    expect(onToggleView).toHaveBeenCalledTimes(3);
     key(chart, { key: 'x' });
     expect(onToggleMarker).not.toHaveBeenCalled();
     key(map, { key: 'x' });

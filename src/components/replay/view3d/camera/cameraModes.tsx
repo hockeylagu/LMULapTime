@@ -1,6 +1,6 @@
-import React, { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Camera } from 'lucide-react';
-import { replayShortcutBlocked } from '../../../../utils/replayShortcuts.js';
+import { useReplayKeys } from '../../../../utils/replayShortcuts.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../../common/dropdown/dropdownStyles.js';
 import { isDriverCamera } from './driverCameras.js';
@@ -43,19 +43,7 @@ export function shadowCascadeSet(mode: CameraMode): ShadowCascadeSet {
 
 /** Mode keys belong to the active 3D map, with the same typing/dialog guards as replay keys. */
 export function useCameraModeShortcuts(map: React.RefObject<HTMLElement | null>, onMode: (mode: CameraMode) => void): void {
-  const handle = useEffectEvent((event: KeyboardEvent) => {
-    if (event.repeat || replayShortcutBlocked(event)) return;
-    const container = map.current, expanded = document.querySelector('[data-map-expanded]');
-    if (!container || container.closest('[inert], [hidden]') || expanded && expanded !== container) return;
-    if (!(event.target instanceof Node && container.contains(event.target))) return;
-    const mode = CAMERA_MODES.find(option => option.shortcut === event.key);
-    if (mode) { event.preventDefault(); onMode(mode.value); }
-  });
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => handle(event);
-    window.addEventListener('keydown', listener);
-    return () => window.removeEventListener('keydown', listener);
-  }, []);
+  useReplayKeys(Object.fromEntries(CAMERA_MODES.map(option => [option.shortcut, () => onMode(option.value)])), map);
 }
 
 interface CameraModeControlProps {

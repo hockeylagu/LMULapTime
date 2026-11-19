@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Select, type SelectItem } from '../../../../src/components/common/dropdown/Select.js';
+import { useReplayKeys } from '../../../../src/utils/replayShortcuts.js';
 
 const OPTIONS: SelectItem<string>[] = [
   { value: 'spa', label: 'Spa' },
@@ -18,6 +19,12 @@ function Harness({ onChange = vi.fn(), initial = 'spa' }: { onChange?: (value: s
     onChange={next => { setValue(next); onChange(next); }} />;
 }
 
+/** A replay page's keys. */
+function ReplayKeys() {
+  useReplayKeys({ x: () => undefined }, 'page');
+  return null;
+}
+
 const active = (combobox: HTMLElement) => document.getElementById(combobox.getAttribute('aria-activedescendant') ?? '')?.textContent;
 
 describe('Select', () => {
@@ -26,6 +33,30 @@ describe('Select', () => {
     expect(screen.getByRole('combobox', { name: 'Track' })).toHaveTextContent('Spa');
     rerender(<Harness key="empty" initial={null} />);
     expect(screen.getByRole('combobox', { name: 'Track' })).toHaveTextContent('Pick a track');
+  });
+
+  it('on a replay page, leaves keys to the replay while closed after a mouse pick, and types ahead again once focus comes back', () => {
+    render(<><ReplayKeys /><Harness /></>);
+    const combobox = screen.getByRole('combobox', { name: 'Track' });
+    fireEvent.pointerDown(combobox); combobox.focus(); fireEvent.click(combobox);
+    fireEvent.click(screen.getByRole('option', { name: /Monza/ }));
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    combobox.dispatchEvent(space); fireEvent.keyDown(combobox, { key: 'l' });
+    expect(space.defaultPrevented).toBe(false);
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.blur(combobox); combobox.focus();
+    fireEvent.keyDown(combobox, { key: 'l' });
+    expect(combobox).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('elsewhere keeps its keys after a mouse pick', () => {
+    render(<Harness />);
+    const combobox = screen.getByRole('combobox', { name: 'Track' });
+    fireEvent.pointerDown(combobox); combobox.focus(); fireEvent.click(combobox);
+    fireEvent.click(screen.getByRole('option', { name: /Monza/ }));
+    fireEvent.keyDown(combobox, { key: 'ArrowDown' });
+    expect(combobox).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('moves through enabled options with arrows, Home and End, and chooses with Enter', () => {

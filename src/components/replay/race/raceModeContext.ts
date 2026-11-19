@@ -1,5 +1,5 @@
-import { createContext, useEffect, useEffectEvent } from 'react';
-import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { createContext } from 'react';
+import { useReplayKeys } from '../../../utils/replayShortcuts.js';
 
 /**
  * Opens the race mode of the inspector on a car (replay slot) and lap, `lapSec` seconds into it (the lap view's cursor), from the
@@ -24,16 +24,5 @@ export const MODE_SWITCH_KEY = 'L';
  * unless typing or a dialog holds the keys; null while that button is disabled.
  */
 export function useModeSwitchKey(open: (() => void) | null): void {
-  const run = useEffectEvent(() => open?.());
-  const enabled = open !== null;
-  useEffect(() => {
-    if (!enabled) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key.toUpperCase() !== MODE_SWITCH_KEY || event.repeat || event.shiftKey || replayShortcutBlocked(event)) return;
-      event.preventDefault();
-      run();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [enabled]);
+  useReplayKeys({ [MODE_SWITCH_KEY.toLowerCase()]: { run: () => open?.(), noShift: true } }, 'page', open !== null);
 }

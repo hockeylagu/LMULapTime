@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent } from 'react';
-import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { useReplayKeys } from '../../../utils/replayShortcuts.js';
 import { RACE_SPEEDS, type RaceClock } from './raceClock.js';
 
 /** Seconds an arrow key moves the clock; Shift moves it further, Ctrl less. */
@@ -9,30 +9,20 @@ const SEEK_NEAR_SEC = 1;
 
 /** Space plays or pauses the race replay; Left and Right step the clock (Shift further, Ctrl less), Home and End jump to its ends, comma and period change the speed. */
 export function useRaceReplayKeys(clock: RaceClock): void {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const arrow = event.key === 'ArrowLeft' || event.key === 'ArrowRight';
-      if (replayShortcutBlocked(event, arrow)) return;
-      if (event.key === ' ' && !event.repeat) {
-        event.preventDefault();
-        clock.setPlaying(!clock.getState().playing);
-      } else if (arrow) {
-        event.preventDefault();
-        const step = (event.ctrlKey ? SEEK_NEAR_SEC : event.shiftKey ? SEEK_FAR_SEC : SEEK_SEC) * (event.key === 'ArrowLeft' ? -1 : 1);
-        clock.seek(clock.getState().timeSec + step);
-      } else if (event.key === 'Home' || event.key === 'End') {
-        event.preventDefault();
-        clock.seek(event.key === 'Home' ? clock.startSec : clock.endSec);
-      } else if (event.key === ',' || event.key === '.') {
-        event.preventDefault();
-        const at = RACE_SPEEDS.indexOf(clock.getState().speed as typeof RACE_SPEEDS[number]);
-        const next = RACE_SPEEDS[Math.max(0, Math.min(RACE_SPEEDS.length - 1, at + (event.key === ',' ? -1 : 1)))];
-        clock.setSpeed(next);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [clock]);
+  const seek = (event: KeyboardEvent) => {
+    const step = (event.ctrlKey ? SEEK_NEAR_SEC : event.shiftKey ? SEEK_FAR_SEC : SEEK_SEC) * (event.key === 'ArrowLeft' ? -1 : 1);
+    clock.seek(clock.getState().timeSec + step);
+  };
+  const speed = (event: KeyboardEvent) => {
+    const at = RACE_SPEEDS.indexOf(clock.getState().speed as typeof RACE_SPEEDS[number]);
+    clock.setSpeed(RACE_SPEEDS[Math.max(0, Math.min(RACE_SPEEDS.length - 1, at + (event.key === ',' ? -1 : 1)))]);
+  };
+  useReplayKeys({
+    ' ': () => clock.setPlaying(!clock.getState().playing),
+    ArrowLeft: { run: seek, repeat: true, ctrl: true }, ArrowRight: { run: seek, repeat: true, ctrl: true },
+    Home: { run: () => clock.seek(clock.startSec), repeat: true }, End: { run: () => clock.seek(clock.endSec), repeat: true },
+    ',': { run: speed, repeat: true }, '.': { run: speed, repeat: true },
+  }, 'page');
 }
 
 /** The race map's camera, as useGpsMapPanZoom gives it. */
@@ -53,24 +43,15 @@ const PAN_KEYS: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: 
  * C and F (map focused) and these act once: the first prevents the other. Off while `active` is false (a view kept loaded, hidden).
  */
 export function useRaceMapKeys(camera: RaceMapCamera, onToggleView?: () => void, active = true): void {
-  const onKey = useEffectEvent((event: KeyboardEvent) => {
-    if (!active || replayShortcutBlocked(event)) return;
-    const key = event.key.toLowerCase(), pan = PAN_KEYS[key];
-    if (pan) camera.panBy(...pan);
-    else if (key === '+' || key === '=') camera.zoomIn();
-    else if (key === '-') camera.zoomOut();
-    else if (key === '0' || key === 'r') camera.resetPanZoom();
-    else if (key === 'c' && !event.repeat) camera.centerOnCar();
-    else if (key === 'f' && !event.repeat) camera.setFollowCar(value => !value);
-    else if (key === 'e' && !event.repeat && onToggleView) onToggleView();
-    else return;
-    event.preventDefault();
-  });
-  useEffect(() => {
-    const handle = (event: KeyboardEvent) => onKey(event);
-    window.addEventListener('keydown', handle);
-    return () => window.removeEventListener('keydown', handle);
-  }, []);
+  const pan = (event: KeyboardEvent) => camera.panBy(...PAN_KEYS[event.key.toLowerCase()]);
+  const reset = { run: () => camera.resetPanZoom(), repeat: true };
+  useReplayKeys({
+    w: { run: pan, repeat: true }, a: { run: pan, repeat: true }, s: { run: pan, repeat: true }, d: { run: pan, repeat: true },
+    '+': { run: () => camera.zoomIn(), repeat: true }, '=': { run: () => camera.zoomIn(), repeat: true },
+    '-': { run: () => camera.zoomOut(), repeat: true }, '0': reset, r: reset,
+    c: () => camera.centerOnCar(), f: () => camera.setFollowCar(value => !value),
+    ...(onToggleView && { e: onToggleView }),
+  }, 'page', active);
 }
 
 /** Wait after the last move before writing the URL, so scrubbing does not rewrite history on every step. */

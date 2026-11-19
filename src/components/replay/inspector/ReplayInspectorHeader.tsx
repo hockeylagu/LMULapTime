@@ -8,7 +8,6 @@ import { ReplayCompareButton } from './compare/ReplayCompareButton.js';
 import { ReplayHeaderShell } from './ReplayHeaderShell.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { PLAYBACK_SPEEDS } from './replayFullscreenControls.js';
 import { Select } from '../../common/dropdown/Select.js';
 import { MODE_SWITCH_KEY, RaceModeContext, useModeSwitchKey } from '../race/raceModeContext.js';
 
@@ -53,11 +52,6 @@ export interface ReplayInspectorHeaderProps {
   baselineError?: string | null;
   isTrajLoading: boolean;
   isLoading?: boolean;
-  isPlaying: boolean;
-  onTogglePlay: () => void;
-  onRewind: () => void;
-  playbackSpeed: number;
-  onSelectPlaybackSpeed: (speed: number) => void;
   formatLapTime: (sec?: number | null) => string;
 }
 
@@ -68,7 +62,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   baselineSessionId, baselineLapNumber, baselineDriverOrdinal, baselineLapOrdinal, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter, compareControls, compareCarTypes, onChangeCompareControls,
   isCompareLapsLoading, comparePagination, compareLapsError, onRetryCompareLaps, onRetryBaseline, onChangeCompareLapFilter, onSelectCompareLap,
   isBaselineLoading, baselineError, isTrajLoading, isLoading = false,
-  isPlaying, onTogglePlay, onRewind, playbackSpeed, onSelectPlaybackSpeed, formatLapTime,
+  formatLapTime,
 }) => {
   const baselineSummary = baselineTrajectory?.laps?.find(l => l.lapNumber === (baselineTrajectory.currentLap ?? baselineLapNumber)) || baselineTrajectory?.laps?.[0];
   const isPrimaryBusy = isLoading || isTrajLoading;
@@ -86,14 +80,12 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         <button type="button" onClick={() => openRace(selectedDriverSlot, trajectory?.currentLap ?? null)} disabled={isLoading}
           title={`Session replay: every car of the session on one clock, from the cursor's moment of this lap (${MODE_SWITCH_KEY})`}
           aria-keyshortcuts={MODE_SWITCH_KEY}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-lg border border-lmu-border bg-lmu-bg px-2.5 text-xs text-lmu-text-soft hover:bg-lmu-card disabled:opacity-40 ${FOCUS_RING}`}>
+          className={`inline-flex h-8 w-[6.5rem] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-lmu-border bg-lmu-bg px-2.5 text-xs text-lmu-text-soft hover:bg-lmu-card disabled:opacity-40 ${FOCUS_RING}`}>
           <ListOrdered aria-hidden="true" className="h-3.5 w-3.5 text-lmu-accent-text" />Session
         </button>
       )}
       drivers={drivers} selectedDriverSlot={selectedDriverSlot} onSelectDriver={onSelectDriver}
       busy={isPrimaryBusy} loadingDrivers={isLoading}
-      playback={{ disabled: isPrimaryBusy || !trajectory?.points.length, isPlaying, onTogglePlay, onRewind,
-        speed: playbackSpeed, speeds: PLAYBACK_SPEEDS, onSelectSpeed: onSelectPlaybackSpeed }}
     >
         {trajectory?.laps && trajectory.laps.length > 0 && (
           <div role="group" aria-label="Lap" className="flex items-center gap-1">

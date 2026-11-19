@@ -42,6 +42,28 @@ describe('MapFullscreenButton', () => {
     expect(map).not.toHaveAttribute('aria-modal');
   });
 
+  it('keeps the replay header above the map and in its focus loop', () => {
+    render(<main><header data-replay-header><button>Compare</button></header><div><button data-testid="background">Background</button>
+      <div data-replay-surface="map" data-testid="map"><MapFullscreenButton /><button>Last map control</button></div></div></main>);
+    const header = document.querySelector<HTMLElement>('[data-replay-header]')!;
+    const compare = screen.getByRole('button', { name: 'Compare' });
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    const map = screen.getByTestId('map');
+    expect(header.inert).toBe(false);
+    expect(screen.getByTestId('background').inert).toBe(true);
+    expect(header.style.zIndex).toBe('1001');
+    expect(map.style.height).toMatch(/^calc\(100dvh - /);
+    // The header's controls take focus and lead the loop.
+    compare.focus();
+    expect(compare).toHaveFocus();
+    const last = screen.getByRole('button', { name: 'Last map control' });
+    last.focus(); fireEvent.keyDown(last, { key: 'Tab' });
+    expect(compare).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(header.style.zIndex).toBe('');
+    expect(map.style.height).toBe('');
+  });
+
   it('dismisses shortcut help before fullscreen and restores map focus', () => {
     render(<div data-replay-surface="map" tabIndex={0} data-testid="map">
       <MapFullscreenButton /><ReplayShortcutHelp />

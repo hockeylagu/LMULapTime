@@ -1,11 +1,14 @@
 import React, { useCallback, useId, useRef, useState } from 'react';
-import { MousePointer2, ZoomIn, Expand, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Activity } from 'lucide-react';
+import { ChartZoomControls, toolbarButton } from './ChartZoomControls.js';
+
+const DIVIDER = <span aria-hidden="true" className="mx-1.5 h-4 w-px shrink-0 bg-lmu-border" />;
+import { GpsMapPlaybackStrip } from '../map/telemetry/GpsMapPlaybackStrip.js';
 import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
 import { TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryPresetSelector } from './presets/TelemetryPresetSelector.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution } from './telemetryResolution.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
-import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { useOutsidePress } from '../../common/dropdown/useAnchoredPanel.js';
 
 export interface TelemetryStripToolbarProps {
@@ -25,7 +28,10 @@ export interface TelemetryStripToolbarProps {
   duckdbRawPointsCount?: number;
   duckdbRawSampleRateHz?: number;
   isFullResolution?: boolean;
+  /** Lap time at the cursor. */
   currentTimeSec?: number;
+  /** Distance from the start line at the cursor. */
+  currentDistM?: number;
   currentFrame?: number;
   totalFrames?: number;
   headerContent?: React.ReactNode;
@@ -59,6 +65,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   duckdbRawSampleRateHz,
   isFullResolution,
   currentTimeSec,
+  currentDistM,
   currentFrame,
   totalFrames,
   headerContent,
@@ -81,87 +88,38 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   useOutsidePress(isResPopoverOpen, [resolutionRef], closeResolution);
   const servedRate = source === 'duckdb' ? duckdbRawSampleRateHz : vcrRawSampleRateHz;
 
-  const formatElapsed = (sec?: number): string => {
-    const s = sec !== undefined && isFinite(sec) && sec >= 0 ? sec : 0;
-    const ms = Math.round(s * 1000);
-    const mins = Math.floor(ms / 60000);
-    const rem = ((ms % 60000) / 1000).toFixed(3).padStart(6, '0');
-    return `${mins}:${rem}`;
-  };
-
   return (
-    <div className="px-2 py-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 bg-lmu-surface border-b border-lmu-border/40 shrink-0 select-none z-[60]">
-      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+    // Short of room, the controls move below the lap readout as one group, instead of cutting or covering it.
+    <div className="px-2 py-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 whitespace-nowrap bg-lmu-surface border-b border-lmu-border/40 shrink-0 select-none z-[60]">
+      <div className="flex items-center gap-2">
         {headerContent && (
-          <div className="min-w-0 flex items-center shrink-0">
+          <div className="flex items-center">
             {headerContent}
           </div>
         )}
 
         {isZoomed && (
-          <span className="text-[10px] font-mono text-lmu-muted" title={`Zoomed: Frames ${viewStart + 1}–${viewEnd + 1}`}>
-            Zoomed: {spanTimeSec !== undefined ? `${spanTimeSec.toFixed(2)}s` : 'selected range'}
+          <span className="text-[11px] text-lmu-muted" title={`Zoomed: Frames ${viewStart + 1}–${viewEnd + 1}`}>
+            Zoomed: <span className="font-mono">{spanTimeSec !== undefined ? `${spanTimeSec.toFixed(2)} s` : 'selected range'}</span>
           </span>
         )}
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        {presets && presets.length > 0 && activePresetId && onSelectPreset && onOpenManageModal && (
+      {/* One compact scale (24px controls, 11px semibold labels, monospace only for numbers), groups split by a hairline. */}
+      <div className="ml-auto flex items-center gap-1 shrink-0">
+        {presets && presets.length > 0 && activePresetId && onSelectPreset && onOpenManageModal && <>
           <TelemetryPresetSelector
             presets={presets}
             activePresetId={activePresetId}
             onSelectPreset={onSelectPreset}
             onOpenManageModal={onOpenManageModal}
           />
-        )}
+          {DIVIDER}
+        </>}
 
-        {/* What dragging the chart does; restoring the full lap stays beside it. */}
-        <div role="group" aria-label="Chart drag mode" className="flex items-center gap-0.5 text-[10px] font-mono">
-          <span className="text-lmu-muted mr-1">Drag:</span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChangeInteractionMode('scrub');
-            }}
-            className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
-              interactionMode === 'scrub'
-                ? 'bg-lmu-raised text-white font-bold'
-                : 'text-lmu-muted hover:text-white'
-            } ${FOCUS_RING}`}
-            aria-pressed={interactionMode === 'scrub'}
-            title="Drag to move the cursor. Shift + wheel zooms, Shift + drag selects a range, Alt + drag pans, X or Alt + click drops marker A to measure time and delta to the cursor, double-click removes it."
-          >
-            <MousePointer2 className="w-3 h-3" />
-            Move cursor
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChangeInteractionMode('zoom');
-            }}
-            className={`px-2 py-0.5 rounded flex items-center gap-1 transition-all ${
-              interactionMode === 'zoom'
-                ? 'bg-lmu-raised text-white font-bold'
-                : 'text-lmu-muted hover:text-white'
-            } ${FOCUS_RING}`}
-            aria-pressed={interactionMode === 'zoom'}
-            title="Drag across the chart to zoom into a range. Double-click to show the full lap."
-          >
-            <ZoomIn className="w-2.5 h-2.5" />
-            Zoom range
-          </button>
-          <button type="button" disabled={!isZoomed}
-            onClick={(event) => { event.stopPropagation(); onResetZoom(); }}
-            title="Show the full lap. You can also double-click the chart."
-            className={`ml-1 pl-2 pr-1 py-0.5 border-l border-lmu-border flex items-center gap-1 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:cursor-not-allowed ${FOCUS_RING}`}>
-            <Expand className="w-3 h-3" /> Full lap
-          </button>
-        </div>
-
+        <ChartZoomControls compact interactionMode={interactionMode} onChangeInteractionMode={onChangeInteractionMode} isZoomed={isZoomed} onResetZoom={onResetZoom} />
         {markerButton}
-        <ReplayShortcutHelp />
+        {DIVIDER}
         {onChangeResolution && (
           <div ref={resolutionRef} className="relative z-[70]" onKeyDown={(event) => {
             if (event.key !== 'Escape' || !isResPopoverOpen) return;
@@ -180,12 +138,12 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
               aria-haspopup="dialog"
               aria-expanded={isResPopoverOpen}
               aria-controls={resolutionId}
-              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] text-lmu-muted hover:text-white ${isResPopoverOpen ? 'bg-lmu-raised text-white' : ''} ${FOCUS_RING}`}
+              className={`${toolbarButton(true)} ${isResPopoverOpen ? 'bg-lmu-raised text-lmu-text' : ''}`}
               title="Inspect replay telemetry resolution and configure recording fidelity"
             >
-              <Activity aria-hidden="true" className="w-2.5 h-2.5 text-lmu-muted" />
+              <Activity aria-hidden="true" className="w-3 h-3" />
               <span className="whitespace-nowrap">
-                <span className={source === 'duckdb' ? 'text-lmu-warn-soft' : 'text-lmu-muted'}>{servedRate ? `${servedRate}Hz` : 'Rate'}</span>{isFullResolution || telemetryResolution === 'full' ? ' • Full Raw' : ''}
+                <span className={`font-mono ${source === 'duckdb' ? 'text-lmu-warn-soft' : ''}`}>{servedRate ? `${servedRate} Hz` : 'Rate'}</span>{isFullResolution || telemetryResolution === 'full' ? ' · Full raw' : ''}
               </span>
             </button>
 
@@ -214,38 +172,10 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 text-[10px] font-mono text-lmu-muted pl-2 border-l border-white/10">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStepIndex?.(-1);
-            }}
-            disabled={currentFrame !== undefined && currentFrame <= 1}
-            className={`w-6 h-6 inline-flex items-center justify-center rounded hover:bg-white/5 text-lmu-muted hover:text-lmu-info-soft disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all cursor-pointer ${FOCUS_RING}`}
-            title="Move scrub line backward (Left Arrow, Shift for 10 frames)"
-            aria-label="Step backward (Left Arrow)"
-          >
-            <ChevronLeft className="w-3 h-3" />
-          </button>
-          <span className="text-white font-bold">{formatElapsed(currentTimeSec)}</span>
-          <span className="hidden sm:inline">
-            Frame {currentFrame ?? 1} / {totalFrames ?? 1}
-          </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStepIndex?.(1);
-            }}
-            disabled={currentFrame !== undefined && totalFrames !== undefined && currentFrame >= totalFrames}
-            className={`w-6 h-6 inline-flex items-center justify-center rounded hover:bg-white/5 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all cursor-pointer ${FOCUS_RING}`}
-            title="Move scrub line forward (Right Arrow, Shift for 10 frames)"
-            aria-label="Step forward (Right Arrow)"
-          >
-            <ChevronRight className="w-3 h-3" />
-          </button>
-        </div>
+        <ReplayShortcutHelp className="h-6 w-6 text-[11px]" />
+        {DIVIDER}
+        <GpsMapPlaybackStrip compact elapsedSec={currentTimeSec ?? 0} distanceM={currentDistM ?? 0}
+          onStep={onStepIndex} atStart={(currentFrame ?? 1) <= 1} atEnd={totalFrames !== undefined && (currentFrame ?? 1) >= totalFrames} />
       </div>
     </div>
   );

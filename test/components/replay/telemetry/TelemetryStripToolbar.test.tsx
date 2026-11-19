@@ -21,14 +21,17 @@ describe('TelemetryStripToolbar', () => {
     expect(handleChangeMode).toHaveBeenCalledWith('zoom');
   });
 
-  it('explains drag modes and restores the full lap view', () => {
-    const onReset = vi.fn();
-    const { rerender } = render(<TelemetryStripToolbar interactionMode="scrub" onChangeInteractionMode={vi.fn()} isZoomed={false} viewStart={0} viewEnd={100} onResetZoom={onReset} />);
-    expect(screen.getByRole('group', { name: 'Chart drag mode' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Move cursor' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Full lap' })).toBeDisabled();
-    rerender(<TelemetryStripToolbar interactionMode="zoom" onChangeInteractionMode={vi.fn()} isZoomed={true} viewStart={20} viewEnd={40} spanTimeSec={8.5} onResetZoom={onReset} />);
-    expect(screen.getByText('Zoomed: 8.50s')).toBeInTheDocument();
+  it('toggles Zoom range and shows Full lap only while zoomed', () => {
+    const onReset = vi.fn(); const onMode = vi.fn();
+    const { rerender } = render(<TelemetryStripToolbar interactionMode="scrub" onChangeInteractionMode={onMode} isZoomed={false} viewStart={0} viewEnd={100} onResetZoom={onReset} />);
+    expect(screen.queryByRole('button', { name: 'Move cursor' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Drag:')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zoom range' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('button', { name: 'Full lap' })).not.toBeInTheDocument();
+    rerender(<TelemetryStripToolbar interactionMode="zoom" onChangeInteractionMode={onMode} isZoomed={true} viewStart={20} viewEnd={40} spanTimeSec={8.5} onResetZoom={onReset} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Zoom range' }));
+    expect(onMode).toHaveBeenLastCalledWith('scrub');
+    expect(screen.getByText('8.50 s')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Full lap' }));
     expect(onReset).toHaveBeenCalledOnce();
   });
@@ -51,14 +54,15 @@ describe('TelemetryStripToolbar', () => {
       />
     );
 
-    const resBtn = screen.getByRole('button', { name: /^60Hz$/i });
+    const resBtn = screen.getByRole('button', { name: /^60 Hz$/i });
     expect(resBtn).toBeInTheDocument();
     expect(resBtn).not.toHaveTextContent(/pts/i);
 
     // Click to open resolution popover
     fireEvent.click(resBtn);
     expect(screen.getByText(/Telemetry Resolution & Fidelity/i)).toBeInTheDocument();
-    expect(screen.getByText(/60 Hz/i)).toBeInTheDocument();
+    // The button and the popover both name the rate.
+    expect(screen.getAllByText(/60 Hz/i).length).toBeGreaterThan(1);
   });
 
   it('displays Full Raw badge when resolution is full or isFullResolution is true', () => {
@@ -79,7 +83,7 @@ describe('TelemetryStripToolbar', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: /60Hz • Full Raw/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /60 Hz · Full raw/i })).toBeInTheDocument();
   });
 
   it('renders interactive data source switcher inside resolution popover and triggers onSelectSource', () => {
@@ -104,7 +108,7 @@ describe('TelemetryStripToolbar', () => {
     );
 
     // Open resolution popover
-    const resBtn = screen.getByRole('button', { name: /^100Hz$/i });
+    const resBtn = screen.getByRole('button', { name: /^100 Hz$/i });
     expect(resBtn).not.toHaveTextContent(/pts/i);
     fireEvent.click(resBtn);
 
@@ -121,7 +125,7 @@ describe('TelemetryStripToolbar', () => {
     expect(handleSelectSource).toHaveBeenCalledWith('duckdb');
   });
 
-  it('renders left and right arrows to move the scrub line and triggers onStepIndex', () => {
+  it('steps the cursor and reads out lap time and distance, not frames', () => {
     const handleStepIndex = vi.fn();
     render(
       <TelemetryStripToolbar
@@ -134,14 +138,15 @@ describe('TelemetryStripToolbar', () => {
         onStepIndex={handleStepIndex}
         currentFrame={50}
         totalFrames={100}
+        currentTimeSec={12.5}
+        currentDistM={1234}
       />
     );
 
-    const leftBtn = screen.getByRole('button', { name: /Step backward \(Left Arrow\)/i });
-    const rightBtn = screen.getByRole('button', { name: /Step forward \(Right Arrow\)/i });
-
-    expect(leftBtn).toBeInTheDocument();
-    expect(rightBtn).toBeInTheDocument();
+    const leftBtn = screen.getByRole('button', { name: 'Step backward' });
+    const rightBtn = screen.getByRole('button', { name: 'Step forward' });
+    expect(screen.getByText('1,234 m')).toBeInTheDocument();
+    expect(screen.queryByText(/Frame/)).not.toBeInTheDocument();
 
     fireEvent.click(leftBtn);
     expect(handleStepIndex).toHaveBeenCalledWith(-1);

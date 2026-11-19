@@ -87,6 +87,7 @@ describe('ReplayInspectorSidebar', () => {
     isSelfAnalysis: true,
     consistencyStats: { lapCount: 0, stats: [], leastConsistent: null },
     cornerConsistencyStats: [],
+    cornerConsistencyUnavailableReason: null,
     isCornerConsistencyLoading: false,
     handleSelectBaselineLap: vi.fn(),
     formatLapTime: (s?: number | null) => `${s ?? 0}s`,
@@ -255,6 +256,7 @@ describe('ReplayInspectorSidebar', () => {
         cornerSubView="consistency"
         consistencyStats={{ lapCount: 3, stats: [], leastConsistent: null }}
         cornerConsistencyStats={[]}
+        cornerConsistencyUnavailableReason={null}
       />
     );
 

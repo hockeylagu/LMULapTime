@@ -88,7 +88,7 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
           summaryRef.current?.focus();
         }
       }}>
-        <summary ref={summaryRef} aria-expanded={infoOpen} className="list-none flex items-center gap-1.5 text-[11px] text-lmu-muted hover:text-white aria-expanded:text-white cursor-pointer rounded px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text [&::-webkit-details-marker]:hidden">
+        <summary ref={summaryRef} aria-expanded={infoOpen} className="list-none flex items-center gap-1.5 text-[11px] text-lmu-muted hover:text-white aria-expanded:text-white cursor-pointer rounded py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text [&::-webkit-details-marker]:hidden">
           <Info aria-hidden="true" className="w-3.5 h-3.5" /> Info
         </summary>
         <div className={`absolute top-full left-0 mt-1 w-[360px] max-h-[70vh] overflow-y-auto custom-scrollbar text-xs z-50 ${DROPDOWN_PANEL} ${DROPDOWN_CONTENT_INSET}`}>

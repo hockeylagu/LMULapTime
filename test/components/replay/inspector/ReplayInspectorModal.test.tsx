@@ -426,9 +426,13 @@ describe('ReplayInspectorContent', () => {
         }}
         cornerStats={[
           {
+            turnId: 1,
+            label: 'T1',
+            title: 'Turn 1',
+            apexM: 10,
             cornerNumber: 1,
             lapsSampled: 3,
-            minDistM: 10,
+            turnInDistM: null,
             entrySpeedKmh: { count: 3, consistencyPct: 1, avg: 120, max: 125, min: 110, stdDev: 5, samples: [{ lapNumber: 1, value: 110 }, { lapNumber: 2, value: 120 }, { lapNumber: 3, value: 125 }] },
             apexSpeedKmh: { count: 3, consistencyPct: 1, avg: 100, max: 105, min: 95, stdDev: 4, samples: [{ lapNumber: 1, value: 95 }, { lapNumber: 2, value: 100 }, { lapNumber: 3, value: 105 }] },
             exitSpeedKmh: { count: 3, consistencyPct: 1, avg: 110, max: 112, min: 108, stdDev: 2, samples: [{ lapNumber: 1, value: 108 }, { lapNumber: 2, value: 110 }, { lapNumber: 3, value: 112 }] },

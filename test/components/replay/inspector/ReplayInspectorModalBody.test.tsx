@@ -78,8 +78,6 @@ describe('ReplayInspectorModalBody', () => {
         setCurrentIndex={vi.fn()}
         isPlaying={false}
         setIsPlaying={vi.fn()}
-        playbackSpeed={1}
-        setPlaybackSpeed={vi.fn()}
         chartZoomRange={null}
         setChartZoomRange={vi.fn()}
         telemetryResolution="high"
@@ -104,6 +102,7 @@ describe('ReplayInspectorModalBody', () => {
           leastConsistent: null,
         }}
         cornerConsistencyStats={[]}
+        cornerConsistencyUnavailableReason={null}
         isCornerConsistencyLoading={false}
         availableConsistencyLaps={[]}
         excludedConsistencyLaps={new Set()}
@@ -160,8 +159,6 @@ describe('ReplayInspectorModalBody', () => {
         setCurrentIndex={vi.fn()}
         isPlaying={false}
         setIsPlaying={vi.fn()}
-        playbackSpeed={1}
-        setPlaybackSpeed={vi.fn()}
         chartZoomRange={null}
         setChartZoomRange={vi.fn()}
         telemetryResolution="high"
@@ -186,6 +183,7 @@ describe('ReplayInspectorModalBody', () => {
           leastConsistent: null,
         }}
         cornerConsistencyStats={[]}
+        cornerConsistencyUnavailableReason={null}
         isCornerConsistencyLoading={false}
         availableConsistencyLaps={[]}
         excludedConsistencyLaps={new Set()}

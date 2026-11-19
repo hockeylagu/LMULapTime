@@ -54,8 +54,6 @@ export interface ReplayInspectorModalBodyProps {
   setCurrentIndex: (index: number) => void;
   isPlaying: boolean;
   setIsPlaying: (value: boolean) => void;
-  playbackSpeed: number;
-  setPlaybackSpeed: (speed: number) => void;
   chartZoomRange: { start: number; end: number } | null;
   setChartZoomRange: (range: { start: number; end: number } | null) => void;
   telemetryResolution: TelemetryResolution;
@@ -77,6 +75,7 @@ export interface ReplayInspectorModalBodyProps {
   consistencyStats: LapConsistencyStats;
   cornerConsistencyStats: CornerConsistencyStat[];
   isCornerConsistencyLoading: boolean;
+  cornerConsistencyUnavailableReason: string | null;
   availableConsistencyLaps: LapConsistencyOption[];
   excludedConsistencyLaps: Set<number>;
   toggleConsistencyLap: (lapNumber: number) => void;
@@ -136,8 +135,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   setCurrentIndex,
   isPlaying,
   setIsPlaying,
-  playbackSpeed,
-  setPlaybackSpeed,
   chartZoomRange,
   setChartZoomRange,
   telemetryResolution,
@@ -158,7 +155,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   isSelfAnalysis,
   consistencyStats,
   cornerConsistencyStats,
-  isCornerConsistencyLoading,
+  isCornerConsistencyLoading, cornerConsistencyUnavailableReason,
   availableConsistencyLaps,
   excludedConsistencyLaps,
   toggleConsistencyLap,
@@ -216,11 +213,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         compareLapsError={compareLapsError}
         onRetryCompareLaps={handleRetryCompareLaps}
         onRetryBaseline={handleRetryBaseline}
-        isPlaying={isPlaying}
-        onTogglePlay={() => setIsPlaying(!isPlaying)}
-        onRewind={() => { setIsPlaying(false); setCurrentIndex(0); }}
-        playbackSpeed={playbackSpeed}
-        onSelectPlaybackSpeed={setPlaybackSpeed}
         formatLapTime={formatLapTime}
       />
 
@@ -231,6 +223,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         </div>
       )}
 
+      <ReplayFullscreenControlsContext.Provider value={fullscreenControls ?? null}>
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         {!isExpanded && <ReplayInspectorTelemetryColumn
           metadata={metadata}
@@ -258,7 +251,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           onSelectSource={onSelectSource}
         />}
 
-        <ReplayFullscreenControlsContext.Provider value={fullscreenControls ?? null}><ReplayInspectorSidebar
+        <ReplayInspectorSidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           cornerCount={cornerCount}
@@ -285,15 +278,16 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           isSelfAnalysis={isSelfAnalysis}
           consistencyStats={consistencyStats}
           cornerConsistencyStats={cornerConsistencyStats}
-          isCornerConsistencyLoading={isCornerConsistencyLoading}
+          isCornerConsistencyLoading={isCornerConsistencyLoading} cornerConsistencyUnavailableReason={cornerConsistencyUnavailableReason}
           handleSelectBaselineLap={handleSelectBaselineLap} formatLapTime={formatLapTime}
           availableConsistencyLaps={availableConsistencyLaps} excludedConsistencyLaps={excludedConsistencyLaps}
           toggleConsistencyLap={toggleConsistencyLap}
           trackVenue={metadata?.trackVenue} trackCourse={metadata?.trackCourse}
           isExpanded={isExpanded} onToggleExpanded={onToggleExpanded}
           view={view} onChangeView={onChangeView}
-        /></ReplayFullscreenControlsContext.Provider>
+        />
       </div>
+      </ReplayFullscreenControlsContext.Provider>
     </main>
   );
 };

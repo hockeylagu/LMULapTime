@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { RaceReplayOverview, RaceReplayProgress, ReplayMetadata } from '../../../../shared/types/index.js';
-import { fetchRaceOverview, fetchRacePoseWindow, lastRaceOverview, fetchRaceProgress, fetchSessionTelemetryMetadata, lastSessionTelemetryMetadata } from '../../../api/replayApi.js';
+import { fetchRaceOverview, fetchRacePoseWindow, lastRaceOverview, fetchRaceDistances, fetchSessionTelemetryMetadata, lastSessionTelemetryMetadata } from '../../../api/replayApi.js';
 import { loadedRace3DView, loadRace3DView } from './raceModeContext.js';
 import { racePitSlots } from '../../../../shared/domain/raceReplay/poseWindow.js';
 import { isNonRaceSession } from '../../../../shared/domain/raceTraffic.js';
@@ -13,6 +13,7 @@ import { indexRaceStandings } from './raceStandings.js';
 import { RaceMapScene } from './RaceMapScene.js';
 import { RaceStandingsTower } from './RaceStandingsTower.js';
 import { RacePlaybackBar } from './RacePlaybackBar.js';
+import { RaceCarHud } from './RaceCarHud.js';
 import { useRaceReplayKeys, useRaceUrlSync } from './useRaceReplayControls.js';
 import { RaceReplayHeader } from './RaceReplayHeader.js';
 import { initialRaceTime } from './raceLaps.js';
@@ -120,7 +121,7 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
   useEffect(() => {
     if (isNonRaceSession(overview.sessionType)) return;
     const controller = new AbortController();
-    fetchRaceProgress(sessionId, { signal: controller.signal }).then(setProgress, () => {});
+    fetchRaceDistances(sessionId, { signal: controller.signal }).then(setProgress, () => {});
     return () => controller.abort();
   }, [sessionId, overview]);
   // A race's cars wait on the grid before the formation lap: the playback bar skips to where the followed car starts.
@@ -146,7 +147,7 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
   const view3d = (is3d || kept3d) && (
     <div className="contents" hidden={!is3d}>
       <Suspense fallback={<div className="relative min-w-0 flex-1 bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
-        <Race3D className="min-w-0 flex-1" overview={overview} index={index} clock={clock} poses={poses} followSlot={followSlot} progress={progress}
+        <Race3D className="min-w-0 flex-1" sessionId={sessionId} overview={overview} index={index} clock={clock} poses={poses} followSlot={followSlot} progress={progress}
           active={is3d} onToggleView={() => onViewChange('2d')} />
       </Suspense>
     </div>
@@ -159,13 +160,14 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
       <div className="flex min-h-0 flex-1">
         {view3d}
         {view === '2d' && (
-          <RaceMapScene className="min-w-0 flex-1" overview={overview} index={index} clock={clock} poses={poses}
+          <RaceMapScene className="min-w-0 flex-1" sessionId={sessionId} overview={overview} index={index} clock={clock} poses={poses}
             followSlot={followSlot} hoverSlot={hoverSlot} trackRequest={trackRequest} onFollow={setFollowSlot} onHover={setHoverSlot}
             onToggleView={() => onViewChange('3d')} />
         )}
         <RaceStandingsTower className="w-[360px] shrink-0" index={index} clock={clock} followSlot={followSlot}
           onFollow={setFollowSlot} pittedAt={timeSec => racePitSlots(poses.windowAt(timeSec), timeSec)} onTrack={slot => { setFollowSlot(slot); setTrackRequest(n => n + 1); }} onHover={setHoverSlot} />
       </div>
+      <RaceCarHud clock={clock} poses={poses} followSlot={followSlot} car={followSlot === null ? undefined : carsBySlot.get(followSlot)} />
       <RacePlaybackBar clock={clock} events={overview.events} cars={carsBySlot} followSlot={followSlot} laps={overview.laps} raceStartSec={raceStartSec} />
     </>
   );

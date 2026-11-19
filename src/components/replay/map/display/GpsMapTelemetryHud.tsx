@@ -9,11 +9,27 @@ export interface GpsMapTelemetryHudProps {
   baselinePoint?: ReplayTrajectoryPoint | null;
   /** Live lap delta; the trace under the HUD shows the speed and pedal differences at the cursor. */
   deltaTimeSec?: number | null;
+  /** Names the primary row (the race names the followed car); else "Primary". */
+  primaryLabel?: string;
   className?: string;
 }
 
+/** A label and its value, a fixed gap apart. */
+const Reading = ({ title, children }: { title?: string; children: React.ReactNode }) =>
+  <span className="inline-flex items-baseline gap-1.5" title={title}>{children}</span>;
+const Label = ({ children }: { children: React.ReactNode }) => <span className="text-[11px] text-lmu-muted">{children}</span>;
+const SLOT_WIDTH: Record<number, string> = { 2: 'w-[2ch]', 3: 'w-[3ch]', 4: 'w-[4ch]', 5: 'w-[5ch]', 8: 'w-[8ch]' };
+/** A value right-aligned in a monospace slot `ch` characters wide. */
+const Slot = ({ ch, color, className = '', children, 'aria-label': ariaLabel }: {
+  ch: number; color?: string; className?: string; children: React.ReactNode; 'aria-label'?: string;
+}) => <span aria-label={ariaLabel} className={`inline-block text-right font-mono tabular-nums ${SLOT_WIDTH[ch]} ${className}`} style={color ? { color } : undefined}>{children}</span>;
+/** A driver aid's light: always there, lit while the aid works. */
+const Aid = ({ on, tone, title, children }: { on?: boolean; tone: string; title: string; children: React.ReactNode }) =>
+  <span data-active={on ? '' : undefined} title={`${title}${on ? ' working' : ''}`}
+    className={`text-[10px] font-semibold ${on ? tone : 'text-lmu-muted/40'}`}>{children}</span>;
+
 export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(({
-  primaryPoint, baselinePoint, deltaTimeSec: rawDelta, className = '',
+  primaryPoint, baselinePoint, deltaTimeSec: rawDelta, primaryLabel = 'Primary', className = '',
 }) => {
   if (!primaryPoint) return null;
   const delta = hasReading(rawDelta) ? rawDelta : null;
@@ -32,26 +48,23 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
       ? `${Math.abs(point.accelLatG).toFixed(1)}${point.accelLatG > 0.05 ? 'L' : point.accelLatG < -0.05 ? 'R' : ''} · ${Math.abs(point.accelLonG).toFixed(1)}${point.accelLonG < -0.05 ? 'B' : 'A'}` : 'unavailable';
     // Only states worth a glance (limiter, pit lane, wet); being on track is the normal case.
     const status = getStatusLabel(point);
+    // Every value sits right-aligned in a slot as wide as its longest reading: nothing moves as the values change.
     return <div data-testid={baseline ? 'telemetry-hud-baseline' : 'telemetry-hud-primary'}
-      className="grid shrink-0 grid-cols-[60px_68px_52px_76px_84px_88px_52px_max-content] items-center gap-x-2 whitespace-nowrap text-xs 2xl:text-[13px]">
-      <span className="inline-flex items-center gap-1.5 text-[11px] text-lmu-muted"
+      className="flex shrink-0 items-baseline gap-x-6 whitespace-nowrap text-xs 2xl:text-[13px]">
+      <span className="inline-flex w-[64px] items-center gap-1.5 truncate text-[11px] text-lmu-muted"
         title={baseline ? 'Reference lap; dashed telemetry traces.' : 'Selected lap; solid telemetry traces.'}>
-        <span aria-hidden="true" className={baseline ? 'w-3 border-t border-dashed border-lmu-warn' : 'w-3 border-t border-lmu-info'} />
-        {baseline ? 'Baseline' : 'Primary'}
+        <span aria-hidden="true" className={baseline ? 'w-3 shrink-0 border-t border-dashed border-lmu-warn' : 'w-3 shrink-0 border-t border-lmu-info'} />
+        {baseline ? 'Baseline' : primaryLabel}
       </span>
-      <span className="font-mono tabular-nums"><span className="font-semibold">{formatReading(point.speedKmh)}</span> <span className="text-lmu-muted">km/h</span></span>
-      <span className="font-mono tabular-nums" title="Selected gear">GEAR {formatGear(point.gear)}</span>
-      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[11px]">THR</span><span style={{ color: TELEMETRY_COLORS.throttle }}>{formatReading(point.throttle, 0)}%</span>
-        {point.tcActive && <span className="text-[11px] text-lmu-warn">TC</span>}
-      </span>
-      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[11px]">BRK</span><span style={{ color: TELEMETRY_COLORS.brake }}>{formatReading(point.brake, 0)}%</span>
-        {point.absActive && <span className="text-[11px] text-lmu-info">ABS</span>}
-      </span>
-      <span className="inline-flex items-baseline gap-1"><span className="text-lmu-muted text-[11px]">STEER</span><span className="font-mono tabular-nums">{steering}</span></span>
-      <span className="font-mono tabular-nums" title={`G-force: ${accelerationDetail}`} aria-label={`G-force: ${accelerationDetail}`}>
-        {hasReading(totalG) ? `${totalG.toFixed(2)}G` : '--'}
-      </span>
-      {status ? <span className="text-[11px] text-lmu-warn" title={getStatusSubtext(point)}>{status}</span> : <span />}
+      <Reading><Slot ch={3} className="font-semibold">{formatReading(point.speedKmh, 0)}</Slot><Label>km/h</Label></Reading>
+      <Reading title="Selected gear"><Label>GEAR</Label><Slot ch={2} className="font-semibold">{formatGear(point.gear)}</Slot></Reading>
+      <Reading><Label>THR</Label><Slot ch={4} color={TELEMETRY_COLORS.throttle}>{formatReading(point.throttle, 0)}%</Slot>
+        <Aid on={point.tcActive} tone="text-lmu-warn" title="Traction control">TC</Aid></Reading>
+      <Reading><Label>BRK</Label><Slot ch={4} color={TELEMETRY_COLORS.brake}>{formatReading(point.brake, 0)}%</Slot>
+        <Aid on={point.absActive} tone="text-lmu-info" title="ABS">ABS</Aid></Reading>
+      <Reading><Label>STEER</Label><Slot ch={8}>{steering}</Slot></Reading>
+      <Reading title={`G-force: ${accelerationDetail}`}><Slot ch={5} aria-label={`G-force: ${accelerationDetail}`}>{hasReading(totalG) ? `${totalG.toFixed(2)}G` : '--'}</Slot></Reading>
+      {status && <span className="text-[11px] text-lmu-warn" title={getStatusSubtext(point)}>{status}</span>}
     </div>;
   };
 

@@ -81,35 +81,37 @@ describe('useTelemetryStripInteraction', () => {
     const points = makePoints(50);
     const onSelectIndex = vi.fn();
 
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useTelemetryStripInteraction({
         points,
         currentIndex: 20,
         onSelectIndex,
       })
     );
+    // The chart is on the page; nothing focused, so its keys arrive from the page itself.
+    result.current.containerRef.current = document.body.appendChild(document.createElement('div'));
 
     // Press ArrowLeft
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
     });
     expect(onSelectIndex).toHaveBeenCalledWith(19);
 
     // Press ArrowRight
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
     });
     expect(onSelectIndex).toHaveBeenCalledWith(21);
 
     // Shift steps 0.5 s rather than an arbitrary sample count.
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true }));
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight', shiftKey: true }));
     });
     expect(onSelectIndex).toHaveBeenCalledWith(25);
 
     // Press Shift+ArrowLeft (back 0.5 s)
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true }));
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft', shiftKey: true }));
     });
     expect(onSelectIndex).toHaveBeenCalledWith(15);
   });

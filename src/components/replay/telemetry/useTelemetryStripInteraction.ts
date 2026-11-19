@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
-import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { steppedIndex, useReplayKeys } from '../../../utils/replayShortcuts.js';
 import { placeGhostMarker, toggleGhostMarker, useGhostSync } from '../inspector/ghostSyncContext.js';
 import { DistanceWindow, fitDistanceWindow, normalizedWheelDelta, zoomDistanceWindow } from './telemetryViewport.js';
 
@@ -44,7 +44,6 @@ export function useTelemetryStripInteraction({
   const publishedRangeRef = useRef<{ start: number; end: number } | null>(null);
   const viewportRafRef = useRef<number | null>(null);
   const panRef = useRef<{ x: number; width: number; window: DistanceWindow } | null>(null);
-  const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   const altClickXRef = useRef<number | null>(null);
   // Marker A (X or Alt-click), shared with the map's From A ghost (see placeGhostMarker).
   const ghostSync = useGhostSync();
@@ -242,55 +241,21 @@ export function useTelemetryStripInteraction({
     onSelectIndex(newIdx);
   }, [totalPoints, safeIndex, onSelectIndex]);
 
-  // Keyboard navigation for Left and Right arrow keys to move the scrub line
-  keyHandlerRef.current = (e: KeyboardEvent) => {
-      if (!enabled || points.length === 0) return;
-      if (replayShortcutBlocked(e)) return;
-      const element = containerRef.current;
-      if (element && e.target instanceof Node && !element.contains(e.target)) return;
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        const direction = e.key === 'ArrowLeft' ? -1 : 1;
-        if (!e.shiftKey) onStepIndex(direction);
-        else {
-          const target = (points[safeIndex]?.timeSec ?? safeIndex / 40) + direction * 0.5;
-          let lo = 0; let hi = points.length - 1;
-          while (lo < hi) {
-            const mid = (lo + hi + 1) >> 1;
-            if ((points[mid].timeSec ?? mid / 40) <= target) lo = mid; else hi = mid - 1;
-          }
-          onSelectIndex(lo);
-        }
-      } else if (e.key === 'Home' || e.key === 'End') {
-        e.preventDefault(); onSelectIndex(e.key === 'Home' ? 0 : totalPoints - 1);
-      } else if (e.key === '+' || e.key === '=' || e.key === '-') {
-        e.preventDefault(); zoomBy(e.key === '-' ? 1.25 : 0.8, pctForIndex(safeIndex) / 100);
-      } else if (e.key === '0') {
-        e.preventDefault(); viewportRef.current = null; handleResetZoom();
-      } else if (e.key === 'Escape' && (isDraggingRef.current || dragSelection || panRef.current)) {
-        e.preventDefault(); handlePointerCancel();
-      } else if (e.key === 'Escape' && markerDistM !== null) {
-        e.preventDefault(); placeGhostMarker(ghostSync, null);
-      } else if (e.key.toLowerCase() === 'x' && !e.repeat && cumDists.length > 0) {
-        e.preventDefault(); toggleGhostMarker(ghostSync, cumDists[safeIndex] ?? 0);
-      }
-    };
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => keyHandlerRef.current(event);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  // The chart's keys: on the chart, or when nothing holds the keys (the map then leaves these to the chart).
+  const step = (event: KeyboardEvent) => onSelectIndex(steppedIndex(points, safeIndex, event.key === 'ArrowLeft' ? -1 : 1, event.shiftKey));
+  const zoom = (event: KeyboardEvent) => zoomBy(event.key === '-' ? 1.25 : 0.8, pctForIndex(safeIndex) / 100);
+  useReplayKeys({
+    ArrowLeft: { run: step, repeat: true }, ArrowRight: { run: step, repeat: true },
+    Home: () => onSelectIndex(0), End: () => onSelectIndex(totalPoints - 1),
+    '+': { run: zoom, repeat: true }, '=': { run: zoom, repeat: true }, '-': { run: zoom, repeat: true },
+    '0': () => { viewportRef.current = null; handleResetZoom(); },
+    Escape: () => {
+      if (isDraggingRef.current || dragSelection || panRef.current) handlePointerCancel();
+      else if (markerDistM !== null) placeGhostMarker(ghostSync, null);
+      else return false;
+    },
+    x: () => (cumDists.length > 0 ? toggleGhostMarker(ghostSync, cumDists[safeIndex] ?? 0) : false),
+  }, containerRef, enabled && points.length > 0);
 
   return {
     containerRef,

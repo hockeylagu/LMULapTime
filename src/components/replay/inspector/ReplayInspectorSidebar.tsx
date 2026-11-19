@@ -43,6 +43,7 @@ export interface ReplayInspectorSidebarProps {
   consistencyStats: LapConsistencyStats;
   cornerConsistencyStats: CornerConsistencyStat[];
   isCornerConsistencyLoading: boolean;
+  cornerConsistencyUnavailableReason: string | null;
   handleSelectBaselineLap: (lapNumber: number) => void;
   formatLapTime: (sec?: number | null) => string;
   availableConsistencyLaps: LapConsistencyOption[];
@@ -91,6 +92,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   consistencyStats,
   cornerConsistencyStats,
   isCornerConsistencyLoading,
+  cornerConsistencyUnavailableReason,
   handleSelectBaselineLap,
   formatLapTime,
   availableConsistencyLaps,
@@ -262,6 +264,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                 stats={consistencyStats}
                 cornerStats={cornerConsistencyStats}
                 isLoadingCornerStats={isCornerConsistencyLoading}
+                cornerStatsUnavailableReason={cornerConsistencyUnavailableReason}
                 onSelectCorner={handleSelectCorner}
                 onSelectBaselineLap={handleSelectBaselineLap}
                 formatLapTime={formatLapTime}

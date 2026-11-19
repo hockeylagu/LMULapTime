@@ -12,6 +12,7 @@ import { useTelemetryStripInteraction } from '../../telemetry/useTelemetryStripI
 import { AVAILABLE_TELEMETRY_CHANNELS, type TelemetryChannelId } from '../../telemetry/presets/telemetryPresets.js';
 import { GpsMapCompactTrace } from './GpsMapCompactTrace.js';
 import { GpsMapPlaybackStrip } from './GpsMapPlaybackStrip.js';
+import { ChartZoomControls } from '../../telemetry/ChartZoomControls.js';
 import { GpsMapTraceCursorChips } from './GpsMapTraceCursorChips.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { Select } from '../../../common/dropdown/Select.js';
@@ -111,13 +112,7 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
       </div>
       <span aria-hidden="true" className="h-5 w-px bg-lmu-border" />
       {!collapsed && <>
-        <button type="button" className={`${buttonClass} ${interactionMode === 'zoom' ? 'bg-lmu-raised text-lmu-text' : ''}`} aria-pressed={interactionMode === 'zoom'}
-          title="Select a range by dragging. Shift-drag also selects a range; double-click restores the full lap."
-          onClick={() => setInteractionMode(mode => mode === 'scrub' ? 'zoom' : 'scrub')}>
-          Zoom range
-        </button>
-        {isZoomed && <button type="button" className={buttonClass}
-          onClick={handleResetZoom}>Full lap</button>}
+        <ChartZoomControls interactionMode={interactionMode} onChangeInteractionMode={setInteractionMode} isZoomed={isZoomed} onResetZoom={handleResetZoom} />
         <MarkerAButton markerDistM={markerDistM} cursorDistM={cumDists[safeIndex]} onToggle={toggleMarkerAtCursor} className="h-7 text-xs" />
         {activeChannel === 'pedals' && <span className="flex gap-3 text-[11px] text-lmu-muted">
           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.throttle }} />Throttle</span>
@@ -126,7 +121,9 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         {activeChannel === 'delta' && <span className="text-[11px] text-lmu-muted" title="Green shading shows time gained; red shading shows time lost.">− ahead / + behind</span>}
       </>}
       <div className="ml-auto flex shrink-0 items-center gap-3">
-      <GpsMapPlaybackStrip isPlaying={isPlaying} onTogglePlay={onTogglePlay} elapsedSec={elapsedSec} distanceM={distanceM} />
+      <GpsMapPlaybackStrip isPlaying={isPlaying} onTogglePlay={onTogglePlay} elapsedSec={elapsedSec} distanceM={distanceM}
+        onStep={delta => onSelectIndex(Math.max(0, Math.min(points.length - 1, safeIndex + delta)))}
+        atStart={safeIndex <= 0} atEnd={safeIndex >= points.length - 1} />
       <button type="button" className={buttonClass}
         aria-label={collapsed ? 'Show telemetry trace' : 'Hide telemetry trace'} aria-expanded={!collapsed} aria-controls={contentId}
         title={collapsed ? 'Show trace (T)' : 'Hide trace (T)'} aria-keyshortcuts="T" onClick={onToggleTrace}>

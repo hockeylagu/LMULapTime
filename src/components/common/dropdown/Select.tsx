@@ -6,6 +6,7 @@ import {
   DROPDOWN_TRIGGER, DROPDOWN_TRIGGER_COMPACT, DROPDOWN_TRIGGER_FILTER,
 } from './dropdownStyles.js';
 import { useAnchoredPanel, useOutsidePress } from './useAnchoredPanel.js';
+import { replayKeysOn } from '../../../utils/replayShortcuts.js';
 
 export type SelectValue = string | number;
 
@@ -91,6 +92,8 @@ export function Select<T extends SelectValue>({
     return index;
   };
   const openList = (index = selectedIndex >= 0 ? selectedIndex : step(-1, 1)) => { setOpen(true); setActive(index); };
+  // Focus came with the mouse (until it leaves): the closed trigger then leaves keys alone.
+  const pointerFocused = useRef(false);
   // Keep the active option in view; test DOMs have no scrollIntoView.
   useLayoutEffect(() => {
     if (open && host && active >= 0) document.getElementById(`${baseId}-${active}`)?.scrollIntoView?.({ block: 'nearest' });
@@ -111,6 +114,9 @@ export function Select<T extends SelectValue>({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    // Closed after a mouse pick on a replay page, the replay's shortcuts keep their keys (Space, letters, arrows); Tab back to
+    // it to type ahead. Elsewhere the trigger keeps its keys.
+    if (!open && pointerFocused.current && replayKeysOn()) return;
     const { key } = event;
     const printable = key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && (key !== ' ' || typed.current.text !== '' && event.timeStamp - typed.current.at < 500);
     if (printable) {
@@ -162,7 +168,8 @@ export function Select<T extends SelectValue>({
     }} id={id} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId}
       aria-activedescendant={open && active >= 0 ? `${baseId}-${active}` : undefined} aria-busy={busy || undefined}
       aria-label={aria['aria-label']} title={title ?? (selected ? textOf(selected) : undefined)} disabled={disabled} data-value={value ?? ''}
-      className={`${trigger} ${className}`} onClick={() => open ? setOpen(false) : openList()} onKeyDown={onKeyDown}>
+      className={`${trigger} ${className}`} onClick={() => open ? setOpen(false) : openList()} onKeyDown={onKeyDown}
+      onPointerDown={() => { pointerFocused.current = true; }} onBlur={() => { pointerFocused.current = false; }}>
       {icon}
       {caption && <span className={DROPDOWN_CAPTION}>{caption}</span>}
       <span className={`min-w-0 flex-1 truncate text-left ${mono ? 'font-mono' : ''} ${selected ? '' : 'text-lmu-muted'}`}>{shown}</span>

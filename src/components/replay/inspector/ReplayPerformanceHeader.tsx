@@ -43,79 +43,82 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
   const isS3Best = Boolean(currentLapSummary.s3Sec && bestS3Sec && Math.abs(currentLapSummary.s3Sec - bestS3Sec) < 0.0005);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 py-1 shrink-0">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-black tracking-wider text-white uppercase flex items-center gap-1.5 pl-1">
-          <Flag className="w-3.5 h-3.5 text-lmu-accent-text" />
-          Lap {currentLap}
-        </span>
-        {currentLapSummary.isOutLap && (
-          <span className="px-2 py-0.5 rounded-full bg-lmu-warn-strong/20 border border-lmu-warn-strong/40 text-lmu-warn-soft font-bold text-[10px]">
-            Outlap
+    <div className="flex flex-wrap items-center gap-x-3">
+      {/* The lap time and the sectors stay on one line. */}
+      <div className="flex items-center gap-3 whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-black tracking-wider text-white uppercase flex items-center gap-1.5 pl-1">
+            <Flag className="w-3.5 h-3.5 text-lmu-accent-text" />
+            Lap {currentLap}
           </span>
-        )}
-        <span
-          className={`text-xs font-mono font-bold ${isPersonalBest ? 'text-lmu-personal-best' : currentLapSummary.isBest ? 'text-lmu-session-best' : 'text-white'}`}
-          title={isPersonalBest ? 'Personal best · Replay GPS lap time' : currentLapSummary.isBest ? 'Session best · Replay GPS lap time' : 'Replay GPS lap time'}
-        >
-          {formatLapTime(currentLapSummary.lapTimeSec)}
-        </span>
+          {currentLapSummary.isOutLap && (
+            <span className="px-2 py-0.5 rounded-full bg-lmu-warn-strong/20 border border-lmu-warn-strong/40 text-lmu-warn-soft font-bold text-[10px]">
+              Outlap
+            </span>
+          )}
+          <span
+            className={`text-xs font-mono font-bold ${isPersonalBest ? 'text-lmu-personal-best' : currentLapSummary.isBest ? 'text-lmu-session-best' : 'text-white'}`}
+            title={isPersonalBest ? 'Personal best · Replay GPS lap time' : currentLapSummary.isBest ? 'Session best · Replay GPS lap time' : 'Replay GPS lap time'}
+          >
+            {formatLapTime(currentLapSummary.lapTimeSec)}
+          </span>
 
-        {/* Overall Lap Delta Pill against Baseline */}
-        {isCompareMode && baselineTrajectory && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5  text-[11px] font-mono">
-            {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
-              <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'}`}>
-                Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s
+          {/* Overall Lap Delta Pill against Baseline */}
+          {isCompareMode && baselineTrajectory && (
+            <div className="flex items-center gap-1.5 px-2 py-0.5  text-[11px] font-mono">
+              {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
+                <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'}`}>
+                  Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s
+                </span>
+              ) : (
+                <span className="text-lmu-muted">--</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 text-xs font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="text-lmu-muted text-[10px]">S1</span>
+            <span className={`font-bold ${isS1Best ? 'text-lmu-gold' : 'text-white'}`} title={isS1Best ? 'Session-best sector 1' : 'Sector 1'}>{currentLapSummary.s1Sec?.toFixed(3) ?? '--'}s</span>
+            {isCompareMode && lapDeltas?.s1Delta !== null && lapDeltas?.s1Delta !== undefined && (
+              <span
+                className={`text-[10px] font-bold ${
+                  lapDeltas.s1Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
+                }`}
+              >
+                {lapDeltas.s1Delta <= 0 ? '' : '+'}{lapDeltas.s1Delta.toFixed(3)}s
               </span>
-            ) : (
-              <span className="text-lmu-muted">--</span>
             )}
           </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 text-xs font-mono">
-        <div className="flex items-center gap-1.5">
-          <span className="text-lmu-muted text-[10px]">S1</span>
-          <span className={`font-bold ${isS1Best ? 'text-lmu-gold' : 'text-white'}`} title={isS1Best ? 'Session-best sector 1' : 'Sector 1'}>{currentLapSummary.s1Sec?.toFixed(3) ?? '--'}s</span>
-          {isCompareMode && lapDeltas?.s1Delta !== null && lapDeltas?.s1Delta !== undefined && (
-            <span
-              className={`text-[10px] font-bold ${
-                lapDeltas.s1Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
-              }`}
-            >
-              {lapDeltas.s1Delta <= 0 ? '' : '+'}{lapDeltas.s1Delta.toFixed(3)}s
-            </span>
-          )}
-        </div>
-        <span className="text-lmu-faint" aria-hidden="true">|</span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-lmu-muted text-[10px]">S2</span>
-          <span className={`font-bold ${isS2Best ? 'text-lmu-blue' : 'text-white'}`} title={isS2Best ? 'Session-best sector 2' : 'Sector 2'}>{currentLapSummary.s2Sec?.toFixed(3) ?? '--'}s</span>
-          {isCompareMode && lapDeltas?.s2Delta !== null && lapDeltas?.s2Delta !== undefined && (
-            <span
-              className={`text-[10px] font-bold ${
-                lapDeltas.s2Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
-              }`}
-            >
-              {lapDeltas.s2Delta <= 0 ? '' : '+'}{lapDeltas.s2Delta.toFixed(3)}s
-            </span>
-          )}
-        </div>
-        <span className="text-lmu-faint" aria-hidden="true">|</span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-lmu-muted text-[10px]">S3</span>
-          <span className={`font-bold ${isS3Best ? 'text-lmu-green' : 'text-white'}`} title={isS3Best ? 'Session-best sector 3' : 'Sector 3'}>{currentLapSummary.s3Sec?.toFixed(3) ?? '--'}s</span>
-          {isCompareMode && lapDeltas?.s3Delta !== null && lapDeltas?.s3Delta !== undefined && (
-            <span
-              className={`text-[10px] font-bold ${
-                lapDeltas.s3Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
-              }`}
-            >
-              {lapDeltas.s3Delta <= 0 ? '' : '+'}{lapDeltas.s3Delta.toFixed(3)}s
-            </span>
-          )}
+          <span className="text-lmu-faint" aria-hidden="true">|</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-lmu-muted text-[10px]">S2</span>
+            <span className={`font-bold ${isS2Best ? 'text-lmu-blue' : 'text-white'}`} title={isS2Best ? 'Session-best sector 2' : 'Sector 2'}>{currentLapSummary.s2Sec?.toFixed(3) ?? '--'}s</span>
+            {isCompareMode && lapDeltas?.s2Delta !== null && lapDeltas?.s2Delta !== undefined && (
+              <span
+                className={`text-[10px] font-bold ${
+                  lapDeltas.s2Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
+                }`}
+              >
+                {lapDeltas.s2Delta <= 0 ? '' : '+'}{lapDeltas.s2Delta.toFixed(3)}s
+              </span>
+            )}
+          </div>
+          <span className="text-lmu-faint" aria-hidden="true">|</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-lmu-muted text-[10px]">S3</span>
+            <span className={`font-bold ${isS3Best ? 'text-lmu-green' : 'text-white'}`} title={isS3Best ? 'Session-best sector 3' : 'Sector 3'}>{currentLapSummary.s3Sec?.toFixed(3) ?? '--'}s</span>
+            {isCompareMode && lapDeltas?.s3Delta !== null && lapDeltas?.s3Delta !== undefined && (
+              <span
+                className={`text-[10px] font-bold ${
+                  lapDeltas.s3Delta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'
+                }`}
+              >
+                {lapDeltas.s3Delta <= 0 ? '' : '+'}{lapDeltas.s3Delta.toFixed(3)}s
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

@@ -230,7 +230,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         totalFrames={points.length}
         headerContent={headerContent}
         markerOverlay={markerOverlay}
-        markerButton={<MarkerAButton markerDistM={markerDistM} cursorDistM={cumDists[safeIndex]} onToggle={toggleMarkerAtCursor} className="py-0.5 text-[10px] font-mono" />}
+        markerButton={<MarkerAButton markerDistM={markerDistM} cursorDistM={cumDists[safeIndex]} onToggle={toggleMarkerAtCursor} className="h-6 rounded-lg text-[11px]" />}
         dragSelection={dragSelection}
         markerPcts={metrics} activeChannels={activePreset?.channels}
         presets={presets} activePresetId={activePresetId} onSelectPreset={handleSelectPreset}

@@ -40,7 +40,7 @@ describe('GpsMapTelemetryHud', () => {
 
     expect(screen.getByTestId('gps-map-telemetry-hud')).toBeInTheDocument();
     expect(screen.getByText('227')).toBeInTheDocument();
-    expect(screen.getByText('GEAR 5')).toBeInTheDocument();
+    expect(screen.getByTitle('Selected gear')).toHaveTextContent('GEAR5');
     expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByText('0%')).toBeInTheDocument();
     expect(screen.queryByText('ON TRACK')).not.toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.queryByTestId('telemetry-hud-baseline')).toBeNull();
   });
 
-  it('renders TC and ABS badges when active on primary car', () => {
+  it('lights the TC and ABS lights while the aids work, keeping them in place otherwise', () => {
     const activeAssists: ReplayTrajectoryPoint = {
       ...mockPrimary,
       tcActive: true,
@@ -57,10 +57,13 @@ describe('GpsMapTelemetryHud', () => {
       brake: 80,
     };
 
-    render(<GpsMapTelemetryHud primaryPoint={activeAssists} />);
+    const { rerender } = render(<GpsMapTelemetryHud primaryPoint={activeAssists} />);
+    expect(screen.getByText('TC')).toHaveAttribute('data-active');
+    expect(screen.getByText('ABS')).toHaveAttribute('data-active');
 
-    expect(screen.getByText('TC')).toBeInTheDocument();
-    expect(screen.getByText('ABS')).toBeInTheDocument();
+    rerender(<GpsMapTelemetryHud primaryPoint={{ ...activeAssists, tcActive: false, absActive: false }} />);
+    expect(screen.getByText('TC')).not.toHaveAttribute('data-active');
+    expect(screen.getByText('ABS')).not.toHaveAttribute('data-active');
   });
 
   it('renders two rows (Primary and Baseline) when baselinePoint is provided', () => {
@@ -162,7 +165,7 @@ describe('GpsMapTelemetryHud', () => {
   it('keeps missing and non-finite channels unavailable', () => {
     render(<GpsMapTelemetryHud primaryPoint={{ x: 0, y: 0, z: 0, speedKmh: NaN, throttle: Infinity }} />);
     const row = screen.getByTestId('telemetry-hud-primary');
-    expect(row).toHaveTextContent('GEAR --');
+    expect(row).toHaveTextContent('GEAR--');
     expect(row).not.toHaveTextContent('UNKNOWN');
     expect(row).not.toHaveTextContent('0.00G');
     expect(row).not.toHaveTextContent('NaN');
@@ -171,7 +174,7 @@ describe('GpsMapTelemetryHud', () => {
 
   it.each([[0, 'N'], [-1, 'R'], [8, '8']])('preserves recorded gear %s as %s', (gear, label) => {
     render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, gear }} />);
-    expect(screen.getByText(`GEAR ${label}`)).toBeInTheDocument();
+    expect(screen.getByTitle('Selected gear')).toHaveTextContent(`GEAR${label}`);
   });
 
   it('shows the pit lane with the air temperature, nothing on track', () => {

@@ -105,6 +105,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         duckdbRawSampleRateHz={duckdbRawSampleRateHz}
         isFullResolution={isFullResolution}
         currentTimeSec={currentTimeSec}
+        currentDistM={currentDistM}
         currentFrame={safeIndex + 1}
         totalFrames={totalFrames}
         headerContent={headerContent}

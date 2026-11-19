@@ -71,8 +71,6 @@ interface Props {
   controlsBefore?: ReactNode;
   /** After the view switch (fullscreen). */
   controlsAfter?: ReactNode;
-  isPlaying?: boolean;
-  onTogglePlay?: () => void;
   /** Below the scene (telemetry). */
   bottom?: ReactNode;
   streamingClassName?: string;
@@ -82,7 +80,7 @@ interface Props {
 export function Scene3DFrame({
   surface, host, scene, state, mode, onModeChange, followMode, onRetry, onToggleView, active = true, expanded, className = '', ariaLabel,
   hostLabel = '3D track. Drag to orbit, scroll to zoom. Left/Right: step replay. WASD: pan camera.',
-  top, children, overlays, controlsBefore, controlsAfter, isPlaying, onTogglePlay, bottom, streamingClassName = 'bottom-2',
+  top, children, overlays, controlsBefore, controlsAfter, bottom, streamingClassName = 'bottom-2',
 }: Props) {
   useCameraModeShortcuts(surface, onModeChange);
   useEffect(() => { if (active) surface.current?.focus({preventScroll: true}); }, [active, surface]);
@@ -97,7 +95,7 @@ export function Scene3DFrame({
         {children}
         <MapControlsOverlay onZoomIn={actions.onZoomIn} onZoomOut={actions.onZoomOut} onReset={actions.onReset}
           followCar={followsCar(mode)} onToggleFollowCar={actions.onToggleFollow}
-          onCenterCar={actions.onCenter} isPlaying={isPlaying} onTogglePlay={onTogglePlay}
+          onCenterCar={actions.onCenter}
           orientation="horizontal" className={`top-2 right-3 bottom-auto ${NARROW_SCENE_CONTROLS}`}>
           <CameraModeControl mode={mode} onChange={onModeChange} />
           {controlsBefore}
