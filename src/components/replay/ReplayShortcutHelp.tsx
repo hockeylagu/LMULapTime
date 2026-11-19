@@ -51,7 +51,7 @@ const SHORTCUTS: Record<ShortcutView, string[][]> = { telemetry: shortcuts, '3d'
 const TITLES: Record<ShortcutView, string> = { telemetry: 'Telemetry shortcuts', '3d': '3D replay shortcuts', race: 'Race replay shortcuts', race3d: 'Race 3D shortcuts' };
 const NOTES = {
   telemetry: 'The keys work anywhere on the replay; the arrows, Home/End, + / − and X move the chart, or the map when it is focused or fullscreen. Dragging the map pauses following.',
-  '3d': 'Follow is the default. Drag, pan or zoom without leaving Follow. Choose a mode with 1–6; camera controls and typing keep their own keys.',
+  '3d': 'Follow is the default. Drag, pan or zoom without leaving Follow. Choose a mode with 1–8; camera controls and typing keep their own keys.',
   race: 'The keys work anywhere on the race replay. Dragging the map pauses following.',
   race3d: 'The keys work anywhere on the race replay; choose a camera with 1–8 on the 3D view. Chase is the default.',
 };
