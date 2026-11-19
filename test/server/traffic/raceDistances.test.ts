@@ -38,6 +38,14 @@ describe('raceDistancesFromPasses', () => {
     expect(distances[60]).toBe(2600);
   });
 
+  it('drops a grid wait in the last turn counted as lap 1, so lap 1 keeps its distance', () => {
+    // Waits on the grid in T2 (before the line) from 0 s to 40 s, joined to the start; lap 1 from 40 s.
+    const progress = raceDistancesFromPasses(data([pass(4, 1, 1, 0, 40), pass(4, 1, 0, 40, 50), pass(4, 1, 1, 50, 60)]));
+    expect(progress.fromSec).toBe(40);
+    const distances = progress.cars[0].distances;
+    expect([distances[0], distances[10], distances[20]]).toEqual([100, 600, 1100]);
+  });
+
   it('keeps the distance going forward, skipping a pass timed back across the line', () => {
     const progress = raceDistancesFromPasses(data([pass(3, 2, 0, 0, 10), pass(3, 1, 1, 10, 20), pass(3, 2, 1, 20, 30)]));
     const distances = progress.cars[0].distances.filter((distance): distance is number => distance !== null);

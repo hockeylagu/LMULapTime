@@ -29,8 +29,11 @@ function carRuns(passes: SessionCornerPasses & { available: true }, slot: number
     knots.push([pass.exitSec, base + turn.endM]);
     for (const knot of knots) {
       const last = run[run.length - 1];
+      // A step back of more than half a lap: the run so far was behind the line but counted in the lap ahead (a grid wait
+      // in the last turn joined to the start), so the run starts again here.
+      if (last && knot[0] >= last[0] && knot[1] < last[1] - length / 2) run = [];
       // Time and distance only go forward; a knot that would step back (a pass re-timed across the line) is skipped.
-      if (!last || (knot[0] > last[0] && knot[1] >= last[1])) run.push(knot);
+      if (!run.length || (knot[0] > run[run.length - 1][0] && knot[1] >= run[run.length - 1][1])) run.push(knot);
     }
     lastExit = pass.exitSec;
   }
