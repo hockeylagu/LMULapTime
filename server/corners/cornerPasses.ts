@@ -1,7 +1,9 @@
 /**
- * Corner passes: each car's time through each turn segment of each lap, with the cues of how it
- * drove it (layer 1 and 2 of docs/plans/proposed/CORNER_INSIGHT.md). Built once per replay from
- * its stored laps at full rate; never a source of truth.
+ * Corner passes: each car's time through each turn segment (or turn sequence) of each lap, with the
+ * cues of how it drove it. Built once per replay from its stored laps at full rate, at ingestion;
+ * never a source of truth. Only replay laps have passes (a telemetry-only session has none), and a
+ * replay whose passes are missing or of another version shows "not built": they are rebuilt offline,
+ * never on open.
  */
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 

@@ -34,7 +34,7 @@ Compare only like with like: same driver, car, layout and dry conditions.
   Deterministic; never AI.
 - History starts with the next built debrief. Older sessions join only when their debrief is opened (about 4 s from
   the stored replays); no background backfill.
-- Corner numbers come from the layout's fixed centre-line segments ([corner insight](CORNER_INSIGHT.md), layer 1), so
+- Corner numbers come from the layout's fixed centre-line segments (the official turns, [corner passes](../../CODE_MAP.md#3-life-of-a-replay-lap-vcr--telemetry-studio)), so
   they are stable between sessions. A track or patch grip change
   can move times too: always show the earlier session's date.
 

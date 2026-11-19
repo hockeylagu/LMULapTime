@@ -1,7 +1,7 @@
 import type { LayoutTurnList, TurnDirection, TurnLabelSource } from './turnLists.js';
 
 /**
- * Places a layout's turns on its centre line (docs/plans/proposed/CORNER_INSIGHT.md, layer 1).
+ * Places a layout's turns on its centre line. A misplaced turn is a fix to this rule, never a per-layout coordinate.
  *
  * The centre line's bends are found from its curvature; each bend is one lobe of curvature in one
  * direction, split where a long bend has two apexes. With an official list, the list decides which

@@ -12,6 +12,15 @@ import {
 } from './cornerPassService.js';
 import { readSequenceLapsInWorker } from './cornerPassWorkerClient.js';
 
+/*
+ * Turn sequences (driver, 2026-11-19): the official turns a class drives as one corner. One map per layout and class
+ * from the class's fastest laps, not one per session, so a sequence means the same in every session and history across
+ * sessions is one query. The map grows at ingestion until it has SEQUENCE_MAP_LAPS laps, then stays: a faster lap
+ * later cannot swing the vote, and its driving shows through its own passes. A recheck only flags a map that differs;
+ * it changes on purpose alone (Settings regeneration, or the offline script's --remap). The detection thresholds are
+ * the same for every class: the class difference comes from each class's own laps.
+ */
+
 /** A map is built from this many laps, then stays as it is. */
 export const SEQUENCE_MAP_LAPS = 10;
 /** The driver's own fastest laps it is checked against. */

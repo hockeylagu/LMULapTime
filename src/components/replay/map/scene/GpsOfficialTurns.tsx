@@ -26,7 +26,7 @@ export interface OfficialTurnMark {
 export interface OfficialTurnTick { id: number; at: Point; normal: Point }
 
 /**
- * The layout's official turns (docs/plans/proposed/CORNER_INSIGHT.md, layer 1) projected on the map's centre line:
+ * The layout's official turns projected on the map's centre line:
  * a badge outside each apex and a tick at each segment's start. `centerSvg` is the centre line projected point for point.
  */
 export function projectOfficialTurns(geometry: TrackBoundaryGeometry | null | undefined, centerSvg: readonly Point[]):

@@ -159,7 +159,7 @@ interface Props {
 }
 
 /**
- * The corner insight card (docs/plans/proposed/CORNER_INSIGHT.md): the followed car's pass through the corner it is in,
+ * The corner insight card: the followed car's pass through the corner it is in,
  * against its usual and the class's fastest, and the turn's strip over the session. The whole pass shows from the
  * turn's entry; fixed size, a value the pass lacks shows "–" or "none".
  */

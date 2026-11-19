@@ -1,7 +1,7 @@
 /**
  * Each layout's corner count as the game's own layout file states it, read once on 2026-11-18 (and once again for a
  * new layout, never exported continuously). A check on the official turn lists only: it never places or labels a
- * turn (docs/plans/proposed/CORNER_INSIGHT.md, step one decision 1).
+ * turn, and the game's own turn numbers never label one.
  */
 export const GAME_CORNER_COUNTS: Readonly<Record<string, number>> = {
   bahrain_endurance: 24, bahrain_outer: 11, bahrain_paddock: 10, bahrain_wec: 15,

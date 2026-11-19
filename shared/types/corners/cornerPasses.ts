@@ -1,7 +1,7 @@
 import type { NonRepresentativeReason } from '../session.js';
 
 /**
- * Corner passes (docs/plans/proposed/CORNER_INSIGHT.md): one car's drive through one official turn segment
+ * Corner passes: one car's drive through one official turn segment
  * of one lap, built per replay from its stored laps (server/corners/).
  */
 export interface CornerPass {

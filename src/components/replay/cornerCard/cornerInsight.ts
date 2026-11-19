@@ -12,9 +12,9 @@ export const MIN_USUAL_PASSES = 3;
 const TRAFFIC_GAP_SEC = 1;
 
 /**
- * Which passes set a car's usual and its class's best (docs/plans/proposed/CORNER_INSIGHT.md, the card): racing laps
- * by the parser's flags, lap 1 left out, and laps left out for contact or off pace; laps tagged for traffic count
- * ("it's a race, not a hotlap"). One rule for every session type.
+ * Which passes set a car's usual and its class's best: racing laps by the parser's flags, lap 1 left out,
+ * and laps left out for contact or off pace; laps tagged for traffic count ("it's a race, not a hotlap"). One rule for
+ * every session type. Marks on the strip only explain; the lap-level clean average still leaves traffic laps out.
  */
 export function lapCounts(lap: CornerPassLap | undefined): boolean {
   if (!lap || lap.lapNumber <= 1 || !lap.isValid || lap.isPitStop || lap.isOutLap) return false;

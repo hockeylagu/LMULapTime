@@ -1,12 +1,14 @@
 /**
- * The official turns of each layout, in driving order from the start line (layer 1 of
- * docs/plans/proposed/CORNER_INSIGHT.md). Real-world facts from the cited sources, never invented:
+ * The official turns of each layout, in driving order from the start line: the fixed segments every lap of every
+ * car is timed through, comparable across cars, classes and sessions. Real-world facts from the cited sources, never invented:
  * a number comes from the circuit's own map ('official'), from that map's labelled turns with the
  * unlabelled numbers between them filled in order ('filled'), or from a racing series' published
  * numbering ('series'); a name comes from the circuit's or the series' pages. A direction is given only
  * where a source states it, and a map position only where a map labels the turn. A layout missing here
- * gets its turns from the centre line's own bends, unnumbered. Any change here changes the layout's
- * segments: bump TURN_LISTS_VERSION.
+ * gets its turns from the centre line's own bends, unnumbered. A turn with no number goes by its official name,
+ * else by its position: never a number of our own. A variant (Bahrain Outer, Sebring School...) keeps the full
+ * layout's numbers and names for the turns it shares, so T3 stays T3. The game's data only checks the count
+ * (gameCornerCounts.ts). Any change here changes the layout's segments: bump TURN_LISTS_VERSION.
  */
 
 export type TurnDirection = 'left' | 'right';

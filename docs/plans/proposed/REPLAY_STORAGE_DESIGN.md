@@ -33,12 +33,12 @@ Proposed direction (not measured yet):
   stay its source.
 - **Everything else is derived from those laps on demand**, in the worker that already decodes them, and held in memory:
   the 10 Hz race poses, the centre-line distance of every sample (the shared track reference the
-  [corner insight](CORNER_INSIGHT.md) plan needs; the race positions index already computes it, at 5 Hz) and the corner
-  passes.
+  corner passes are built on) and the corner passes.
 - **A derived result is stored only when measured too slow**, keyed by a version key (rule version, geometry revision,
   parser version), built at ingestion, rebuilt offline when the key changes and never a source of truth. The first one,
-  the [corner insight](CORNER_INSIGHT.md) passes, is SQL rows keyed like `replay_laps` (driver, 2026-11-18). The race
-  positions index is retired (2026-11-18, corner insight step 5: the live gaps come from the passes); the native lap
+  the [corner passes](../../CODE_MAP.md#3-life-of-a-replay-lap-vcr--telemetry-studio), is SQL rows keyed like
+  `replay_laps` (driver, 2026-11-18; about 82 bytes a pass, +1.5% of the database). The race positions index is retired
+  (2026-11-18: the live gaps come from the passes); the native lap
   cache moves to the one pattern later.
 - No further full copies of the samples (below); the distance channel is one column per lap, and only if stored.
 

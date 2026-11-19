@@ -157,10 +157,8 @@ items and the open code-review findings.
 
 ## Unstarted proposals
 
-- [Corner insight](proposed/CORNER_INSIGHT.md): an always-on card for the corner the car is in, against its own race
-  and its class; corners as fixed centre-line segments plus driving sequences detected per lap; passes computed on demand
-  for both lap and race views, built once per session into a disposable cache (on demand measured at ~45 s on Le Mans).
-  The Consistency panel and the debrief move onto the same passes. Plan accepted; step one (official turns) done.
+- Rival duel: two cars' corner passes over the same laps, on the corner passes and sequences already built
+  (corner insight delivered 2026-11-19; see [code map](../CODE_MAP.md#3-life-of-a-replay-lap-vcr--telemetry-studio)).
 - [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
   driver decisions first (Crew Chief overlap, voice, naming).
 - [Live wetness projection](proposed/LIVE_WETNESS_PROJECTION.md): when the track will reach the next wetness step,

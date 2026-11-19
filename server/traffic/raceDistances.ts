@@ -58,9 +58,10 @@ function sweep(runs: Knot[][], fromSec: number, hz: number, count: number): Arra
 }
 
 /**
- * Every car's distance along the track once a second, from the session's corner passes (docs/plans/proposed/
- * CORNER_INSIGHT.md, step 5): linear between each turn's entry, slowest point and exit, as timing loops at every turn
- * boundary would read it. Null in the pit lane and garage, where a car has no passes.
+ * Every car's distance along the track once a second, from the session's corner passes: linear between each turn's
+ * entry, slowest point and exit, as timing loops at every turn boundary would read it. Null in the pit lane and
+ * garage, where a car has no passes. The per-second gap was kept over a gap read only at turn boundaries (driver,
+ * 2026-11-19): that one updated every 8.6 s typically and up to 61 s on Le Mans' straights.
  */
 export function raceDistancesFromPasses(passes: SessionCornerPasses & { available: true }, hz = RACE_DISTANCES_HZ): RaceReplayProgress {
   const slots = [...new Set(passes.passes.map(pass => pass.slot))].sort((a, b) => a - b);
