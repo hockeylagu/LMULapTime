@@ -67,6 +67,16 @@ describe('endpoint benchmark coverage and comparisons', () => {
     } finally { fetch.mockRestore(); }
   });
 
+  it('times a binary response without parsing it as JSON', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      new Uint8Array([0x4c, 0x4d, 0x52, 0x50, 0, 1]), { status: 200, headers: { 'Content-Type': 'application/octet-stream' } },
+    ));
+    try {
+      const result = await measureRequest('http://localhost', '/api/session/example/race/poses?window=0');
+      expect(result).toMatchObject({ status: 200, bytes: 6, body: null });
+    } finally { fetch.mockRestore(); }
+  });
+
   it('classifies every current endpoint, including optional routes without private data', () => {
     const db = new SessionDatabase(':memory:');
     try {
@@ -151,6 +161,8 @@ describe('endpoint benchmark coverage and comparisons', () => {
       const response = await measureRequest(server.baseUrl, '/api/sessions?page=1&pageSize=5');
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ sessions: [{ id: fixture.id }] });
+      // Every production router is mounted, the corner sequences' included.
+      expect((await measureRequest(server.baseUrl, '/api/corner-sequences/maps')).status).toBe(200);
       expect(source.getDb().prepare('SELECT projection_version FROM sessions WHERE id = ?').get(fixture.id))
         .toEqual(sourceProjection);
       expect(source.isSessionSummaryReady()).toBe(false);

@@ -15,6 +15,7 @@ import { createAiRouter } from '../../server/routes/aiRoutes.js';
 import { createDataPluginRouter } from '../../server/routes/dataPluginRoutes.js';
 import { createSystemRouter } from '../../server/routes/systemRoutes.js';
 import { createReferenceRouter } from '../../server/routes/referenceRoutes.js';
+import { createCornerSequenceRouter } from '../../server/routes/cornerSequenceRoutes.js';
 import { createSessionRouter } from '../../server/routes/sessionRoutes.js';
 import { createLeaderboardRouter } from '../../server/routes/leaderboardRoutes.js';
 import { createReplayRouter } from '../../server/routes/replayRoutes.js';
@@ -63,6 +64,7 @@ export async function startBenchmarkServer(snapshot: string) {
   app.use('/api/ai', createAiRouter(store));
   app.use('/api', createSystemRouter(context));
   app.use('/api', createReferenceRouter(context));
+  app.use('/api', createCornerSequenceRouter(context));
   app.use('/api', createSessionRouter(context));
   app.use('/api', createLeaderboardRouter(context));
   app.use('/api', createReplayRouter(context));
@@ -90,6 +92,10 @@ export async function measureRequest(baseUrl: string, url: string): Promise<Http
   const response = await fetch(new URL(url, baseUrl), { signal: AbortSignal.timeout(120_000), headers: { Connection: 'close' } });
   const buffer = await response.arrayBuffer();
   const ms = performance.now() - start;
+  // Binary bodies (the race pose windows) are timed and sized, not parsed.
+  if (response.ok && response.headers.get('content-type')?.startsWith('application/octet-stream')) {
+    return { ms, bytes: buffer.byteLength, status: response.status, body: null };
+  }
   const text = Buffer.from(buffer).toString('utf8');
   let body: unknown;
   try { body = JSON.parse(text); }
