@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { applySearchParamUpdates, updateSearchParams } from '../../utils/urlParams.js';
 import { ReplayInspectorContent } from './inspector/ReplayInspectorContent.js';
@@ -8,6 +8,7 @@ import { RaceReplayView } from './race/RaceReplayView.js';
 import { fetchRaceOverview } from '../../api/replayApi.js';
 import { loadRace3DView, RaceModeContext } from './race/raceModeContext.js';
 import { SceneShellsContext, useSharedSceneShells } from './view3d/scene/sceneShells.js';
+import { TelemetryVisit } from './telemetryVisit.js';
 
 /** How long after the lap view opens the session replay's overview is asked for (about 0.2 s of server work, 80 KB). */
 const OVERVIEW_AHEAD_MS = 1000;
@@ -19,7 +20,7 @@ const numberParam = (value: string | null): number | null => {
 };
 
 export const ReplayInspectorPage: React.FC = () => {
-  const { pathname } = useLocation();
+  const { pathname, key: locationKey } = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
@@ -39,53 +40,44 @@ export const ReplayInspectorPage: React.FC = () => {
     markerDistM, setMarkerDistM,
   }), [syncMode, markerDistM, searchParams, setSearchParams]);
   const isRace = searchParams.get('mode') === 'race';
-  const readHistoryIdx = (): number | null => {
-    const state = window.history.state as { idx?: unknown } | null;
-    return typeof state?.idx === 'number' ? state.idx : null;
-  };
-  const [entryHistoryIdx] = useState<number | null>(() => readHistoryIdx());
-  const internalDepthRef = useRef(0);
+  // Where Back leaves to, kept across a remount (hot reload, page reload).
+  const [visit] = useState(() => new TelemetryVisit(isRace));
+  useEffect(() => { visit.noteEntry(); }, [visit, locationKey]);
   // Leaving the race replay, the lap view comes back on the lap it showed instead of loading it again.
   const [fromRace, setFromRace] = useState(false);
   // Seconds into the lap the other mode opens at: the lap view's cursor for the race, the race clock for the lap view.
   const [handoffLapSec, setHandoffLapSec] = useState<number | null>(null);
   const openRace = useCallback((slot: number | null, lapNumber: number | null, lapSec?: number | null) => {
-    internalDepthRef.current += 1;
+    visit.markRaceFromLap();
     setHandoffLapSec(lapSec ?? null);
     setSearchParams(
       (prev) => applySearchParamUpdates(prev || searchParams, {
         mode: 'race', car: slot === null ? null : String(slot), lap: lapNumber === null ? null : String(lapNumber), t: null,
       }),
     );
-  }, [searchParams, setSearchParams]);
+  }, [visit, searchParams, setSearchParams]);
 
-  const closeRace = useCallback(() => {
-    setFromRace(true); setHandoffLapSec(null);
-    const currentIdx = readHistoryIdx();
-    const canPopToLap = (currentIdx !== null && entryHistoryIdx !== null && currentIdx > entryHistoryIdx)
-      || internalDepthRef.current > 0;
-    if (canPopToLap) {
-      internalDepthRef.current = Math.max(0, internalDepthRef.current - 1);
-      void navigate(-1);
-      return;
-    }
-    updateSearchParams(searchParams, setSearchParams, { mode: null, t: null, car: null, lap: null });
-  }, [entryHistoryIdx, navigate, searchParams, setSearchParams]);
-
+  // Back leaves the page for the entry before the one it opened on, however many race views it opened since.
   const closeTelemetry = useCallback(() => {
     if (!sessionId) return;
-    const currentIdx = readHistoryIdx();
-    if (currentIdx !== null && entryHistoryIdx !== null) {
-      const stepsBack = Math.max(1, currentIdx - entryHistoryIdx + 1);
-      if (currentIdx < stepsBack) {
-        void navigate(`/session/${encodeURIComponent(sessionId)}`, { replace: true });
-        return;
-      }
-      void navigate(-stepsBack);
+    const { currentIdx, entryIdx } = visit;
+    const stepsBack = currentIdx !== null && entryIdx !== null ? Math.max(1, currentIdx - entryIdx + 1) : 1;
+    if (currentIdx !== null && currentIdx < stepsBack) {
+      void navigate(`/session/${encodeURIComponent(sessionId)}`, { replace: true });
       return;
     }
-    void navigate(-(1 + internalDepthRef.current));
-  }, [entryHistoryIdx, navigate, sessionId]);
+    void navigate(-stepsBack);
+  }, [visit, navigate, sessionId]);
+
+  // Back from the race returns where it was opened from: the lap view (the entry before, pushed by `openRace`), or the
+  // page before the telemetry page when it opened on the race, so Back never leads into a lap view the user did not come from.
+  const closeRace = useCallback(() => {
+    setFromRace(true); setHandoffLapSec(null);
+    if (!visit.raceFromLap) { closeTelemetry(); return; }
+    const { currentIdx, entryIdx } = visit;
+    if (currentIdx !== null && entryIdx !== null && currentIdx > entryIdx) { void navigate(-1); return; }
+    updateSearchParams(searchParams, setSearchParams, { mode: null, t: null, car: null, lap: null });
+  }, [visit, navigate, closeTelemetry, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (pathname !== '/telemetry' && pathname !== '/replay') return;

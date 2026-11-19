@@ -64,7 +64,7 @@ vi.mock('../../../../src/components/replay/race/RaceReplayView.js', () => ({
 }));
 
 describe('ReplayInspectorPage', () => {
-  beforeEach(() => { window.location.hash = '#/replay'; });
+  beforeEach(() => { window.location.hash = '#/replay'; sessionStorage.clear(); });
 
   it('redirects to the dashboard when no session is selected', async () => {
     render(<ReplayInspectorPage />);
@@ -158,7 +158,7 @@ describe('ReplayInspectorPage', () => {
     await waitFor(() => expect(window.location.hash).toContain('/'));
   });
 
-  it('returns from race view to lap view on Race Back, and clears mode=race when opened directly', async () => {
+  it('returns from race view to lap view on Race Back when the lap view opened it', async () => {
     window.location.hash = '#/telemetry?sessionId=session-1&view=2d';
     render(<ReplayInspectorPage />);
 
@@ -169,12 +169,16 @@ describe('ReplayInspectorPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Race Back' }));
     await waitFor(() => expect(screen.getByTestId('mock-inspector')).toBeInTheDocument());
     expect(window.location.hash).not.toContain('mode=race');
+  });
 
+  it('leaves for the page before on Race Back when the race was opened directly, not into a lap view', async () => {
+    // The test router has one entry, so going back stays; the old Back turned this race into the lap view.
     window.location.hash = '#/telemetry?sessionId=session-1&view=2d&mode=race';
     render(<ReplayInspectorPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Race Back' }));
-    await waitFor(() => expect(screen.getAllByTestId('mock-inspector').length).toBeGreaterThan(0));
-    expect(window.location.hash).not.toContain('mode=race');
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.queryByTestId('mock-inspector')).not.toBeInTheDocument();
+    expect(window.location.hash).toContain('mode=race');
   });
 
   it('keeps the 3D view and the moment between the lap view and the race, both ways', async () => {
