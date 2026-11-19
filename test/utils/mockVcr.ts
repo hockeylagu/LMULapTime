@@ -63,7 +63,7 @@ export function createMockVcrBuffer(): Buffer {
 }
 
 /** An event header (docs/VCR_FORMAT.md §3.2): route 0, session code 0 unless given. */
-export function vcrEventHeader(opcode: number, size: number, slot: number, sessionCode = 0): Buffer {
+function vcrEventHeader(opcode: number, size: number, slot: number, sessionCode = 0): Buffer {
   const header = Buffer.alloc(4);
   header.writeUInt32LE(((sessionCode << 26) | (opcode << 17) | (size << 8) | (slot & 0xff)) >>> 0, 0);
   return header;

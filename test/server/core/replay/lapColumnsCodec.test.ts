@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isDeepStrictEqual } from 'node:util';
 import zlib from 'node:zlib';
 import { decodeLapColumns, encodeLapColumns, type LapColumn, type StoredLapColumns } from '../../../../server/core/replay/lapColumnsCodec.js';
 
@@ -100,7 +101,10 @@ describe('binary lap columns', () => {
       timeSec: Array.from({ length: n }, (_, i) => Number((i * 0.02).toFixed(4))),
       x: Array.from({ length: n }, (_, i) => Number((Math.sin(i / 900) * 800).toFixed(4))),
     });
-    expect(decodeLapColumns<TestLap>(encodeLapColumns(stored))).toStrictEqual(stored);
+    const decoded = decodeLapColumns<TestLap>(encodeLapColumns(stored));
+    // Vitest's matcher walks these 400,000 values in ~270 ms. Node's strict deep equality is at least as strict
+    // (SameValue numbers, so -0 and NaN; same keys and prototypes) in ~7 ms; on a mismatch the matcher reports the diff.
+    if (!isDeepStrictEqual(decoded, stored)) expect(decoded).toStrictEqual(stored);
   });
 
   it('stores an empty lap', () => {

@@ -12,9 +12,9 @@ import {
   parseViewBox,
   isRunInViewBox,
   isPointInViewBox,
-} from '../../src/components/replay/map/replayMapUtils.js';
-import type { ReplayTrajectoryPoint } from '../../shared/types/index.js';
-import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
+} from '../../../../src/components/replay/map/replayMapUtils.js';
+import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
+import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../src/utils/lapAlignment.js';
 
 describe('replayMapUtils', () => {
   const mockPoints: ReplayTrajectoryPoint[] = [

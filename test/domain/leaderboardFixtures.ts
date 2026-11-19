@@ -1,7 +1,7 @@
 import type { DetailedSession, DriverData, LapData } from '../../shared/types/index.js';
 
-export const MONZA_VENUE = 'Autodromo Nazionale Monza';
-export const MONZA_GP = 'Autodromo Nazionale Monza';
+const MONZA_VENUE = 'Autodromo Nazionale Monza';
+const MONZA_GP = 'Autodromo Nazionale Monza';
 export const MONZA_CURVA_GRANDE = 'Monza Curva Grande Circuit';
 
 /** A flying lap; sectors split the time 30/40/30 unless given. */

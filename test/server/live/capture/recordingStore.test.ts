@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -43,21 +43,45 @@ const READBACK_SQL = `SELECT (SELECT count(*) FROM capture_samples) AS samples, 
   (SELECT CAST(manifest_json AS VARCHAR) FROM capture_manifest WHERE singleton = TRUE) AS manifest
   FROM capture_samples ORDER BY sample_index LIMIT 1`;
 
-function readInChild(filename: string): Record<string, Json> {
+/**
+ * A clean reader process, started before the file exists so its Node and DuckDB start (~250 ms) overlap the
+ * worker's. It opens the file only when `read` sends the filename, after the worker has exited.
+ */
+function startChildReader() {
   const source = `
     const { DuckDBInstance } = require('@duckdb/node-api');
-    (async () => {
-      const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
+    let input = '';
+    process.stdin.setEncoding('utf8').on('data', chunk => { input += chunk; }).on('end', () => (async () => {
+      const [filename, sql] = JSON.parse(input);
+      const instance = await DuckDBInstance.create(filename, { access_mode: 'READ_ONLY' });
       const connection = await instance.connect();
       try {
-        process.stdout.write(JSON.stringify((await connection.runAndReadAll(process.argv[2])).getRowObjectsJson()[0]));
+        process.stdout.write(JSON.stringify((await connection.runAndReadAll(sql)).getRowObjectsJson()[0]));
       } finally {
         connection.closeSync();
         instance.closeSync();
       }
-    })().catch(error => { console.error(error); process.exitCode = 1; });
+    })().catch(error => { console.error(error); process.exitCode = 1; }));
   `;
-  return JSON.parse(execFileSync(process.execPath, ['-e', source, filename, READBACK_SQL], { encoding: 'utf8' })) as Record<string, Json>;
+  const child = spawn(process.execPath, ['-e', source], { stdio: ['pipe', 'pipe', 'pipe'] });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.setEncoding('utf8').on('data', (chunk: string) => { stdout += chunk; });
+  child.stderr.setEncoding('utf8').on('data', (chunk: string) => { stderr += chunk; });
+  const exited = new Promise<number | null>((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+  return {
+    async read(filename: string): Promise<Record<string, Json>> {
+      child.stdin.end(JSON.stringify([filename, READBACK_SQL]));
+      const code = await exited;
+      if (code !== 0) throw new Error(`Reader process exited ${code}: ${stderr}`);
+      return JSON.parse(stdout) as Record<string, Json>;
+    },
+    /** Ends a reader the test never used: an empty input makes it exit. */
+    async close(): Promise<void> {
+      if (!child.stdin.writableEnded) child.stdin.end();
+      await exited;
+    },
+  };
 }
 
 afterEach(async () => {
@@ -67,16 +91,20 @@ afterEach(async () => {
 describe('LiveCaptureRecordingStore worker', () => {
   it('writes typed samples and sparse JSON evidence, then reopens read-only in a clean process', async () => {
     const directory = await createDirectory();
-    const writer = await createWriter(directory);
+    const reader = startChildReader();
+    let readback: Record<string, Json>;
     const batch = makeBatch();
-    const answer = await writer.send(batch);
-    expect(answer.type).toBe('persisted');
-    if (answer.type !== 'persisted') throw new Error('Expected persisted result');
-    expect(answer.manifest).toEqual(batch.manifest);
-    expect(answer.bytes).toBeGreaterThan(0);
-    await writer.close();
+    try {
+      const writer = await createWriter(directory);
+      const answer = await writer.send(batch);
+      expect(answer.type).toBe('persisted');
+      if (answer.type !== 'persisted') throw new Error('Expected persisted result');
+      expect(answer.manifest).toEqual(batch.manifest);
+      expect(answer.bytes).toBeGreaterThan(0);
+      await writer.close();
 
-    const readback = readInChild(path.join(directory, batch.manifest.filename));
+      readback = await reader.read(path.join(directory, batch.manifest.filename));
+    } finally { await reader.close(); }
     expect(readback.samples).toBe('2');
     expect(readback.observations).toBe('1');
     expect(readback.velocity).toBe(0);

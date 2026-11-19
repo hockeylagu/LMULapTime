@@ -150,10 +150,10 @@ export function testSun(): ScenerySun {
 }
 
 /** A synthetic Hosek-Wilkie A–I with a strong glow around the sun (not the published data). */
-export const TEST_HOSEK_DISTRIBUTION = [-1.07, -0.17, 1.11, 3.67, -4.25, 0.88, 0.16, 1.95, 0.69];
+const TEST_HOSEK_DISTRIBUTION = [-1.07, -0.17, 1.11, 3.67, -4.25, 0.88, 0.16, 1.95, 0.69];
 
 /** Hosek-Wilkie datasets (albedo × turbidity × control point) holding one distribution and radiance per channel everywhere. */
-export function testHosekDatasets(distributions: number[][], radiances: number[]): Pick<SceneryHosekSky, 'coefficients' | 'radiances'> {
+function testHosekDatasets(distributions: number[][], radiances: number[]): Pick<SceneryHosekSky, 'coefficients' | 'radiances'> {
   const channel = (values: number[]) => Array.from({ length: values.length * 6 * 10 * 2 }, (_, i) => values[i % values.length]);
   return {
     coefficients: distributions.map(channel) as SceneryHosekSky['coefficients'],

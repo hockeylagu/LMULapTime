@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
+import { memoryDatabase } from '../../../helpers/memoryDatabase.js';
 import { getLiveCaptureIndexRows, setLiveCaptureAvailability, setLiveCaptureMatch, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { getLearningSource, readCurrentLearningExamples } from '../../../../server/core/live/dbLiveLearningStore.js';
 import { evaluateLiveLearning } from '../../../../server/live/learning/report.js';
@@ -11,17 +12,6 @@ import { learningCohort } from '../../../../shared/domain/learning/cohort.js';
 import type { AutomaticLearningState } from '../../../../shared/domain/learning/automatic.js';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 import type { StoredLearningEvent } from '../../../../shared/types/liveLearning.js';
-
-const databases: SessionDatabase[] = [];
-afterEach(() => {
-  for (const db of databases.splice(0)) db.close();
-});
-
-function database(): SessionDatabase {
-  const db = new SessionDatabase(':memory:');
-  databases.push(db);
-  return db;
-}
 
 function addSession(db: SessionDatabase): void {
   const raw = db.getDb();
@@ -58,7 +48,7 @@ function manifest(overrides: Partial<LiveCaptureManifest> = {}): LiveCaptureMani
 }
 
 function verifiedDatabase(): { db: SessionDatabase; capture: LiveCaptureManifest } {
-  const db = database();
+  const db = memoryDatabase();
   addSession(db);
   const capture = manifest();
   upsertLiveCapture(db.getDb(), capture, 4096);

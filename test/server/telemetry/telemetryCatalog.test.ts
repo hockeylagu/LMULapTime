@@ -1,15 +1,8 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
-import { SessionDatabase } from '../../../server/core/db.js';
+import { memoryDatabase } from '../../helpers/memoryDatabase.js';
 import type { DuckDbFileInfo, enrichDuckDbDirectory } from '../../../server/telemetry/telemetryMatcher.js';
 
-const databases: SessionDatabase[] = [];
-afterEach(() => { for (const db of databases.splice(0)) db.close(); });
-function database(): SessionDatabase {
-  const db = new SessionDatabase(':memory:');
-  databases.push(db);
-  return db;
-}
 function file(directory = 'C:\\fake', filename = 'Spa_P.duckdb'): DuckDbFileInfo {
   return { filename, filePath: `${directory}\\${filename}`, mtimeMs: 1000, fileSizeBytes: 2048,
     trackName: 'Spa', sessionType: 'P', timestampStr: '', timestampEpochMs: 0 };
@@ -17,7 +10,7 @@ function file(directory = 'C:\\fake', filename = 'Spa_P.duckdb'): DuckDbFileInfo
 
 describe('TelemetryCatalog', () => {
   it('does not materialize metadata at construction or for status; reads current SQLite rows on demand', () => {
-    const db = database();
+    const db = memoryDatabase();
     const read = vi.spyOn(db, 'getTelemetryFiles');
     const catalog = new TelemetryCatalog(db);
     expect(read).not.toHaveBeenCalled();
@@ -31,7 +24,7 @@ describe('TelemetryCatalog', () => {
   });
 
   it('clears only scan state; SQLite owns retained metadata', () => {
-    const db = database();
+    const db = memoryDatabase();
     db.upsertTelemetryMetadata(file());
     const catalog = new TelemetryCatalog(db);
     catalog.clear();
@@ -40,7 +33,7 @@ describe('TelemetryCatalog', () => {
   });
 
   it('runs a missing-directory refresh without deleting retained metadata', async () => {
-    const db = database();
+    const db = memoryDatabase();
     db.upsertTelemetryMetadata(file());
     const catalog = new TelemetryCatalog(db);
     expect(await catalog.refresh('C:\\non_existent_telemetry_directory_xyz')).toBe(0);
@@ -50,7 +43,7 @@ describe('TelemetryCatalog', () => {
   });
 
   it('uses SQLite file versions for each scan, retries failures and publishes partial progress', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const previous = file();
     db.upsertTelemetryMetadata(previous);
     const changed = { ...previous, fileSizeBytes: 4096 };
@@ -74,7 +67,7 @@ describe('TelemetryCatalog', () => {
   });
 
   it('shows progress while it runs and records files that could not be read', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const record = vi.spyOn(db, 'recordIngestError');
     const unreadable = { ...file('C:\\fake', 'locked.duckdb'), enrichmentError: 'database is locked' };
     const catalog = new TelemetryCatalog(db, async (_directory, options) => {
@@ -88,7 +81,7 @@ describe('TelemetryCatalog', () => {
   });
 
   it('reports a directory that fails to scan', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const record = vi.spyOn(db, 'recordIngestError');
     const catalog = new TelemetryCatalog(db, async () => { throw new Error('access denied'); });
     await expect(catalog.refresh('C:\\fake')).rejects.toThrow('access denied');
@@ -97,7 +90,7 @@ describe('TelemetryCatalog', () => {
   });
 
   it('ignores a stale refresh after the directory changes', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const resolvers = new Map<string, (files: DuckDbFileInfo[]) => void>();
     const enrichDirectory = vi.fn((directory: string) => new Promise<DuckDbFileInfo[]>(resolve => { resolvers.set(directory, resolve); }));
     const catalog = new TelemetryCatalog(db, enrichDirectory);
@@ -116,7 +109,7 @@ describe('TelemetryCatalog', () => {
   });
 
   it('yields during bulk publication and stops a stale scan before publishing more files', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const files = Array.from({ length: 25 }, (_, index) => file('C:\\fake', `session-${index}.duckdb`));
     const catalog = new TelemetryCatalog(db, async () => files);
     const upsert = db.upsertTelemetryMetadata.bind(db);

@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { DuckDBInstance } from '@duckdb/node-api';
 import { expect, it } from 'vitest';
 import { LiveService } from '../../../../server/live/liveService.js';
@@ -27,6 +28,12 @@ class Reader extends EventEmitter {
 
 it('persists recorded memory values through service, real worker, rediscovery and SQLite indexing without a dashboard', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'lmu-capture-pipeline-'));
+  // The rediscovery worker runs the real worker code too, but boots alongside the recording worker
+  // instead of after it. It loads DuckDB up front (~200 ms of a worker's ~300 ms start; the store
+  // imports it lazily on first use), then the real bootstrap. It reads the directory only on 'catalog'.
+  const bootstrap = new URL('../../../../server/live/capture/recordingWorkerBootstrap.mjs', import.meta.url).href;
+  const discoveryWorker = new Worker(`import('@duckdb/node-api').then(() => import(${JSON.stringify(bootstrap)}))`,
+    { eval: true, workerData: { directory } });
   const db = new SessionDatabase(':memory:');
   const reader = new Reader();
   const capture = new LiveCaptureController({ directory,
@@ -100,7 +107,7 @@ it('persists recorded memory values through service, real worker, rediscovery an
     expect(byKind('terrain-material')).toEqual([{ materialId: 0, rawName: 'RDRACEOLD,ROAD,' }]);
     expect(byKind('terrain-change')).toEqual(['FL', 'FR', 'RL', 'RR'].map(corner => ({ corner, materialId: 0 })));
     const discovered: string[] = [];
-    const discovery = new LiveCaptureController({ directory, onPersist: () => {},
+    const discovery = new LiveCaptureController({ directory, onPersist: () => {}, createWorker: () => discoveryWorker,
       onCatalog: (recordings, errors) => {
         expect(errors).toEqual([]);
         discovered.push(...recordings.map(entry => entry.manifest.recordingId));
@@ -115,6 +122,7 @@ it('persists recorded memory values through service, real worker, rediscovery an
     expect(await reconcileLiveCaptures(db.getDb(), directory)).toMatchObject({ indexed: 1, verified: 0, pending: 1 });
   } finally {
     await service.stop();
+    await discoveryWorker.terminate();
     db.close();
     await rm(directory, { recursive: true, force: true });
   }

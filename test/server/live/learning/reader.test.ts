@@ -1,6 +1,9 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+// Loaded with the file: the store imports DuckDB lazily, so the first fixture write would otherwise carry the
+// process's one-time DuckDB load (~200 ms) inside whichever test runs first.
+import '@duckdb/node-api';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readLearningEventsInWorker } from '../../../../server/live/learning/reader.js';
 import { parseLearningEvent, readLearningEvents } from '../../../../server/live/learning/readEvents.js';

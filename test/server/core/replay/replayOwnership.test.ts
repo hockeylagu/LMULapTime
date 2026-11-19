@@ -1,16 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { SessionDatabase } from '../../../../server/core/db.js';
+import { describe, expect, it } from 'vitest';
+import { memoryDatabase } from '../../../helpers/memoryDatabase.js';
 import { initReplayMatchingSchema } from '../../../../server/core/replay/replayMatchingSchema.js';
 import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { resolveReplayPrimarySlot } from '../../../../server/replay/decode/replayParser.js';
 
-const databases: SessionDatabase[] = [];
-afterEach(() => { for (const db of databases.splice(0)) db.close(); });
-function database(): SessionDatabase {
-  const db = new SessionDatabase(':memory:');
-  databases.push(db);
-  return db;
-}
 function metadata(): ReplayMetadata {
   return {
     filename: 'Custom R1.Vcr', filePath: 'C:/deleted/Custom R1.Vcr', fileSizeBytes: 100, mtimeMs: 1000,
@@ -35,7 +28,7 @@ describe('retained replay identity reconciliation', () => {
     expect(resolveReplayPrimarySlot(meta)).toBeUndefined();
   });
   it('repairs list ownership before on-demand reads and preserves explicit driver recordings', () => {
-    const db = database();
+    const db = memoryDatabase();
     const meta = metadata();
     db.upsertReplayMetadataCache(meta.filename, meta.filePath, meta.mtimeMs, meta.fileSizeBytes, meta);
     const trajectory: ReplayTrajectoryData = { replayName: meta.filename, driverSlot: 1, currentLap: 1,
@@ -61,7 +54,7 @@ describe('retained replay identity reconciliation', () => {
   });
 
   it('leaves duplicate exact configured names unresolved', () => {
-    const db = database();
+    const db = memoryDatabase();
     const meta = metadata();
     meta.drivers.push({ name: 'Ann', slot: 3 });
     db.upsertReplayMetadataCache(meta.filename, meta.filePath, meta.mtimeMs, meta.fileSizeBytes, meta);
@@ -71,7 +64,7 @@ describe('retained replay identity reconciliation', () => {
   });
 
   it('rebuilds old compact matching facts with the exact custom course from retained metadata', () => {
-    const db = database();
+    const db = memoryDatabase();
     const meta = metadata();
     db.upsertReplayMetadataCache(meta.filename, meta.filePath, meta.mtimeMs, meta.fileSizeBytes, meta);
     db.getDb().exec("UPDATE replay_metadata SET matching_version=1,matching_json='{}'");

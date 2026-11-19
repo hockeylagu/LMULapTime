@@ -3,22 +3,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
+import { memoryDatabase } from '../../../helpers/memoryDatabase.js';
 import { getSessionLiveCaptures, indexLiveCaptureCatalog, listLiveCaptureManifests, setLiveCaptureAvailability, setLiveCaptureMatch, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from '../../../../server/live/capture/reconcile.js';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 
-const databases: SessionDatabase[] = [];
 const folders: string[] = [];
 afterEach(async () => {
-  for (const db of databases.splice(0)) db.close();
   for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true });
 });
-
-function database(): SessionDatabase {
-  const db = new SessionDatabase(':memory:');
-  databases.push(db);
-  return db;
-}
 
 async function recordingDirectory(): Promise<string> {
   const directory = await mkdtemp(path.join(tmpdir(), 'lmu-live-capture-'));
@@ -64,7 +57,7 @@ function manifest(overrides: Partial<LiveCaptureManifest> = {}): LiveCaptureMani
 
 describe('live capture XML reconciliation', () => {
   it('updates renamed filenames in the index while preserving verified XML ownership', () => {
-    const db = database();
+    const db = memoryDatabase();
     const raw = db.getDb();
     addSession(db, { id: 'official', timestamp: 0, mtime: 3600_000 });
     const capture = manifest({ filename: 'unresolved_recording-a.live.duckdb' });
@@ -78,7 +71,7 @@ describe('live capture XML reconciliation', () => {
   });
 
   it('summarizes startup discovery, unchanged scans, updates and restored files', () => {
-    const db = database();
+    const db = memoryDatabase();
     const raw = db.getDb();
     const entry = { manifest: manifest(), bytes: 4096 };
     expect(indexLiveCaptureCatalog(raw, [entry])).toEqual({ total: 1, added: 1, updated: 0 });
@@ -91,7 +84,7 @@ describe('live capture XML reconciliation', () => {
   });
 
   it('reports only newly available recordings and counts available files independently of XML links', () => {
-    const db = database();
+    const db = memoryDatabase();
     const raw = db.getDb();
     const capture = manifest();
     expect(db.getCacheStats().liveTelemetryFilesCount).toBe(0);
@@ -108,7 +101,7 @@ describe('live capture XML reconciliation', () => {
   });
 
   it('links only a unique candidate with matching identity, interval, layout and lap anchors', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const directory = await recordingDirectory();
     const start = Date.parse('2026-10-10T11:00:00Z');
     addSession(db, { id: 'session-match', timestamp: start - 5_000, mtime: start + 3600_000 });
@@ -128,7 +121,7 @@ describe('live capture XML reconciliation', () => {
   });
 
   it('links an entry name to the session of the same car, across the 2026 rename (COTA race 2026-10-21)', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const directory = await recordingDirectory();
     const start = Date.parse('2026-10-10T11:00:00Z');
     addSession(db, { id: 'session-match', timestamp: start - 5_000, mtime: start + 3600_000, car: 'Ferrari 296 LMGT3 Evo' });
@@ -143,7 +136,7 @@ describe('live capture XML reconciliation', () => {
   });
 
   it('links on one timed lap and rejects a timed lap that disagrees (COTA practice 2026-10-20)', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const directory = await recordingDirectory();
     const start = Date.parse('2026-10-10T11:00:00Z');
     addSession(db, { id: 'session-a', timestamp: start - 5_000, mtime: start + 3600_000, laps: [{ number: 2, time: 101.2 }, { number: 4, time: 100 }] });
@@ -157,7 +150,7 @@ describe('live capture XML reconciliation', () => {
   });
 
   it('keeps insufficient, restarted and ambiguous evidence pending, then withdraws a no-longer-unique link', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const directory = await recordingDirectory();
     const start = Date.parse('2026-10-10T11:00:00Z');
     addSession(db, { id: 'session-a', timestamp: start - 5_000, mtime: start + 3600_000 });
@@ -177,7 +170,7 @@ describe('live capture XML reconciliation', () => {
   });
 
   it('withdraws stale XML version provenance when the XML session is reparsed or disappears', async () => {
-    const db = database();
+    const db = memoryDatabase();
     const directory = await recordingDirectory();
     const start = Date.parse('2026-10-10T11:00:00Z');
     addSession(db, { id: 'session-a', timestamp: start - 5_000, mtime: start + 3600_000 });

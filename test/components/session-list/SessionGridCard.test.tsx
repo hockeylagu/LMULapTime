@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SessionGridCard } from '../../../src/components/session-list/SessionGridCard.js';
 import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
+import { modifierClick } from '../../helpers/modifierClick.js';
 
 const session = makeSessionCard({
   id: 'session-race-1',
@@ -16,12 +17,6 @@ const session = makeSessionCard({
  position: 1, gridPosition: 3, positionGain: 2, bestLapNumber: 4, driverOrdinal: 0, bestLapOrdinal: 3,
   },
 });
-
-/** The test DOM cannot open a new tab: swallow the browser default after React has seen the click. */
-function modifierClick(el: HTMLElement, init: { ctrlKey?: boolean; metaKey?: boolean }): void {
-  el.addEventListener('click', e => e.preventDefault(), { once: true });
-  fireEvent.click(el, init);
-}
 
 function setup() {
   const onSelectSession = vi.fn();
