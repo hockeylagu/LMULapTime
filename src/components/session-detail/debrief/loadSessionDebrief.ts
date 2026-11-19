@@ -1,7 +1,7 @@
-import type { ComparableLap, DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
+import type { ComparableLap, DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import type { CornerPass, SessionCornerPasses } from '../../../../shared/types/corners/cornerPasses.js';
 import { getBestLapNumber, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
-import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
+import { lapCounts } from '../../replay/cornerCard/cornerInsight.js';
 import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { fetchSessionCornerPasses, fetchSessionTelemetry } from '../../../api/replayApi.js';
@@ -41,14 +41,6 @@ export class DebriefUnavailableError extends Error {}
 
 const deltaTo = (lapTime: number, reference: ComparableLap | null) =>
   reference && typeof reference.lapTime === 'number' ? Number((lapTime - reference.lapTime).toFixed(3)) : null;
-
-/**
- * The laps whose passes count for repeatability: the clean laps, and the laps the parser left out for traffic
- * (the passes know where the traffic was: only those with a car close in front drop out).
- */
-function repeatabilityLaps(laps: LapData[]): LapData[] {
-  return selectCleanLapCandidates(laps.map(lap => (lap.nonRepresentativeReason === 'traffic' ? { ...lap, nonRepresentativeReason: undefined } : lap)));
-}
 
 /** This session's laps in the driver's class, any car, as comparison laps. */
 function sessionClassLaps(session: DetailedSession, carClass: string | null): ComparableLap[] {
@@ -148,7 +140,10 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
   if (!passes.some(pass => pass.lapNumber === lapNumber)) throw new DebriefUnavailableError('The replay has no passes for your best lap.');
   if (referencePasses.length === 0) throw new DebriefUnavailableError('The replay has no passes for the reference lap.');
 
-  const repeatLaps = new Set(repeatabilityLaps(driver.laps || []).map(l => l.lapNumber));
+  // The laps the corner card counts, in the analysed lap's conditions (traffic laps count: only passes with a car close in front drop out).
+  const ownLaps = own.laps.filter(item => item.slot === slot);
+  const wet = ownLaps.find(item => item.lapNumber === lapNumber)?.wet ?? false;
+  const repeatLaps = new Set(ownLaps.filter(item => lapCounts(item) && item.wet === wet).map(item => item.lapNumber));
   repeatLaps.add(lapNumber);
   return {
     sessionId: session.id,

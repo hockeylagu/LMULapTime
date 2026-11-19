@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type { ComparableLap, DetailedSession, DriverData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import type { CornerPass, CornerPassCar, SessionCornerPasses } from '../../../../shared/types/corners/cornerPasses.js';
+import type { CornerPass, CornerPassCar, CornerPassLap, SessionCornerPasses } from '../../../../shared/types/corners/cornerPasses.js';
 
 export const MY_REPLAY = 'Daytona International Speedway Road Course R1 10.Vcr';
 export const REF_REPLAY = 'Daytona International Speedway Road Course Q1 7.Vcr';
@@ -60,23 +60,30 @@ function pass(slot: number, lapNumber: number, sec: number, extra: Partial<Corne
   };
 }
 
-function built(cars: CornerPassCar[], passes: CornerPass[]): SessionCornerPasses {
+/** Each passed lap's flags as the route serves them: a valid dry racing lap, unless `flags` says otherwise. */
+function built(cars: CornerPassCar[], passes: CornerPass[], flags: Record<number, Partial<CornerPassLap>> = {}): SessionCornerPasses {
+  const laps = passes.map((item): CornerPassLap => ({
+    slot: item.slot, lapNumber: item.lapNumber, startSec: item.lapNumber * 100, endSec: item.lapNumber * 100 + 100,
+    isValid: true, isPitStop: false, isOutLap: false, wet: false, ...(item.slot === 0 ? flags[item.lapNumber] : {}),
+  }));
   return {
     available: true, layoutKey: 'daytona_road', startStationM: 0, trackLengthM: 5000,
     turns: [{ id: 1, label: 'T1', title: 'Turn 1', apexM: 70, startM: 30, endM: 110 }],
-    cars, passes, laps: [], contacts: [],
+    cars, passes, laps, contacts: [],
   };
 }
 
 export interface DebriefServerOptions {
   /** The analysed driver's laps run with Vinicius Ares close in front through T1. */
   trafficLaps?: number[];
+  /** The analysed driver's lap flags, by lap number (others are valid dry racing laps). */
+  lapFlags?: Record<number, Partial<CornerPassLap>>;
   /** What the session's corner passes answer instead (e.g. not built). */
   passes?: SessionCornerPasses;
 }
 
 /** The corner passes of the two sessions: R1 (the driver, Enzo Syl when in the session, and a traffic car) and Q1 (the references). */
-function sessionPasses(sessionId: string, trafficLaps: number[]): SessionCornerPasses {
+function sessionPasses(sessionId: string, trafficLaps: number[], lapFlags: Record<number, Partial<CornerPassLap>>): SessionCornerPasses {
   if (sessionId === 'Q1') {
     // Catani's lap 3 and the near rival's lap 5 are both under driver 0 (referenceLap, realisticLap).
     return built([{ slot: 0, name: 'Davide Catani', sessionDriverOrdinal: 0 }], [pass(0, 3, 2.4), pass(0, 5, 2.56)]);
@@ -92,7 +99,8 @@ function sessionPasses(sessionId: string, trafficLaps: number[]): SessionCornerP
       pass(0, 16, 2.72, close(16)), pass(0, 18, 2.4, close(18)), pass(0, 20, 2.8, close(20)),
       pass(1, 2, 2.6), pass(1, 3, 2.5),
       ...trafficLaps.map(lapNumber => pass(2, lapNumber, 2.8, { entrySec: lapNumber * 100 - 0.4 })),
-    ]
+    ],
+    lapFlags,
   );
 }
 
@@ -106,7 +114,7 @@ export function mockDebriefServer(compareLaps: ComparableLap[] = [referenceLap],
     const params = new URLSearchParams(url.split('?')[1] ?? '');
     const passesMatch = /\/api\/session\/([^/]+)\/corner-passes/.exec(url);
     if (passesMatch) {
-      const all = options.passes ?? sessionPasses(passesMatch[1], options.trafficLaps ?? []);
+      const all = options.passes ?? sessionPasses(passesMatch[1], options.trafficLaps ?? [], options.lapFlags ?? {});
       const ordinal = params.get('driverOrdinal');
       if (!all.available || ordinal === null) return ok(all);
       const slot = all.cars.find(car => car.sessionDriverOrdinal === Number(ordinal))?.slot;

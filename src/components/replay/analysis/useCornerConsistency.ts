@@ -1,12 +1,11 @@
-import { isCleanReplayLap } from '../../../../shared/domain/lapComparison.js';
 import { useEffect, useMemo, useState } from 'react';
+import { lapCounts } from '../cornerCard/cornerInsight.js';
 import type { SessionCornerPasses } from '../../../../shared/types/corners/cornerPasses.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { computeCornerConsistencyStats, CornerConsistencyStat, placeStatsOnLap } from '../../../utils/cornerConsistency.js';
 import { fetchSessionCornerPasses } from '../../../api/replayApi.js';
 import { isAbortError } from '../../../api/apiClient.js';
 
-const EMPTY_LAP_SUMMARIES: NonNullable<ReplayTrajectoryData['laps']> = [];
 const NO_CORNER_STATS: CornerConsistencyStat[] = [];
 const NO_EXCLUDED_LAPS: ReadonlySet<number> = new Set();
 
@@ -25,7 +24,7 @@ export interface CornerConsistencyPlacement {
 
 /**
  * The selected driver's corner passes for the session (lazily - only when `enabled`), one request, and how
- * repeatably they drive each official turn over the session's clean laps, less the laps left out. Each turn is
+ * repeatably they drive each official turn over the laps the corner card counts, less the laps left out. Each turn is
  * placed on the displayed lap (`placement`): its apex's lap distance and the detected corner holding it.
  */
 export function useCornerConsistency(
@@ -37,7 +36,6 @@ export function useCornerConsistency(
   excludedLaps: ReadonlySet<number> = NO_EXCLUDED_LAPS,
   placement?: CornerConsistencyPlacement
 ): UseCornerConsistencyResult {
-  const lapSummaries = trajectory?.laps || metadata?.laps || EMPTY_LAP_SUMMARIES;
   const driverOrdinal = trajectory?.driverOrdinal
     ?? metadata?.drivers.find(item => item.slot === selectedDriverSlot)?.sessionDriverOrdinal;
 
@@ -63,14 +61,18 @@ export function useCornerConsistency(
   const answered = key !== null && loaded?.key === key;
   const passes = answered && loaded.response?.available ? loaded.response : null;
   const points = trajectory?.points;
+  const shownLap = trajectory?.currentLap;
   const cornerStats = useMemo(() => {
     if (!passes) return NO_CORNER_STATS;
-    // The same laps the sector consistency counts: clean laps by the stored lap flags, less the laps left out.
-    const counted = new Set(lapSummaries.filter(lap => isCleanReplayLap(lap) && !excludedLaps.has(lap.lapNumber)).map(lap => lap.lapNumber));
+    // The laps the corner card counts (`lapCounts`), in the shown lap's conditions, less the laps left out.
+    const slot = passes.passes[0]?.slot;
+    const laps = passes.laps.filter(lap => lap.slot === slot);
+    const wet = laps.find(lap => lap.lapNumber === shownLap)?.wet ?? false;
+    const counted = new Set(laps.filter(lap => lapCounts(lap) && lap.wet === wet && !excludedLaps.has(lap.lapNumber)).map(lap => lap.lapNumber));
     const stats = computeCornerConsistencyStats(passes.passes, passes.turns, counted);
     if (!placement || !points) return stats;
     return placeStatsOnLap(stats, { points, dists: placement.dists }, passes.startStationM, passes.trackLengthM, placement.corners);
-  }, [passes, lapSummaries, excludedLaps, placement, points]);
+  }, [passes, shownLap, excludedLaps, placement, points]);
 
   return {
     cornerStats,

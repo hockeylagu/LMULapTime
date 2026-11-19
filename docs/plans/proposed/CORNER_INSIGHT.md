@@ -204,11 +204,12 @@ Each step lands on its own, with zero warnings, before the next starts.
 3. **Consistency and debrief on the passes.** Both read the session's passes; the 400-point per-lap paths and their
    corner windowing are removed. Built 2026-11-18: `GET /api/session/:id/corner-passes` (`server/corners/sessionCornerPasses.ts`)
    serves the turns, the cars and the passes, one request for the session (a driver's only with `driverOrdinal`).
-   - Consistency panel: one row per official turn over the clean laps (Brake, Turn-in, Throttle, Entry, Apex, Exit,
+   - Consistency panel: one row per official turn over the laps the card counts, in the shown lap's conditions, less
+     the laps left out (Brake, Turn-in, Throttle, Entry, Apex, Exit,
      each relative to the pass's slowest point). Each turn is placed on the displayed lap for its mini map, and a
      click opens the corner the lap's own detection finds at its apex.
    - Session debrief: official turns ranked by the analysed pass against the reference lap's pass; repeatability from
-     the session's passes, leaving out a pass with a car within 1 s in front (its spell from the pass's closest car);
+     the session's passes on the laps the card counts in the analysed lap's conditions, leaving out a pass with a car within 1 s in front (its spell from the pass's closest car);
      an analysed pass in traffic is trusted at half. Evidence (brake, turn-in, apex, throttle, exit) against the
      fastest lap's pass. The link opens the detected corner holding the turn's apex, or the lap when none does.
    - The lap-versus-lap views keep their detected corners (the inspector's Compare list, the rival debrief, the AI

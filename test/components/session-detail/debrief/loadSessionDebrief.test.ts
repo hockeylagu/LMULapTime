@@ -64,12 +64,19 @@ describe('loadSessionDebrief', () => {
   });
 
   it('times the laps the parser left out for traffic', async () => {
-    mockDebriefServer();
-    const flagged = { ...me, laps: me.laps.map(l => (l.lapNumber === 16 ? { ...l, nonRepresentativeReason: 'traffic' as const } : l)) };
+    mockDebriefServer([referenceLap], { lapFlags: { 16: { nonRepresentativeReason: 'traffic' } } });
 
-    const debrief = await loadSessionDebrief(session, flagged);
+    const debrief = await loadSessionDebrief(session, me);
 
     expect(debrief.lapsTimed).toBe(3);
+  });
+
+  it('times only the laps in the analysed lap\'s conditions', async () => {
+    mockDebriefServer([referenceLap], { lapFlags: { 16: { wet: true } } });
+
+    const debrief = await loadSessionDebrief(session, me);
+
+    expect(debrief.lapsTimed).toBe(2);
   });
 
   it('ranks against the lap about 0.5% faster, and takes the technique from the fastest', async () => {
@@ -118,10 +125,9 @@ describe('loadSessionDebrief', () => {
   });
 
   it('ranks from the analysed lap alone when no other lap has passes', async () => {
-    mockDebriefServer([{ ...referenceLap }]);
-    const onlyBestLap = { ...me, laps: me.laps.filter(l => l.lapNumber === 20 || l.lapNumber === 1).concat([{ ...me.laps[1], lapNumber: 99 }]) };
+    mockDebriefServer([{ ...referenceLap }], { lapFlags: { 16: { isValid: false }, 18: { isPitStop: true } } });
 
-    const debrief = await loadSessionDebrief(session, onlyBestLap);
+    const debrief = await loadSessionDebrief(session, me);
 
     expect(debrief.lapsTimed).toBe(1);
     expect(debrief.corners[0]).toMatchObject({ cornerNumber: 1, lapsLosing: null, repeatability: 1 });
