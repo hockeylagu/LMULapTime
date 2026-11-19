@@ -335,6 +335,93 @@ export function initDbSchema(db: DatabaseType): void {
       built_at INTEGER NOT NULL
     );
 
+    -- Sequence passes: the same rows through each sequence of the car's class map (segment = the sequence's first
+    -- turn id), with their own build (its version_key names the maps it read).
+    CREATE TABLE IF NOT EXISTS replay_sequence_passes (
+      filename TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      lap_number INTEGER NOT NULL,
+      segment INTEGER NOT NULL,
+      entry_ms INTEGER NOT NULL,
+      min_speed_after_ms INTEGER,
+      duration_ms INTEGER NOT NULL,
+      entry_speed_dkmh INTEGER,
+      min_speed_dkmh INTEGER,
+      exit_speed_dkmh INTEGER,
+      min_speed_dm INTEGER,
+      brake_dm INTEGER,
+      turn_in_dm INTEGER,
+      throttle_dm INTEGER,
+      ahead_slot INTEGER,
+      ahead_gap_ms INTEGER,
+      behind_slot INTEGER,
+      behind_gap_ms INTEGER,
+      PRIMARY KEY (filename, driver_slot, lap_number, segment)
+    ) WITHOUT ROWID;
+
+    CREATE TABLE IF NOT EXISTS replay_sequence_pass_builds (
+      filename TEXT PRIMARY KEY,
+      version_key TEXT NOT NULL,
+      layout_key TEXT NOT NULL,
+      pass_count INTEGER NOT NULL,
+      built_at INTEGER NOT NULL
+    );
+
+    -- Turn sequence maps (server/corners/sequenceMapService.ts): one per layout and class, from its fastest laps;
+    -- map_key names the rule, turns, centre line and laps it was built from.
+    CREATE TABLE IF NOT EXISTS corner_sequence_maps (
+      layout_key TEXT NOT NULL,
+      car_class TEXT NOT NULL,
+      map_key TEXT NOT NULL,
+      length_m REAL NOT NULL,
+      lap_count INTEGER NOT NULL,
+      built_at INTEGER NOT NULL,
+      PRIMARY KEY (layout_key, car_class)
+    );
+
+    -- A map's sequences: turn ids in driving order (comma separated), start and slowest point from the start line in
+    -- decimetres, and the driver's own laps' check (same grouping, start offset), null without one.
+    CREATE TABLE IF NOT EXISTS corner_sequence_map_sequences (
+      layout_key TEXT NOT NULL,
+      car_class TEXT NOT NULL,
+      first_turn INTEGER NOT NULL,
+      turn_ids TEXT NOT NULL,
+      exit_turn_ids TEXT NOT NULL,
+      start_dm INTEGER NOT NULL,
+      min_dm INTEGER NOT NULL,
+      spread_median_dm INTEGER NOT NULL,
+      spread_max_dm INTEGER NOT NULL,
+      lap_count INTEGER NOT NULL,
+      check_same INTEGER,
+      check_offset_dm INTEGER,
+      PRIMARY KEY (layout_key, car_class, first_turn)
+    ) WITHOUT ROWID;
+
+    -- A full map checked against a fresh map from the class's fastest laps of the day (after new fast laps came in):
+    -- whether they agree and, when not, what differs. Flagged for the driver; the map only changes on regenerate.
+    CREATE TABLE IF NOT EXISTS corner_sequence_map_checks (
+      layout_key TEXT NOT NULL,
+      car_class TEXT NOT NULL,
+      checked_at INTEGER NOT NULL,
+      agrees INTEGER NOT NULL,
+      detail TEXT NOT NULL,
+      PRIMARY KEY (layout_key, car_class)
+    );
+
+    -- The laps a map was built from (role 'map'), checked against (role 'check', the driver's own), and the fastest
+    -- laps of its last check (role 'fresh').
+    CREATE TABLE IF NOT EXISTS corner_sequence_map_laps (
+      layout_key TEXT NOT NULL,
+      car_class TEXT NOT NULL,
+      role TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      lap_number INTEGER NOT NULL,
+      lap_time_ms INTEGER NOT NULL,
+      driver_name TEXT NOT NULL,
+      PRIMARY KEY (layout_key, car_class, role, filename, driver_slot, lap_number)
+    ) WITHOUT ROWID;
+
     CREATE TABLE IF NOT EXISTS replay_trajectory_defaults (
       filename TEXT NOT NULL,
       driver_slot INTEGER NOT NULL,

@@ -5,6 +5,7 @@ import { LapSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { buildAiLapEvidence } from '../../../utils/aiReportPayload.js';
 import type { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { comparisonConfidence, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
+import { cornerName } from '../../../utils/cornerAnalysis/helpers.js';
 import { ApiError, fetchJson, isAbortError, postJson } from '../../../api/apiClient.js';
 import { FOCUS_RING, PRIMARY_BUTTON } from '../../common/buttonStyles.js';
 
@@ -165,7 +166,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
           <h4 className="text-xs font-bold uppercase tracking-wider text-lmu-accent-text">Key Improvements</h4>
           {report.report.improvements.map((item, index) => <article key={`${item.title}-${index}`} className="rounded-xl border border-lmu-border bg-lmu-card/60 p-4">
             <h5 className="text-sm font-bold text-white">
-              {item.cornerNumber !== undefined && <span className="mr-1.5 rounded bg-lmu-raised px-1.5 py-0.5 font-mono text-xs text-lmu-warn-soft">#{index + 1} T{item.cornerNumber}</span>}
+              {item.cornerNumber !== undefined && <span className="mr-1.5 rounded bg-lmu-raised px-1.5 py-0.5 font-mono text-xs text-lmu-warn-soft">#{index + 1} {cornerName({ cornerNumber: item.cornerNumber, label: evidence.priorities?.find(corner => corner.cornerNumber === item.cornerNumber)?.cornerLabel })}</span>}
               {item.title}
             </h5>
             <div className="mt-3 space-y-2 text-sm leading-relaxed">

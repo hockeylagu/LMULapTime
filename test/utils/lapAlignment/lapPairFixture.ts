@@ -10,7 +10,7 @@ import {
   getDistancesInReferenceFrame,
   getTrajectoryDistances,
 } from '../../../src/utils/lapAlignment.js';
-import { computeLapSegmentComparisons } from '../../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { compareOnDips } from '../cornerAnalysis/dipWindows.js';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis/types.js';
 import {
   computeBaselineDeltaByIdx,
@@ -127,7 +127,7 @@ export function loadLapPair(name: LapPairName): LoadedLapPair {
   return pair;
 }
 
-/** Corner/straight segments exactly as the replay inspector computes them in compare mode. */
+/** Corner/straight segments as the replay inspector compares them, over the primary lap's speed dips (no layout here). */
 export function computePairSegments(
   primary: ReplayTrajectoryPoint[],
   baseline: ReplayTrajectoryPoint[],
@@ -135,13 +135,13 @@ export function computePairSegments(
   layoutKey?: string
 ): LapSegmentComparison[] {
   const spec = layoutKey ? getCircuitSpecification(layoutKey) : undefined;
-  return computeLapSegmentComparisons(primary, baseline, 6, trackLengthM, spec?.nominalWidthM);
+  return compareOnDips(primary, baseline, 6, trackLengthM, spec?.nominalWidthM);
 }
 
 export const isCorner = (s: LapSegmentComparison): s is CornerSegmentComparison => s.type === 'corner';
 
 /** Pedal markers exactly as ReplayMapContainer builds them in compare mode. */
-export function buildPedalMarkers(corners: CornerSegmentComparison[]) {
+function buildPedalMarkers(corners: CornerSegmentComparison[]) {
   const markers: Array<{ cornerNumber: number; distM: number; kind: 'brake' | 'throttle'; isBaseline: boolean }> = [];
   for (const c of corners) {
     if (c.primaryBrakingDistM !== null) markers.push({ cornerNumber: c.cornerNumber, distM: c.primaryBrakingDistM, kind: 'brake', isBaseline: false });

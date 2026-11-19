@@ -128,7 +128,7 @@ describe('ReplayInspectorSidebar', () => {
     render(<ReplayInspectorSidebar {...baseProps} selectedCornerNumber={1} />);
 
     // Corner details rendered
-    expect(screen.getByText(/Turn 1/i)).toBeInTheDocument();
+    expect(screen.getByText('T1', { selector: '[title="T1 Apex Analysis"]' })).toBeInTheDocument();
     expect(screen.getByText(/Entry Phase/i)).toBeInTheDocument();
     expect(screen.getByText(/Rotation Phase/i)).toBeInTheDocument();
   });

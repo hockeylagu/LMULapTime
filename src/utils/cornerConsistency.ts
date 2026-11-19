@@ -82,7 +82,7 @@ export interface CornerConsistencyStat extends Record<CornerMetric, ConsistencyM
   apexM: number;
   lapsSampled: number;
   time: ConsistencyMetricStat;
-  /** Where the turn's apex is on the displayed lap (its own distance), and the corner detected there; set by placeStatsOnLap. */
+  /** Where the turn's apex is on the displayed lap (its own distance), and the lap's corner holding it; set by placeStatsOnLap. */
   lapDistM?: number | null;
   cornerNumber?: number | null;
 }
@@ -104,8 +104,8 @@ export function lapDistanceAtStation(points: ReadonlyArray<{ stationM?: number }
 }
 
 /**
- * Places each turn's stats on the displayed lap: the apex's lap distance (for its mini map) and the corner the lap's
- * own detection finds there (where a click on the turn opens). Turn apexes are from the start line; `startStationM`
+ * Places each turn's stats on the displayed lap: the apex's lap distance (for its mini map) and the lap's corner
+ * holding it (where a click on the turn opens). Turn apexes are from the start line; `startStationM`
  * puts them on the centre line.
  */
 export function placeStatsOnLap(

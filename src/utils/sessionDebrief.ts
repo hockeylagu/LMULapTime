@@ -19,10 +19,10 @@ const EVIDENCE_MIN_SPEED_KMH = 2;
 export type CornerPhase = 'entry' | 'rotation' | 'exit';
 
 export interface DebriefCorner {
-  /** "T7" for an official turn (or its name, or where it is); "Corner 3" for a corner the lap's own detection found. */
+  /** "T5–T6" for a class sequence, "T7" for an official turn (or its name, or where it is); "Corner 3" for a corner without one. */
   label: string;
   title?: string;
-  /** The corner the analysed lap's detection finds here, which a link opens in telemetry; null when none matches. */
+  /** The corner's number in the lap view (the layout's order), which a link opens in telemetry; null when none matches. */
   cornerNumber: number | null;
   entryDistM: number;
   minDistM: number;
@@ -125,9 +125,9 @@ const cornersOf = (segments: LapSegmentComparison[]) =>
 
 /**
  * The session's official turn stats (placed on the analysed lap, cornerConsistency placeStatsOnLap) for each
- * corner the lap's detection found: the turn whose apex is nearest the corner's slowest point, of those it holds.
+ * corner of the lap: the turn whose apex is nearest the corner's slowest point, of those it holds.
  */
-function statsForDetectedCorners(corners: CornerSegmentComparison[], stats: CornerConsistencyStat[] | null): Map<number, CornerConsistencyStat> {
+function statsForCorners(corners: CornerSegmentComparison[], stats: CornerConsistencyStat[] | null): Map<number, CornerConsistencyStat> {
   const byCorner = new Map<number, CornerConsistencyStat>();
   for (const corner of corners) {
     let best: CornerConsistencyStat | undefined;
@@ -143,7 +143,7 @@ function statsForDetectedCorners(corners: CornerSegmentComparison[], stats: Corn
 /**
  * Ranks the corners to work on by priority = time lost x repeatability x confidence (AGENTS.md
  * rule C: deterministic, never the AI). `segments` compare the analysed lap with the reference
- * lap (corners the analysed lap's detection found); `cornerStats` are the session's official turn
+ * lap (the layout's corners placed on the analysed lap); `cornerStats` are the session's official turn
  * passes placed on that lap, so a corner lost on one lap only ranks below one lost on every lap.
  * With a technique reference, the evidence describes how that (faster) lap takes the corner.
  */
@@ -154,7 +154,7 @@ export function rankDebriefCorners(
   limit = DEBRIEF_CORNER_LIMIT,
   options: RankDebriefOptions = {}
 ): DebriefCorner[] {
-  const statsByCorner = statsForDetectedCorners(cornersOf(segments), cornerStats);
+  const statsByCorner = statsForCorners(cornersOf(segments), cornerStats);
   const technique = new Map(cornersOf(options.technique ?? []).map(corner => [corner.cornerNumber, corner]));
 
   return cornersOf(segments)
@@ -173,7 +173,7 @@ export function rankDebriefCorners(
       const timeLossSec = Number(corner.timeDeltaSec.toFixed(3));
       const techniqueCorner = technique.get(corner.cornerNumber);
       return {
-        label: `Corner ${corner.cornerNumber}`,
+        label: corner.label ?? `Corner ${corner.cornerNumber}`,
         cornerNumber: corner.cornerNumber,
         entryDistM: corner.entryDistM,
         minDistM: corner.minDistM,
@@ -261,7 +261,7 @@ export interface TurnDebriefInput {
   technique: CornerPass[] | null;
   /** The car close in front through one of the driver's passes, if any (passTrafficSpell). */
   trafficOf: (pass: CornerPass, turn: CornerTurn) => TrafficSpell | null;
-  /** The corner the analysed lap's own detection finds at a turn, for the telemetry link. */
+  /** The lap view's number for a turn's corner, for the telemetry link. */
   cornerNumberAt?: (turn: CornerTurn) => number | null;
   limit?: number;
 }

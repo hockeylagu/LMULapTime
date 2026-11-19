@@ -14,6 +14,8 @@
  */
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
+import { resolveDriverCarClass } from '../../shared/domain/vehicleMapping.js';
+import type { LayoutCorners } from '../../shared/types/corners/cornerPasses.js';
 import { selectFeatureSamples } from '../../server/replay/decode/trajectoryDownsampler.js';
 import { applyTelemetryPostProcessing } from '../../src/utils/telemetryPostProcessing.js';
 import { computeLapComparisons } from '../../src/utils/replayComparison.js';
@@ -99,12 +101,17 @@ async function main() {
     const [p, b] = await Promise.all([fetchFullLap(pair.primary), fetchFullLap(pair.baseline)]);
     const trackLengthM = p.trackLengthM ?? 0;
     const nominalWidthM = p.layoutKey ? getCircuitSpecification(p.layoutKey).nominalWidthM : undefined;
+    // The lap view's corners: the class's map (or the official turns) placed on the lap.
+    const query = new URLSearchParams({ layoutKey: p.layoutKey ?? '', carClass: resolveDriverCarClass(p.vehicleIdentity) });
+    const cornersRes = await fetch(`http://localhost:3001/api/corner-sequences/layout?${query.toString()}`);
+    if (!cornersRes.ok) throw new Error(`${cornersRes.status} for the corners of ${p.layoutKey}`);
+    const corners = (await cornersRes.json()) as LayoutCorners;
     const run = (primary: ReplayTrajectoryPoint[], baseline: ReplayTrajectoryPoint[]) => {
       const pp = applyTelemetryPostProcessing(primary);
       const bp = applyTelemetryPostProcessing(baseline);
       const comparisons = computeLapComparisons(pp, bp, trackLengthM);
       return {
-        segments: computeLapSegmentComparisons(pp, bp, 6, trackLengthM, nominalWidthM),
+        segments: computeLapSegmentComparisons(pp, bp, corners, trackLengthM, nominalWidthM),
         finalDeltaSec: comparisons[comparisons.length - 1]?.deltaTimeSec ?? NaN,
       };
     };

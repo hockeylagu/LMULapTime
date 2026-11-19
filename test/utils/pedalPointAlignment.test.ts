@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { compareOnDips } from './cornerAnalysis/dipWindows.js';
 import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
 import {
@@ -65,7 +65,7 @@ describe('pedal point alignment between two laps', () => {
   });
 
   it('reports brake points at the same physical spot as the telemetry channels, without clipping', () => {
-    const corner = computeLapSegmentComparisons(primary, baseline, 6, TRACK_LENGTH_M)
+    const corner = compareOnDips(primary, baseline, 6, TRACK_LENGTH_M)
       .find((s): s is CornerSegmentComparison => s.type === 'corner');
     if (!corner) throw new Error('expected a corner');
 
@@ -98,7 +98,7 @@ describe('pedal point alignment between two laps', () => {
     // Primary picks up the throttle at its apex (station 300); the baseline is back on it 20 m
     // earlier (station 280), before the primary's apex where the throttle window opens.
     const earlyThrottleBaseline = buildLap(11, 190, 1.05, 280);
-    const corner = computeLapSegmentComparisons(primary, earlyThrottleBaseline, 6, TRACK_LENGTH_M)
+    const corner = compareOnDips(primary, earlyThrottleBaseline, 6, TRACK_LENGTH_M)
       .find((s): s is CornerSegmentComparison => s.type === 'corner');
     if (!corner) throw new Error('expected a corner');
 
@@ -111,7 +111,7 @@ describe('pedal point alignment between two laps', () => {
 
   it('keeps throttle-on at the apex for a corner taken flat, instead of reaching into the straight', () => {
     const flatBaseline = buildLap(11, null, 1.05);
-    const corner = computeLapSegmentComparisons(primary, flatBaseline, 6, TRACK_LENGTH_M)
+    const corner = compareOnDips(primary, flatBaseline, 6, TRACK_LENGTH_M)
       .find((s): s is CornerSegmentComparison => s.type === 'corner');
     if (!corner) throw new Error('expected a corner');
 

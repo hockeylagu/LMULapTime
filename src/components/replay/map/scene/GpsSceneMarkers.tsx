@@ -7,9 +7,17 @@ import { isPointInViewBox, parseViewBox, PEDAL_MARKER_LINE_HALF_LEN,
 import { buildRibbonIndex, type RibbonIndex, type MarkerObstacle } from './cornerRibbonClearance.js';
 import { placeMarkerBox, placeCornerBadges, cornerExteriorSigns, markerSegmentsOverlap } from './markerPlacement.js';
 import { MarkerGuide } from './MarkerGuide.js';
+import { cornerName } from '../../../../utils/cornerAnalysis/helpers.js';
+
+// The round badge holds the corner's short name: a turn range ("T14–T15") shows its first turn; a sequence is "SQ5".
+const badgeName = (m: { cornerNumber: number; label?: string }) => cornerName(m).split('–')[0];
+
+// A DIN-style face whose Q stays on the line like S and the digits (the monospace Q's tail drops below it); ships with Windows.
+const BADGE_FONT = '"Bahnschrift SemiCondensed", Bahnschrift, ui-sans-serif, sans-serif';
 
 export interface CornerMarkerPoint {
   cornerNumber: number;
+  label?: string;
   sx: number;
   sy: number;
   idx: number;
@@ -245,13 +253,15 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
             <text
               x="0"
               y="0"
+              // Capitals and digits centred: the baseline sits half the cap height (0.35 em) below the middle.
+              dy="0.35em"
               textAnchor="middle"
-              dominantBaseline="central"
-              className={`font-mono font-bold select-none pointer-events-none ${
+              fontFamily={BADGE_FONT}
+              className={`font-bold select-none pointer-events-none ${
                 m.isSelected ? 'fill-white text-sm' : m.isDimmed ? 'fill-lmu-text text-xs' : 'fill-lmu-text text-xs'
               }`}
             >
-              T{m.cornerNumber}
+              {badgeName(m)}
             </text>
           </g>
         </g>

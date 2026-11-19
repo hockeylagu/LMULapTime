@@ -131,7 +131,7 @@ describe('TelemetryCornerStrip', () => {
       />
     );
 
-    const t2Btn = screen.getByRole('button', { name: 'Turn 2' });
+    const t2Btn = screen.getByRole('button', { name: 'T2' });
     expect(t2Btn.className).toContain('border-lmu-aqua');
     expect(t2Btn.className).toContain('bg-lmu-aqua-deep/40');
   });
@@ -149,7 +149,7 @@ describe('TelemetryCornerStrip', () => {
       />
     );
 
-    const t1Btn = screen.getByRole('button', { name: 'Turn 1' });
+    const t1Btn = screen.getByRole('button', { name: 'T1' });
     fireEvent.click(t1Btn);
 
     expect(handleSelectCorner).toHaveBeenCalledWith(1);
@@ -258,10 +258,10 @@ describe('TelemetryCornerStrip', () => {
       />
     );
 
-    const t1Btn = screen.getByRole('button', { name: 'Turn 1' });
+    const t1Btn = screen.getByRole('button', { name: 'T1' });
     expect(t1Btn).toHaveAttribute(
       'title',
-      'Turn 1: Delta +0.12s (Running: +0.05s → +0.17s)'
+      'T1: Delta +0.12s (Running: +0.05s → +0.17s)'
     );
   });
 });

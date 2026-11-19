@@ -384,6 +384,25 @@ describe('TelemetryStripCharts', () => {
     expect(container.querySelectorAll('.border-dashed').length).toBe(3);
   });
 
+  it('draws the IN and OUT of a corner that starts on the first point and ends on the last', () => {
+    const points: ReplayTrajectoryPoint[] = [0, 10, 30, 60, 100].map((distance, index) => ({
+      x: distance, y: 0, z: 0, rotY: 0, speedKmh: 120, throttle: 80, brake: 0, steerYaw: 0, timeSec: 3600 + index * 0.1,
+    }));
+    render(
+      <TelemetryStripCharts
+        points={points}
+        currentIndex={0}
+        onSelectIndex={vi.fn()}
+        selectedCornerMarkers={{ cornerNumber: 17, entryFrame: 0, minFrame: 2, exitFrame: 4 }}
+      />
+    );
+
+    expect(screen.getByText('T17 IN').parentElement?.style.left).toBe('0%');
+    const out = screen.getByText('T17 OUT');
+    expect(out.parentElement?.style.right).toBe('0px');
+    expect(out).toHaveClass('right-1', 'bottom-6');
+  });
+
   it('keeps the default channel header free of line offset readings', () => {
     const primaryPoints: ReplayTrajectoryPoint[] = [
       { x: 0, y: 0, z: 0, speedKmh: 150, timeSec: 0, stationM: 0, lateralOffsetM: 1.2 },

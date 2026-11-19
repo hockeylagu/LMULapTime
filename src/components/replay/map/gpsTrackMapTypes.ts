@@ -4,6 +4,7 @@ import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js
 
 export interface GpsTrackMapCorner {
   cornerNumber: number;
+  label?: string;
   minDistM: number;
 }
 

@@ -155,6 +155,8 @@ describe('Gemini AI adapter', () => {
       const bad = { ...ranked, priorities: [{ rank: 1, cornerNumber: 5.5, timeLossSec: 0.7, confidence: 1 }] };
 
       await expect(analyzeLap({ evidence: bad, forceRegenerate: true })).rejects.toMatchObject({ code: 'invalid_request' });
+      const badLabel = { ...ranked, priorities: [{ rank: 1, cornerNumber: 5, cornerLabel: '', timeLossSec: 0.7, confidence: 1 }] };
+      await expect(analyzeLap({ evidence: badLabel, forceRegenerate: true })).rejects.toMatchObject({ code: 'invalid_request' });
     });
   });
 });

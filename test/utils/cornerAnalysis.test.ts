@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { computeLapSegmentComparisons, lapCornerWindows } from '../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { compareOnDips } from './cornerAnalysis/dipWindows.js';
+import type { LayoutCorners } from '../../shared/types/corners/cornerPasses.js';
 import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
 import fs from 'fs';
 import path from 'path';
@@ -39,7 +41,7 @@ function loadCachedLapFixture(name: string): ReplayTrajectoryData {
   } as ReplayTrajectoryData;
 }
 
-describe('computeLapSegmentComparisons', () => {
+describe('compareLapSegments over the lap\'s speed dips', () => {
   // Speed trace with genuine turning points at both ends (100->200->minSpeed->200->100),
   // so the boundary "max" points actually register - not a flat plateau the algorithm
   // can't turn around on. Corner window: entry@30m, min@70m, exit@110m; lap ends at 140m.
@@ -66,7 +68,7 @@ describe('computeLapSegmentComparisons', () => {
     const baseline = buildLap(100, 0.3);
     const primary = buildLap(90, 0.3);
 
-    const segments = computeLapSegmentComparisons(primary, baseline);
+    const segments = compareOnDips(primary, baseline);
 
     expect(segments.map(s => s.type)).toEqual(['straight', 'corner', 'straight']);
     expect(segments[0].entryDistM).toBe(0);
@@ -99,7 +101,7 @@ describe('computeLapSegmentComparisons', () => {
   it("finds the comparison lap's own slowest point, which can lie away from the primary lap's", () => {
     const primary = buildLap(90, 0.3);
     const baseline = buildLap(100, 0.3).map(p => p.x === 80 ? {...p, speedKmh: 95} : p);
-    const corner = computeLapSegmentComparisons(primary, baseline).find(s => s.type === 'corner');
+    const corner = compareOnDips(primary, baseline).find(s => s.type === 'corner');
     if (corner?.type !== 'corner') throw new Error('expected corner segment');
     expect(corner.minDistM).toBe(70);
     expect(corner.baselineMinDistM).toBe(80);
@@ -109,7 +111,7 @@ describe('computeLapSegmentComparisons', () => {
     const baseline = buildLap(100, 0.3);
     const primary = buildLap(100, 0.5); // same speeds, but slower through the corner stretch
 
-    const segments = computeLapSegmentComparisons(primary, baseline);
+    const segments = compareOnDips(primary, baseline);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
 
@@ -125,7 +127,7 @@ describe('computeLapSegmentComparisons', () => {
     const baseline = withBrakeThrottle(buildLap(100, 0.3), 40, 80);
     const primary = withBrakeThrottle(buildLap(100, 0.3), 50, 70);
 
-    const segments = computeLapSegmentComparisons(primary, baseline);
+    const segments = compareOnDips(primary, baseline);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
 
@@ -154,7 +156,7 @@ describe('computeLapSegmentComparisons', () => {
       steerYaw: point.x >= 50 && point.x <= 70 ? 20 : 0,
     }));
 
-    const corner = computeLapSegmentComparisons(primary, baseline).find(segment => segment.type === 'corner');
+    const corner = compareOnDips(primary, baseline).find(segment => segment.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
 
     expect(corner.phaseTiming?.entry).toMatchObject({ startDistM: 30, endDistM: 43 });
@@ -181,7 +183,7 @@ describe('computeLapSegmentComparisons', () => {
     // otherwise the exact same physical lap as the passing "no drift" test above.
     const primary = shiftRecording(withBrakeThrottle(buildLap(100, 0.3), 50, 70), 5);
 
-    const segments = computeLapSegmentComparisons(primary, baseline);
+    const segments = compareOnDips(primary, baseline);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner segment');
 
@@ -202,82 +204,8 @@ describe('computeLapSegmentComparisons', () => {
   });
 
   it('returns an empty array when either lap has no points', () => {
-    expect(computeLapSegmentComparisons([], buildLap(100, 0.3))).toEqual([]);
-    expect(computeLapSegmentComparisons(buildLap(100, 0.3), [])).toEqual([]);
-  });
-
-  it('ignores noise dips below the prominence threshold (no corner rows, still covers the lap)', () => {
-    const speeds = [100, 150, 200, 200, 195, 200, 200, 180, 150, 100]; // only a 5 km/h dip
-    const toPoints = (s: number[]) => s.map((speedKmh, i) => ({
-      x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3,
-    }));
-    const segments = computeLapSegmentComparisons(toPoints(speeds), toPoints(speeds));
-
-    expect(segments.filter(s => s.type === 'corner')).toHaveLength(0);
-    expect(segments.some(s => s.type === 'straight')).toBe(true);
-  });
-
-  it('still detects a small but genuine corner (8 km/h dip) that the old 10 km/h threshold used to miss', () => {
-    const speeds = [100, 150, 200, 200, 192, 200, 200, 180, 150, 100]; // an 8 km/h dip
-    const toPoints = (s: number[]) => s.map((speedKmh, i) => ({
-      x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3,
-    }));
-    const segments = computeLapSegmentComparisons(toPoints(speeds), toPoints(speeds));
-
-    const corners = segments.filter(s => s.type === 'corner');
-    expect(corners).toHaveLength(1);
-  });
-
-  it('does not drop a trailing corner whose recovery never dips again before the lap data ends', () => {
-    // Corner1 (30->50->80) closes normally. Corner2 (80->100->?) recovers just enough to
-    // register its own apex, but then climbs continuously to the last sample with no
-    // further dip - so there's no natural "exit" max to close it off with.
-    const speeds = [100, 150, 200, 200, 150, 100, 150, 200, 200, 120, 80, 120, 160, 200, 240];
-    const toPoints = (s: number[]) => s.map((speedKmh, i) => ({
-      x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3,
-    }));
-    const segments = computeLapSegmentComparisons(toPoints(speeds), toPoints(speeds));
-
-    const corners = segments.filter(s => s.type === 'corner');
-    expect(corners).toHaveLength(2);
-    expect(corners[0]).toMatchObject({ entryDistM: 30, minDistM: 50, exitDistM: 80 });
-    expect(corners[1]).toMatchObject({ entryDistM: 80, minDistM: 100, exitDistM: 140 });
-  });
-
-  it('uses the active lap to define corner boundaries in compare mode, not the baseline noise pattern', () => {
-    const primarySpeeds = [100, 150, 200, 200, 180, 150, 100, 150, 200, 200, 180, 150, 100];
-    const baselineSpeeds = [100, 150, 200, 200, 194, 200, 200, 194, 200, 200, 150, 100];
-    const baselineSteer = [0, -50, -50, -50, 50, -50, -50, 50, -50, -50, -50, -50];
-
-    const toPoints = (speeds: number[], steer: number[] = speeds.map(() => 0)) => speeds.map((speedKmh, i) => ({
-      x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: steer[i], timeSec: i * 0.3,
-    }));
-
-    const segments = computeLapSegmentComparisons(toPoints(primarySpeeds), toPoints(baselineSpeeds, baselineSteer), 20);
-    const corners = segments.filter(s => s.type === 'corner');
-
-    expect(corners).toHaveLength(1);
-    expect(corners[0]).toMatchObject({ entryDistM: 30, minDistM: 60, exitDistM: 90 });
-  });
-
-  it('splits a corner into linked sub-corners on a genuine steering-direction reversal, even without a full speed recovery', () => {
-    const speeds = [100, 150, 200, 200, 194, 200, 200, 194, 200, 200, 150, 100];
-    const steerYaw = [0, -50, -50, -50, 50, -50, -50, 50, -50, -50, -50, -50];
-    const toPoints = (steer: number[]) => speeds.map((speedKmh, i) => ({
-      x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: steer[i], timeSec: i * 0.3,
-    }));
-
-    // A high prominence threshold (20) means neither 6 km/h dip would register as a corner
-    // on its own - only a genuine steering reversal can force them through.
-    const zeroSteer = speeds.map(() => 0);
-    const withoutSteering = computeLapSegmentComparisons(toPoints(zeroSteer), toPoints(zeroSteer), 20);
-    expect(withoutSteering.filter(s => s.type === 'corner')).toHaveLength(0);
-
-    const withSteering = computeLapSegmentComparisons(toPoints(steerYaw), toPoints(steerYaw), 20);
-    const corners = withSteering.filter(s => s.type === 'corner');
-    expect(corners).toHaveLength(2);
-    expect(corners[0]).toMatchObject({ entryDistM: 30, minDistM: 40, exitDistM: 60 });
-    expect(corners[1]).toMatchObject({ entryDistM: 60, minDistM: 70, exitDistM: 90 });
+    expect(compareOnDips([], buildLap(100, 0.3))).toEqual([]);
+    expect(compareOnDips(buildLap(100, 0.3), [])).toEqual([]);
   });
 
   it('measures distance monotonically from lap start even when stationM metadata is present', () => {
@@ -287,7 +215,7 @@ describe('computeLapSegmentComparisons', () => {
     primary.forEach((p, i) => { p.stationM = 1600 + i * 10; });
     baseline.forEach((p, i) => { p.stationM = 1600 + i * 10; });
 
-    const segments = computeLapSegmentComparisons(primary, baseline, 6);
+    const segments = compareOnDips(primary, baseline, 6);
 
     expect(segments[0].entryDistM).toBe(0);
     expect(segments[0].exitDistM).toBe(30);
@@ -306,7 +234,7 @@ describe('computeLapSegmentComparisons', () => {
     primary.forEach(p => { p.stationM = p.x; });
     baseline.forEach(p => { p.stationM = p.x; });
 
-    const segments = computeLapSegmentComparisons(primary, baseline, 6, trackLen);
+    const segments = compareOnDips(primary, baseline, 6, trackLen);
     const corner = segments.find(s => s.type === 'corner');
     expect(corner).toBeDefined();
     if (!corner || corner.type !== 'corner') return;
@@ -364,7 +292,7 @@ describe('computeLapSegmentComparisons', () => {
       };
     });
 
-    const segments = computeLapSegmentComparisons(points, points);
+    const segments = compareOnDips(points, points);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner');
 
@@ -414,7 +342,7 @@ describe('computeLapSegmentComparisons', () => {
     const patientLap = buildCurveLap(90);
     const earlyLap = buildCurveLap(50);
 
-    const segments = computeLapSegmentComparisons(earlyLap, patientLap);
+    const segments = compareOnDips(earlyLap, patientLap);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner');
 
@@ -433,7 +361,7 @@ describe('computeLapSegmentComparisons', () => {
       { x: 100, y: 0, z: 0, speedKmh: 140, throttle: 0, brake: 0, steerYaw: 0, timeSec: 2 },
     ];
 
-    const segments = computeLapSegmentComparisons(points, points, 10);
+    const segments = compareOnDips(points, points, 10);
     const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
 
     if (corners.length > 0) {
@@ -448,7 +376,7 @@ describe('computeLapSegmentComparisons', () => {
       { x: 80, y: 0, z: 0, speedKmh: 155, throttle: 100, brake: 0, steerYaw: -5, tcActive: true, timeSec: 1.6 },
     ];
 
-    const segments = computeLapSegmentComparisons(points, points, 10);
+    const segments = compareOnDips(points, points, 10);
     const corners = segments.filter((s): s is CornerSegmentComparison => s.type === 'corner');
 
     if (corners.length > 0) {
@@ -477,7 +405,7 @@ describe('computeLapSegmentComparisons', () => {
     const wideLap = buildLapWithOffsets(5.5);
     const pinchedLap = buildLapWithOffsets(4.0);
 
-    const segments = computeLapSegmentComparisons(wideLap, pinchedLap, 10, 150, 12.0);
+    const segments = compareOnDips(wideLap, pinchedLap, 10, 150, 12.0);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner');
 
@@ -508,7 +436,7 @@ describe('computeLapSegmentComparisons', () => {
         timeSec: i * 0.4,
       }));
 
-    const segments = computeLapSegmentComparisons(measuredLap(12, 5), measuredLap(8, 7), 10, 150, 12);
+    const segments = compareOnDips(measuredLap(12, 5), measuredLap(8, 7), 10, 150, 12);
     const corner = segments.find(segment => segment.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner');
 
@@ -538,7 +466,7 @@ describe('computeLapSegmentComparisons', () => {
       timeSec: i * 0.4,
     }));
 
-    const segments = computeLapSegmentComparisons(unknownLap, unknownLap, 10, 150, 12);
+    const segments = compareOnDips(unknownLap, unknownLap, 10, 150, 12);
     const corner = segments.find(segment => segment.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner');
     expect(corner.primaryTrackUsage?.entrySpaceLeftM).toBeUndefined();
@@ -551,7 +479,7 @@ describe('computeLapSegmentComparisons', () => {
     expect(traj.driverName).toBe('Samuel Lague');
     enrichTrajectoryWithTrackGeometry(traj, 'Algarve International Circuit', 'Grand Prix', traj.replayName);
 
-    const segments = computeLapSegmentComparisons(traj.points, traj.points, 6, traj.trackLengthM, 14.0);
+    const segments = compareOnDips(traj.points, traj.points, 6, traj.trackLengthM, 14.0);
     const corners = segments.filter(s => s.type === 'corner');
     const c9 = corners.find(c => c.cornerNumber === 9);
     expect(c9).toBeDefined();
@@ -578,7 +506,7 @@ describe('computeLapSegmentComparisons', () => {
       timeSec: i * 0.5,
     }));
 
-    const segments = computeLapSegmentComparisons(lapWithWideEntry, lapWithWideEntry, 10, 200, 14.0);
+    const segments = compareOnDips(lapWithWideEntry, lapWithWideEntry, 10, 200, 14.0);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner');
 
@@ -626,7 +554,7 @@ describe('computeLapSegmentComparisons', () => {
       timeSec: i * 0.42,
     }));
 
-    const segments = computeLapSegmentComparisons(lapA, lapB, 10, 200, 14.0);
+    const segments = compareOnDips(lapA, lapB, 10, 200, 14.0);
     const corner = segments.find(s => s.type === 'corner');
     if (!corner || corner.type !== 'corner') throw new Error('expected corner');
 
@@ -644,5 +572,29 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.entrySpaceDeltaM).toBe(-1.8); // 0.2 - 2.0 = -1.8m
     expect(corner.apexSpaceDeltaM).toBe(-1.7);  // 0.1 - 1.8 = -1.7m
     expect(corner.exitSpaceDeltaM).toBe(-2.2);  // 0.3 - 2.5 = -2.2m
+  });
+});
+
+describe("computeLapSegmentComparisons on the layout's corners", () => {
+  // A 1000 m lap sampled every 10 m, its start line at station 300: lap distance d is station (300 + d) mod 1000.
+  const speeds = Array.from({ length: 100 }, (_, i) => (i === 20 ? 90 : i === 25 ? 80 : i === 95 ? 70 : 200));
+  const lap = speeds.map((speedKmh, i) => ({
+    x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3, stationM: (300 + i * 10) % 1000,
+  }));
+  const corners: LayoutCorners = {
+    kind: 'sequences', startStationM: 300, lengthM: 1000, corners: [
+      // The second runs across the start line back to the first's start, its slowest point before the line.
+      { id: 3, label: 'T3', title: 'T3 sequence', apexM: 950, startM: 300, endM: 1100 },
+      { id: 1, label: 'T1–T2', title: 'T1–T2 sequence', apexM: 200, startM: 100, endM: 300 },
+    ],
+  };
+
+  it("windows each corner from its start to its end, numbered in the layout's order, with the lap's own slowest point", () => {
+    const windows = computeLapSegmentComparisons(lap, lap, corners).filter(s => s.type === 'corner');
+    expect(windows.map(s => [s.cornerNumber, s.label, s.entryDistM, s.exitDistM, s.minDistM])).toEqual([
+      [1, 'T1–T2', 100, 300, 250],
+      [2, 'T3', 300, 990, 950],
+    ]);
+    expect(lapCornerWindows(corners, lap, lap.map(p => p.x), 0, 990)).toHaveLength(2);
   });
 });

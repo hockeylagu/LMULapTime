@@ -1,4 +1,4 @@
-import { LucideIcon, LayoutDashboard, Film, BrainCircuit, Database, HardDrive, Radio, ChartNoAxesCombined, Gamepad2 } from 'lucide-react';
+import { LucideIcon, LayoutDashboard, Film, BrainCircuit, Database, HardDrive, Radio, ChartNoAxesCombined, Gamepad2, Spline } from 'lucide-react';
 import { AppStatus } from '../../../shared/types/index.js';
 
 export interface SettingsSectionDef {
@@ -57,6 +57,13 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: Film,
     description: 'Decoded binary VCR replays, archived replays LMU has deleted, and the replay files list',
     keywords: ['replay', 'replays', 'vcr', 'cache', 'trajectories', 'coordinates', 'telemetry', 'files', 'scan replays', 'playback', 'binary', 'archive', 'archived', 'deleted', 'version'],
+  },
+  {
+    id: 'corner-sequences',
+    title: 'Corner Sequences',
+    icon: Spline,
+    description: 'How corners are grouped per track and class, how the latest fastest laps agree, and regenerating a map',
+    keywords: ['corner', 'corners', 'sequence', 'sequences', 'map', 'chicane', 'esses', 'turns', 'regenerate', 'remap', 'check', 'flagged'],
   },
   {
     id: 'folder-paths',

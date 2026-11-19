@@ -150,12 +150,18 @@ describe('ReplayInspectorContent', () => {
   });
 
   it('shows the Corners tab for self-analysis even without a baseline lap loaded', async () => {
+    // The lap's layout has one corner (stations 40-80 m); its class's corners come from the layout route.
+    const traj = { ...mockTraj, layoutKey: 'test_layout', points: mockTraj.points.map((point, i) => ({ ...point, stationM: i * 50 })) };
+    const corners = { kind: 'turns', startStationM: 0, lengthM: 1000, corners: [{ id: 1, label: 'T1', title: 'Turn 1', apexM: 60, startM: 40, endM: 80 }] };
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(traj) });
+      }
+      if (url.includes('/corner-sequences/layout?layoutKey=test_layout')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(corners) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
@@ -171,9 +177,9 @@ describe('ReplayInspectorContent', () => {
     const cornersTab = screen.getByRole('button', { name: /Corners/i });
     fireEvent.click(cornersTab);
 
-    // This mock lap's speed trace doesn't have a full braking->apex->accel cycle, so no
-    // corners are detected - but the tab/table render at all (without compare mode) is the point.
-    expect(screen.getByText(/Straight \(/i)).toBeInTheDocument();
+    // The lap against itself (no compare mode): the straight to the corner, and the corner by its name.
+    expect(await screen.findAllByText(/Straight \(/i)).toHaveLength(2);
+    expect(screen.getAllByText('T1').length).toBeGreaterThan(0);
     expect(screen.queryByText(/Whole lap:/i)).not.toBeInTheDocument();
   });
 

@@ -7,12 +7,15 @@ import { MiniCornerMap } from '../map/MiniCornerMap.js';
 import { LapSelectorDropdown, LapConsistencyOption } from './LapSelectorDropdown.js';
 import { consistencyClass, MetricRow, LeastConsistentBadge } from './ConsistencyMetricRow.js';
 import { EMPTY_ARRAY } from '../../../utils/emptyDefaults.js';
+import { FOCUS_RING } from '../../common/buttonStyles.js';
+import type { CornerSegmentKind } from '../../../../shared/types/corners/cornerPasses.js';
+import { setConsistencySegments, useConsistencySegments } from './consistencySegments.js';
 
 export interface ConsistencyPanelProps {
   stats: LapConsistencyStats;
   cornerStats?: CornerConsistencyStat[];
   isLoadingCornerStats?: boolean;
-  /** Opens the corner the displayed lap detects at a turn (the turn's stat carries it). */
+  /** Opens the displayed lap's corner holding a turn (the turn's stat carries it). */
   onSelectCorner?: (cornerNumber: number) => void;
   /** Why there are no corner stats (passes not built), when known. */
   cornerStatsUnavailableReason?: string | null;
@@ -31,6 +34,21 @@ export interface ConsistencyPanelProps {
 }
 
 const NO_EXCLUDED_LAPS = new Set<number>();
+
+/** Sequences (as the class drives them, the corner card's corners) or the official turns, one by one. */
+function SegmentSwitch() {
+  const segments = useConsistencySegments();
+  const option = (value: CornerSegmentKind, label: string, title: string) => (
+    <button type="button" aria-pressed={segments === value} title={title} onClick={() => setConsistencySegments(value)}
+      className={`rounded px-1.5 py-0.5 font-sans font-semibold transition-colors cursor-pointer ${segments === value ? 'bg-lmu-raised text-lmu-text' : 'text-lmu-muted hover:text-lmu-text'} ${FOCUS_RING}`}>{label}</button>
+  );
+  return (
+    <div role="group" aria-label="Corners as" className="ml-auto flex items-center">
+      {option('sequences', 'Sequences', "The corners as the class drives them: turns taken in one braking zone or rhythm grouped, as on the corner card")}
+      {option('turns', 'Turns', "The circuit's official turns, one by one")}
+    </div>
+  );
+}
 
 export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
   stats,
@@ -122,10 +140,11 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
           <Flag className="w-3 h-3" />
           <span>Corner Consistency</span>
           {isLoadingCornerStats && <Loader2 className="w-3 h-3 animate-spin ml-1" />}
+          <SegmentSwitch />
         </div>
 
         {isLoadingCornerStats ? (
-          <div className="px-3 py-4 text-center text-lmu-muted text-xs">Loading your passes through each turn...</div>
+          <div className="px-3 py-4 text-center text-lmu-muted text-xs">Loading your passes through each corner...</div>
         ) : cornerStats.length === 0 ? (
           <div className="px-3 py-4 text-center text-lmu-muted text-xs">
             {cornerStatsUnavailableReason ?? 'Need at least 2 valid laps in this replay to analyze per-corner consistency.'}

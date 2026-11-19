@@ -88,7 +88,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
       {state.status === 'idle' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-1">
           <p className="text-xs text-lmu-muted">
-            Ranks the turns of your best lap that cost the most against a realistic {selectedDriver.carType} target (or the faster cars of your class in this session when none is faster), with what the fastest lap does there.
+            Ranks the corners of your best lap that cost the most against a realistic {selectedDriver.carType} target (or the faster cars of your class in this session when none is faster), with what the fastest lap does there.
           </p>
           <button
             type="button"
@@ -101,7 +101,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
       )}
       {state.status === 'loading' && (
         <p className="flex items-center gap-2 text-xs text-lmu-muted py-2">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Comparing your best lap with other {selectedDriver.carType} laps, turn by turn...
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Comparing your best lap with other {selectedDriver.carType} laps, corner by corner...
         </p>
       )}
       {state.status === 'unavailable' && <p className="text-xs text-lmu-muted py-1">{state.reason}</p>}
@@ -134,8 +134,8 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
             <p className="text-xs text-lmu-gain py-1">You matched or beat the reference through every corner.</p>
           )}
           <p className="text-[11px] text-lmu-muted">
-            Official turns, ranked by time lost × how often you lose it ({state.debrief.lapsTimed} laps timed).
-            Passes through a turn with another car within a second in front are left out, and a turn of this lap driven in traffic ranks lower.
+            {state.debrief.segments === 'sequences' ? 'Corners as your class drives them (turns taken in one braking zone or rhythm together)' : 'Official turns (no corner map for your class on this track yet)'}, ranked by time lost × how often you lose it ({state.debrief.lapsTimed} laps timed).
+            Passes through a corner with another car within a second in front are left out, and a corner of this lap driven in traffic ranks lower.
           </p>
           {state.debrief.caveats.map((caveat) => (
             <p key={caveat} className="text-[11px] text-lmu-warn-soft">{caveat}</p>

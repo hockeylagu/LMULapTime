@@ -147,7 +147,8 @@ describe('GpsTrackMapScene overlays and geometry', () => {
 
     const textEl = screen.getByText('T1');
     expect(textEl).toHaveAttribute('text-anchor', 'middle');
-    expect(textEl).toHaveAttribute('dominant-baseline', 'central');
+    // Capitals centred on the circle: the baseline half the cap height below its middle.
+    expect(textEl).toHaveAttribute('dy', '0.35em');
     expect(textEl).toHaveAttribute('x', '0');
     expect(textEl).toHaveAttribute('y', '0');
   });

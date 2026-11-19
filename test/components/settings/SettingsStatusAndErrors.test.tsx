@@ -78,6 +78,7 @@ describe('Settings overview card', () => {
       'Peripherals',
       'AI Lap Reports',
       'Cached Replays',
+      'Corner Sequences',
       'Folder Paths & Driver',
     ]);
   });

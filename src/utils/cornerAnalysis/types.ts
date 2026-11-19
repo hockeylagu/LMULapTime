@@ -32,6 +32,9 @@ export interface CornerTypeSpecificDetails {
 export interface CornerSegmentComparison extends BaseSegmentComparison {
   type: 'corner';
   cornerNumber: number;
+  /** The corner as the layout names it ("T1–T2", from the class's map or the official turns); none when detected. */
+  label?: string;
+  title?: string;
   minDistM: number;
   /** Where the comparison lap is slowest in the corner (its own apex), in the primary lap's distance frame. */
   baselineMinDistM?: number;

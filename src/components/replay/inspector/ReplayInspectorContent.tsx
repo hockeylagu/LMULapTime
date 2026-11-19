@@ -1,14 +1,13 @@
-import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useReplayInspectorData } from './useReplayInspectorData.js';
 import { ReplayPlaybackCursorContext } from './replayPlaybackCursor.js';
 import { useCornerConsistency } from '../analysis/useCornerConsistency.js';
+import { useConsistencySegments } from '../analysis/consistencySegments.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
-import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/segmentComparisons.js';
+import { useLapSegments } from './useLapSegments.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
-import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 import { RaceModeContext } from '../race/raceModeContext.js';
 import { useConsistencyLapSelection } from './useConsistencyLapSelection.js';
@@ -139,12 +138,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     setColorBy('speed');
   }
 
-  const lapSegments = useMemo(() => {
-    if (!trajectory || !hasCompatibleTrackStations(trajectory, isCompareMode && baselineTrajectory ? baselineTrajectory : trajectory)) return [];
-    const baseline = isCompareMode && baselineTrajectory ? baselineTrajectory.points : trajectory.points;
-    const spec = trajectory.layoutKey ? getCircuitSpecification(trajectory.layoutKey) : undefined;
-    return computeLapSegmentComparisons(trajectory.points, baseline, 6, trajectory.trackLengthM, spec?.nominalWidthM);
-  }, [isCompareMode, trajectory, baselineTrajectory]);
+  const { segments: lapSegments, kind: lapCornerKind } = useLapSegments(trajectory, isCompareMode ? baselineTrajectory : null);
 
   const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);
   const cornerCount = cornerSegments.length;
@@ -160,13 +154,15 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     [trajectory]
   );
 
-  // The official turns' stats, placed on the displayed lap: where each apex is, and the corner detected there.
+  // The panel's corners (sequences or turns; the AI report reads the lap's own, so a corner's repeatability is its own
+  // passes), placed on the displayed lap: each apex and the lap's corner holding it.
   const cornerPlacement = useMemo(() => ({ dists: primaryDists, corners: cornerSegments }), [primaryDists, cornerSegments]);
+  const panelSegments = useConsistencySegments();
   const {
     cornerStats: cornerConsistencyStats, isLoading: isCornerConsistencyLoading, unavailableReason: cornerConsistencyUnavailableReason,
   } = useCornerConsistency(
     (activeTab === 'corners' && cornerSubView === 'consistency') || (activeTab === 'ai-report' && isCompareMode),
-    activeSessionId, metadata, selectedDriverSlot, trajectory, excludedConsistencyLaps, cornerPlacement
+    activeSessionId, metadata, selectedDriverSlot, trajectory, excludedConsistencyLaps, cornerPlacement, activeTab === 'ai-report' ? lapCornerKind : panelSegments
   );
 
   const bestSectors = useMemo(() => {
@@ -205,6 +201,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     if (!selectedCorner || primaryDists.length === 0) return null;
     return {
       cornerNumber: selectedCorner.cornerNumber,
+      label: selectedCorner.label,
       entryFrame: findIndexAtDistance(primaryDists, selectedCorner.entryDistM),
       minFrame: findIndexAtDistance(primaryDists, selectedCorner.minDistM),
       exitFrame: findIndexAtDistance(primaryDists, selectedCorner.exitDistM),

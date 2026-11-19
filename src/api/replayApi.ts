@@ -128,3 +128,9 @@ export function fetchSessionCornerPasses(sessionId: string, driverOrdinal?: numb
   const query = driverOrdinal === undefined ? '' : `?driverOrdinal=${driverOrdinal}`;
   return fetchJson<SessionCornerPasses>(`/api/session/${encodeURIComponent(sessionId)}/corner-passes${query}`, init);
 }
+
+/** Every car's passes through its class's turn sequences (the corner card's corners), or the driver's only. */
+export function fetchSessionSequencePasses(sessionId: string, driverOrdinal?: number, init?: RequestInit): Promise<SessionCornerPasses> {
+  const driver = driverOrdinal === undefined ? '' : `&driverOrdinal=${driverOrdinal}`;
+  return fetchJson<SessionCornerPasses>(`/api/session/${encodeURIComponent(sessionId)}/corner-passes?segments=sequences${driver}`, init);
+}

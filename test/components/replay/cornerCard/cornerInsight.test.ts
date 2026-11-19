@@ -85,6 +85,26 @@ describe('cornerInsightAt', () => {
     expect(cornerInsightAt(index, 1, 411)?.versus).toBeNull();
   });
 
+  it('reads each car\'s own class sequences, and compares only a sequence holding the same turns', () => {
+    // GT3 takes T1 and T2 as one sequence (id 1); the hypercar takes T1 alone (id 1) and T2 (id 2).
+    const sequences = [
+      { id: 1, label: 'T1–T2', title: '', apexM: 200, startM: 100, endM: 600, sequence: { carClass: 'GT3', turnIds: [1, 2] } },
+      { id: 1, label: 'T1', title: '', apexM: 200, startM: 100, endM: 300, sequence: { carClass: 'Hyper', turnIds: [1] } },
+      { id: 2, label: 'T2', title: '', apexM: 450, startM: 300, endM: 600, sequence: { carClass: 'Hyper', turnIds: [2] } },
+    ];
+    const laps = [2, 3, 4].flatMap(n => [lap(1, n), lap(2, n), lap(3, n)]);
+    const passes = [2, 3, 4].flatMap(n => [pass(1, n, 1, 8), pass(2, n, 1, 7.5), pass(3, n, 1, 3), pass(3, n, 2, 3)]);
+    const index = indexCornerInsight({ ...built(passes, laps), turns: sequences });
+    expect(cornerInsightAt(index, 1, 311)?.turn.label).toBe('T1–T2');
+    expect(cornerInsightAt(index, 3, 311)?.turn.label).toBe('T1');
+    // The gain is against the class's own: the GT3 rival, never the hypercar, over the GT3's one sequence.
+    expect(cornerInsightAt(index, 1, 311)?.gain).toMatchObject({ carNumber: '7', rank: 1, of: 1 });
+    expect(cornerInsightAt(index, 1, 311)?.gain?.deltaSec).toBeCloseTo(0.5);
+    // A compare lap whose sequence 1 holds other turns has no time to compare.
+    expect(cornerInsightAt(index, 1, 311, { index, slot: 3, lapNumber: 3 })?.versus).toBeNull();
+    expect(cornerInsightAt(index, 1, 311, { index, slot: 2, lapNumber: 3 })?.versus?.timeDelta).toBeCloseTo(0.5);
+  });
+
   it('marks the incident and the pit lane', () => {
     const index = race();
     const lap4 = cornerInsightAt(index, 1, 414);

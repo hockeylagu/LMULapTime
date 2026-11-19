@@ -57,7 +57,7 @@ describe('CornerApexChart', () => {
       />
     );
 
-    expect(screen.getByText(/Turn 3/i)).toBeInTheDocument();
+    expect(screen.getByText('T3')).toBeInTheDocument();
     expect(screen.getByText(/Entry Phase/i)).toBeInTheDocument();
     expect(screen.getByText('180')).toBeInTheDocument();
     expect(screen.getByText(/Rotation Phase/i)).toBeInTheDocument();
@@ -254,7 +254,7 @@ describe('CornerApexChart', () => {
     );
 
     // Micro-bar elements are present
-    expect(screen.getByText(/Turn 3/i)).toBeInTheDocument();
+    expect(screen.getByText('T3')).toBeInTheDocument();
     expect(screen.getByText(/ENTRY 180/i)).toBeInTheDocument();
     expect(screen.getByText(/MIN 85/i)).toBeInTheDocument();
     expect(screen.getByText(/EXIT 150/i)).toBeInTheDocument();

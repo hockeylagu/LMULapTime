@@ -73,6 +73,7 @@ describe('Settings navigation', () => {
       'Peripherals',
       'AI Lap Reports',
       'Cached Replays',
+      'Corner Sequences',
       'Folder Paths & Driver',
     ]);
     await settled();

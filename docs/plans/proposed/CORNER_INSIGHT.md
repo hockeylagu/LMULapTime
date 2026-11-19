@@ -1,4 +1,4 @@
-# Corner insight (plan accepted 2026-11-18, steps one to four built)
+# Corner insight (plan accepted 2026-11-18, steps one to five built, step 6 maps and passes built, readers next)
 
 Agreed with the driver on 2026-11-18. Goal: while watching a race or a lap, see how the car drove the corner it is in
 against its own race and its class, and bring the lap and race data onto one track reference so such questions are
@@ -42,12 +42,13 @@ driver's, so they are split.
    the shared reference for queries between laps, cars and sessions. The centre line is cut into the layout's official
    turns (step one decision 1): one segment per turn, its time comparable across cars, classes and sessions. The turns
    change only with their official list or the track package's geometry revision; no coordinate is edited by hand.
-2. **The driving (detected per lap).** Each lap's sequences (braking, turn-in, slowest point, accelerating again) are
-   detected from its channels when its passes are built, and placed on the segments they cover: a chicane in one
-   braking zone covers two segments, a flat kink has no sequence and still a time. A class's usual way through is the
-   median of its sequences in the session, worked out when a view opens. No per-class map is stored or reviewed.
+2. **The driving (a sequence map per layout and class).** How a class drives the turns (braking, turn-in, slowest
+   point, accelerating again) is detected once on its fastest laps and stored as a map: which official turns it takes
+   as one sequence (a chicane in one braking zone covers two turns) and where its speed starts to drop for each (a
+   brake, a lift, or a steering reversal between linked corners). Every lap is timed through the map's sequences when
+   its passes are built (step 6).
 
-The card's times come from layer 1; its explanation from layer 2. A better detection rule is a version bump and an
+Layer 1 times every official turn; layer 2 times the sequences the driver feels, as the detected corners do today. A better detection rule is a version bump and an
 offline rebuild of the passes (decision 6), never a data fix. The `corner-map` worktree (hand-reviewed per-class maps, see [corner comparison](../CORNER_COMPARISON_REWORK.md))
 adapts to this model if it is kept, rather than this model waiting for it.
 
@@ -207,11 +208,11 @@ Each step lands on its own, with zero warnings, before the next starts.
    - Consistency panel: one row per official turn over the laps the card counts, in the shown lap's conditions, less
      the laps left out (Brake, Turn-in, Throttle, Entry, Apex, Exit,
      each relative to the pass's slowest point). Each turn is placed on the displayed lap for its mini map, and a
-     click opens the corner the lap's own detection finds at its apex.
+     click opens the lap view on that turn.
    - Session debrief: official turns ranked by the analysed pass against the reference lap's pass; repeatability from
      the session's passes on the laps the card counts in the analysed lap's conditions, leaving out a pass with a car within 1 s in front (its spell from the pass's closest car);
      an analysed pass in traffic is trusted at half. Evidence (brake, turn-in, apex, throttle, exit) against the
-     fastest lap's pass. The link opens the detected corner holding the turn's apex, or the lap when none does.
+     fastest lap's pass. The link opens the lap view on the same corner, numbered in the layout's order.
    - The lap-versus-lap views keep their detected corners (the inspector's Compare list, the rival debrief, the AI
      report); the AI report's repeatability reads the placed turn stats.
 4. **The card.** In the race view and the lap view, on the same passes. Built 2026-11-18
@@ -228,11 +229,162 @@ Each step lands on its own, with zero warnings, before the next starts.
    - The race view's live gaps (`/race/distances`, `server/traffic/raceDistances.ts`) read every car's distance once a
      second, linear between each pass's entry, slowest point and exit; a gap of more than 0.5 s between two passes
      (pit lane, garage) leaves the car empty. Against the old 5 Hz index on six stored races the gaps differ by a median
-     of 0.03-0.07 s (p95 0.23-0.47 s, Le Mans worst); the crossing-only option (a gap per turn boundary, about every
-     3 s at Le Mans) was not built, and stays open for the driver to try.
+     of 0.03-0.07 s (p95 0.23-0.47 s, Le Mans worst); the crossing-only option (a gap per turn boundary, exact there,
+     held between) was compared on Le Mans R1 52 (2026-11-19): it updates every 8.6 s typically, 30 s at the 90th
+     percentile and up to 61 s on the straights, lagging a sudden change until the next boundary, while matching the
+     per-second gap to 0.18 s (median; 1.0 s at the 95th percentile). Settled by the driver: the per-second gap stays,
+     crossing-only is dropped.
    - The traffic route had no reader left (the debrief takes each pass's spell from its closest car, step 3), so it is
      removed; a screen that needs spells builds them from the passes' closest cars when it comes.
    The lap-level traffic tag (from the session's line crossings) does not use the index and is unchanged.
+6. **Turn sequences (layer 2), proposed 2026-11-19; maps and sequence passes built 2026-11-19, readers next.** The card and the panel read one official turn at a time, where the
+   driver thinks in sequences: esses taken in one rhythm, a chicane in one braking zone. The detected corners of the
+   lap-versus-lap views ("Corner N") read that way but move with the shown lap and number in lap order. Sequences bring
+   both onto the passes: at least as close to the driving as the detected corners, with stable labels and the class's
+   usual way through.
+   - **Detection rule.** The detected corners' rule moves to `shared/domain/`: alternating speed peaks and dips with
+     6 km/h prominence, a steering reversal splitting at 2 km/h once the lock reaches a quarter of the lap's largest.
+     Thresholds unchanged and the same for every class (driver, 2026-11-19: "a good compromise"): the class difference
+     shows through each class's own laps, and the steering split already scales with each car's lock.
+   - **A map per layout and class, from its fastest laps** (driver, 2026-11-19), not worked out per session: a
+     sequence then means the same in every session, so history across sessions is one query. The map's laps: the
+     fastest clean dry laps, one or two per driver, up to 10; at least 3 in all. The driver's own count only when
+     among them: their replay is no denser (count below). Two neighbouring official turns join when most of the map's
+     laps drive them as one corner, or as one braking zone (a chicane: under a third of the speed comes back between
+     them). The driver's own **5 fastest** clean dry laps in the class then **validate** the
+     map (driver, 2026-11-19), read from the native 100 Hz telemetry where it exists: detected the same way, they must
+     group the same turns and start each sequence within 10 m of the map (a first value: 50 samples a second is about 1.4 m apart at 250 km/h,
+     and a good driver's braking point moves a few metres lap to lap). The report gives every sequence's distance, so
+     the first fill shows whether 10 m is right; a lift or a steering split may sit less sharply than a braking point. A
+     sequence that fails is reported by the builder and the script for a look, the map kept, so no egregious boundary
+     passes unseen. Where the driver's laps are the only ones, the check has nothing to compare and says so. In the
+     app the check reads the driver's replay laps: the first audit found them grouped and placed as the native telemetry
+     places them, so the native read stays in the audit script (`tools/analysis/buildSequenceMaps.ts`). Each sequence stores its turns and its start: where the class's speed starts to drop
+     for it (a brake, a lift or a coast), the median speed peak before it on the map's laps, or the point a steering
+     reversal splits two linked corners. A sequence runs from its start to the next sequence's start, the straight
+     after a corner being its exit, exactly as the detected corners do today (driver, 2026-11-19). Labelled SQ1, SQ2… in lap order (driver,
+     2026-11-19, replacing the first rule of naming it by what it spans); its title names the turns by their labels: one turn
+     its label, several the range ("T3–T5"). A numbered turn goes by its number, a name only where the circuit
+     numbers none (Le Mans); official names over a numbered range were turned down (driver, 2026-11-19: "Monza is too
+     verbose"). The familiar names go before the range instead ("Lesmo 1, Lesmo 2 (T6–T7)", "Variante Ascari (T8–T9),
+     then T10 flat on the exit"; driver, 2026-11-19: "the familiar names for the turn if possible"), from cited sources
+     in `shared/domain/circuitTurns/familiarNames.ts` (Monza, Silverstone, Interlagos, Sebring and their variants), else
+     the turn list's own names (Spa, Laguna Seca, Daytona, Fuji); a name is given once, an exit sharing it going by its
+     number or ", flat on the exit" (Le Mans' Porsche Curves). Imola, Barcelona, Paul Ricard, Fuji, Long Beach and the
+     Maggotts / Becketts / Chapel split come from general racing knowledge, no source page (driver, 2026-11-19: "I'm ok
+     to hard code those… its not like the circuit change"), each checked against its placed turn's direction, uncertain
+     ones left out; Bahrain, Portimão, Qatar and COTA go by numbers, as drivers call them. Edited by hand as needed. Kept apart from `turnLists.ts`, whose version bump rebuilds the passes.
+   - **Built in the app.** The builder lives in `server/corners/`. Ingestion builds a missing map when a session brings
+     its layout and class to 3 usable laps; the map grows with each session until it has 10, then stays fixed. Replays
+     record every car, so a multi-class race maps every class on its grid. A faster lap later (an alien's) does not
+     change a full map: one lap cannot swing the vote, and its different driving shows on the card through its passes.
+   - **Re-map on purpose only, checked on its own** (driver, 2026-11-19: "Flag it"). A rule change is a version bump.
+     Once 3 laps new to the class's fastest 10 are stored, ingestion builds a fresh map from the fastest 10 and compares
+     it (same grouping, starts within 10 m); the result and the laps read are stored, the map is never replaced on its
+     own. Settings → Corner Sequences lists every map with the driver's check and the last recheck, flags one that
+     differs (with what: "T5–T6: now T5 + T6", "T1: start 18 m later") and regenerates it, then its layout's sequence
+     passes, one map at a time and not during a replay scan. The offline script (`--remap --layout --class`) does the
+     same with the app stopped.
+   - **Sequence rows per lap.** Each lap's time through each sequence of its class's map, its minimum speed and cues
+     (brake point, turn-in, throttle back on), built at ingestion in the passes' worker from the samples it has already
+     decoded, keyed like the passes plus the map's version. Built as passes: the pass rule runs a second time with each
+     car's class sequences as its segments (start to the next start), so a sequence row has every column of a turn
+     pass, traffic included (`replay_sequence_passes`). The sequence across the line is the lap's it starts in. A sequence's time cannot be summed from the turn passes,
+     its start being where the speed drops, not a turn boundary, and interpolating between pass points was off by 0.03-0.07 s
+     on the live gaps. A re-map rebuilds its layout and class's rows; the turn passes are untouched.
+   - **First fill.** An offline script (app stopped) calls the builder over every stored replay: maps first, then the
+     rows. Counted 2026-11-19 on the stored replays (dry, valid, not lap 1 or an out lap, every turn passed): 48
+     layout and class pairs on 24 layouts; 42 have 10 laps or more from 5 drivers or more, 47 have at least 3. The
+     thin ones are the driver's own alone (Barcelona GT3 3 laps, Interlagos GT3 11, Silverstone National GT3 14,
+     Silverstone WEC GT3 10, Spa Hypercar 8) and Paul Ricard Short GT3 (1 lap, no map). The other 8 layouts have no
+     dry replay yet. The replay records the driver's own car at the same rate as every other (median 50 samples a
+     second for both): its laps are no denser there, only the native telemetry is (100 Hz).
+   - **First audit, 2026-11-19** (report mode, nothing written to the database). The rule moved to
+     `shared/domain/cornerSequences/` (`speedTurningPoints.ts`, the client's Compare list now calls it there), the map
+     rule beside it (`sequenceMap.ts`), the lap reading in `server/corners/sequenceLaps.ts` and the script
+     `tools/analysis/buildSequenceMaps.ts` (report and SVG pictures). 47 maps built in about 40 s. The 10 map laps agree
+     on each start within 4 m (median; 11 m at the 90th percentile). Native against replay on the same laps of the
+     driver: the same grouping on all 202 sequences of 23 pairs, starts 1 m apart (median; 3 m at the 90th
+     percentile, 17 m once). So the 50 Hz replay places boundaries as the native telemetry does. Against the map, the
+     driver's own laps start 10-26 m earlier at Le Mans: driving (earlier braking than the 10 fastest), not data, so
+     that comparison is informative only and the replay check is the one held to 10 m. Fixed on the way: a
+     sequence's slowest point is the lap's own corner (it reached into the next one's dip), the first turn is never
+     an exit turn, one-driver pairs take more of that driver's laps, a repeated name labels once, a bend no source
+     names goes by its distance ("km 0.9", as the Consistency panel shows it). Sebring School's hairpin (driver: "the
+     brake point is not at the middle"): taken in two dips, it picks up 12-17 km/h in its middle, so the last peak
+     before it sat mid-hairpin. A start is now the last peak before the first turn's apex that the speed drops from
+     for real, at least half the largest drop after a peak there (the hairpin: 12 against 108 km/h); the fastest
+     peak and the peak before the slowest point were tried and moved other starts (Porsche Curves, Forest Esses).
+     Every other start stays within 20 m of the first build.
+   - **Chicanes join** (driver, 2026-11-19: "should the bus stop be one sequence?", then kept for every circuit). The
+     Bus Stop and Monza's first chicane split at a real speed rise (8-15 km/h), not at the steering reversal: without
+     the split they stayed two. A rise alone cannot tell them from a lift between two corners (Raidillon 6-11 km/h), but
+     how much of the speed lost into the first turn comes back before the second can: chicanes 1-20%, separate corners
+     40% and more. Two turns now join on a lap when no peak sits between them **or less than a third comes back**.
+     Over every map: 410 sequences become 356, no start moves more than 10 m, native and replay still group alike. It
+     joins, among others, the Bus Stop, T5-T6 and T12-T13 at Spa, Monza T1-T2, Interlagos T1-T2, Silverstone's
+     Maggotts-Becketts-Chapel and Brooklands-Luffield, Imola T17-T18, Fuji T10-T12, Le Mans' Ford Chicanes with the
+     Motul Turn. The steering split stays (it alone split only Spa Hypercar T5-T6).
+   - **Review fixes, 2026-11-19.** The speed come back between two turns is read in track order, so a pair across
+     the start line can join. A run of turns no lap slows for is held by the sequence before it as exit turns: every
+     turn has a sequence (none of the 47 maps had such a run). A map's laps are the parser's clean dry laps of the
+     replay's matched session, the replay's own flags only for a lap no session holds. Ingestion's corner work and a
+     regeneration run one at a time; a map change rebuilds only the sequence passes. The 47 maps stand as built: the
+     rule is not bumped, so they change only when regenerated or remapped offline.
+   - **Settled, left as they are** (driver, 2026-11-19, after a second review): the `act(...)` warnings reported in
+     the race replay view's tests (not reproduced in any run here); no guard for an empty map in a recheck (a map
+     with no sequence cannot come from laps that drove every turn); a worker run with nothing to build (once per
+     replay, when its "no map" key is first stored); the offline script needing a second run on a new database
+     (ingestion builds a replay's turn passes, then its maps, in one go).
+   - **First fill, 2026-11-19** (app closed, `tools/analysis/buildCornerPasses.ts`): 47 maps on 24 layouts in 21 s
+     (356 sequences), then the sequence passes of all 540 replays in 327 s: 467,430 rows. A lap's sequence times add up
+     to its lap time within 4-56 ms (median per layout; they start at the first sequence, not the line); 0.2-4.4% of
+     laps differ by over 1 s, a stop or a spin inside a sequence. The driver's own laps group 244 of the 267 checked
+     sequences as the map does; 65 starts sit more than 10 m from the map's (driving, as in the audit).
+   - **Readers.** The card and the Consistency panel, then the session debrief, the inspector's Compare list and its
+     map badges, the rival debrief and the AI report. The lap-versus-lap metrics (brake point, turn-in, trail braking,
+     rotation, track usage, the entry/rotation/exit split) stay, because they need both laps' full traces, and take
+     their windows from the class's map. The Consistency panel keeps the official turns for turn-by-turn detail, and
+     the live gaps stay on the turn passes.
+   - **Removed once every reader moved** (driver, 2026-11-19): the per-lap detection in `src/utils/cornerAnalysis/`
+     (`findSpeedTurningPoints` and the corner building of `computeLapSegmentComparisons`), the "Corner N" numbering, and
+     the debrief's and panel's mapping of an official turn to the detected corner at its apex.
+   - **Check.** Each class's map drawn on the 2D map on Monza and Le Mans (fast kinks), Portimão (esses) and Sebring
+     School (short turns), accepted by the driver's eye like the official turns. A class grouped wrongly changes the shared rule (for example a dip as a share of the
+     entry speed), a per-class value only if no shared rule works.
+   - **The card shows one entry per sequence** (driver, 2026-11-19): a chicane taken in one braking zone is one card,
+     from where the speed drops to where it drops for the next sequence, with one time, minimum speed, gain and brake point. The per-turn times stay in the
+     Consistency panel. Built 2026-11-19, the first reader (driver: "Card first"): the card reads the sequence passes
+     (`corner-passes?segments=sequences`), each car its class's map; the gain ranks the car's sequences ("3rd of 5
+     corners"), and a compare lap counts only through a sequence holding the same turns. A class without a map has no
+     card on that track ("No class of this replay has a corner map on this track yet", or no pass for that car).
+   - **The Consistency panel switches** (driver, 2026-11-19, chose a switch over sequences only or rows opening to
+     turns): Sequences (default, the driver's class map, as the card) or Turns (the official turns, one by one), one
+     switch in the panel's corner header, remembered. The AI report reads the same corners as the lap view (its sequences when the class has a map, else
+     the turns), so a corner's repeatability counts that corner's own passes (review fix, 2026-11-19).
+   - **The session debrief ranks sequences** (driver, 2026-11-19): "where the time goes" compares the best lap with the
+     references through the class's sequences ("SQ3"); a reference pass counts only through a sequence holding
+     the same turns. A class without a map on the layout keeps the official turns, and the note under the list says
+     which it ranked.
+   - **The lap view takes its corners from the map** (driver, 2026-11-19, "Whole lap view" over the Compare list
+     alone): one corner list for the lap view (Compare list, telemetry corner strip and markers, map badges, handling
+     balance, AI report). Each sequence of the lap's class is a window from its start to the next start, the lap's own
+     slowest point inside as the apex, numbered in the layout's order; a class without a map gets the official turns
+     as windows. Built 2026-11-19 (`GET /api/corner-sequences/layout`, `useLapSegments`, `lapCornerWindows`).    - **The rival debrief** (driver, 2026-11-19, "Rival debrief"): Compare laps' "where the time is" ranks your class's
+     corners the same way (`loadLapPairDebrief` → `loadLayoutCorners`, the cached fetch the lap view shares), named
+     as the map names them ("SQ5"); its links open the lap view on the same corner number. Built 2026-11-19.
+   - **The AI report** (driver, 2026-11-19, "AI report"): its evidence carries each corner's name (`cornerLabel` on
+     segments and priorities) and the prompt names corners by it, never by number (PROMPT_VERSION 9). Every reader has
+     moved.
+   - **Client detection removed** (driver, 2026-11-19, "Remove it"): `src/` no longer finds corners in a lap. The lap
+     view, the rival debrief and the AI report need the layout's corners (without a centre line there are none, and
+     the list says so); the session debrief and the panel number corners in the layout's order, so the telemetry
+     fetch behind their links is gone. The speed-dip rule stays in `shared/domain/cornerSequences/` to build the maps;
+     tests window their laps on its dips (`test/utils/cornerAnalysis/dipWindows.ts`).
+   - **Sequences are numbered** (driver, 2026-11-19: "SQ1 SQ2 etc", everywhere, single turns too): every screen, the
+     map badge and the AI report call a sequence SQ1, SQ2… in lap order (the lap view's corner number); the turns it
+     covers ("T14–T15", "km 0.9") show on hover. Set where the sequences are served (`sequenceTurns`,
+     `server/corners/sessionCornerPasses.ts`); the stored maps are unchanged. Official turns keep their names.
 
 Later, on the same passes: the rival duel (two cars' segments over the same laps) and
 [debrief corner tracking](DEBRIEF_CORNER_TRACKING.md) across sessions, which needs layer 1's stable segment numbers.

@@ -12,6 +12,7 @@ import { PeripheralsCard } from './peripherals/PeripheralsCard.js';
 import { LiveLearningPanel } from './learning/LiveLearningPanel.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
+import { SequenceMapsCard } from './sequences/SequenceMapsCard.js';
 import { SettingsSidebar } from './SettingsSidebar.js';
 import { useReplayCache } from './replays/useReplayCache.js';
 import { useAiSettings } from './hooks/useAiSettings.js';
@@ -102,6 +103,8 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         );
       case 'replay-cache':
         return <ReplayCacheCard replay={replay} replayScanStatus={replayScanStatus} />;
+      case 'corner-sequences':
+        return <SequenceMapsCard />;
       case 'live-dashboard':
         return <LiveDashboardCard />;
       case 'peripherals':

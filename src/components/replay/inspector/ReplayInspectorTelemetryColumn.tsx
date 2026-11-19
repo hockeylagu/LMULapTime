@@ -21,7 +21,7 @@ export interface ReplayInspectorTelemetryColumnProps {
   setChartZoomRange: (range: { start: number; end: number } | null) => void;
   telemetryResolution: TelemetryResolution;
   handleChangeResolution: (res: TelemetryResolution) => void;
-  selectedCornerMarkers: { cornerNumber: number; entryFrame: number; minFrame: number; exitFrame: number } | null;
+  selectedCornerMarkers: { cornerNumber: number; label?: string; entryFrame: number; minFrame: number; exitFrame: number } | null;
   cornerSegments: CornerSegmentComparison[];
   lapSegments: LapSegmentComparison[];
   selectedCornerNumber: number | null;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useEffectEvent, useCallback, useRef, startTransition } from 'react';
 import type { AppStatus, ScanStatus } from '../../shared/types/index.js';
 import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
+import { sequenceMapsChanged } from './cornerSequenceApi.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
 import { setVehicleLogoSource } from './vehicles/vehicleLogosApi.js';
 import { isDemoMode } from './anonymizeData.js';
@@ -162,7 +163,8 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
   // The server can start a scan by itself (after a session); its events wake the polling that would otherwise be idle.
   useAppEvents({
     onScanStarted: startScanPolling,
-    onScanFinished: () => { loadedKey.current = null; startScanPolling(); },
+    // A scan may have grown a class's sequence map and rebuilt its sequence passes.
+    onScanFinished: () => { loadedKey.current = null; sequenceMapsChanged(); startScanPolling(); },
     onGameStarted,
     onGameRunning: setGameRunning,
   }, true);

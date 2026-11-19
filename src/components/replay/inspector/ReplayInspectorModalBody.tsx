@@ -81,7 +81,7 @@ export interface ReplayInspectorModalBodyProps {
   toggleConsistencyLap: (lapNumber: number) => void;
   selectedCornerNumber: number | null;
   handleSelectCorner: (cornerNumber: number | null) => void;
-  selectedCornerMarkers: { cornerNumber: number; entryFrame: number; minFrame: number; exitFrame: number } | null;
+  selectedCornerMarkers: { cornerNumber: number; label?: string; entryFrame: number; minFrame: number; exitFrame: number } | null;
   primaryDists: number[];
   activeTab: 'map' | 'corners' | 'ai-report';
   setActiveTab: (tab: 'map' | 'corners' | 'ai-report') => void;

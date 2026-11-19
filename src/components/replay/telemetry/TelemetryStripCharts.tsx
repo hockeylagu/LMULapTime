@@ -143,12 +143,14 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? pctForIndex(sectors.s1Frame) : null;
   const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? pctForIndex(sectors.s2Frame) : null;
 
+  // A corner can start on the view's first point or end on its last (the lap's last corner ends at the lap's end).
+  const cornerPct = (frame: number | undefined) => (frame !== undefined && frame >= viewStart && frame <= viewEnd ? pctForIndex(frame) : null);
   const metrics = {
     s1Pct,
     s2Pct,
-    cornerEntryPct: selectedCornerMarkers && selectedCornerMarkers.entryFrame > viewStart && selectedCornerMarkers.entryFrame < viewEnd ? pctForIndex(selectedCornerMarkers.entryFrame) : null,
-    cornerMinPct: selectedCornerMarkers && selectedCornerMarkers.minFrame > viewStart && selectedCornerMarkers.minFrame < viewEnd ? pctForIndex(selectedCornerMarkers.minFrame) : null,
-    cornerExitPct: selectedCornerMarkers && selectedCornerMarkers.exitFrame > viewStart && selectedCornerMarkers.exitFrame < viewEnd ? pctForIndex(selectedCornerMarkers.exitFrame) : null,
+    cornerEntryPct: cornerPct(selectedCornerMarkers?.entryFrame),
+    cornerMinPct: cornerPct(selectedCornerMarkers?.minFrame),
+    cornerExitPct: cornerPct(selectedCornerMarkers?.exitFrame),
   };
 
   if (isLoading) return (

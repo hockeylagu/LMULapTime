@@ -38,6 +38,26 @@ export interface CornerTurn {
   apexM: number;
   startM: number;
   endM: number;
+  /**
+   * A class's turn sequence (`?segments=sequences`): its class and the official turns it holds. Its id is its first
+   * turn's, so it is unique within the class only; the slowest point stands for the apex.
+   */
+  sequence?: { carClass: string; turnIds: number[] };
+}
+
+/** What the passes cut: the layout's official turns, or each class's turn sequences (`?segments=`). */
+export type CornerSegmentKind = 'turns' | 'sequences';
+
+/**
+ * GET /api/corner-sequences/layout: a layout's corners for a class, any lap's (no replay needed): the class's sequences,
+ * or the official turns when the class has no map there. Distances from the start line; `startStationM` puts them on
+ * the centre line.
+ */
+export interface LayoutCorners {
+  kind: CornerSegmentKind;
+  startStationM: number;
+  lengthM: number;
+  corners: CornerTurn[];
 }
 
 /** A car of the replay, for naming the traffic a pass met. */

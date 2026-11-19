@@ -64,7 +64,7 @@ describe('CornerSpeedTable', () => {
 
   it('shows an empty-state message when there are no segments', () => {
     render(<CornerSpeedTable segments={[]} />);
-    expect(screen.getByText(/Not enough distinct braking\/apex events/i)).toBeInTheDocument();
+    expect(screen.getByText(/No corners for this lap/i)).toBeInTheDocument();
   });
 
   it('renders corner and straight rows with speeds, deltas, and the whole-lap total', () => {

@@ -1,6 +1,7 @@
 import { AiLapEvidence, ReplayLapSummary, ReplayTrajectoryData } from '../../shared/types/index.js';
 import { LapSegmentComparison } from './cornerAnalysis/types.js';
 import type { DebriefCorner } from './sessionDebrief.js';
+import { cornerName } from './cornerAnalysis/helpers.js';
 
 const round = (value: number): number => Number(value.toFixed(3));
 const optionalRound = (value: number | null | undefined): number | undefined => value == null ? undefined : round(value);
@@ -53,6 +54,7 @@ export function buildAiLapEvidence({
           segmentIndex: segment.segmentIndex,
           type: 'corner' as const,
           cornerNumber: segment.cornerNumber,
+          cornerLabel: cornerName(segment),
           turnDirection: segment.turnDirection,
           cornerAngleDeg: optionalRound(segment.cornerAngleDeg),
           effectiveRadiusM: optionalRound(segment.effectiveRadiusM),
@@ -153,10 +155,11 @@ export function buildAiLapEvidence({
   };
 
   if (hasBaseline && priorities && priorities.length > 0) {
-    // Corners the lap's detection found (rankDebriefCorners): each has its number.
+    // The lap's corners (rankDebriefCorners): each has its number, and its name on the layout.
     evidence.priorities = priorities.flatMap(corner => corner.cornerNumber === null ? [] : [{ ...corner, cornerNumber: corner.cornerNumber }]).map((corner, index) => ({
       rank: index + 1,
       cornerNumber: corner.cornerNumber,
+      cornerLabel: corner.label,
       timeLossSec: round(corner.timeLossSec),
       lapsLosing: corner.lapsLosing ?? undefined,
       lapsSampled: corner.lapsSampled ?? undefined,

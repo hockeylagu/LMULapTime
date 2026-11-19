@@ -1,6 +1,7 @@
 import React, { useContext } from 'react';
 import { Repeat, Snail, Scan, X } from 'lucide-react';
 import type { CornerSegmentComparison } from '../../../../utils/cornerAnalysis/types.js';
+import { cornerName } from '../../../../utils/cornerAnalysis/helpers.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { formatTimeDelta, timeDeltaClass } from '../../analysis/CornerTableFormatters.js';
 import { ReplayFullscreenControlsContext } from '../../inspector/replayFullscreenControls.js';
@@ -29,7 +30,7 @@ export const CornerFocusBar: React.FC<Props> = ({ corner, compared, looping, onT
   return (
     <div data-testid="corner-focus-bar" onPointerDown={event => event.stopPropagation()}
       className="absolute bottom-12 left-1/2 z-20 flex w-max -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-lg border border-lmu-border bg-lmu-card px-1.5 py-1 shadow-lg">
-      <span className="px-1.5 font-mono text-xs font-bold text-lmu-text">T{corner.cornerNumber}</span>
+      <span className="px-1.5 font-mono text-xs font-bold text-lmu-text" title={corner.title}>{cornerName(corner)}</span>
       {compared && <span className={`pr-1 font-mono text-xs ${timeDeltaClass(corner.timeDeltaSec)}`}>{formatTimeDelta(corner.timeDeltaSec)}</span>}
       <button type="button" aria-pressed={looping} onClick={onToggleLoop} className={toggleClass(looping)}
         title={looping ? 'Play the lap on from the corner' : 'Repeat the corner from entry to exit'}>

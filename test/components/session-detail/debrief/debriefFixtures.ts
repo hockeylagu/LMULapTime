@@ -1,19 +1,11 @@
 import { vi } from 'vitest';
-import type { ComparableLap, DetailedSession, DriverData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
+import type { ComparableLap, DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import { clearLayoutCornersCache } from '../../../../src/api/cornerSequenceApi.js';
 import type { CornerPass, CornerPassCar, CornerPassLap, SessionCornerPasses } from '../../../../shared/types/corners/cornerPasses.js';
 
-export const MY_REPLAY = 'Daytona International Speedway Road Course R1 10.Vcr';
-export const REF_REPLAY = 'Daytona International Speedway Road Course Q1 7.Vcr';
+const MY_REPLAY = 'Daytona International Speedway Road Course R1 10.Vcr';
+const REF_REPLAY = 'Daytona International Speedway Road Course Q1 7.Vcr';
 export const ME = 'Samuel Lague';
-
-/**
- * The analysed lap as telemetry: 200 km/h down to 100 at 70 m and back up (the detected corner 1 runs
- * 30-110 m), on stations equal to its distance so the official turn at 70 m falls in it.
- */
-function cornerLap(): ReplayTrajectoryPoint[] {
-  const speeds = [100, 150, 200, 200, 180, 150, 100, 100, 150, 180, 200, 200, 180, 150, 100];
-  return speeds.map((speedKmh, i) => ({ x: i * 10, y: 0, z: 0, stationM: i * 10, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3 }));
-}
 
 function lap(lapNumber: number, lapTime: number) {
   return { lapNumber, lapTime, position: 3, s1: null, s2: null, s3: null, topSpeed: null, fCompound: '', rCompound: '', isPitStop: false, isValid: true };
@@ -60,16 +52,25 @@ function pass(slot: number, lapNumber: number, sec: number, extra: Partial<Corne
   };
 }
 
+const TURNS = [{ id: 1, label: 'T1', title: 'Turn 1', apexM: 70, startM: 30, endM: 110 }];
+
+/** The class sequences (`?segments=sequences`): the Hyper map takes T1 and T2 together; a GT3 map's sequence 1 holds T1 alone. */
+function sequences(hyperTurnIds = [1, 2]) {
+  return [
+    { id: 1, label: 'T1–T2', title: 'T1–T2', apexM: 70, startM: 30, endM: 110, sequence: { carClass: 'Hyper', turnIds: hyperTurnIds } },
+    { id: 1, label: 'T1', title: 'T1', apexM: 70, startM: 30, endM: 90, sequence: { carClass: 'GT3', turnIds: [1] } },
+  ];
+}
+
 /** Each passed lap's flags as the route serves them: a valid dry racing lap, unless `flags` says otherwise. */
-function built(cars: CornerPassCar[], passes: CornerPass[], flags: Record<number, Partial<CornerPassLap>> = {}): SessionCornerPasses {
+function built(cars: CornerPassCar[], passes: CornerPass[], flags: Record<number, Partial<CornerPassLap>> = {}, turns = TURNS): SessionCornerPasses {
   const laps = passes.map((item): CornerPassLap => ({
     slot: item.slot, lapNumber: item.lapNumber, startSec: item.lapNumber * 100, endSec: item.lapNumber * 100 + 100,
     isValid: true, isPitStop: false, isOutLap: false, wet: false, ...(item.slot === 0 ? flags[item.lapNumber] : {}),
   }));
   return {
     available: true, layoutKey: 'daytona_road', startStationM: 0, trackLengthM: 5000,
-    turns: [{ id: 1, label: 'T1', title: 'Turn 1', apexM: 70, startM: 30, endM: 110 }],
-    cars, passes, laps, contacts: [],
+    turns, cars, passes, laps, contacts: [],
   };
 }
 
@@ -80,13 +81,17 @@ export interface DebriefServerOptions {
   lapFlags?: Record<number, Partial<CornerPassLap>>;
   /** What the session's corner passes answer instead (e.g. not built). */
   passes?: SessionCornerPasses;
+  /** What the sequence passes answer instead (e.g. no map for the class). */
+  sequencePasses?: SessionCornerPasses;
+  /** The turns the reference session's Hyper sequence 1 holds (its map grouped otherwise). */
+  referenceTurnIds?: number[];
 }
 
 /** The corner passes of the two sessions: R1 (the driver, Enzo Syl when in the session, and a traffic car) and Q1 (the references). */
-function sessionPasses(sessionId: string, trafficLaps: number[], lapFlags: Record<number, Partial<CornerPassLap>>): SessionCornerPasses {
+function sessionPasses(sessionId: string, trafficLaps: number[], lapFlags: Record<number, Partial<CornerPassLap>>, turns = TURNS): SessionCornerPasses {
   if (sessionId === 'Q1') {
     // Catani's lap 3 and the near rival's lap 5 are both under driver 0 (referenceLap, realisticLap).
-    return built([{ slot: 0, name: 'Davide Catani', sessionDriverOrdinal: 0 }], [pass(0, 3, 2.4), pass(0, 5, 2.56)]);
+    return built([{ slot: 0, name: 'Davide Catani', carClass: 'Hyper', sessionDriverOrdinal: 0 }], [pass(0, 3, 2.4), pass(0, 5, 2.56)], {}, turns);
   }
   const close = (lapNumber: number) => (trafficLaps.includes(lapNumber) ? { aheadSlot: 2, aheadGapSec: 0.4 } : {});
   return built(
@@ -101,27 +106,35 @@ function sessionPasses(sessionId: string, trafficLaps: number[], lapFlags: Recor
       ...trafficLaps.map(lapNumber => pass(2, lapNumber, 2.8, { entrySec: lapNumber * 100 - 0.4 })),
     ],
     lapFlags,
+    turns,
   );
 }
 
 const ok = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
 
-/** Serves comparable laps, the sessions' corner passes, and the analysed lap's telemetry. */
+/** Serves comparable laps, the sessions' corner passes, and the layout's corners. */
 export function mockDebriefServer(compareLaps: ComparableLap[] = [referenceLap], options: DebriefServerOptions = {}) {
+  clearLayoutCornersCache();
   const fetchMock = vi.fn((input: string) => {
     const url = decodeURIComponent(String(input));
     if (url.startsWith('/api/compare/laps')) return ok({ laps: compareLaps });
     const params = new URLSearchParams(url.split('?')[1] ?? '');
     const passesMatch = /\/api\/session\/([^/]+)\/corner-passes/.exec(url);
     if (passesMatch) {
-      const all = options.passes ?? sessionPasses(passesMatch[1], options.trafficLaps ?? [], options.lapFlags ?? {});
+      const bySequence = params.get('segments') === 'sequences';
+      const turns = bySequence ? sequences(passesMatch[1] === 'Q1' ? options.referenceTurnIds : undefined) : TURNS;
+      const all = (bySequence ? options.sequencePasses : undefined) ?? options.passes
+        ?? sessionPasses(passesMatch[1], options.trafficLaps ?? [], options.lapFlags ?? {}, turns);
       const ordinal = params.get('driverOrdinal');
       if (!all.available || ordinal === null) return ok(all);
       const slot = all.cars.find(car => car.sessionDriverOrdinal === Number(ordinal))?.slot;
       return ok({ ...all, passes: all.passes.filter(item => item.slot === slot) });
     }
-    if (url.startsWith('/api/session/R1/telemetry?') && params.get('lapOrdinal') === '3') {
-      return ok({ sessionId: 'R1', driverOrdinal: 0, lapOrdinal: 3, replayName: MY_REPLAY, currentLap: 20, stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: cornerLap() });
+    // The lap view's corners for the driver's class: its map (a sequence before T1–T2, so T1–T2 is corner 2), else the turns.
+    if (url.startsWith('/api/corner-sequences/layout?') && params.get('layoutKey') === 'daytona_road') {
+      const noMap = options.sequencePasses && !options.sequencePasses.available;
+      const map = [{ id: 9, label: 'T9', title: 'T9', apexM: 10, startM: 0, endM: 30, sequence: { carClass: 'Hyper', turnIds: [9] } }, sequences()[0]];
+      return ok({ kind: noMap ? 'turns' : 'sequences', startStationM: 0, lengthM: 5000, corners: noMap ? TURNS : map });
     }
     return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ error: 'Not found' }) });
   });

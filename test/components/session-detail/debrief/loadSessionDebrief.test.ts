@@ -27,7 +27,9 @@ describe('loadSessionDebrief', () => {
     // Lap 1 is the start lap and is not timed. T1 holds the analysed lap's detected corner 1.
     expect(debrief.lapsTimed).toBe(3);
     expect(debrief.corners).toHaveLength(1);
-    expect(debrief.corners[0]).toMatchObject({ label: 'T1', cornerNumber: 1, timeLossSec: 0.4, lapsLosing: 2, lapsSampled: 3, confidence: 1 });
+    // Through the class's sequence T1–T2 (the Hyper map's, not the GT3 map's sequence of the same id).
+    expect(debrief.segments).toBe('sequences');
+    expect(debrief.corners[0]).toMatchObject({ label: 'T1–T2', cornerNumber: 2, timeLossSec: 0.4, lapsLosing: 2, lapsSampled: 3, confidence: 1 });
     // The driver's passes come from one request for the whole session.
     expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/session/R1/corner-passes'))).toHaveLength(1);
   });
@@ -89,7 +91,7 @@ describe('loadSessionDebrief', () => {
     expect(debrief.technique?.driverName).toBe('Davide Catani');
     expect(debrief.lapDeltaSec).toBe(0.484);
     expect(debrief.techniqueDeltaSec).toBe(1.92);
-    expect(debrief.corners[0]).toMatchObject({ cornerNumber: 1, timeLossSec: 0.24, techniqueLossSec: 0.4 });
+    expect(debrief.corners[0]).toMatchObject({ cornerNumber: 2, timeLossSec: 0.24, techniqueLossSec: 0.4 });
     expect(new URLSearchParams(debriefCornerLink(debrief, 1, 'technique').split('?')[1]).get('compareDriver')).toBe('Davide Catani');
     expect(new URLSearchParams(debriefCornerLink(debrief, 1).split('?')[1]).get('compareDriver')).toBe('Near Rival');
   });
@@ -118,6 +120,23 @@ describe('loadSessionDebrief', () => {
     expect(debrief.corners[0].traffic).toMatchObject({ driverName: 'Vinicius Ares', kind: 'battle', closestGapSec: 0.4 });
   });
 
+  it('ranks the official turns when the class has no corner map on this track', async () => {
+    const fetchMock = mockDebriefServer([referenceLap], { sequencePasses: { available: false, reason: 'No class of this replay has a corner map on this track yet.' } });
+
+    const debrief = await loadSessionDebrief(session, me);
+
+    expect(debrief.segments).toBe('turns');
+    expect(debrief.corners[0]).toMatchObject({ label: 'T1', timeLossSec: 0.4 });
+    // The reference lap is read through the official turns too.
+    expect(fetchMock.mock.calls.map(([url]) => String(url)).filter(url => url.startsWith('/api/session/Q1/corner-passes'))).toEqual(['/api/session/Q1/corner-passes?driverOrdinal=0']);
+  });
+
+  it('leaves out a reference corner its session groups from other turns', async () => {
+    mockDebriefServer([referenceLap], { referenceTurnIds: [1] });
+
+    await expect(loadSessionDebrief(session, me)).rejects.toThrow('The replay has no passes for the reference lap.');
+  });
+
   it('says why when the session passes are not built', async () => {
     mockDebriefServer([referenceLap], { passes: { available: false, reason: 'Corner times are still being built.' } });
 
@@ -130,6 +149,6 @@ describe('loadSessionDebrief', () => {
     const debrief = await loadSessionDebrief(session, me);
 
     expect(debrief.lapsTimed).toBe(1);
-    expect(debrief.corners[0]).toMatchObject({ cornerNumber: 1, lapsLosing: null, repeatability: 1 });
+    expect(debrief.corners[0]).toMatchObject({ cornerNumber: 2, lapsLosing: null, repeatability: 1 });
   });
 });

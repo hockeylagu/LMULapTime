@@ -14,6 +14,7 @@ const exclusions: Record<string, string> = {
   '/api/cache/clear': 'Destroys the benchmark dataset.',
   '/api/scan': 'Starts ingestion and changes the dataset.',
   '/api/reference-laptimes/refresh': 'Calls Google Sheets and changes benchmark targets.',
+  '/api/corner-sequences/maps/regenerate': 'Rebuilds a sequence map and the sequence passes of its layout.',
   '/api/rivals/pin': 'Changes the selected rival.',
   '/api/live/settings': 'Changes the live dashboard settings.',
   '/api/desktop/browser': 'Changes the desktop-local browser monitor preference.',

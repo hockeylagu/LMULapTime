@@ -49,30 +49,30 @@ const vsUsual = <span className="font-sans text-lmu-muted"> vs usual</span>;
 function Body({ insight, versusMode, versusNote, onPick }: { insight: CornerInsight; versusMode: boolean; versusNote?: string | null; onPick?: (cell: StripCell) => void }) {
   const { time, minSpeed, gain, best } = insight;
   if (versusMode) return <VersusBody insight={insight} note={versusNote} onPick={onPick} />;
-  const usual = insight.usualSec === null ? 'no usual yet: it needs 3 laps that count through this turn'
+  const usual = insight.usualSec === null ? 'no usual yet: it needs 3 laps that count through this corner'
     : `Usual ${seconds(insight.usualSec)} s${insight.spreadSec === null ? '' : ` ±${seconds(insight.spreadSec)}`}${best ? `, best ${seconds(best.timeSec)} s on lap ${best.lapNumber}` : ''}`;
   const rival = gain ? `${gain.carNumber ? `#${gain.carNumber} ` : ''}${gain.name}` : '';
   const split = gain && gain.entrySec !== null && gain.exitSec !== null ? { entry: gain.entrySec, exit: gain.exitSec } : null;
   return (
     <>
       <dl className="grid grid-cols-[3fr_2fr] gap-x-3 px-3 pt-2">
-        <Stat label="Time" title={`First number: seconds since the car entered this turn, counting with the replay. Second: its whole time through the turn on this lap. Under them: that time against its usual time here. ${usual}`}
+        <Stat label="Time" title={`First number: seconds since the car entered this corner, counting with the replay. Second: its whole time through the corner on this lap. Under them: that time against its usual time here. ${usual}`}
           delta={time.delta === null ? <span className="text-lmu-muted">no usual yet</span> : <><span className={timeTone(time.delta)}>{signed(time.delta, 3)}</span>{vsUsual}</>}>
           {/* Padded to the pass time's width so the line does not move as the seconds tick. */}
           <span className="whitespace-pre">{insight.elapsedSec.toFixed(1).padStart(seconds(time.value).length - 2)}</span>
           <span className="font-normal text-lmu-muted"> / </span>{seconds(time.value)}<span className="text-xs font-normal text-lmu-muted"> s</span>
         </Stat>
-        <Stat label="Min speed" title="The slowest speed in this turn on this lap, against the car's usual slowest speed here"
+        <Stat label="Min speed" title="The slowest speed in this corner on this lap, against the car's usual slowest speed here"
           delta={minSpeed?.delta == null ? <span className="text-lmu-muted">{DASH}</span> : <><span className={speedTone(minSpeed.delta)}>{signed(minSpeed.delta, 0)}</span>{vsUsual}</>}>
           {minSpeed ? <>{Math.round(minSpeed.value)}<span className="text-xs font-normal text-lmu-muted"> km/h</span></> : DASH}
         </Stat>
       </dl>
       <dl className="mx-3 mt-2 space-y-1 border-t border-lmu-border pt-2 pb-2.5 text-xs">
-        <div className="flex items-baseline gap-2" title={gain ? `The car's usual time through this turn against the fastest usual time of its class (${rival}); and where this turn ranks among the car's turns by time to find` : 'Needs 3 laps that count through this turn, for the car and for another car of its class'}>
+        <div className="flex items-baseline gap-2" title={gain ? `The car's usual time through this corner against the fastest usual time of its class (${rival}); and where this corner ranks among the car's corners by time to find` : 'Needs 3 laps that count through this corner, for the car and for another car of its class'}>
           <dt className={LABEL}>Gain</dt>
           <dd className="truncate">{!gain ? DASH : gain.deltaSec > 0.0005
             ? <><span className="font-mono text-sm font-semibold tabular-nums text-lmu-loss">{seconds(gain.deltaSec)} s</span>
-              <span className="text-lmu-text-soft"> to find · {ordinal(gain.rank)} of {gain.of} turns</span></>
+              <span className="text-lmu-text-soft"> to find · {ordinal(gain.rank)} of {gain.of} corners</span></>
             : <span className="text-lmu-gain">fastest in class</span>}</dd>
         </div>
         {split && <div className="flex items-baseline gap-3" title="The gain split at the slowest point: on the way in (braking, turn-in) and on the way out (back to the throttle)">
@@ -80,7 +80,7 @@ function Body({ insight, versusMode, versusNote, onPick }: { insight: CornerInsi
           <dd><span className="text-lmu-text-soft">Entry </span><span className={`font-mono tabular-nums ${timeTone(split.entry)}`}>{signed(split.entry, 3)}</span></dd>
           <dd><span className="text-lmu-text-soft">Exit </span><span className={`font-mono tabular-nums ${timeTone(split.exit)}`}>{signed(split.exit, 3)}</span></dd>
         </div>}
-        {gain && <div title={`How ${rival} usually takes this turn compared with the car: ${howText(gain)}`}>
+        {gain && <div title={`How ${rival} usually takes this corner compared with the car: ${howText(gain)}`}>
           <dt className="sr-only">How</dt>
           <dd className="line-clamp-2 leading-snug text-lmu-text"><span className="font-mono text-lmu-text-soft">{gain.carNumber ? `#${gain.carNumber}` : gain.name}</span> {howText(gain)}</dd>
         </div>}
@@ -92,36 +92,36 @@ function Body({ insight, versusMode, versusNote, onPick }: { insight: CornerInsi
 
 const whoText = (versus: Versus) => `${versus.carNumber ? `#${versus.carNumber} ` : ''}L${versus.lapNumber}`;
 
-/** The compare mode: this pass against the compare lap's pass through the turn, with where and how the gap is made. */
+/** The compare mode: this pass against the compare lap's pass through the corner, with where and how the gap is made. */
 function VersusBody({ insight, note, onPick }: { insight: CornerInsight; note?: string | null; onPick?: (cell: StripCell) => void }) {
   const { time, minSpeed, versus } = insight;
   const vs = versus && <span className="font-sans text-lmu-muted"> vs {whoText(versus)}</span>;
   return (
     <>
       <dl className="grid grid-cols-[3fr_2fr] gap-x-3 px-3 pt-2">
-        <Stat label="Time" title="First number: seconds since the car entered this turn, counting with the replay. Second: its whole time through the turn on this lap. Under them: that time against the compare lap's time through the same turn"
+        <Stat label="Time" title="First number: seconds since the car entered this corner, counting with the replay. Second: its whole time through the corner on this lap. Under them: that time against the compare lap's time through the same turn"
           delta={versus ? <><span className={timeTone(versus.timeDelta)}>{signed(versus.timeDelta, 3)}</span>{vs}</> : <span className="text-lmu-muted">{DASH}</span>}>
           <span className="whitespace-pre">{insight.elapsedSec.toFixed(1).padStart(seconds(time.value).length - 2)}</span>
           <span className="font-normal text-lmu-muted"> / </span>{seconds(time.value)}<span className="text-xs font-normal text-lmu-muted"> s</span>
         </Stat>
-        <Stat label="Min speed" title="The slowest speed in this turn on this lap, against the compare lap's slowest speed here"
+        <Stat label="Min speed" title="The slowest speed in this corner on this lap, against the compare lap's slowest speed here"
           delta={versus?.minSpeedDelta == null ? <span className="text-lmu-muted">{DASH}</span> : <><span className={speedTone(versus.minSpeedDelta)}>{signed(versus.minSpeedDelta, 0)}</span>{vs}</>}>
           {minSpeed ? <>{Math.round(minSpeed.value)}<span className="text-xs font-normal text-lmu-muted"> km/h</span></> : DASH}
         </Stat>
       </dl>
       <dl className="mx-3 mt-2 space-y-1 border-t border-lmu-border pt-2 pb-2.5 text-xs">
-        {!versus ? <p className="text-lmu-muted">{note ?? 'The compare lap has no time through this turn.'}</p> : <>
-          <div className="flex items-baseline gap-2" title={`The compare lap's time through this turn: ${versus.name}, lap ${versus.lapNumber}`}>
+        {!versus ? <p className="text-lmu-muted">{note ?? 'The compare lap has no time through this corner.'}</p> : <>
+          <div className="flex items-baseline gap-2" title={`The compare lap's time through this corner: ${versus.name}, lap ${versus.lapNumber}`}>
             <dt className={LABEL}>Compare</dt>
             <dd className="truncate"><span className="font-mono tabular-nums text-lmu-text">{seconds(versus.timeSec)} s</span>
               <span className="text-lmu-text-soft"> {whoText(versus)}</span></dd>
           </div>
-          {versus.entrySec !== null && versus.exitSec !== null && <div className="flex items-baseline gap-3" title="Where the time is gained or lost, split at each lap's slowest point in the turn: on the way in (braking, turn-in) and on the way out (back to the throttle)">
+          {versus.entrySec !== null && versus.exitSec !== null && <div className="flex items-baseline gap-3" title="Where the time is gained or lost, split at each lap's slowest point in the corner: on the way in (braking, turn-in) and on the way out (back to the throttle)">
             <dt className="sr-only">Where</dt>
             <dd><span className="text-lmu-text-soft">Entry </span><span className={`font-mono tabular-nums ${timeTone(versus.entrySec)}`}>{signed(versus.entrySec, 3)}</span></dd>
             <dd><span className="text-lmu-text-soft">Exit </span><span className={`font-mono tabular-nums ${timeTone(versus.exitSec)}`}>{signed(versus.exitSec, 3)}</span></dd>
           </div>}
-          <div title={`How the compare lap takes this turn compared with this lap: ${howText(versus)}`}>
+          <div title={`How the compare lap takes this corner compared with this lap: ${howText(versus)}`}>
             <dt className="sr-only">How</dt>
             <dd className="line-clamp-2 leading-snug text-lmu-text"><span className="font-mono text-lmu-text-soft">{whoText(versus)}</span> {howText(versus)}</dd>
           </div>
@@ -140,7 +140,7 @@ function ModeSwitch({ versusMode }: { versusMode: boolean }) {
   );
   return <div role="group" aria-label="Measure against" className="flex shrink-0 items-center">
     {option(false, 'Usual', "Against the car's usual and its class's fastest")}
-    {option(true, 'Compare', "Against the compare lap's time through each turn")}
+    {option(true, 'Compare', "Against the compare lap's time through each corner")}
   </div>;
 }
 
@@ -159,7 +159,7 @@ interface Props {
 }
 
 /**
- * The corner insight card (docs/plans/proposed/CORNER_INSIGHT.md): the followed car's pass through the turn it is in,
+ * The corner insight card (docs/plans/proposed/CORNER_INSIGHT.md): the followed car's pass through the corner it is in,
  * against its usual and the class's fastest, and the turn's strip over the session. The whole pass shows from the
  * turn's entry; fixed size, a value the pass lacks shows "–" or "none".
  */
@@ -179,7 +179,7 @@ export const CornerInsightCard: React.FC<Props> = ({ insight, reason, loading, o
       </header>
       {insight ? <Body insight={insight} versusMode={Boolean(versusMode)} versusNote={versusNote} onPick={onPick} /> : (
         <p role={reason ? 'note' : 'status'} className="px-3 py-3 text-xs text-lmu-muted">
-          {reason ?? (loading ? 'Loading the corner times…' : 'The car has not reached a turn yet.')}
+          {reason ?? (loading ? 'Loading the corner times…' : 'The car has not reached a corner yet.')}
         </p>
       )}
     </aside>

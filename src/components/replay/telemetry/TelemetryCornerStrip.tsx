@@ -2,6 +2,7 @@ import React from 'react';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
+import { cornerName } from '../../../utils/cornerAnalysis/helpers.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface TelemetryCornerStripProps {
@@ -185,15 +186,15 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
 
         const cornerTooltip = isCompareMode
           ? entryDelta !== undefined && exitDelta !== undefined
-            ? `Turn ${c.cornerNumber}: Delta ${c.timeDeltaSec > 0 ? '+' : ''}${c.timeDeltaSec.toFixed(2)}s (Running: ${entryDelta >= 0 ? '+' : ''}${entryDelta.toFixed(2)}s → ${exitDelta >= 0 ? '+' : ''}${exitDelta.toFixed(2)}s)`
-            : `Corner ${c.cornerNumber}: Min Speed ${c.primaryMinSpeedKmh} km/h, Time ${c.primaryTimeSec}s, Delta ${c.timeDeltaSec > 0 ? '+' : ''}${c.timeDeltaSec.toFixed(3)}s`
-          : `Corner ${c.cornerNumber}: Min Speed ${c.primaryMinSpeedKmh} km/h, Time ${c.primaryTimeSec}s`;
+            ? `${cornerName(c)}: Delta ${c.timeDeltaSec > 0 ? '+' : ''}${c.timeDeltaSec.toFixed(2)}s (Running: ${entryDelta >= 0 ? '+' : ''}${entryDelta.toFixed(2)}s → ${exitDelta >= 0 ? '+' : ''}${exitDelta.toFixed(2)}s)`
+            : `${cornerName(c)}: Min Speed ${c.primaryMinSpeedKmh} km/h, Time ${c.primaryTimeSec}s, Delta ${c.timeDeltaSec > 0 ? '+' : ''}${c.timeDeltaSec.toFixed(3)}s`
+          : `${cornerName(c)}: Min Speed ${c.primaryMinSpeedKmh} km/h, Time ${c.primaryTimeSec}s`;
 
         return (
           <button
             key={c.cornerNumber}
             type="button"
-            aria-label={`Turn ${c.cornerNumber}`}
+            aria-label={cornerName(c)}
             onClick={() => handleCornerClick(c.cornerNumber, c.minDistM)}
             title={cornerTooltip}
             className={`flex-1 min-w-[62px] py-1 px-1.5 rounded-lg border transition-all cursor-pointer flex flex-col items-center justify-center ${borderAndBgClass} ${FOCUS_RING}`}
@@ -203,7 +204,7 @@ export const TelemetryCornerStrip: React.FC<TelemetryCornerStripProps> = ({
                 isSelected ? 'text-lmu-aqua-soft' : 'text-lmu-info'
               }`}
             >
-              T{c.cornerNumber}
+              {cornerName(c)}
             </span>
             <span className={`text-[11px] font-mono font-bold leading-tight ${metricClass}`}>
               {metricDisplay}

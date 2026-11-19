@@ -59,6 +59,8 @@ export interface PassLapSamples {
 export interface CarLaps {
   slot: number;
   laps: PassLapSamples[];
+  /** This car's own segments in place of the build's (a class's sequences); none: it is only traffic for the others. */
+  segments?: PassSegment[];
 }
 
 /** A turn's segment of the centre line, from the start line (metres). */
@@ -137,11 +139,11 @@ function placeOnLap(track: LapTrack, lengthM: number): void {
 }
 
 /**
- * The lap with the samples of the laps before and after it within LINE_BORROW_M of its ends. A stored lap is cut
+ * The lap with the samples of the laps before and after it within `borrowM` of its ends. A stored lap is cut
  * where the game timed it, often metres past the centre line's start: the crossing of a turn starting on the line
  * is then in the previous lap's last samples, and of one ending on it in the next lap's first ones.
  */
-function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: LapTrack | undefined, lengthM: number): LapTrack {
+function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: LapTrack | undefined, lengthM: number, borrowM: number): LapTrack {
   const n = track.t.length;
   if (n === 0) return track;
   const out: LapTrack = { lapNumber: track.lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], joined: [] };
@@ -165,7 +167,7 @@ function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: L
     const shift = end >= 0 ? lineUp(previous.d[end], track.d[0]) : 0;
     if (end >= 0 && follows(previous.t[end], previous.d[end] + shift, track.t[0], track.d[0])) {
       let start = end;
-      while (start > 0 && previous.joined[start] && previous.d[start - 1] + shift >= track.d[0] - LINE_BORROW_M) start--;
+      while (start > 0 && previous.joined[start] && previous.d[start - 1] + shift >= track.d[0] - borrowM) start--;
       for (let i = start; i <= end; i++) push(previous, i, shift, i > start);
     }
   }
@@ -175,7 +177,7 @@ function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: L
     while (i < next.t.length && next.t[i] <= track.t[n - 1]) i++;
     const shift = i < next.t.length ? lineUp(next.d[i], track.d[n - 1]) : 0;
     if (i < next.t.length && follows(track.t[n - 1], track.d[n - 1], next.t[i], next.d[i] + shift)) {
-      for (let first = i; i < next.t.length && next.d[i] + shift <= track.d[n - 1] + LINE_BORROW_M && (i === first || next.joined[i]); i++) {
+      for (let first = i; i < next.t.length && next.d[i] + shift <= track.d[n - 1] + borrowM && (i === first || next.joined[i]); i++) {
         push(next, i, shift, true);
       }
     }
@@ -355,8 +357,9 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
       }
       previousSlowest = slowest;
     }
-    const midSec = (entry.sec + exit.sec) / 2;
-    if (midSec < ownFromSec || midSec > ownToSec) continue;
+    // A segment running across the line (a sequence ending in the next lap) is the lap's it starts in.
+    const ownSec = endM > lengthM ? entry.sec : (entry.sec + exit.sec) / 2;
+    if (ownSec < ownFromSec || ownSec > ownToSec) continue;
     const onLap = (m: number | null) => (m === null ? null : m - offset);
     if ((last.get(id)?.entrySec ?? -Infinity) > entry.sec) continue;
     last.set(id, {
@@ -451,7 +454,16 @@ function addTraffic(passes: CornerPass[], traces: CarTrace[], lengthM: number): 
   }
 }
 
-/** Every car's passes through every segment of every lap it drove through completely. */
+/** The samples borrowed from the neighbouring laps for segments that run across the line (metres past each end). */
+export function lineBorrowM(segments: readonly PassSegment[], lengthM: number): number {
+  return Math.max(LINE_BORROW_M, ...segments.flatMap(({ startM, endM }) =>
+    endM > lengthM ? [endM - lengthM + LINE_BORROW_M, lengthM - startM + LINE_BORROW_M] : []));
+}
+
+/**
+ * Every car's passes through every segment (the build's, or the car's own) of every lap it drove through
+ * completely. Traffic counts every car.
+ */
 export function buildCornerPasses(cars: CarLaps[], segments: PassSegment[], lengthM: number): CornerPass[] {
   const passes: CornerPass[] = [];
   const traces: CarTrace[] = [];
@@ -459,8 +471,10 @@ export function buildCornerPasses(cars: CarLaps[], segments: PassSegment[], leng
     const tracks = [...car.laps].sort((a, b) => a.lapNumber - b.lapNumber).map(lap => lapTrack(lap, lengthM));
     tracks.forEach((track, k) => {
       if (track.t.length === 0) return;
-      const joined = withNeighbours(track, tracks[k - 1], tracks[k + 1], lengthM);
-      passes.push(...lapPasses(car.slot, joined, segments, lengthM, track.t[0], track.t[track.t.length - 1]));
+      const own = car.segments ?? segments;
+      if (own.length === 0) return;
+      const joined = withNeighbours(track, tracks[k - 1], tracks[k + 1], lengthM, lineBorrowM(own, lengthM));
+      passes.push(...lapPasses(car.slot, joined, own, lengthM, track.t[0], track.t[track.t.length - 1]));
     });
     traces.push(carTrace(car.slot, tracks, lengthM));
   }

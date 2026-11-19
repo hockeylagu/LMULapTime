@@ -10,13 +10,15 @@ import {
   getDistancesInReferenceFrame,
 } from '../lapAlignment.js';
 import { unwrapAngle } from '../computedTelemetry.js';
+import { lapDistanceAtStation } from '../cornerConsistency.js';
+import type { LayoutCorners } from '../../../shared/types/corners/cornerPasses.js';
 import type {
   CornerPhaseTiming, CornerSegmentComparison, CornerTrackUsage, CornerTypeSpecificDetails, LapSegmentComparison, StraightSegmentComparison,
 } from './types.js';
 import {
-  BRAKE_ONSET_LOOKBACK_M, BRAKE_ON_THRESHOLD_PCT, MIN_STRAIGHT_LENGTH_M, SEGMENT_SCAN_STEP_M, STEER_REVERSAL_FRACTION,
-  THROTTLE_ON_MIN_HOLD_SEC, THROTTLE_ON_THRESHOLD_PCT, computeMaxAbsSteer, findSpeedTurningPoints, findThresholdCrossingDistM,
-  getHeadingAtDistance, maxSpeedInRangeKmh, slowestDistInRange, throttleOnsetLookbackM, type SpeedTurningPoint,
+  BRAKE_ONSET_LOOKBACK_M, BRAKE_ON_THRESHOLD_PCT, MIN_STRAIGHT_LENGTH_M, SEGMENT_SCAN_STEP_M,
+  THROTTLE_ON_MIN_HOLD_SEC, THROTTLE_ON_THRESHOLD_PCT, findThresholdCrossingDistM,
+  getHeadingAtDistance, maxSpeedInRangeKmh, slowestDistInRange, throttleOnsetLookbackM,
 } from './helpers.js';
 
 type RoadEdge = 'leftRoadDistanceM' | 'rightRoadDistanceM';
@@ -84,34 +86,60 @@ function minimumMeasuredEdgeSpace(
   return Math.min(minimum, endValue);
 }
 
+/** A corner placed on a lap: from its entry to its exit, in the lap's own distance. */
+export interface CornerWindow { cornerNumber: number; label: string; title: string; entryM: number; exitM: number }
+
 /**
- * Detects corners (braking -> apex -> acceleration) from the PRIMARY lap's speed trace and
- * builds a complete, contiguous breakdown of the WHOLE lap (corners + the straights between
- * them) comparing primary vs baseline. All distances are in the primary lap's frame; corner
- * numbering can therefore change when the primary lap changes. Each segment's `timeDeltaSec` isolates the time
- * gained/lost across just that stretch (not cumulative drift from earlier on), so the full
- * list sums to the lap's total time delta - together this explains where the overall gap
- * comes from, not just how big it is.
- *
- * NOTE ON NUMBERING: T1/T2/T3... are just detected dips numbered in lap order, not the
- * track's official turn numbers (we have no ground-truth layout to map to - see repo memory
- * track-geometry-sources.md). A genuine but small/fast corner whose speed loss falls below
- * `minProminenceKmh` gets silently skipped, which shifts every later corner's number down by
- * one relative to reality. The default here (6) sits just above the ~5 km/h noise floor
- * (see the "ignores noise dips" test) to catch small real corners without flagging jitter.
- *
- * LINKED CORNERS (esses/chicanes): a genuine steering-direction reversal can force a turn
- * point once the speed swing reaches `MIN_LINKED_PROMINENCE_KMH` (much lower than the normal
- * `minProminenceKmh`) - see `findSpeedTurningPoints`. Speed alone can't separate corners where
- * the car never gets back up to speed between apexes, but a steering reversal proves the car
- * changed direction.
+ * The layout's corners on a lap, in its own distances: each from its start to its end (a sequence's end is the next
+ * one's start). The corner across the start line falls at the lap's end when its slowest point is before the line,
+ * else at its start. A corner the lap does not pass (no stations there) is left out.
+ */
+export function lapCornerWindows(
+  corners: LayoutCorners, points: ReadonlyArray<{ stationM?: number }>, dists: readonly number[], lapStartM: number, lapEndM: number
+): CornerWindow[] {
+  const L = corners.lengthM;
+  const at = (m: number) => lapDistanceAtStation(points, dists, ((corners.startStationM + m) % L + L) % L);
+  const windows = [...corners.corners].sort((a, b) => a.startM - b.startM).flatMap((corner, i): CornerWindow[] => {
+    const entryM = at(corner.startM), exitM = at(corner.endM), apexM = at(corner.apexM);
+    const named = { cornerNumber: i + 1, label: corner.label || `km ${(corner.apexM / 1000).toFixed(1)}`, title: corner.title };
+    if (entryM !== null && exitM !== null && exitM > entryM) return [{ ...named, entryM, exitM }];
+    if ((corner.startM >= 0 && corner.endM <= L) || apexM === null) return [];
+    if (entryM !== null && apexM >= entryM) return [{ ...named, entryM, exitM: lapEndM }];
+    return exitM !== null && apexM <= exitM ? [{ ...named, entryM: lapStartM, exitM }] : [];
+  });
+  return windows.sort((a, b) => a.entryM - b.entryM);
+}
+
+/** A corner window's boundary or apex, in the primary lap's distance. */
+interface Boundary { distM: number }
+
+/**
+ * The WHOLE lap broken into the layout's corners (the lap's class's sequences, else the official turns, placed on the
+ * lap by `lapCornerWindows`) and the straights between them, comparing primary vs baseline. All distances are in the
+ * primary lap's frame; corners are numbered in the layout's order, so a corner keeps its number on every lap. Each
+ * segment's `timeDeltaSec` isolates the time gained/lost across just that stretch (not cumulative drift from earlier
+ * on), so the full list sums to the lap's total time delta.
  */
 export function computeLapSegmentComparisons(
   primaryPoints: ReplayTrajectoryPoint[],
   baselinePoints: ReplayTrajectoryPoint[],
-  minProminenceKmh = 6,
+  corners: LayoutCorners,
   trackLengthM?: number,
-  nominalWidthM?: number
+  nominalWidthM?: number,
+): LapSegmentComparison[] {
+  if (!primaryPoints?.length || !baselinePoints?.length) return [];
+  const dists = getTrajectoryDistances(primaryPoints, trackLengthM);
+  const windows = lapCornerWindows(corners, primaryPoints, dists, dists[0] || 0, dists[dists.length - 1] || 0);
+  return compareLapSegments(primaryPoints, baselinePoints, windows, trackLengthM, nominalWidthM);
+}
+
+/** The lap comparison over given corner windows (in the primary lap's distance): `computeLapSegmentComparisons`'s core. */
+export function compareLapSegments(
+  primaryPoints: ReplayTrajectoryPoint[],
+  baselinePoints: ReplayTrajectoryPoint[],
+  windows: readonly CornerWindow[],
+  trackLengthM?: number,
+  nominalWidthM?: number,
 ): LapSegmentComparison[] {
   if (!primaryPoints?.length || !baselinePoints?.length) return [];
 
@@ -121,26 +149,8 @@ export function computeLapSegmentComparisons(
   // driven distance drifts metres away from the primary's by mid-lap.
   const primaryDists = getTrajectoryDistances(primaryPoints, trackLengthM);
   const baselineDists = getDistancesInReferenceFrame(baselinePoints, primaryPoints, trackLengthM);
-  const primaryMinSteerAmplitude = computeMaxAbsSteer(primaryPoints) * STEER_REVERSAL_FRACTION;
-  const turningPoints = findSpeedTurningPoints(primaryPoints, primaryDists, minProminenceKmh, primaryMinSteerAmplitude);
   const totalDistM = primaryDists[primaryDists.length - 1] || 0;
   const startDistM = primaryDists[0] || 0;
-
-  // A dangling min/max at either end of the lap - e.g. the last corner leads straight onto
-  // the line with no further speed dip before the data ends - has no closing boundary of the
-  // opposite type, so the corner-building loop below (which requires a max on both sides of
-  // every min) would otherwise silently drop it instead of treating it as a real corner.
-  // Close it off using the lap's own start/end point as an implicit boundary.
-  if (turningPoints.length > 0 && turningPoints[0].type === 'min' && turningPoints[0].distM - startDistM >= MIN_STRAIGHT_LENGTH_M) {
-    turningPoints.unshift({ index: 0, distM: startDistM, type: 'max' });
-  }
-  if (
-    turningPoints.length > 0 &&
-    turningPoints[turningPoints.length - 1].type === 'min' &&
-    totalDistM - turningPoints[turningPoints.length - 1].distM >= MIN_STRAIGHT_LENGTH_M
-  ) {
-    turningPoints.push({ index: primaryPoints.length - 1, distM: totalDistM, type: 'max' });
-  }
 
   // Segment and phase deltas are differences of the SAME cumulative delta trace the telemetry
   // delta channel shows (each lap timed from its own S/F crossing), so the segments add up to the lap delta and never disagree with the chart. The
@@ -172,7 +182,7 @@ export function computeLapSegmentComparisons(
     };
   };
 
-  const buildCorner = (cornerNumber: number, entry: SpeedTurningPoint, min: SpeedTurningPoint, exit: SpeedTurningPoint): CornerSegmentComparison => {
+  const buildCorner = (cornerNumber: number, entry: Boundary, min: Boundary, exit: Boundary): CornerSegmentComparison => {
     const primaryAtEntry = interpolatePointAtDistance(primaryPoints, primaryDists, entry.distM);
     const primaryAtMin = interpolatePointAtDistance(primaryPoints, primaryDists, min.distM);
     const primaryAtExit = interpolatePointAtDistance(primaryPoints, primaryDists, exit.distM);
@@ -581,26 +591,17 @@ export function computeLapSegmentComparisons(
   };
 
   const segments: LapSegmentComparison[] = [];
-  let cornerNumber = 0;
   let prevBoundaryDist = startDistM;
-
-  for (let i = 1; i < turningPoints.length - 1; i++) {
-    const min = turningPoints[i];
-    const entry = turningPoints[i - 1];
-    const exit = turningPoints[i + 1];
-    if (min.type !== 'min' || entry.type !== 'max' || exit.type !== 'max') continue;
-
-    const straight = buildStraight(prevBoundaryDist, entry.distM);
+  // The lap's own slowest point inside each window is its apex.
+  for (const window of windows) {
+    const straight = buildStraight(prevBoundaryDist, window.entryM);
     if (straight) segments.push(straight);
-
-    cornerNumber++;
-    segments.push(buildCorner(cornerNumber, entry, min, exit));
-    prevBoundaryDist = exit.distM;
+    const minM = slowestDistInRange(primaryPoints, primaryDists, window.entryM, window.exitM) ?? (window.entryM + window.exitM) / 2;
+    segments.push({ ...buildCorner(window.cornerNumber, { distM: window.entryM }, { distM: minM }, { distM: window.exitM }), label: window.label, title: window.title });
+    prevBoundaryDist = window.exitM;
   }
-
   const trailing = buildStraight(prevBoundaryDist, totalDistM);
   if (trailing) segments.push(trailing);
-
   segments.forEach((s, idx) => { s.segmentIndex = idx; });
   return segments;
 }

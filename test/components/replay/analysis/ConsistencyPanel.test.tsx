@@ -164,7 +164,7 @@ describe('ConsistencyPanel', () => {
     expect(screen.getAllByText('Sector 2').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('±0.150s')).toBeInTheDocument();
     expect(screen.getByText('0.3%')).toBeInTheDocument();
-    expect(screen.getByText('Loading your passes through each turn...')).toBeInTheDocument();
+    expect(screen.getByText('Loading your passes through each corner...')).toBeInTheDocument();
   });
 
   it('renders empty corner stats message when cornerStats is empty', () => {
@@ -193,6 +193,17 @@ describe('ConsistencyPanel', () => {
     );
 
     expect(screen.getByText('Corner times are not built for this replay yet.')).toBeInTheDocument();
+  });
+
+  it('switches its corners between the class sequences (the default) and the official turns, remembered', () => {
+    render(<ConsistencyPanel stats={baseStats} cornerStats={[]} formatLapTime={formatLapTime} />);
+    const sequences = screen.getByRole('button', { name: 'Sequences' }), turns = screen.getByRole('button', { name: 'Turns' });
+    expect(sequences).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(turns);
+    expect(turns).toHaveAttribute('aria-pressed', 'true');
+    expect(localStorage.getItem('lmu-consistency-segments-v1')).toBe('turns');
+    fireEvent.click(sequences);
+    expect(sequences).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renders corner details, mini map, and expands metric chart on click', () => {

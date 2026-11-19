@@ -56,7 +56,8 @@ export interface ClassGap {
 /** The session's passes, indexed for the card: built once per response, read every clock tick. */
 export interface CornerInsightIndex {
   data: BuiltCornerPasses;
-  turns: Map<number, CornerTurn>;
+  /** The turn (or the car's class sequence) a pass of the car's went through. */
+  turnOf(slot: number, segment: number): CornerTurn | undefined;
   cars: Map<number, CornerPassCar>;
   laps: Map<string, CornerPassLap>;
   /** Each car's passes in time order. */
@@ -65,11 +66,13 @@ export interface CornerInsightIndex {
   contacts: Map<number, number[]>;
   usual(slot: number, segment: number, wet: boolean): Usual;
 
-  /** The car's turns against its class, the most time lost first. */
+  /** The car's turns (its class's sequences) against its class, the most time lost first. */
   classGaps(slot: number, wet: boolean): ClassGap[];
 }
 
 const lapKey = (slot: number, lapNumber: number) => `${slot}|${lapNumber}`;
+// A sequence's id is its first turn's: unique within its class only. An official turn has no class.
+const turnKey = (carClass: string | undefined, id: number) => `${carClass ?? ''}|${id}`;
 
 function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V) {
   const list = map.get(key);
@@ -92,6 +95,9 @@ export function indexCornerInsight(data: BuiltCornerPasses): CornerInsightIndex 
   const contacts = new Map<number, number[]>();
   for (const contact of [...data.contacts].sort((a, b) => a.timeSec - b.timeSec)) pushTo(contacts, contact.slot, contact.timeSec);
 
+  const turns = new Map(data.turns.map(turn => [turnKey(turn.sequence?.carClass, turn.id), turn]));
+  const turnOf = (slot: number, segment: number) =>
+    turns.get(turnKey(cars.get(slot)?.carClass, segment)) ?? turns.get(turnKey(undefined, segment));
   const usuals = new Map<string, Usual>();
   const usual = (slot: number, segment: number, wet: boolean): Usual => {
     const key = `${slot}|${segment}|${wet ? 'wet' : 'dry'}`;
@@ -120,7 +126,8 @@ export function indexCornerInsight(data: BuiltCornerPasses): CornerInsightIndex 
     if (!found) {
       const carClass = cars.get(slot)?.carClass;
       const rivals = data.cars.filter(car => car.slot !== slot && car.carClass === carClass);
-      found = data.turns.flatMap(turn => {
+      const ownTurns = data.turns.filter(turn => !turn.sequence || turn.sequence.carClass === carClass);
+      found = ownTurns.flatMap(turn => {
         const own = usual(slot, turn.id, wet).timeSec;
         if (own === null) return [];
         let fastest: { slot: number; timeSec: number } | null = null;
@@ -134,7 +141,7 @@ export function indexCornerInsight(data: BuiltCornerPasses): CornerInsightIndex 
     }
     return found;
   };
-  return { data, turns: new Map(data.turns.map(turn => [turn.id, turn])), cars, laps, passes, contacts, usual, classGaps };
+  return { data, turnOf, cars, laps, passes, contacts, usual, classGaps };
 }
 
 /** A pass's marks on the strip: where it happened, not whether it counts. */
@@ -267,7 +274,7 @@ export function currentPass(index: CornerInsightIndex, slot: number, timeSec: nu
  */
 export function cornerInsightAt(index: CornerInsightIndex, slot: number, timeSec: number, compareLap?: CompareLap | null): CornerInsight | null {
   const pass = currentPass(index, slot, timeSec);
-  const turn = pass && index.turns.get(pass.segment);
+  const turn = pass && index.turnOf(slot, pass.segment);
   if (!pass || !turn) return null;
   const lap = index.laps.get(lapKey(slot, pass.lapNumber));
   const wet = Boolean(lap?.wet);
@@ -284,7 +291,7 @@ export function cornerInsightAt(index: CornerInsightIndex, slot: number, timeSec
     spreadSec: usual.spreadSec,
     best: usual.best ? { timeSec: passTime(usual.best), lapNumber: usual.best.lapNumber } : null,
     gain: gainOf(index, slot, pass.segment, wet),
-    versus: compareLap ? versusOf(index, pass, compareLap) : null,
+    versus: compareLap ? versusOf(index, pass, turn, compareLap) : null,
     strip: stripOf(index, slot, pass),
   };
 }
@@ -292,11 +299,17 @@ export function cornerInsightAt(index: CornerInsightIndex, slot: number, timeSec
 const minSpeedAt = (pass: CornerPass, from: 'entry' | 'exit') =>
   pass.minSpeedSec === null ? null : from === 'entry' ? pass.minSpeedSec - pass.entrySec : pass.exitSec - pass.minSpeedSec;
 
-/** The compare lap's pass through the same turn of the same layout (turn ids are the layout's, across sessions). */
-function versusOf(index: CornerInsightIndex, pass: CornerPass, other: CompareLap): Versus | null {
+const heldTurns = (turn: CornerTurn) => (turn.sequence?.turnIds ?? [turn.id]).join(',');
+
+/**
+ * The compare lap's pass through the same turn of the same layout (turn ids are the layout's, across sessions); for a
+ * sequence, one holding the same turns (another class's map, or a regenerated one, may group them otherwise).
+ */
+function versusOf(index: CornerInsightIndex, pass: CornerPass, turn: CornerTurn, other: CompareLap): Versus | null {
   if (other.index.data.layoutKey !== index.data.layoutKey) return null;
   const theirs = other.index.passes.get(other.slot)?.find(p => p.lapNumber === other.lapNumber && p.segment === pass.segment);
-  if (!theirs) return null;
+  const theirTurn = theirs && other.index.turnOf(other.slot, theirs.segment);
+  if (!theirs || !theirTurn || heldTurns(theirTurn) !== heldTurns(turn)) return null;
   const car = other.index.cars.get(other.slot);
   return {
     carNumber: car?.carNumber, name: car?.name ?? '', lapNumber: theirs.lapNumber,

@@ -10,7 +10,7 @@ import { vi } from 'vitest';
 import { describe, it, expect } from 'vitest';
 import { enrichTrajectoryWithTrackGeometry, getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
 import { computeLapComparisons } from '../../../src/utils/replayComparison.js';
-import { computeLapSegmentComparisons } from '../../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { compareOnDips } from '../../utils/cornerAnalysis/dipWindows.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 describe('Baseline Comparison & Reference Change Invariance', () => {
@@ -180,7 +180,7 @@ describe('Baseline Comparison & Reference Change Invariance', () => {
     const enrichedB = enrichTrajectoryWithTrackGeometry(trajB, 'Autodromo Nazionale Monza');
 
     // Call computeLapSegmentComparisons without manual distance options
-    const segments = computeLapSegmentComparisons(enrichedA.points, enrichedB.points);
+    const segments = compareOnDips(enrichedA.points, enrichedB.points);
     expect(segments.length).toBeGreaterThan(0);
 
     const corners = segments.filter(s => s.type === 'corner');

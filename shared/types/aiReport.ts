@@ -19,6 +19,8 @@ export interface AiEvidenceSegment {
   primaryTimeSec?: number;
   baselineTimeSec?: number;
   cornerNumber?: number;
+  /** The corner's name on the layout ("T1–T2"): the report names corners by it. */
+  cornerLabel?: string;
   turnDirection?: 'left' | 'right';
   cornerAngleDeg?: number;
   effectiveRadiusM?: number;
@@ -106,7 +108,7 @@ export interface AiLapEvidence {
   };
   trackLimits?: { available: boolean; incidents: Array<{ description: string; lapNumber?: number; warningPoints?: number }> };
   /** The corners to explain, already ranked by the app (time lost x repeatability x confidence). */
-  priorities?: Array<{ rank: number; cornerNumber: number; timeLossSec: number; lapsLosing?: number; lapsSampled?: number; confidence: number }>;
+  priorities?: Array<{ rank: number; cornerNumber: number; cornerLabel?: string; timeLossSec: number; lapsLosing?: number; lapsSampled?: number; confidence: number }>;
 }
 
 export interface AiReportSection {

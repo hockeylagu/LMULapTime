@@ -2,6 +2,7 @@ import React from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
+import { cornerName } from '../../../utils/cornerAnalysis/helpers.js';
 import type { TelemetryChartPathsResult } from './telemetryChartTypes.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';
@@ -9,6 +10,9 @@ import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 import { TelemetryChannelId, TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryResolution } from './telemetryResolution.js';
 import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
+
+/** Where a marker line sits; one on the strip's last point hugs the right edge so it stays visible. */
+const edgeStyle = (pct: number): React.CSSProperties => (pct >= 100 ? { right: 0 } : { left: `${pct}%` });
 
 export interface TelemetryStripViewProps {
   points: ReplayTrajectoryPoint[];
@@ -29,7 +33,7 @@ export interface TelemetryStripViewProps {
   onJumpToDistance?: (distM: number) => void;
   cumDists?: number[];
   currentDistM?: number;
-  selectedCornerMarkers?: { cornerNumber: number; entryFrame: number; minFrame: number; exitFrame: number } | null;
+  selectedCornerMarkers?: { cornerNumber: number; label?: string; entryFrame: number; minFrame: number; exitFrame: number } | null;
   interactionMode: 'scrub' | 'zoom';
   setInteractionMode: (mode: 'scrub' | 'zoom') => void;
   isZoomed: boolean;
@@ -84,6 +88,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   hasDuckDb, duckdbUnavailableReason, onSelectSource,
 }) => {
   const { s1Pct, s2Pct, cornerEntryPct, cornerMinPct, cornerExitPct } = markerPcts;
+  const markerName = selectedCornerMarkers ? cornerName(selectedCornerMarkers) : '';
 
   return (
     <>
@@ -145,21 +150,21 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         {cornerEntryPct !== null && (
           <div style={{ left: `${cornerEntryPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-aqua/60 pointer-events-none z-10 border-l border-dashed border-lmu-aqua/60">
             <span className="absolute bottom-1 left-1 px-1 py-px rounded bg-lmu-aqua-strong/20 text-lmu-aqua-soft text-[10px] font-mono font-bold whitespace-nowrap">
-              T{selectedCornerMarkers?.cornerNumber} IN
+              {`${markerName} IN`}
             </span>
           </div>
         )}
         {cornerMinPct !== null && (
           <div style={{ left: `${cornerMinPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-loss/70 pointer-events-none z-10 border-l border-dashed border-lmu-loss/70">
             <span className="absolute bottom-1 left-1 px-1 py-px rounded bg-lmu-loss-strong/20 text-lmu-loss-soft text-[10px] font-mono font-bold whitespace-nowrap">
-              T{selectedCornerMarkers?.cornerNumber} APEX
+              {`${markerName} APEX`}
             </span>
           </div>
         )}
         {cornerExitPct !== null && (
-          <div style={{ left: `${cornerExitPct}%` }} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-gain/60 pointer-events-none z-10 border-l border-dashed border-lmu-gain/60">
-            <span className="absolute bottom-1 left-1 px-1 py-px rounded bg-lmu-gain-strong/20 text-lmu-gain-soft text-[10px] font-mono font-bold whitespace-nowrap">
-              T{selectedCornerMarkers?.cornerNumber} OUT
+          <div style={edgeStyle(cornerExitPct)} className="absolute top-3.5 bottom-0 w-[1px] bg-lmu-gain/60 pointer-events-none z-10 border-l border-dashed border-lmu-gain/60">
+            <span className={`absolute ${cornerExitPct >= 100 ? 'bottom-6 right-1' : 'bottom-1 left-1'} px-1 py-px rounded bg-lmu-gain-strong/20 text-lmu-gain-soft text-[10px] font-mono font-bold whitespace-nowrap`}>
+              {`${markerName} OUT`}
             </span>
           </div>
         )}
@@ -190,7 +195,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
             <div style={{ left: `${cornerMinPct}%` }} className="absolute inset-y-0 w-[1px] bg-lmu-loss/70" />
           )}
           {cornerExitPct !== null && (
-            <div style={{ left: `${cornerExitPct}%` }} className="absolute inset-y-0 w-[1px] bg-lmu-gain/60" />
+            <div style={edgeStyle(cornerExitPct)} className="absolute inset-y-0 w-[1px] bg-lmu-gain/60" />
           )}
         </div>
 

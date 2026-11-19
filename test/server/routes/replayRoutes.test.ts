@@ -127,6 +127,8 @@ describe('session telemetry routes', () => {
     expect((await request(app).get('/api/session/session-1/corner-passes')).body).toMatchObject({ available: false });
     expect((await request(app).get('/api/session/session-1/corner-passes?driverOrdinal=5')).status).toBe(404);
     expect((await request(app).get('/api/session/session-1/corner-passes?driverOrdinal=x')).status).toBe(400);
+    expect((await request(app).get('/api/session/session-1/corner-passes?segments=sequences')).body).toMatchObject({ available: false });
+    expect((await request(app).get('/api/session/session-1/corner-passes?segments=corners')).status).toBe(400);
     expect((await request(app).get('/api/session/missing/corner-passes')).status).toBe(404);
   });
 

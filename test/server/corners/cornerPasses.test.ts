@@ -267,4 +267,20 @@ describe('buildCornerPasses', () => {
     const passes = buildCornerPasses([{ slot: 1, laps: [lap(1)] }, { slot: 9, laps: [parked] }], SEGMENTS, LENGTH);
     expect(passes.filter(p => p.slot === 1).map(p => [p.aheadSlot, p.behindSlot])).toEqual([[null, null], [null, null]]);
   });
+
+  it('times each car\'s own segments, one running far across the line into the next lap, and counts every car as traffic', () => {
+    const first = lap(1);
+    const second = lap(2, first.times[first.times.length - 1] + 0.1);
+    // A class's sequences: the second runs 150 m into the next lap, past the 200 m borrowed for the turns.
+    const sequences = [{ id: 5, startM: 150, endM: 700 }, { id: 6, startM: 700, endM: LENGTH + 450 }];
+    const cars = [{ slot: 1, laps: [first, second], segments: sequences }, { slot: 2, laps: [lap(1, 1)], segments: [] }];
+    const passes = buildCornerPasses(cars, [], LENGTH);
+    // Lap 1 holds the sequence across the line (most of it is in lap 1); lap 2's has no lap 3 to end in. Car 2 drives none.
+    expect(passes.map(p => [p.slot, p.lapNumber, p.segment])).toEqual([[1, 1, 5], [1, 1, 6], [1, 2, 5]]);
+    const across = passes[1];
+    // 300 m at 50 m/s to the line, then the first 450 m of lap 2 (its corner 200-400 m slower).
+    expect(across.exitSec).toBeGreaterThan(second.times[0] + 9);
+    expect(across.brakeM).toBeCloseTo(LENGTH + 200, -1);
+    expect(passes[0].behindSlot).toBe(2);
+  });
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Flag, ArrowUpRight } from 'lucide-react';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
+import { cornerName } from '../../../utils/cornerAnalysis/helpers.js';
 import {
   speedDeltaClass,
   timeDeltaClass,
@@ -43,7 +44,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
   if (!segments || segments.length === 0) {
     return (
       <div className={`flex items-center justify-center h-32 text-lmu-muted text-xs text-center px-4 ${className}`}>
-        Not enough distinct braking/apex events detected in this lap to break it down.
+        No corners for this lap: it needs detailed track data, and the track's corner list.
       </div>
     );
   }
@@ -109,7 +110,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
               } ${FOCUS_RING}`}
             >
               <Flag className="w-2.5 h-2.5" />
-              T{c.cornerNumber} +{c.timeDeltaSec.toFixed(3)}s
+              {cornerName(c)} +{c.timeDeltaSec.toFixed(3)}s
             </button>
           ))}
         </div>
@@ -158,7 +159,7 @@ export const CornerSpeedTable: React.FC<CornerSpeedTableProps> = ({
                     <td className="px-2 py-1.5 font-bold text-white">
                       <span className="inline-flex items-center gap-1.5 flex-wrap">
                         <Flag className={`w-2.5 h-2.5 ${s.cornerNumber === selectedCornerNumber ? 'text-lmu-accent-text' : 'text-lmu-muted'}`} />
-                        <span>T{s.cornerNumber}</span>
+                        <span title={s.title}>{cornerName(s)}</span>
                       </span>
                     </td>
                     {tableMode === 'speed' ? (

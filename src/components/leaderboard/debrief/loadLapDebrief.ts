@@ -1,5 +1,7 @@
 import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
+import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
+import { loadLayoutCorners } from '../../../api/cornerSequenceApi.js';
 import { fetchSessionTelemetry } from '../../../api/replayApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/segmentComparisons.js';
 import { comparisonConfidence, DebriefCorner, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
@@ -39,7 +41,10 @@ export async function loadLapPairDebrief(yours: TelemetryLapRef, theirs: Telemet
     throw new LapDebriefUnavailableError('Detailed local track data is required for corner analysis.');
   }
   const spec = target.layoutKey ? getCircuitSpecification(target.layoutKey) : undefined;
-  const segments = computeLapSegmentComparisons(target.points, reference.points, 6, target.trackLengthM, spec?.nominalWidthM);
+  // Your class's corners, as the lap view windows them, so a corner opens there under the same name and number.
+  const corners = target.layoutKey ? await loadLayoutCorners(target.layoutKey, resolveDriverCarClass(target.vehicleIdentity)) : null;
+  if (!corners) throw new LapDebriefUnavailableError('The corners of this track could not be loaded.');
+  const segments = computeLapSegmentComparisons(target.points, reference.points, corners, target.trackLengthM, spec?.nominalWidthM);
   const confidence = comparisonConfidence(target, reference);
   return {
     corners: rankDebriefCorners(segments, null, confidence),

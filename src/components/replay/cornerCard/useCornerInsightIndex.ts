@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiErrorMessage } from '../../../api/apiClient.js';
-import { fetchSessionCornerPasses } from '../../../api/replayApi.js';
+import { onSequenceMapsChanged } from '../../../api/cornerSequenceApi.js';
+import { fetchSessionSequencePasses } from '../../../api/replayApi.js';
 import { indexCornerInsight, type CornerInsightIndex } from './cornerInsight.js';
 
 /** The card's data for a session: its index, or why there is none, while it loads neither. */
@@ -23,7 +24,7 @@ const keptFor = (sessionId: string | null | undefined) => (sessionId ? kept.find
 function loadSession(sessionId: string): Promise<Loaded> {
   const inFlight = pending.get(sessionId);
   if (inFlight) return inFlight;
-  const request = fetchSessionCornerPasses(sessionId).then(
+  const request = fetchSessionSequencePasses(sessionId).then(
     (response): Loaded => {
       // Passes not built yet are not kept either: ingestion can build them while the app runs.
       if (!response.available) return { sessionId, index: null, reason: response.reason };
@@ -38,7 +39,7 @@ function loadSession(sessionId: string): Promise<Loaded> {
   return request;
 }
 
-/** Every car's corner passes of the session, indexed for the corner card; one request per session. */
+/** Every car's passes through its class's turn sequences, indexed for the corner card; one request per session. */
 export function useCornerInsightIndex(sessionId: string | null | undefined): CornerInsightState {
   const [loaded, setLoaded] = useState(() => keptFor(sessionId));
   useEffect(() => {
@@ -51,8 +52,10 @@ export function useCornerInsightIndex(sessionId: string | null | undefined): Cor
   return { index: current?.index ?? null, reason: current?.reason ?? null, loading: Boolean(sessionId) && !current };
 }
 
-/** Test seam: forget the kept answers. */
+/** Forgets the kept answers: a scan or a map regeneration may have rebuilt the sequence passes. */
 export function forgetCornerInsightIndex(): void {
   kept = [];
   pending.clear();
 }
+
+onSequenceMapsChanged(forgetCornerInsightIndex);

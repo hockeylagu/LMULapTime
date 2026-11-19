@@ -119,17 +119,18 @@ describe('buildAiLapEvidence', () => {
       primaryThrottleOnDistM: null, baselineThrottleOnDistM: null, throttleOnDeltaM: null,
     }) as CornerSegmentComparison;
     // Nine corners losing more than corner 1; the app still ranks corner 1 first (it is lost every lap).
-    const segments = [corner(1, 0.06), ...Array.from({ length: 9 }, (_, i) => corner(i + 2, 0.2 + i / 10))];
-    const ranked = [{ cornerNumber: 1, timeLossSec: 0.06, lapsLosing: 22, lapsSampled: 22, confidence: 1 }] as DebriefCorner[];
+    const segments = [{ ...corner(1, 0.06), label: 'T1–T2' }, ...Array.from({ length: 9 }, (_, i) => corner(i + 2, 0.2 + i / 10))];
+    const ranked = [{ cornerNumber: 1, label: 'T1–T2', timeLossSec: 0.06, lapsLosing: 22, lapsSampled: 22, confidence: 1 }] as DebriefCorner[];
     const baseline = { ...trajectory, replayName: 'baseline.Vcr', sessionId: 'baseline-session' };
 
     const evidence = buildAiLapEvidence({
       trajectory, baselineTrajectory: baseline, baselineLapSummary: baseline.laps![0], segments, priorities: ranked,
     });
 
-    expect(evidence.priorities).toEqual([{ rank: 1, cornerNumber: 1, timeLossSec: 0.06, lapsLosing: 22, lapsSampled: 22, confidence: 1 }]);
+    expect(evidence.priorities).toEqual([{ rank: 1, cornerNumber: 1, cornerLabel: 'T1–T2', timeLossSec: 0.06, lapsLosing: 22, lapsSampled: 22, confidence: 1 }]);
     expect(evidence.segments).toHaveLength(8);
-    expect(evidence.segments[0].cornerNumber).toBe(1);
+    // Each corner travels with its name on the layout, else its number on the lap.
+    expect(evidence.segments.slice(0, 2).map(segment => [segment.cornerNumber, segment.cornerLabel])).toEqual([[1, 'T1–T2'], [10, 'T10']]);
   });
 
   it('sends no priorities without a comparison lap', () => {

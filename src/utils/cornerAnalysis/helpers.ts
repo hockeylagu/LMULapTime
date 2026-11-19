@@ -1,94 +1,6 @@
 import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { InterpolatedPoint, interpolatePointAtDistance } from '../replayComparison.js';
 
-export interface SpeedTurningPoint {
-  index: number;
-  distM: number;
-  type: 'max' | 'min';
-}
-
-// A steering reversal only forces a turn point at this much smaller speed swing than the
-// normal prominence threshold - it still needs a genuine (if small) speed change, just not a
-// full recovery, so pure flat-out kinks with zero speed change still don't count.
-const MIN_LINKED_PROMINENCE_KMH = 2;
-
-/**
- * Extracts alternating local speed maxima/minima from a speed-vs-distance trace, requiring
- * each swing to exceed `minProminenceKmh` before it counts, to reject telemetry noise.
- *
- * `minSteerReversalAmplitude` (if > 0) lets a genuine steering-direction reversal force a turn
- * point early, once the speed swing since the last extreme reaches just `MIN_LINKED_PROMINENCE_KMH`
- * instead of the full `minProminenceKmh` - this is what separates linked corners/esses where
- * the car changes direction again before speed fully recovers between apexes.
- */
-export function findSpeedTurningPoints(
-  points: ReplayTrajectoryPoint[],
-  dists: number[],
-  minProminenceKmh: number,
-  minSteerReversalAmplitude = 0
-): SpeedTurningPoint[] {
-  if (points.length < 3) return [];
-  const turningPoints: SpeedTurningPoint[] = [];
-  let direction: 'up' | 'down' | null = null;
-  let extremeIdx = 0;
-  let extremeVal = points[0].speedKmh || 0;
-
-  // Tracks the steering trace's own running sign/extreme so a genuine direction reversal
-  // (sign flip after building up real lock) can be detected at each sample.
-  let steerSign = 0;
-  let steerExtreme = 0;
-
-  for (let i = 1; i < points.length; i++) {
-    const v = points[i].speedKmh || 0;
-
-    let steerReversed = false;
-    if (minSteerReversalAmplitude > 0) {
-      const steer = points[i].steerYaw || 0;
-      const curSteerSign = steer > 0 ? 1 : steer < 0 ? -1 : 0;
-      if (curSteerSign !== 0) {
-        if (steerSign === 0) {
-          steerSign = curSteerSign;
-          steerExtreme = Math.abs(steer);
-        } else if (curSteerSign === steerSign) {
-          steerExtreme = Math.max(steerExtreme, Math.abs(steer));
-        } else {
-          steerReversed = steerExtreme >= minSteerReversalAmplitude;
-          steerSign = curSteerSign;
-          steerExtreme = Math.abs(steer);
-        }
-      }
-    }
-
-    if (direction === null) {
-      if (v > extremeVal) direction = 'up';
-      else if (v < extremeVal) direction = 'down';
-      continue;
-    }
-    if (direction === 'up') {
-      if (v >= extremeVal) {
-        extremeVal = v;
-        extremeIdx = i;
-      } else if (extremeVal - v >= minProminenceKmh || (steerReversed && extremeVal - v >= MIN_LINKED_PROMINENCE_KMH)) {
-        turningPoints.push({ index: extremeIdx, distM: dists[extremeIdx], type: 'max' });
-        direction = 'down';
-        extremeVal = v;
-        extremeIdx = i;
-      }
-    } else {
-      if (v <= extremeVal) {
-        extremeVal = v;
-        extremeIdx = i;
-      } else if (v - extremeVal >= minProminenceKmh || (steerReversed && v - extremeVal >= MIN_LINKED_PROMINENCE_KMH)) {
-        turningPoints.push({ index: extremeIdx, distM: dists[extremeIdx], type: 'min' });
-        direction = 'up';
-        extremeVal = v;
-        extremeIdx = i;
-      }
-    }
-  }
-  return turningPoints;
-}
-
 export const SEGMENT_SCAN_STEP_M = 2;
 export const BRAKE_ON_THRESHOLD_PCT = 10;
 export const THROTTLE_ON_THRESHOLD_PCT = 90;
@@ -97,22 +9,6 @@ export const THROTTLE_ON_THRESHOLD_PCT = 90;
 // back - is not the pick-up, and whether one such sample survives depends on the resolution.
 export const THROTTLE_ON_MIN_HOLD_SEC = 0.4;
 export const MIN_STRAIGHT_LENGTH_M = 5;
-
-// A steering reversal only counts as "genuine" if the lock built up to at least this fraction
-// of whatever the strongest steering input anywhere in the lap was - keeps small wheel
-// corrections mid-corner from being mistaken for a full direction change.
-export const STEER_REVERSAL_FRACTION = 0.25;
-
-/**
- * Returns the largest absolute steering value seen anywhere in the lap, used to scale the
- * reversal-detection threshold above so it works regardless of whether steerYaw is in raw
- * degrees or a normalized -1..1 range (different telemetry sources use different units).
- */
-export function computeMaxAbsSteer(points: ReplayTrajectoryPoint[]): number {
-  let maxAbs = 0;
-  for (const p of points) maxAbs = Math.max(maxAbs, Math.abs(p.steerYaw || 0));
-  return maxAbs;
-}
 
 // How far before a corner's entry (speed peak) a brake application may have started. A lap
 // compared against another lap's corner windows can brake before that lap's speed peak.
@@ -277,3 +173,8 @@ export function getHeadingAtDistance(points: ReplayTrajectoryPoint[], dists: num
   return Math.atan2(dx, dz);
 }
 
+
+/** A corner's short name: the layout's ("T1–T2", from the class's map or the official turns), else its number on the lap. */
+export function cornerName(corner: { cornerNumber: number; label?: string }): string {
+  return corner.label || `T${corner.cornerNumber}`;
+}

@@ -51,10 +51,18 @@ import {
 } from './replay/dbReplayTrajectoryStore.js';
 import {
   ReplayLapRow,
+  getReplayLapBlobs,
   getReplayLapSignature,
   listReplayLapRows,
 } from './replay/dbReplayLapRows.js';
-import { getCornerPassBuild, listCornerPasses, replaceCornerPasses, type CornerPassBuild } from './replay/dbCornerPassStore.js';
+import {
+  getCornerPassBuild, listCornerPasses, listLayoutPassReplays, replaceCornerPasses, type CornerPassBuild, type PassKind,
+} from './replay/dbCornerPassStore.js';
+import {
+  getSequenceMap, getSequenceMapFreshLaps, listSequenceCandidateLaps, listSequenceMaps, recordSequenceMapCheck, replaceSequenceMap,
+  type MapLapRef, type StoredSequenceMap,
+} from './replay/dbSequenceMapStore.js';
+import type { SequenceMapSummary } from '../../shared/types/corners/sequenceMaps.js';
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 import type { StoredReplayFileInfo } from './replay/replayStorageTypes.js';
 import {
@@ -326,16 +334,50 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return listReplayLapRows(this.db, filename);
   }
 
-  public getCornerPassBuild(filename: string): CornerPassBuild | null {
-    return getCornerPassBuild(this.db, filename);
+  public getCornerPassBuild(filename: string, kind?: PassKind): CornerPassBuild | null {
+    return getCornerPassBuild(this.db, filename, kind);
   }
 
-  public replaceCornerPasses(filename: string, build: Omit<CornerPassBuild, 'passCount'>, passes: CornerPass[]): void {
-    replaceCornerPasses(this.db, filename, build, passes);
+  public replaceCornerPasses(filename: string, build: Omit<CornerPassBuild, 'passCount'>, passes: CornerPass[], kind?: PassKind): void {
+    replaceCornerPasses(this.db, filename, build, passes, kind);
   }
 
-  public listCornerPasses(filename: string): CornerPass[] {
-    return listCornerPasses(this.db, filename);
+  public listCornerPasses(filename: string, kind?: PassKind): CornerPass[] {
+    return listCornerPasses(this.db, filename, kind);
+  }
+
+  /** The stored replays whose corner passes were built on a layout. */
+  public listLayoutPassReplays(layoutKey: string): string[] {
+    return listLayoutPassReplays(this.db, layoutKey);
+  }
+
+  public getReplayLapBlobs(filename: string, laps: ReadonlyArray<{ slot: number; lapNumber: number }>): ReplayLapRow[] {
+    return getReplayLapBlobs(this.db, filename, laps);
+  }
+
+  /** A layout and class's turn sequence map (server/corners/sequenceMapService.ts). */
+  public getSequenceMap(layoutKey: string, carClass: string): StoredSequenceMap | null {
+    return getSequenceMap(this.db, layoutKey, carClass);
+  }
+
+  public replaceSequenceMap(map: StoredSequenceMap): void {
+    replaceSequenceMap(this.db, map);
+  }
+
+  public getSequenceMapFreshLaps(layoutKey: string, carClass: string): MapLapRef[] {
+    return getSequenceMapFreshLaps(this.db, layoutKey, carClass);
+  }
+
+  public recordSequenceMapCheck(layoutKey: string, carClass: string, check: { agrees: boolean; detail: string }, freshLaps: readonly MapLapRef[]): void {
+    recordSequenceMapCheck(this.db, layoutKey, carClass, check, freshLaps);
+  }
+
+  public listSequenceMaps(): SequenceMapSummary[] {
+    return listSequenceMaps(this.db);
+  }
+
+  public listSequenceCandidateLaps(filename: string): Array<{ slot: number; lapNumber: number; lapTimeSec: number; passes: number }> {
+    return listSequenceCandidateLaps(this.db, filename);
   }
 
   public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, trajectory: ReplayTrajectoryData, filePath?: string): void {

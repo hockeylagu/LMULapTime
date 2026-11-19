@@ -2,6 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
+import { cornerName } from '../../../utils/cornerAnalysis/helpers.js';
 import { CornerTechniqueDeck } from './CornerTechniqueDeck.js';
 import { CornerSpeedGraph } from './CornerSpeedGraph.js';
 import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
@@ -50,7 +51,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
         <div className="flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <span className="inline-flex items-center h-5 px-1.5 rounded bg-lmu-info-strong/20 text-lmu-info font-mono font-bold text-xs shrink-0 whitespace-nowrap">
-              Turn {corner.cornerNumber}
+              {cornerName(corner)}
             </span>
             {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
               <span className="inline-flex items-center h-5 text-xs text-lmu-muted font-mono shrink-0 whitespace-nowrap">{corner.cornerAngleDeg}° {corner.turnDirection === 'left' ? '↰' : '↱'}</span>
@@ -97,8 +98,8 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
       {/* Master Unified Header */}
       <div className="flex items-center justify-between px-2 py-1 border-b border-lmu-border/60 gap-2 min-w-0">
         <div className="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
-          <span className="inline-flex items-center h-6 text-lmu-text-soft font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`Turn ${corner.cornerNumber} Apex Analysis`}>
-            Turn {corner.cornerNumber}
+          <span className="inline-flex items-center h-6 text-lmu-text-soft font-mono font-bold text-xs shrink-0 whitespace-nowrap" title={`${cornerName(corner)} Apex Analysis`}>
+            {cornerName(corner)}
           </span>
           {corner.turnDirection && corner.cornerAngleDeg !== undefined && (
             <span

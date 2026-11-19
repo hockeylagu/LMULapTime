@@ -395,6 +395,7 @@ export function computeGhostPosition(
 
 export interface DispersedCornerMarker {
   cornerNumber: number;
+  label?: string;
   sx: number;
   sy: number;
   idx: number;
@@ -492,7 +493,7 @@ function distanceToPolyline(
  * each flag is anchored on the primary line at that distance, whatever the baseline.
  */
 export function computeDispersedCornerMarkers(
-  corners: Array<{ cornerNumber: number; minDistM: number }> | undefined,
+  corners: Array<{ cornerNumber: number; label?: string; minDistM: number }> | undefined,
   primaryDists: number[],
   svgPoints: ProjectedPoint[],
   baselineSvgPoints?: ProjectedPoint[],
@@ -579,6 +580,7 @@ export function computeDispersedCornerMarkers(
 
     markers.push({
       cornerNumber: c.cornerNumber,
+      label: c.label,
       sx: bestCand.sx,
       sy: bestCand.sy,
       idx: pt.idx,

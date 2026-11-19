@@ -84,6 +84,11 @@ describe('rankDebriefCorners', () => {
     expect(ranked.map(c => c.cornerNumber)).toEqual([3, 4, 6]);
   });
 
+  it("names a corner as the layout does, else by its number", () => {
+    const ranked = rankDebriefCorners([corner(1, 10, 0.4, { label: 'T1–T2' }), corner(2, 10, 0.3)], null, 1);
+    expect(ranked.map(c => c.label)).toEqual(['T1–T2', 'Corner 2']);
+  });
+
   it('uses the analysed lap alone when the session laps were not timed', () => {
     const [only] = rankDebriefCorners([corner(5, 28.8, 0.766)], null, 0.8);
 

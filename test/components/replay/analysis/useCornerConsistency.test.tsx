@@ -103,6 +103,17 @@ describe('useCornerConsistency', () => {
     expect(result.current.cornerStats[0].time.samples.map(s => s.lapNumber)).toEqual([3, 4]);
   });
 
+  it('asks for the class sequences when the panel shows them, again when it switches', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(json(built([pass(2, 4.1), pass(3, 4.3)]))));
+    const hook = renderHook(({ segments }) => useCornerConsistency(true, 'session', null, 3, trajectory(2), undefined, undefined, segments),
+      { initialProps: { segments: 'sequences' as 'sequences' | 'turns' } });
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    expect(requestUrl(fetchMock.mock.calls[0][0])).toContain('/corner-passes?segments=sequences&driverOrdinal=0');
+    hook.rerender({ segments: 'turns' });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(requestUrl(fetchMock.mock.calls[1][0])).toContain('/corner-passes?driverOrdinal=0');
+  });
+
   it('finds the driver from the replay metadata without a trajectory', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(json(built([])));
     const { result } = renderHook(() => useCornerConsistency(true, 'session', metadata, 3, null));
