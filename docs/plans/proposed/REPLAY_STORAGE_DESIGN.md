@@ -23,7 +23,7 @@ codec, key and idea of where the car is on the track:
 |---|---|---|
 | `replay_trajectories` | every car, every lap, full replay rate (source of truth) | binary columns (`LMTB`, [format](../../REPLAY_CACHE_FORMAT.md)) per car and lap |
 | `telemetry_lap_cache` | the player's native laps, read from the DuckDB files | Brotli JSON per lap (`dbCache.ts`) |
-| `replay_race_positions` | every car's distance along the centre line, 5 Hz | one Brotli JSON per replay (`racePositions.ts`, `RACE_POSITIONS_VERSION`) |
+| `replay_race_positions` (removed 2026-11-18) | every car's distance along the centre line, 5 Hz | one Brotli JSON per replay |
 | race poses (memory) | every car resampled to 10 Hz | 60 s windows, rebuilt from the laps (`racePoses.ts`) |
 
 Proposed direction (not measured yet):
@@ -38,8 +38,8 @@ Proposed direction (not measured yet):
 - **A derived result is stored only when measured too slow**, keyed by a version key (rule version, geometry revision,
   parser version), built at ingestion, rebuilt offline when the key changes and never a source of truth. The first one,
   the [corner insight](CORNER_INSIGHT.md) passes, is SQL rows keyed like `replay_laps` (driver, 2026-11-18). The race
-  positions index is retired after the passes work (its spells and live gaps come from the pass builder, corner insight
-  step 5); the native lap cache moves to the one pattern later.
+  positions index is retired (2026-11-18, corner insight step 5: the live gaps come from the passes); the native lap
+  cache moves to the one pattern later.
 - No further full copies of the samples (below); the distance channel is one column per lap, and only if stored.
 
 Measured 2026-11-18 (read-only scratch scripts, one thread, idle machine; the second round ran slower under 2.8 GB of

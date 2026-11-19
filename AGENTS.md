@@ -25,7 +25,8 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 | `server/sessions/` | XML parser (`parser.ts`), lap classification, replay matching, pit stops, analytics |
 | `server/replay/` | Trajectory/telemetry services, upgrade runner, `decode/` (.Vcr decoding), `worker/` (worker thread) |
 | `server/telemetry/` | DuckDB 100 Hz reader, catalog, session links, coordinate fusion |
-| `server/traffic/` | Replay 5 Hz track position index and traffic spells |
+| `server/traffic/` | Race replay: every car's poses (worker) and live gaps from the corner passes |
+| `server/corners/` | Corner passes: every car's time and cues through each official turn, built per replay on a worker |
 | `server/tracks/` | Track geometry, centerline projection, timing line cuts, station glitch repair |
 | `server/routes/` | Express domain routers (`ai`, `leaderboard`, `live`, `liveEvidence`, `reference`, `replay`, `session`, `system`, `dataPlugin`), readiness gates |
 | `server/ai/`, `server/benchmarks/` | Gemini race engineer; Google Sheets alien benchmarks scraper and diff |
