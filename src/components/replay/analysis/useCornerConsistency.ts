@@ -1,96 +1,80 @@
-import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import { isCleanReplayLap } from '../../../../shared/domain/lapComparison.js';
-import { useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { SessionCornerPasses } from '../../../../shared/types/corners/cornerPasses.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
-import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
-import { applyTelemetryPostProcessing } from '../../../utils/telemetryPostProcessing.js';
-import { fetchSessionTelemetry } from '../../../api/replayApi.js';
+import { computeCornerConsistencyStats, CornerConsistencyStat, placeStatsOnLap } from '../../../utils/cornerConsistency.js';
+import { fetchSessionCornerPasses } from '../../../api/replayApi.js';
+import { isAbortError } from '../../../api/apiClient.js';
 
-// Kept small since these laps are only used for corner-window timing, not full detail rendering.
-const CONSISTENCY_MAX_POINTS = 400;
 const EMPTY_LAP_SUMMARIES: NonNullable<ReplayTrajectoryData['laps']> = [];
 const NO_CORNER_STATS: CornerConsistencyStat[] = [];
+const NO_EXCLUDED_LAPS: ReadonlySet<number> = new Set();
 
 export interface UseCornerConsistencyResult {
   cornerStats: CornerConsistencyStat[];
   isLoading: boolean;
-  lapsSampled: number;
+  /** Why there are no corner stats (no replay, passes not built), when the load said so. */
+  unavailableReason: string | null;
+}
+
+/** The displayed lap, to place each turn on: its distances, and the corners its own detection found. */
+export interface CornerConsistencyPlacement {
+  dists: readonly number[];
+  corners: ReadonlyArray<{ cornerNumber: number; entryDistM: number; exitDistM: number }>;
 }
 
 /**
- * Fetches every other valid lap of the current session driver (lazily - only when `enabled`)
- * and times each one through the same corner windows as the currently displayed lap, to
- * surface which corners are driven consistently vs. which vary lap to lap. Results live only
- * for this mounted selection and are recomputed from the current trajectory inputs.
+ * The selected driver's corner passes for the session (lazily - only when `enabled`), one request, and how
+ * repeatably they drive each official turn over the session's clean laps, less the laps left out. Each turn is
+ * placed on the displayed lap (`placement`): its apex's lap distance and the detected corner holding it.
  */
 export function useCornerConsistency(
   enabled: boolean,
   activeSessionId: string | null,
   metadata: ReplayMetadata | null,
   selectedDriverSlot: number | null,
-  trajectory: ReplayTrajectoryData | null
+  trajectory: ReplayTrajectoryData | null,
+  excludedLaps: ReadonlySet<number> = NO_EXCLUDED_LAPS,
+  placement?: CornerConsistencyPlacement
 ): UseCornerConsistencyResult {
   const lapSummaries = trajectory?.laps || metadata?.laps || EMPTY_LAP_SUMMARIES;
-  const currentLap = trajectory?.currentLap;
-  const points = trajectory?.points;
-  const trackLengthM = trajectory?.trackLengthM;
-  const source = trajectory?.source;
-  const stationSource = trajectory?.stationSource;
-  const geometryRevision = trajectory?.geometryRevision;
   const driverOrdinal = trajectory?.driverOrdinal
     ?? metadata?.drivers.find(item => item.slot === selectedDriverSlot)?.sessionDriverOrdinal;
 
-  // The load this selection asks for; null when there is nothing to load.
-  const request = useMemo(() => {
-    if (!enabled || !activeSessionId || !points?.length || stationSource === 'odometer' || driverOrdinal === undefined) return null;
-    // Sourced from trajectory.laps first, same as computeLapConsistencyStats, so this hook's
-    // notion of "valid" always agrees with the sector-level consistency stats.
-    const isLapValid = (lapNumber: number) => {
-      const summary = lapSummaries.find(l => l.lapNumber === lapNumber);
-      return summary ? isCleanReplayLap(summary) : true;
-    };
-    const otherLaps = lapSummaries.filter(l => isCleanReplayLap(l) && l.lapNumber !== currentLap);
-    // The currently displayed lap is only usable as a data point if it's itself valid - an
-    // invalid/outlap current lap still supplies the corner-boundary geometry (referencePoints
-    // below) but must not contribute its own times/speeds to the aggregated stats.
-    const currentLapIsValid = currentLap === undefined || isLapValid(currentLap);
-    if (otherLaps.length === 0 && !currentLapIsValid) return null;
-    return { sessionId: activeSessionId, selectedDriverSlot, driverOrdinal, currentLap, currentLapIsValid, otherLaps,
-      points, trackLengthM, source, stationSource, geometryRevision };
-  }, [enabled, activeSessionId, selectedDriverSlot, driverOrdinal, currentLap, points, trackLengthM, lapSummaries, source, stationSource, geometryRevision]);
+  const key = enabled && activeSessionId && driverOrdinal !== undefined ? `${activeSessionId}|${driverOrdinal}` : null;
+  const [loaded, setLoaded] = useState<{ key: string; response: SessionCornerPasses | null; reason: string | null } | null>(null);
 
-  const [result, setResult] = useState<{ request: NonNullable<typeof request>; cornerStats: CornerConsistencyStat[]; lapsSampled: number } | null>(null);
-  const answered = !!request && result?.request === request;
-
-  // Metadata and driver object identity must not retrigger the load: the lap ordinals are read when it starts.
-  const driverLapOrdinals = useEffectEvent(() => metadata?.drivers.find(item => item.slot === selectedDriverSlot)?.sessionLapOrdinals);
   useEffect(() => {
-    if (!request) return;
+    if (!key || !activeSessionId || driverOrdinal === undefined) return;
     const controller = new AbortController();
-    const lapOrdinals = driverLapOrdinals();
-    const { sessionId, driverOrdinal: ordinal, source: lapSource, stationSource: stations, geometryRevision: revision } = request;
-    void Promise.all(
-      request.otherLaps.map(l => {
-        const lapOrdinal = lapOrdinals?.[String(l.lapNumber)];
-        if (lapOrdinal === undefined) return Promise.resolve({ lapNumber: l.lapNumber, points: [] });
-        return fetchSessionTelemetry(sessionId, { resolutionQuery: `maxPoints=${CONSISTENCY_MAX_POINTS}`, lapOrdinal, driverOrdinal: ordinal, source: lapSource }, { signal: controller.signal })
-          .then((data: ReplayTrajectoryData | null): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: data && hasCompatibleTrackStations({ stationSource: stations, geometryRevision: revision }, data) ? applyTelemetryPostProcessing(data.points || []) : [] }))
-          .catch((): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: [] }));
+    fetchSessionCornerPasses(activeSessionId, driverOrdinal, { signal: controller.signal })
+      .then(response => {
+        // A late answer for a session no longer shown must not replace the current one.
+        if (controller.signal.aborted) return;
+        setLoaded({ key, response, reason: response.available ? null : response.reason });
       })
-    ).then(results => {
-      if (controller.signal.aborted) return;
-      const laps: CornerConsistencyLapInput[] = [
-        ...(request.currentLapIsValid ? [{ lapNumber: request.currentLap ?? 0, points: request.points }] : []),
-        ...results.filter(r => r.points.length > 0),
-      ];
-      setResult({ request, cornerStats: computeCornerConsistencyStats(laps, request.points, request.trackLengthM), lapsSampled: laps.length });
-    });
+      .catch((error: unknown) => {
+        if (isAbortError(error) || controller.signal.aborted) return;
+        setLoaded({ key, response: null, reason: error instanceof Error ? error.message : 'Corner times are unavailable.' });
+      });
     return () => controller.abort();
-  }, [request]);
+  }, [key, activeSessionId, driverOrdinal]);
+
+  const answered = key !== null && loaded?.key === key;
+  const passes = answered && loaded.response?.available ? loaded.response : null;
+  const points = trajectory?.points;
+  const cornerStats = useMemo(() => {
+    if (!passes) return NO_CORNER_STATS;
+    // The same laps the sector consistency counts: clean laps by the stored lap flags, less the laps left out.
+    const counted = new Set(lapSummaries.filter(lap => isCleanReplayLap(lap) && !excludedLaps.has(lap.lapNumber)).map(lap => lap.lapNumber));
+    const stats = computeCornerConsistencyStats(passes.passes, passes.turns, counted);
+    if (!placement || !points) return stats;
+    return placeStatsOnLap(stats, { points, dists: placement.dists }, passes.startStationM, passes.trackLengthM, placement.corners);
+  }, [passes, lapSummaries, excludedLaps, placement, points]);
 
   return {
-    cornerStats: answered ? result.cornerStats : NO_CORNER_STATS,
-    isLoading: !!request && !answered,
-    lapsSampled: answered ? result.lapsSampled : 0,
+    cornerStats,
+    isLoading: key !== null && !answered,
+    unavailableReason: answered ? loaded.reason : null,
   };
 }

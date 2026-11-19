@@ -153,7 +153,8 @@ export function buildAiLapEvidence({
   };
 
   if (hasBaseline && priorities && priorities.length > 0) {
-    evidence.priorities = priorities.map((corner, index) => ({
+    // Corners the lap's detection found (rankDebriefCorners): each has its number.
+    evidence.priorities = priorities.flatMap(corner => corner.cornerNumber === null ? [] : [{ ...corner, cornerNumber: corner.cornerNumber }]).map((corner, index) => ({
       rank: index + 1,
       cornerNumber: corner.cornerNumber,
       timeLossSec: round(corner.timeLossSec),

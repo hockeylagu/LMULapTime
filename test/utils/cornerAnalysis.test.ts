@@ -1,10 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis/segmentComparisons.js';
 import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
-import {
-  computeCornerConsistencyStats,
-  filterCornerConsistencyStats,
-} from '../../src/utils/cornerConsistency.js';
 import fs from 'fs';
 import path from 'path';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
@@ -324,40 +320,6 @@ describe('computeLapSegmentComparisons', () => {
     const primaryEnd = primary[primary.length - 1].timeSec ?? 0;
     const baselineEnd = baseline[baseline.length - 1].timeSec ?? 0;
     expect(totalDelta).toBeCloseTo(primaryEnd - baselineEnd, 2);
-  });
-
-  it('computes consistency metrics across valid laps and ignores empty lap inputs', () => {
-    const reference = buildLap(100, 0.3);
-    const second = buildLap(95, 0.35).map((point, index) => ({ ...point, timeSec: (point.timeSec ?? 0) + index * 0.02 }));
-    const stats = computeCornerConsistencyStats([
-      { lapNumber: 2, points: reference },
-      { lapNumber: 1, points: second },
-      { lapNumber: 3, points: [] },
-    ], reference);
-
-    expect(stats).toHaveLength(1);
-    expect(stats[0].lapsSampled).toBe(2);
-    expect(stats[0].time.samples.map(sample => sample.lapNumber)).toEqual([1, 2]);
-    expect(stats[0].entrySpeedKmh).not.toBeNull();
-    expect(stats[0].apexSpeedKmh).not.toBeNull();
-  });
-
-  it('returns no consistency stats when there are too few samples after filtering', () => {
-    const reference = buildLap(100, 0.3);
-    const stats = computeCornerConsistencyStats([
-      { lapNumber: 1, points: reference },
-      { lapNumber: 2, points: reference },
-    ], reference);
-    expect(stats).toHaveLength(1);
-
-    expect(filterCornerConsistencyStats(stats, new Set())).toBe(stats);
-    expect(filterCornerConsistencyStats(stats, new Set([1]))).toEqual([]);
-  });
-
-  it('returns empty consistency results for missing reference or lap data', () => {
-    expect(computeCornerConsistencyStats([], buildLap(100, 0.3))).toEqual([]);
-    expect(computeCornerConsistencyStats([{ lapNumber: 1, points: [] }], buildLap(100, 0.3))).toEqual([]);
-    expect(computeCornerConsistencyStats([{ lapNumber: 1, points: buildLap(100, 0.3) }], [])).toEqual([]);
   });
 
   it('computes corner angle, turn direction, effective radius, and turn-in point for a curved corner', () => {

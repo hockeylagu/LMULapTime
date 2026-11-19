@@ -27,15 +27,15 @@ describe('SessionDebriefCard', () => {
   it('requires a fresh on-demand request after the card remounts', async () => {
     mockDebriefServer();
     const first = renderAndAsk();
-    await screen.findByTestId('debrief-corner-1');
+    await screen.findByTestId('debrief-corner-T1');
     first.unmount();
 
     render(<SessionDebriefCard session={session} selectedDriver={me} />);
 
     expect(screen.getByRole('button', { name: /Show where the time goes/ })).toBeInTheDocument();
-    expect(screen.queryByTestId('debrief-corner-1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('debrief-corner-T1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Show where the time goes/ }));
-    expect(await screen.findByTestId('debrief-corner-1')).toBeInTheDocument();
+    expect(await screen.findByTestId('debrief-corner-T1')).toBeInTheDocument();
   });
 
   it('lists the corner to work on and opens it in telemetry against the reference', async () => {
@@ -45,13 +45,12 @@ describe('SessionDebriefCard', () => {
 
     expect(screen.getByText(/Comparing your best lap with other Peugeot 9x8 laps/)).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Comparing laps for your debrief.');
-    const row = await screen.findByTestId('debrief-corner-1');
+    const row = await screen.findByTestId('debrief-corner-T1');
     expect(screen.getByRole('status')).toHaveTextContent('Your lap debrief is ready.');
     expect(row).toHaveTextContent('T1');
     expect(row).toHaveTextContent('+0.400s');
     expect(row).toHaveTextContent('lost on 2 of 3 laps');
     expect(screen.getByText('Davide Catani')).toBeInTheDocument();
-    expect(screen.getByText(/comparison confidence \(80%\)/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('link', { name: 'Open T1 in telemetry' }));
 
@@ -61,20 +60,14 @@ describe('SessionDebriefCard', () => {
   });
 
   it('ranks against a realistic target, shows the fastest lap for technique, and names the traffic', async () => {
-    mockDebriefServer([referenceLap, realisticLap], {
-      available: true,
-      laps: [{ lapNumber: 20, spells: [{
-        driverName: 'Rui Paiva', carClass: 'GT3', kind: 'multiclass', direction: 'ahead',
-        startSec: 10, endSec: 14, startStationM: 40, endStationM: 90, closestGapSec: 0.4,
-      }] }],
-    });
+    mockDebriefServer([referenceLap, realisticLap], { trafficLaps: [20] });
 
     renderAndAsk();
 
-    const row = await screen.findByTestId('debrief-corner-1');
+    const row = await screen.findByTestId('debrief-corner-T1');
     expect(row).toHaveTextContent('+0.240s');
     expect(row).toHaveTextContent('+0.400s vs fastest');
-    expect(row).toHaveTextContent('Behind Rui Paiva (GT3)');
+    expect(row).toHaveTextContent('Vinicius Ares');
     expect(screen.getByText(/realistic target/)).toHaveTextContent('Near Rival');
     expect(screen.getByText(/Technique from the fastest/)).toHaveTextContent('Davide Catani');
     expect(screen.getByText(/ranks lower/)).toBeInTheDocument();
@@ -116,6 +109,6 @@ describe('SessionDebriefCard', () => {
     mockDebriefServer();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
-    expect(await screen.findByTestId('debrief-corner-1')).toBeInTheDocument();
+    expect(await screen.findByTestId('debrief-corner-T1')).toBeInTheDocument();
   });
 });

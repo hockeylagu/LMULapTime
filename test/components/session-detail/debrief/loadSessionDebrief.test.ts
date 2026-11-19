@@ -8,7 +8,7 @@ import type { DriverData } from '../../../../shared/types/index.js';
 import { me, mockDebriefServer, realisticLap, referenceLap, session } from './debriefFixtures.js';
 
 describe('loadSessionDebrief', () => {
-  it('ranks the best lap corners against the fastest same-car lap, with how often each is lost', async () => {
+  it('ranks the best lap turns against the fastest same-car lap, with how often each is lost', async () => {
     const fetchMock = mockDebriefServer();
 
     const debrief = await loadSessionDebrief(session, me);
@@ -23,13 +23,13 @@ describe('loadSessionDebrief', () => {
     expect(debrief.lapNumber).toBe(20);
     expect(debrief.lapDeltaSec).toBe(1.92);
 
-    // Lap 20 is 0.4 s down in the corner; lap 16 is also slower than the reference there, lap 18 is not.
-    // Lap 1 is the start lap and is not timed.
+    // Lap 20 is 0.4 s down through T1; lap 16 is also slower than the reference there, lap 18 is not.
+    // Lap 1 is the start lap and is not timed. T1 holds the analysed lap's detected corner 1.
     expect(debrief.lapsTimed).toBe(3);
     expect(debrief.corners).toHaveLength(1);
-    expect(debrief.corners[0]).toMatchObject({ cornerNumber: 1, timeLossSec: 0.4, lapsLosing: 2, lapsSampled: 3 });
-    // Neither lap came from DuckDB, so the comparison is trusted at 80%.
-    expect(debrief.confidence).toBe(0.8);
+    expect(debrief.corners[0]).toMatchObject({ label: 'T1', cornerNumber: 1, timeLossSec: 0.4, lapsLosing: 2, lapsSampled: 3, confidence: 1 });
+    // The driver's passes come from one request for the whole session.
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/session/R1/corner-passes'))).toHaveLength(1);
   });
 
   it('links a corner to the telemetry view with the reference as the comparison lap', async () => {
@@ -63,22 +63,13 @@ describe('loadSessionDebrief', () => {
     await expect(loadSessionDebrief(noReplay, me)).rejects.toThrow('This session has no replay to analyse.');
   });
 
-  it('warns when the analysed lap was run in traffic, and leaves traffic laps out of repeatability', async () => {
+  it('times the laps the parser left out for traffic', async () => {
     mockDebriefServer();
-    const gt3 = { name: 'Rui Paiva', carClass: 'GT3', sameClass: false };
-    const inTraffic = {
-      ...me,
-      laps: me.laps.map(l => {
-        if (l.lapNumber === 20) return { ...l, traffic: { ahead: null, behind: null, following: false, passed: [gt3], passedBy: [] } };
-        if (l.lapNumber === 16) return { ...l, nonRepresentativeReason: 'traffic' as const };
-        return l;
-      }),
-    };
+    const flagged = { ...me, laps: me.laps.map(l => (l.lapNumber === 16 ? { ...l, nonRepresentativeReason: 'traffic' as const } : l)) };
 
-    const debrief = await loadSessionDebrief(session, inTraffic);
+    const debrief = await loadSessionDebrief(session, flagged);
 
-    expect(debrief.caveats).toContain('Your lap was run in traffic (Other classes: passed Rui Paiva (GT3)): a tow or a pass changes the numbers.');
-    expect(debrief.lapsTimed).toBe(2);
+    expect(debrief.lapsTimed).toBe(3);
   });
 
   it('ranks against the lap about 0.5% faster, and takes the technique from the fastest', async () => {
@@ -110,32 +101,23 @@ describe('loadSessionDebrief', () => {
     expect(debrief.caveats[0]).toBe('No Peugeot 9x8 lap on this layout is clearly faster, so the references are faster Hyper cars from this session: part of each gap can be the car.');
   });
 
-  it('leaves out the corner passes run in traffic, times laps flagged for traffic, and ranks a corner of this lap in traffic lower', async () => {
-    const spell = (startStationM: number, endStationM: number) => ({
-      driverName: 'Vinicius Ares', carClass: 'Hyper', kind: 'battle' as const, direction: 'ahead' as const,
-      startSec: 0, endSec: 5, startStationM, endStationM, closestGapSec: 0.4,
-    });
-    mockDebriefServer([referenceLap], {
-      available: true,
-      laps: [
-        { lapNumber: 16, spells: [spell(60, 90)] }, // through the corner (30-110 m)
-        { lapNumber: 18, spells: [spell(120, 140)] }, // after it: the lap's corner still counts
-        { lapNumber: 20, spells: [spell(100, 20)] }, // across the line and into the corner
-      ],
-    });
-    const flagged = { ...me, laps: me.laps.map(l => (l.lapNumber === 18 ? { ...l, nonRepresentativeReason: 'traffic' as const } : l)) };
+  it('leaves out the passes run with a car close in front, and ranks a turn of this lap in traffic lower', async () => {
+    mockDebriefServer([referenceLap], { trafficLaps: [16, 20] });
 
-    const debrief = await loadSessionDebrief(session, flagged);
+    const debrief = await loadSessionDebrief(session, me);
 
-    expect(debrief.trafficKnown).toBe(true);
-    expect(debrief.lapsTimed).toBe(3);
-    // Lap 20 (analysed) and 16 ran the corner in traffic: only lap 18 is left, too few to sample.
-    expect(debrief.corners[0]).toMatchObject({ lapsInTraffic: 2, lapsSampled: null, confidence: 0.4 });
-    expect(debrief.corners[0].traffic?.driverName).toBe('Vinicius Ares');
-    expect(debrief.caveats.some(c => c.includes('run in traffic'))).toBe(false);
+    // Lap 20 (analysed) and 16 ran T1 behind Vinicius Ares: only lap 18 is left, too few to sample.
+    expect(debrief.corners[0]).toMatchObject({ lapsInTraffic: 2, lapsSampled: null, confidence: 0.5 });
+    expect(debrief.corners[0].traffic).toMatchObject({ driverName: 'Vinicius Ares', kind: 'battle', closestGapSec: 0.4 });
   });
 
-  it('still ranks the corners when the other laps cannot be loaded', async () => {
+  it('says why when the session passes are not built', async () => {
+    mockDebriefServer([referenceLap], { passes: { available: false, reason: 'Corner times are still being built.' } });
+
+    await expect(loadSessionDebrief(session, me)).rejects.toThrow('Corner times are still being built.');
+  });
+
+  it('ranks from the analysed lap alone when no other lap has passes', async () => {
     mockDebriefServer([{ ...referenceLap }]);
     const onlyBestLap = { ...me, laps: me.laps.filter(l => l.lapNumber === 20 || l.lapNumber === 1).concat([{ ...me.laps[1], lapNumber: 99 }]) };
 

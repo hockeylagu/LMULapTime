@@ -80,7 +80,8 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
     const baselineLapSummary = baselineTrajectory?.laps?.find(lap => lap.lapNumber === (baselineLapNumber ?? baselineTrajectory.currentLap));
     // The app ranks the corners (AGENTS.md rule C); the report only explains them.
     const priorities = baselineTrajectory
-      ? rankDebriefCorners(segments, cornerStats?.length ? cornerStats : null, comparisonConfidence(trajectory, baselineTrajectory), AI_PRIORITY_LIMIT)
+      ? rankDebriefCorners(segments, cornerStats?.length ? cornerStats : null, comparisonConfidence(trajectory, baselineTrajectory), AI_PRIORITY_LIMIT,
+        { lapNumber: trajectory.currentLap })
       : undefined;
     try {
       return buildAiLapEvidence({

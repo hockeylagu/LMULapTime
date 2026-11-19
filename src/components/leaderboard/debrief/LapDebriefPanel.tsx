@@ -68,12 +68,12 @@ export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, again
         <ol>
           {debrief.corners.map((corner, i) => (
             <DebriefCornerRow
-              key={corner.cornerNumber}
+              key={corner.label}
               rank={i + 1}
               corner={corner}
               hasTechnique={false}
-              toLink={(cornerNumber) => buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber)}
-              onOpen={(cornerNumber) => void navigate(buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber))}
+              toLink={(cornerNumber) => buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber ?? undefined)}
+              onOpen={(cornerNumber) => void navigate(buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber ?? undefined))}
             />
           ))}
         </ol>

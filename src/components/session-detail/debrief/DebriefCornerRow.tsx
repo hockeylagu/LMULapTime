@@ -16,9 +16,9 @@ export interface DebriefCornerRowProps {
   rank: number;
   corner: DebriefCorner;
   /** Link generator for the corner in telemetry. */
-  toLink?: (cornerNumber: number, against: 'reference' | 'technique') => string;
+  toLink?: (cornerNumber: number | null, against: 'reference' | 'technique') => string;
   /** Opens the corner in telemetry against the realistic reference, or the technique (fastest) lap. */
-  onOpen: (cornerNumber: number, against: 'reference' | 'technique') => void;
+  onOpen: (cornerNumber: number | null, against: 'reference' | 'technique') => void;
   /** Whether there is a separate technique lap: the evidence then describes it. */
   hasTechnique: boolean;
 }
@@ -39,13 +39,13 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
   const techUrl = toLink?.(corner.cornerNumber, 'technique');
 
   return (
-    <li className="flex items-start gap-3 py-2.5 border-t border-lmu-border/40 first:border-t-0" data-testid={`debrief-corner-${corner.cornerNumber}`}>
+    <li className="flex items-start gap-3 py-2.5 border-t border-lmu-border/40 first:border-t-0" data-testid={`debrief-corner-${corner.label}`}>
       <span className="mt-0.5 w-5 h-5 shrink-0 rounded-full bg-lmu-raised border border-lmu-rule text-[11px] font-bold text-white flex items-center justify-center">
         {rank}
       </span>
       <div className="flex-1 min-w-0 space-y-1.5">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-sm font-bold text-white">T{corner.cornerNumber}</span>
+          <span className="text-sm font-bold text-white" title={corner.title || undefined}>{corner.label}</span>
           <span className="font-mono text-sm font-bold text-lmu-loss">+{corner.timeLossSec.toFixed(3)}s</span>
           {corner.techniqueLossSec !== null && (
             <span className="font-mono text-xs text-lmu-muted" title="Time lost here against the fastest lap">
@@ -60,7 +60,7 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
         {corner.traffic && (
           <span
             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-lmu-warn-strong/10 border border-lmu-warn-strong/30 text-[11px] text-lmu-warn-soft"
-            title="Another car was within a second through this corner on this lap: ranked lower, the loss may not be yours"
+            title="Another car was within a second in front through here on this lap: ranked lower, the loss may not be yours"
           >
             <Users className="w-3 h-3" /> {describeTrafficSpell(corner.traffic)}
           </span>
@@ -82,12 +82,12 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
             to={refUrl}
             onClick={linkClickHandler(() => onOpen(corner.cornerNumber, 'reference'))}
             className={`${linkClass} ${FOCUS_RING}`}
-            aria-label={`Open T${corner.cornerNumber} in telemetry`}
+            aria-label={`Open ${corner.label} in telemetry`}
           >
             Open <ChevronRight className="w-3.5 h-3.5" />
           </Link>
         ) : (
-          <button type="button" onClick={() => onOpen(corner.cornerNumber, 'reference')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} in telemetry`}>
+          <button type="button" onClick={() => onOpen(corner.cornerNumber, 'reference')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open ${corner.label} in telemetry`}>
             Open <ChevronRight className="w-3.5 h-3.5" />
           </button>
         )}
@@ -97,12 +97,12 @@ export const DebriefCornerRow: React.FC<DebriefCornerRowProps> = ({ rank, corner
               to={techUrl}
               onClick={linkClickHandler(() => onOpen(corner.cornerNumber, 'technique'))}
               className={`${linkClass} ${FOCUS_RING}`}
-              aria-label={`Open T${corner.cornerNumber} against the fastest lap`}
+              aria-label={`Open ${corner.label} against the fastest lap`}
             >
               Fastest <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           ) : (
-            <button type="button" onClick={() => onOpen(corner.cornerNumber, 'technique')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open T${corner.cornerNumber} against the fastest lap`}>
+            <button type="button" onClick={() => onOpen(corner.cornerNumber, 'technique')} className={`${linkClass} ${FOCUS_RING}`} aria-label={`Open ${corner.label} against the fastest lap`}>
               Fastest <ChevronRight className="w-3.5 h-3.5" />
             </button>
           )

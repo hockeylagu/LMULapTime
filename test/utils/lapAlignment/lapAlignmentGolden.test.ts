@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { computeLapComparisons } from '../../../src/utils/replayComparison.js';
 import {
   computeMapScene,
-  computePairConsistency,
   computePairSegments,
   isCorner,
   LAP_PAIRS,
@@ -12,8 +11,7 @@ import {
 
 /**
  * Golden (characterization) snapshot of the whole lap-comparison pipeline on real laps:
- * telemetry channels, corner/straight segments, map ghost/markers/delta colouring and corner
- * consistency. It does not assert correctness - lapAlignmentInvariants.test.ts does - it makes
+ * telemetry channels, corner/straight segments, map ghost/markers/delta colouring. It does not assert correctness - lapAlignmentInvariants.test.ts does - it makes
  * EVERY change in output visible. A snapshot diff must be explained in the commit that causes it;
  * refactors must produce none. Update with `npx vitest run -u test/utils/lapAlignment`.
  */
@@ -77,9 +75,6 @@ if (process.env.LMU_PERSONAL_FIXTURES) describe.each(PAIRS)('lap comparison gold
     }, 2)).toMatchSnapshot();
   });
 
-  it('corner consistency', () => {
-    expect(roundDeep(computePairConsistency(pair))).toMatchSnapshot();
-  });
 });
 
 else describe.skip('Private recording regressions',()=>{it('requires LMU_PERSONAL_FIXTURES',()=>{});});

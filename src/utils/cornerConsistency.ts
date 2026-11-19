@@ -1,14 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
-import {
-  interpolatePointAtDistance,
-} from './replayComparison.js';
-import {
-  getDistancesInReferenceFrame,
-} from './lapAlignment.js';
-import { unwrapAngle } from './computedTelemetry.js';
-import { computeLapSegmentComparisons } from './cornerAnalysis/segmentComparisons.js';
-import { CornerSegmentComparison } from './cornerAnalysis/types.js';
-import { findThresholdCrossingDistM, getHeadingAtDistance, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M, THROTTLE_ON_THRESHOLD_PCT, THROTTLE_ON_MIN_HOLD_SEC, throttleOnsetLookbackM } from './cornerAnalysis/helpers.js';
+import type { CornerPass, CornerTurn } from '../../shared/types/corners/cornerPasses.js';
 
 export interface LapMetricSample {
   lapNumber: number;
@@ -42,12 +32,6 @@ export function computeMetricStat(samples: LapMetricSample[]): ConsistencyMetric
     consistencyPct: avg !== 0 ? (stdDev / Math.abs(avg)) * 100 : 0,
     samples: [...samples].sort((a, b) => a.lapNumber - b.lapNumber),
   };
-}
-
-function pushTo(map: Map<number, LapMetricSample[]>, key: number, lapNumber: number, value: number): void {
-  const list = map.get(key);
-  if (list) list.push({ lapNumber, value });
-  else map.set(key, [{ lapNumber, value }]);
 }
 
 function findSampleValue(samples: LapMetricSample[], lapNumber: number): number | undefined {
@@ -85,157 +69,114 @@ export function bestAndWorstTimeLaps(timeStat: ConsistencyMetricStat): { bestLap
   return { bestLapNumber: best.lapNumber, worstLapNumber: worst.lapNumber };
 }
 
-export interface CornerConsistencyStat {
-  cornerNumber: number;
-  lapsSampled: number;
-  // Apex distance (m) along the reference lap's own path - useful for plotting this corner's
-  // location on that lap's track map.
-  minDistM: number;
-  time: ConsistencyMetricStat;
-  // Meters before the apex where braking began (see computeCornerConsistencyStats).
-  brakingDistM: ConsistencyMetricStat | null;
-  // Meters after the apex where throttle was reapplied.
-  throttleOnDistM: ConsistencyMetricStat | null;
-  entrySpeedKmh: ConsistencyMetricStat | null;
-  apexSpeedKmh: ConsistencyMetricStat | null;
-  exitSpeedKmh: ConsistencyMetricStat | null;
-  turnInDistM?: ConsistencyMetricStat | null;
-  rotationAtThrottlePct?: ConsistencyMetricStat | null;
-}
+/** The metrics a corner's passes are compared on, each relative to the pass's own slowest point. */
+const METRICS = ['brakingDistM', 'turnInDistM', 'throttleOnDistM', 'entrySpeedKmh', 'apexSpeedKmh', 'exitSpeedKmh'] as const;
+type CornerMetric = typeof METRICS[number];
 
-export interface CornerConsistencyLapInput {
-  lapNumber: number;
-  points: ReplayTrajectoryPoint[];
+export interface CornerConsistencyStat extends Record<CornerMetric, ConsistencyMetricStat | null> {
+  /** The official turn (`CornerTurn.id`) the passes went through. */
+  turnId: number;
+  label: string;
+  title: string;
+  /** The turn's apex, metres from the start line along the centre line. */
+  apexM: number;
+  lapsSampled: number;
+  time: ConsistencyMetricStat;
+  /** Where the turn's apex is on the displayed lap (its own distance), and the corner detected there; set by placeStatsOnLap. */
+  lapDistM?: number | null;
+  cornerNumber?: number | null;
 }
 
 /**
- * Measures how repeatably each corner is driven across multiple laps of the same replay.
- * Corner boundaries (entry/apex/exit) are detected once from a fixed reference lap (compared
- * against itself), so every lap is timed and sampled at those same reference distances -
- * each corner's time uses the same entry->exit window as computeLapSegmentComparisons' "vs
- * Baseline" corner table, so the two always agree on what that corner's time means. Brake/
- * throttle onset points are still reported relative to the apex (see below) for readability.
+ * The displayed lap's own distance at a centre-line station, between the two samples around it; null when the lap
+ * has no stations or never passes it. `stationM` and the samples' stations share the centre line's frame.
  */
-export function computeCornerConsistencyStats(
-  laps: CornerConsistencyLapInput[],
-  referencePoints: ReplayTrajectoryPoint[],
-  trackLengthM?: number
+export function lapDistanceAtStation(points: ReadonlyArray<{ stationM?: number }>, dists: readonly number[], stationM: number): number | null {
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1].stationM, b = points[i].stationM;
+    // A sample pair across the lap's seam (station back to 0) holds no station between them.
+    if (a === undefined || b === undefined || b < a) continue;
+    if (stationM < a || stationM > b) continue;
+    const f = b > a ? (stationM - a) / (b - a) : 0;
+    return dists[i - 1] + (dists[i] - dists[i - 1]) * f;
+  }
+  return null;
+}
+
+/**
+ * Places each turn's stats on the displayed lap: the apex's lap distance (for its mini map) and the corner the lap's
+ * own detection finds there (where a click on the turn opens). Turn apexes are from the start line; `startStationM`
+ * puts them on the centre line.
+ */
+export function placeStatsOnLap(
+  stats: CornerConsistencyStat[],
+  lap: { points: ReadonlyArray<{ stationM?: number }>; dists: readonly number[] },
+  startStationM: number,
+  trackLengthM: number,
+  corners: ReadonlyArray<{ cornerNumber: number; entryDistM: number; exitDistM: number }>
 ): CornerConsistencyStat[] {
-  if (!referencePoints?.length || !laps?.length) return [];
+  return stats.map(stat => {
+    const station = ((startStationM + stat.apexM) % trackLengthM + trackLengthM) % trackLengthM;
+    const lapDistM = lapDistanceAtStation(lap.points, lap.dists, station);
+    const corner = lapDistM === null ? undefined : corners.find(c => c.entryDistM <= lapDistM && lapDistM <= c.exitDistM);
+    return { ...stat, lapDistM, cornerNumber: corner?.cornerNumber ?? null };
+  });
+}
 
-  const canonicalCorners = computeLapSegmentComparisons(referencePoints, referencePoints, 6, trackLengthM)
-    .filter((s): s is CornerSegmentComparison => s.type === 'corner')
-    .sort((a, b) => a.minDistM - b.minDistM);
-  if (canonicalCorners.length === 0) return [];
+/** How a turn is named on a card or a row: its label, else where it is ("km 4.1"). */
+export function turnDisplayName(turn: Pick<CornerTurn, 'label' | 'apexM'>): string {
+  return turn.label || `km ${(turn.apexM / 1000).toFixed(1)}`;
+}
 
-  const timesByCorner = new Map<number, LapMetricSample[]>();
-  const brakingByCorner = new Map<number, LapMetricSample[]>();
-  const throttleByCorner = new Map<number, LapMetricSample[]>();
-  const entrySpeedByCorner = new Map<number, LapMetricSample[]>();
-  const apexSpeedByCorner = new Map<number, LapMetricSample[]>();
-  const exitSpeedByCorner = new Map<number, LapMetricSample[]>();
-  const turnInByCorner = new Map<number, LapMetricSample[]>();
-  const rotationByCorner = new Map<number, LapMetricSample[]>();
+/** A pass's metrics: brake and turn-in points in metres before its slowest point, throttle in metres after it (negative before). */
+export function passMetrics(pass: CornerPass): Record<CornerMetric, number | null> {
+  const apex = pass.minSpeedM;
+  const before = (m: number | null) => apex === null || m === null ? null : apex - m;
+  return {
+    brakingDistM: before(pass.brakeM),
+    turnInDistM: before(pass.turnInM),
+    throttleOnDistM: apex === null || pass.throttleM === null ? null : pass.throttleM - apex,
+    entrySpeedKmh: pass.entrySpeedKmh,
+    apexSpeedKmh: pass.minSpeedKmh,
+    exitSpeedKmh: pass.exitSpeedKmh,
+  };
+}
 
-  for (const lap of laps) {
-    if (!lap.points?.length) continue;
-    // Corner windows come from the reference lap, so this lap is measured in the reference
-    // lap's distance frame (station-matched) rather than its own drifting driven distance.
-    const lapDists = getDistancesInReferenceFrame(lap.points, referencePoints, trackLengthM);
+function statFor(turn: CornerTurn, time: LapMetricSample[], metrics: Record<CornerMetric, LapMetricSample[]>): CornerConsistencyStat | null {
+  const timeStat = computeMetricStat(time);
+  if (!timeStat) return null;
+  const { bestLapNumber, worstLapNumber } = bestAndWorstTimeLaps(timeStat);
+  const stat = {
+    turnId: turn.id, label: turnDisplayName(turn), title: turn.title, apexM: turn.apexM,
+    lapsSampled: timeStat.count, time: timeStat,
+  } as CornerConsistencyStat;
+  for (const metric of METRICS) stat[metric] = applyTimeRelativeBestWorst(computeMetricStat(metrics[metric]), bestLapNumber, worstLapNumber);
+  return stat;
+}
 
-    for (const corner of canonicalCorners) {
-      const throttleLookbackM = throttleOnsetLookbackM(corner.entryDistM, corner.minDistM);
-      // Same entry->exit window computeLapSegmentComparisons uses for the "vs Baseline" corner
-      // table, so a corner's time here always agrees with what that table calls its Δ Time -
-      // apex-to-apex would measure a different (overlapping but distinct) stretch of track.
-      const entryT = interpolatePointAtDistance(lap.points, lapDists, corner.entryDistM).timeSec;
-      const exitT = interpolatePointAtDistance(lap.points, lapDists, corner.exitDistM).timeSec;
-      const cornerTimeSec = exitT - entryT;
-      if (isFinite(cornerTimeSec) && cornerTimeSec > 0) pushTo(timesByCorner, corner.cornerNumber, lap.lapNumber, cornerTimeSec);
-
-      pushTo(entrySpeedByCorner, corner.cornerNumber, lap.lapNumber, interpolatePointAtDistance(lap.points, lapDists, corner.entryDistM).speedKmh);
-      pushTo(apexSpeedByCorner, corner.cornerNumber, lap.lapNumber, interpolatePointAtDistance(lap.points, lapDists, corner.minDistM).speedKmh);
-      pushTo(exitSpeedByCorner, corner.cornerNumber, lap.lapNumber, interpolatePointAtDistance(lap.points, lapDists, corner.exitDistM).speedKmh);
-
-      const brakingDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.entryDistM, corner.minDistM, p => p.brake, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M);
-      // Reported relative to the apex (meters BEFORE the minimum-speed point), not as an
-      // absolute lap distance, so the number reads the same regardless of where on the track
-      // this corner sits.
-      if (brakingDistM !== null) pushTo(brakingByCorner, corner.cornerNumber, lap.lapNumber, corner.minDistM - brakingDistM);
-      const throttleOnDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, THROTTLE_ON_THRESHOLD_PCT, throttleLookbackM, THROTTLE_ON_MIN_HOLD_SEC);
-      // Reported relative to the apex too (meters AFTER the minimum-speed point).
-      if (throttleOnDistM !== null) pushTo(throttleByCorner, corner.cornerNumber, lap.lapNumber, throttleOnDistM - corner.minDistM);
-
-      const turnInDistM = findThresholdCrossingDistM(lap.points, lapDists, corner.entryDistM, corner.minDistM, p => Math.abs(p.steerYaw || 0), 5);
-      if (turnInDistM !== null) pushTo(turnInByCorner, corner.cornerNumber, lap.lapNumber, corner.minDistM - turnInDistM);
-
-      if (corner.cornerAngleDeg && corner.cornerAngleDeg > 5) {
-        const initialThrDist = findThresholdCrossingDistM(lap.points, lapDists, corner.minDistM, corner.exitDistM, p => p.throttle, 15, throttleLookbackM) ?? throttleOnDistM;
-        if (initialThrDist !== null) {
-          const hEntry = getHeadingAtDistance(lap.points, lapDists, corner.entryDistM);
-          const hThr = getHeadingAtDistance(lap.points, lapDists, initialThrDist);
-          const rotRad = Math.abs(unwrapAngle(hThr - hEntry));
-          const totalRad = (corner.cornerAngleDeg * Math.PI) / 180;
-          const rotPct = Math.min(100, Math.max(0, Math.round((rotRad / totalRad) * 100)));
-          pushTo(rotationByCorner, corner.cornerNumber, lap.lapNumber, rotPct);
-        }
+/**
+ * How repeatably a driver takes each official turn: their passes on `lapNumbers` (the laps that count),
+ * turn by turn in driving order. A turn needs two passes.
+ */
+export function computeCornerConsistencyStats(passes: CornerPass[], turns: CornerTurn[], lapNumbers: ReadonlySet<number>): CornerConsistencyStat[] {
+  const byTurn = new Map<number, CornerPass[]>();
+  for (const pass of passes) {
+    if (!lapNumbers.has(pass.lapNumber)) continue;
+    const list = byTurn.get(pass.segment);
+    if (list) list.push(pass); else byTurn.set(pass.segment, [pass]);
+  }
+  return turns.flatMap(turn => {
+    const turnPasses = byTurn.get(turn.id) ?? [];
+    const metrics = Object.fromEntries(METRICS.map(metric => [metric, [] as LapMetricSample[]])) as Record<CornerMetric, LapMetricSample[]>;
+    for (const pass of turnPasses) {
+      const values = passMetrics(pass);
+      for (const metric of METRICS) {
+        const value = values[metric];
+        if (value !== null) metrics[metric].push({ lapNumber: pass.lapNumber, value });
       }
     }
-  }
-
-  const stats: CornerConsistencyStat[] = [];
-  for (const corner of canonicalCorners) {
-    const timeStat = computeMetricStat(timesByCorner.get(corner.cornerNumber) || []);
-    if (!timeStat) continue;
-    const { bestLapNumber, worstLapNumber } = bestAndWorstTimeLaps(timeStat);
-    stats.push({
-      cornerNumber: corner.cornerNumber,
-      lapsSampled: timeStat.count,
-      minDistM: corner.minDistM,
-      time: timeStat,
-      brakingDistM: applyTimeRelativeBestWorst(computeMetricStat(brakingByCorner.get(corner.cornerNumber) || []), bestLapNumber, worstLapNumber),
-      throttleOnDistM: applyTimeRelativeBestWorst(computeMetricStat(throttleByCorner.get(corner.cornerNumber) || []), bestLapNumber, worstLapNumber),
-      entrySpeedKmh: applyTimeRelativeBestWorst(computeMetricStat(entrySpeedByCorner.get(corner.cornerNumber) || []), bestLapNumber, worstLapNumber),
-      apexSpeedKmh: applyTimeRelativeBestWorst(computeMetricStat(apexSpeedByCorner.get(corner.cornerNumber) || []), bestLapNumber, worstLapNumber),
-      exitSpeedKmh: applyTimeRelativeBestWorst(computeMetricStat(exitSpeedByCorner.get(corner.cornerNumber) || []), bestLapNumber, worstLapNumber),
-      turnInDistM: applyTimeRelativeBestWorst(computeMetricStat(turnInByCorner.get(corner.cornerNumber) || []), bestLapNumber, worstLapNumber),
-      rotationAtThrottlePct: applyTimeRelativeBestWorst(computeMetricStat(rotationByCorner.get(corner.cornerNumber) || []), bestLapNumber, worstLapNumber),
-    });
-  }
-  return stats;
-}
-
-/**
- * Recomputes each corner's metric stats after dropping specific outlier laps, reusing the
- * already-fetched per-lap samples so no re-fetch/re-timing pass over telemetry is needed.
- * A corner is dropped entirely if fewer than 2 laps remain for its time metric.
- */
-export function filterCornerConsistencyStats(
-  stats: CornerConsistencyStat[],
-  excludedLapNumbers: Set<number>
-): CornerConsistencyStat[] {
-  if (excludedLapNumbers.size === 0) return stats;
-
-  const keep = (samples: LapMetricSample[]) => samples.filter(s => !excludedLapNumbers.has(s.lapNumber));
-
-  const filtered: CornerConsistencyStat[] = [];
-  for (const corner of stats) {
-    const timeStat = computeMetricStat(keep(corner.time.samples));
-    if (!timeStat) continue;
-    const { bestLapNumber, worstLapNumber } = bestAndWorstTimeLaps(timeStat);
-    filtered.push({
-      cornerNumber: corner.cornerNumber,
-      lapsSampled: timeStat.count,
-      minDistM: corner.minDistM,
-      time: timeStat,
-      brakingDistM: applyTimeRelativeBestWorst(corner.brakingDistM ? computeMetricStat(keep(corner.brakingDistM.samples)) : null, bestLapNumber, worstLapNumber),
-      throttleOnDistM: applyTimeRelativeBestWorst(corner.throttleOnDistM ? computeMetricStat(keep(corner.throttleOnDistM.samples)) : null, bestLapNumber, worstLapNumber),
-      entrySpeedKmh: applyTimeRelativeBestWorst(corner.entrySpeedKmh ? computeMetricStat(keep(corner.entrySpeedKmh.samples)) : null, bestLapNumber, worstLapNumber),
-      apexSpeedKmh: applyTimeRelativeBestWorst(corner.apexSpeedKmh ? computeMetricStat(keep(corner.apexSpeedKmh.samples)) : null, bestLapNumber, worstLapNumber),
-      exitSpeedKmh: applyTimeRelativeBestWorst(corner.exitSpeedKmh ? computeMetricStat(keep(corner.exitSpeedKmh.samples)) : null, bestLapNumber, worstLapNumber),
-      turnInDistM: applyTimeRelativeBestWorst(corner.turnInDistM ? computeMetricStat(keep(corner.turnInDistM.samples)) : null, bestLapNumber, worstLapNumber),
-      rotationAtThrottlePct: applyTimeRelativeBestWorst(corner.rotationAtThrottlePct ? computeMetricStat(keep(corner.rotationAtThrottlePct.samples)) : null, bestLapNumber, worstLapNumber),
-    });
-  }
-  return filtered;
+    const time = turnPasses.map(pass => ({ lapNumber: pass.lapNumber, value: pass.exitSec - pass.entrySec }));
+    const stat = statFor(turn, time, metrics);
+    return stat ? [stat] : [];
+  });
 }

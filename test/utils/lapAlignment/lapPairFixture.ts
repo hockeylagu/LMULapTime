@@ -12,7 +12,6 @@ import {
 } from '../../../src/utils/lapAlignment.js';
 import { computeLapSegmentComparisons } from '../../../src/utils/cornerAnalysis/segmentComparisons.js';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis/types.js';
-import { computeCornerConsistencyStats } from '../../../src/utils/cornerConsistency.js';
 import {
   computeBaselineDeltaByIdx,
   computeDispersedCornerMarkers,
@@ -189,17 +188,6 @@ export function computeMapScene(
     bounds, effectiveBaseline, svgPoints, baselineSvgPoints, primaryDists, baselineDists,
     deltaByIdx, baselineDeltaByIdx, ghostAt, pedalMarkerPoints, cornerMarkers,
   };
-}
-
-export function computePairConsistency(pair: LoadedLapPair) {
-  return computeCornerConsistencyStats(
-    [
-      { lapNumber: pair.primary.lapNumber, points: pair.primary.points },
-      { lapNumber: 1000 + pair.baseline.lapNumber, points: pair.baseline.points },
-    ],
-    pair.primary.points,
-    pair.trackLengthM
-  );
 }
 
 /** Rounds every number (deeply) so snapshots are stable against float noise and readable. */

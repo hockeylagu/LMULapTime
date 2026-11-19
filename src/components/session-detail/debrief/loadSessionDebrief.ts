@@ -1,22 +1,17 @@
-import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
-import type { ComparableLap, DetailedSession, DriverData, LapData, LapTraffic, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import type { ComparableLap, DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
+import type { CornerPass, SessionCornerPasses } from '../../../../shared/types/corners/cornerPasses.js';
 import { getBestLapNumber, getDisplayTrackName } from '../../../../shared/domain/formatters.js';
-import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { fetchJson, isAbortError } from '../../../api/apiClient.js';
-import { fetchSessionTelemetry, fetchSessionTraffic } from '../../../api/replayApi.js';
+import { fetchSessionCornerPasses, fetchSessionTelemetry } from '../../../api/replayApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/segmentComparisons.js';
-import { computeCornerConsistencyStats, CornerConsistencyLapInput } from '../../../utils/cornerConsistency.js';
+import { getTrajectoryDistances } from '../../../utils/lapAlignment.js';
+import { lapDistanceAtStation } from '../../../utils/cornerConsistency.js';
 import { pickReferenceLaps } from '../../../utils/referenceLaps.js';
-import { describeLapTraffic } from '../../../utils/lapTrafficText.js';
-import { comparisonConfidence, DebriefCorner, DebriefTraffic, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
-import { applyTelemetryPostProcessing, applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
+import { DebriefCorner, passTrafficSpell, rankTurnCorners } from '../../../utils/sessionDebrief.js';
+import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, trajectoryResolutionQuery } from '../../replay/telemetry/telemetryResolution.js';
-import { describeComparisonCaveats } from '../../replay/inspector/ComparisonAccuracyNotice.js';
-
-/** The session's other laps are only timed through each corner, so a light trace is enough. */
-const REPEATABILITY_LAP_MAX_POINTS = 400;
 
 export interface SessionDebrief {
   sessionId: string;
@@ -36,12 +31,9 @@ export interface SessionDebrief {
   /** Analysed lap time minus the technique lap time (seconds). */
   techniqueDeltaSec: number | null;
   corners: DebriefCorner[];
-  /** Laps of the session timed through each corner for repeatability (the analysed lap included). */
+  /** Laps of the session whose passes count for repeatability (the analysed lap included). */
   lapsTimed: number;
-  confidence: number;
   caveats: string[];
-  /** Whether the replay placed every car on track, so traffic is known corner by corner. */
-  trafficKnown: boolean;
 }
 
 /** Why the session has no debrief, in words the driver can act on. */
@@ -51,28 +43,11 @@ const deltaTo = (lapTime: number, reference: ComparableLap | null) =>
   reference && typeof reference.lapTime === 'number' ? Number((lapTime - reference.lapTime).toFixed(3)) : null;
 
 /**
- * Who was close to the driver, lap by lap, from the replay; null when the replay cannot tell
- * (then traffic is only known lap by lap, from the parser's flags).
+ * The laps whose passes count for repeatability: the clean laps, and the laps the parser left out for traffic
+ * (the passes know where the traffic was: only those with a car close in front drop out).
  */
-async function loadTraffic(sessionId: string, driverName: string, signal?: AbortSignal): Promise<DebriefTraffic | null> {
-  try {
-    const response = await fetchSessionTraffic(sessionId, driverName, { signal });
-    return response.available ? new Map(response.laps.map(lap => [lap.lapNumber, lap.spells])) : null;
-  } catch (err: unknown) {
-    if (isAbortError(err) || signal?.aborted) throw err;
-    return null;
-  }
-}
-
-/**
- * The laps to time for repeatability. When the replay tells where the traffic was, a lap the
- * parser left out for traffic is timed too: only its corners driven with a car close are dropped.
- */
-function repeatabilityLaps(laps: LapData[], trafficKnown: boolean): LapData[] {
-  const candidates = trafficKnown
-    ? laps.map(lap => (lap.nonRepresentativeReason === 'traffic' ? { ...lap, nonRepresentativeReason: undefined } : lap))
-    : laps;
-  return selectCleanLapCandidates(candidates);
+function repeatabilityLaps(laps: LapData[]): LapData[] {
+  return selectCleanLapCandidates(laps.map(lap => (lap.nonRepresentativeReason === 'traffic' ? { ...lap, nonRepresentativeReason: undefined } : lap)));
 }
 
 /** This session's laps in the driver's class, any car, as comparison laps. */
@@ -94,13 +69,44 @@ function sessionClassLaps(session: DetailedSession, carClass: string | null): Co
     })));
 }
 
+type BuiltPasses = Extract<SessionCornerPasses, { available: true }>;
+
+/** A comparison lap's passes, from its session's corner passes. */
+async function lapPasses(lap: ComparableLap, signal?: AbortSignal): Promise<CornerPass[]> {
+  const response = await fetchSessionCornerPasses(lap.sessionId as string, lap.driverOrdinal, { signal });
+  if (!response.available) throw new DebriefUnavailableError(`The reference lap's session: ${response.reason}`);
+  return response.passes.filter(pass => pass.lapNumber === lap.lapNumber);
+}
+
 /**
- * Compares the driver's best lap of the session with two same-car laps on this layout: a
- * realistic one about 0.5% faster (what to expect to gain, and the ranking) and the fastest
- * there is (how to drive each corner). When no same-car lap is clearly faster, both come from
- * the other cars of the class in this session. The laps are loaded exactly as the telemetry view loads
- * them, so a debrief corner opens there with the same numbers; the session's other clean laps
- * are timed through the same corners for repeatability, leaving out passes with traffic.
+ * The corner the analysed lap's own detection finds at each turn (where a debrief corner opens in telemetry):
+ * null when the lap has no track stations or no corner holds the turn's apex.
+ */
+async function cornerFinder(session: DetailedSession, driverOrdinal: number, lapOrdinal: number, passes: BuiltPasses, signal?: AbortSignal) {
+  const resolutionQuery = trajectoryResolutionQuery(DEFAULT_TELEMETRY_RESOLUTION);
+  try {
+    const target = applyTelemetryPostProcessingToTrajectory(await fetchSessionTelemetry(session.id, { resolutionQuery, driverOrdinal, lapOrdinal }, { signal }));
+    const points = target.points ?? [];
+    const dists = getTrajectoryDistances(points, target.trackLengthM);
+    const corners = computeLapSegmentComparisons(points, points, 6, target.trackLengthM)
+      .flatMap(segment => segment.type === 'corner' ? [segment] : []);
+    return (turn: { apexM: number }) => {
+      const station = ((passes.startStationM + turn.apexM) % passes.trackLengthM + passes.trackLengthM) % passes.trackLengthM;
+      const distM = lapDistanceAtStation(points, dists, station);
+      return distM === null ? null : corners.find(c => c.entryDistM <= distM && distM <= c.exitDistM)?.cornerNumber ?? null;
+    };
+  } catch (err: unknown) {
+    if (isAbortError(err) || signal?.aborted) throw err;
+    return () => null;
+  }
+}
+
+/**
+ * Compares the driver's best lap of the session with two same-car laps on this layout, turn by official turn,
+ * from the corner passes: a realistic one about 0.5% faster (what to expect to gain, and the ranking) and the
+ * fastest there is (how to drive each turn). When no same-car lap is clearly faster, both come from the other
+ * cars of the class in this session. The session's other passes give the repeatability, leaving out passes
+ * with a car close in front.
  */
 export async function loadSessionDebrief(session: DetailedSession, driver: DriverData, signal?: AbortSignal): Promise<SessionDebrief> {
   if (!session.matchingReplayFile) throw new DebriefUnavailableError('This session has no replay to analyse.');
@@ -111,10 +117,10 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
     item.name.trim().toLowerCase() === driver.name.trim().toLowerCase());
   const lapOrdinal = driverOrdinal >= 0 ? session.drivers[driverOrdinal].laps.findIndex(item => item.lapNumber === lapNumber) : -1;
   if (driverOrdinal < 0 || lapOrdinal < 0) throw new DebriefUnavailableError('The selected driver or lap is unavailable in this session.');
-  // Started first: the first request for a race builds its positions index, the slowest step.
-  const trafficRequest = loadTraffic(session.id, driver.name, signal);
-  trafficRequest.catch(() => undefined); // awaited below; an early throw here must not leave it unhandled
 
+  // Every car's passes: the driver's own, and the cars they met (their laps tell a battle from a lapping).
+  const ownRequest = fetchSessionCornerPasses(session.id, undefined, { signal });
+  ownRequest.catch(() => undefined); // awaited below; an early throw here must not leave it unhandled
   const query = new URLSearchParams({
     track: getDisplayTrackName(session.trackVenue, session.trackCourse),
     carType: driver.carType,
@@ -129,48 +135,21 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
     throw new DebriefUnavailableError(`No other ${driver.carType} lap with replay data on this layout to compare with yet.`);
   }
 
-  const resolutionQuery = trajectoryResolutionQuery(DEFAULT_TELEMETRY_RESOLUTION);
-  const loadLap = (ref: ComparableLap) =>
-    fetchSessionTelemetry(ref.sessionId as string, { resolutionQuery, driverOrdinal: ref.driverOrdinal as number, lapOrdinal: ref.lapOrdinal as number }, { signal })
-      .then(applyTelemetryPostProcessingToTrajectory);
-  const [target, referenceTrajectory, techniqueTrajectory, traffic] = await Promise.all([
-    fetchSessionTelemetry(session.id, { resolutionQuery, driverOrdinal, lapOrdinal }, { signal }).then(applyTelemetryPostProcessingToTrajectory),
-    loadLap(reference),
-    technique ? loadLap(technique) : Promise.resolve(null),
-    trafficRequest,
+  const own = await ownRequest;
+  if (!own.available) throw new DebriefUnavailableError(own.reason);
+  const slot = own.cars.find(car => car.sessionDriverOrdinal === driverOrdinal)?.slot;
+  if (slot === undefined) throw new DebriefUnavailableError('The driver is not in this session replay.');
+  const [referencePasses, techniquePasses, cornerNumberAt] = await Promise.all([
+    lapPasses(reference, signal),
+    technique?.sessionId && technique.driverOrdinal !== undefined ? lapPasses(technique, signal) : Promise.resolve(null),
+    cornerFinder(session, driverOrdinal, lapOrdinal, own, signal),
   ]);
-  if (!target.points?.length || !referenceTrajectory.points?.length) {
-    throw new DebriefUnavailableError('The replay has no telemetry for one of the two laps.');
-  }
+  const passes = own.passes.filter(pass => pass.slot === slot);
+  if (!passes.some(pass => pass.lapNumber === lapNumber)) throw new DebriefUnavailableError('The replay has no passes for your best lap.');
+  if (referencePasses.length === 0) throw new DebriefUnavailableError('The replay has no passes for the reference lap.');
 
-  if (!hasCompatibleTrackStations(target, referenceTrajectory)) {
-    throw new DebriefUnavailableError('Detailed local track data is required for corner analysis.');
-  }
-  const spec = target.layoutKey ? getCircuitSpecification(target.layoutKey) : undefined;
-  const compare = (other: ReplayTrajectoryData) =>
-    computeLapSegmentComparisons(target.points, other.points, 6, target.trackLengthM, spec?.nominalWidthM);
-  const segments = compare(referenceTrajectory);
-  const techniqueSegments = techniqueTrajectory?.points?.length && hasCompatibleTrackStations(target, techniqueTrajectory) ? compare(techniqueTrajectory) : undefined;
-
-  const otherLapNumbers = repeatabilityLaps(driver.laps || [], traffic !== null)
-    .map(l => l.lapNumber)
-    .filter(n => n !== lapNumber);
-  const otherLaps = await Promise.all(otherLapNumbers.map(n =>
-    fetchSessionTelemetry(session.id, {
-      resolutionQuery: `maxPoints=${REPEATABILITY_LAP_MAX_POINTS}`,
-      driverOrdinal,
-      lapOrdinal: session.drivers[driverOrdinal].laps.findIndex(item => item.lapNumber === n),
-    }, { signal })
-      .then((data): CornerConsistencyLapInput => ({ lapNumber: n, points: hasCompatibleTrackStations(target, data) ? applyTelemetryPostProcessing(data?.points || []) : [] }))
-      .catch((err: unknown): CornerConsistencyLapInput => {
-        if (signal?.aborted) throw err;
-        return { lapNumber: n, points: [] };
-      })
-  ));
-  const timedLaps = [{ lapNumber, points: target.points }, ...otherLaps.filter(l => l.points.length > 0)];
-  const cornerStats = timedLaps.length > 1 ? computeCornerConsistencyStats(timedLaps, target.points, target.trackLengthM) : null;
-
-  const confidence = comparisonConfidence(target, referenceTrajectory);
+  const repeatLaps = new Set(repeatabilityLaps(driver.laps || []).map(l => l.lapNumber));
+  repeatLaps.add(lapNumber);
   return {
     sessionId: session.id,
     driverOrdinal,
@@ -183,30 +162,23 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
     pool,
     lapDeltaSec: deltaTo(lap.lapTime, reference),
     techniqueDeltaSec: deltaTo(lap.lapTime, technique),
-    corners: rankDebriefCorners(segments, cornerStats, confidence, undefined, { technique: techniqueSegments, traffic, lapNumber }),
-    lapsTimed: timedLaps.length,
-    confidence,
-    // With the replay's traffic, each corner says whether a car was close; otherwise warn for the lap.
-    caveats: [
-      ...(pool === 'class' ? [`No ${driver.carType} lap on this layout is clearly faster, so the references are faster ${carClass} cars from this session: part of each gap can be the car.`] : []),
-      ...describeComparisonCaveats(target, referenceTrajectory),
-      ...(traffic ? [] : describeLapTrafficCaveat(lap.traffic)),
-    ],
-    trafficKnown: traffic !== null,
+    corners: rankTurnCorners({
+      turns: own.turns, passes, lapNumber, repeatLaps, reference: referencePasses, technique: techniquePasses,
+      trafficOf: (pass, turn) => passTrafficSpell(pass, turn, own.cars, own.passes),
+      cornerNumberAt,
+    }),
+    lapsTimed: new Set(passes.filter(pass => repeatLaps.has(pass.lapNumber)).map(pass => pass.lapNumber)).size,
+    caveats: pool === 'class'
+      ? [`No ${driver.carType} lap on this layout is clearly faster, so the references are faster ${carClass} cars from this session: part of each gap can be the car.`]
+      : [],
   };
-}
-
-/** A best lap run in traffic is not a clean read: a tow flatters the straights and a pass costs corners. */
-function describeLapTrafficCaveat(traffic: LapTraffic | undefined): string[] {
-  const events = describeLapTraffic(traffic);
-  return events.length > 0 ? [`Your lap was run in traffic (${events.join('; ')}): a tow or a pass changes the numbers.`] : [];
 }
 
 /**
  * The telemetry view on one debrief corner, with the realistic reference (or, for `technique`,
- * the fastest lap) loaded as the comparison lap.
+ * the fastest lap) loaded as the comparison lap. Without a matching corner it opens the lap.
  */
-export function debriefCornerLink(debrief: SessionDebrief, cornerNumber: number, against: 'reference' | 'technique' = 'reference'): string {
+export function debriefCornerLink(debrief: SessionDebrief, cornerNumber: number | null, against: 'reference' | 'technique' = 'reference'): string {
   const lap = against === 'technique' && debrief.technique ? debrief.technique : debrief.reference;
   const params = new URLSearchParams({
     sessionId: debrief.sessionId,
@@ -216,7 +188,7 @@ export function debriefCornerLink(debrief: SessionDebrief, cornerNumber: number,
     baselineDriverOrdinal: String(lap.driverOrdinal ?? ''),
     baselineLapOrdinal: String(lap.lapOrdinal ?? ''),
     compareDriver: lap.driverName,
-    corner: String(cornerNumber),
+    ...(cornerNumber === null ? {} : { corner: String(cornerNumber) }),
     view: '2d',
   });
   return `/telemetry?${params.toString()}`;

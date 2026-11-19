@@ -8,7 +8,7 @@ const loader = { load: vi.fn() };
 const renderPanel = () => render(<LapDebriefPanel pairKey="me|rival" againstLabel="Rival" load={loader.load} />);
 
 const corner = (cornerNumber: number, timeLossSec: number): DebriefCorner => ({
-  cornerNumber, entryDistM: 100 * cornerNumber, minDistM: 100 * cornerNumber + 40, timeLossSec,
+  label: `Corner ${cornerNumber}`, cornerNumber, entryDistM: 100 * cornerNumber, minDistM: 100 * cornerNumber + 40, timeLossSec,
   lapsLosing: null, lapsSampled: null, repeatability: 1, confidence: 1, priority: timeLossSec,
   worstPhase: 'entry', evidence: ['Brake 12 m later'], techniqueLossSec: null, traffic: null, lapsInTraffic: 0,
 });
@@ -31,10 +31,10 @@ describe('LapDebriefPanel', () => {
     expect(loader.load).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: /Where's the time/ }));
-    expect(await screen.findByTestId('debrief-corner-5')).toHaveTextContent('Brake 12 m later');
+    expect(await screen.findByTestId('debrief-corner-Corner 5')).toHaveTextContent('Brake 12 m later');
     expect(screen.getByText('One lap was recorded at a lower rate.')).toBeInTheDocument();
 
-    const openT5 = screen.getByTestId('debrief-corner-5').querySelector('a, button') as HTMLElement;
+    const openT5 = screen.getByTestId('debrief-corner-Corner 5').querySelector('a, button') as HTMLElement;
     fireEvent.click(openT5);
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
     const params = new URLSearchParams(window.location.hash.split('?')[1]);
@@ -52,7 +52,7 @@ describe('LapDebriefPanel', () => {
       theirs: { driverName: 'Rival', lapNumber: 3, sessionId: 's-Rival', driverOrdinal: 1, lapOrdinal: 2 },
     });
     render(<LapDebriefPanel pairKey="me|rival" againstLabel="Rival" load={loader.load} autoStart />);
-    expect(await screen.findByTestId('debrief-corner-2')).toBeInTheDocument();
+    expect(await screen.findByTestId('debrief-corner-Corner 2')).toBeInTheDocument();
     expect(loader.load).toHaveBeenCalledTimes(1);
   });
 

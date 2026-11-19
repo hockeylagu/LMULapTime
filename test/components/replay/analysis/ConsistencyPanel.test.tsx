@@ -62,9 +62,13 @@ describe('ConsistencyPanel', () => {
 
   const mockCornerStats: CornerConsistencyStat[] = [
     {
+      turnId: 1,
+      label: 'T1',
+      title: 'Turn 1',
+      apexM: 400,
+      lapDistM: 120,
       cornerNumber: 1,
       lapsSampled: 3,
-      minDistM: 120,
       time: {
         count: 3,
         min: 6.2,
@@ -104,15 +108,6 @@ describe('ConsistencyPanel', () => {
         stdDev: 2.1,
         consistencyPct: 0.25,
         samples: [{ lapNumber: 1, value: 90 }],
-      },
-      rotationAtThrottlePct: {
-        count: 1,
-        min: 80,
-        avg: 82,
-        max: 85,
-        stdDev: 2.0,
-        consistencyPct: 0.2,
-        samples: [{ lapNumber: 1, value: 80 }],
       },
       entrySpeedKmh: {
         count: 1,
@@ -169,7 +164,7 @@ describe('ConsistencyPanel', () => {
     expect(screen.getAllByText('Sector 2').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('±0.150s')).toBeInTheDocument();
     expect(screen.getByText('0.3%')).toBeInTheDocument();
-    expect(screen.getByText('Timing every lap through each corner...')).toBeInTheDocument();
+    expect(screen.getByText('Loading your passes through each turn...')).toBeInTheDocument();
   });
 
   it('renders empty corner stats message when cornerStats is empty', () => {
@@ -185,6 +180,19 @@ describe('ConsistencyPanel', () => {
     expect(
       screen.getByText('Need at least 2 valid laps in this replay to analyze per-corner consistency.')
     ).toBeInTheDocument();
+  });
+
+  it('says why there are no turn stats when the passes are unavailable', () => {
+    render(
+      <ConsistencyPanel
+        stats={baseStats}
+        cornerStats={[]}
+        cornerStatsUnavailableReason="Corner times are not built for this replay yet."
+        formatLapTime={formatLapTime}
+      />
+    );
+
+    expect(screen.getByText('Corner times are not built for this replay yet.')).toBeInTheDocument();
   });
 
   it('renders corner details, mini map, and expands metric chart on click', () => {
@@ -212,10 +220,9 @@ describe('ConsistencyPanel', () => {
       />
     );
 
-    const cornerHeaders = screen.getAllByText('Corner 1');
+    const cornerHeaders = screen.getAllByText('T1');
     expect(cornerHeaders.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Turn-In Pt')).toBeInTheDocument();
-    expect(screen.getByText('Rot% @ Gas')).toBeInTheDocument();
     // Metric values are read on the fastest and slowest pass, not each metric's own extremes.
     expect(screen.getByText('Fastest pass')).toBeInTheDocument();
     expect(screen.getByText('Slowest pass')).toBeInTheDocument();

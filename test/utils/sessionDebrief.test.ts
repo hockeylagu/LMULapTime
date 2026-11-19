@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   comparisonConfidence,
   describeCornerEvidence,
+  passTrafficSpell,
   rankDebriefCorners,
-  spellCoversCorner,
+  rankTurnCorners,
 } from '../../src/utils/sessionDebrief.js';
 import type { CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
 import type { CornerConsistencyStat } from '../../src/utils/cornerConsistency.js';
 import type { ReplayTrajectoryData } from '../../shared/types/index.js';
+import type { CornerPass, CornerTurn } from '../../shared/types/corners/cornerPasses.js';
 
 function corner(cornerNumber: number, primaryTimeSec: number, timeDeltaSec: number, extra: Partial<CornerSegmentComparison> = {}): CornerSegmentComparison {
   return {
@@ -39,13 +41,18 @@ function corner(cornerNumber: number, primaryTimeSec: number, timeDeltaSec: numb
   };
 }
 
-/** Consistency stat timing each of the session's laps through a corner. */
+/** An official turn's stat timing each of the session's laps (2, 3, ...) through it, placed on the corner's slowest point. */
 function lapTimes(cornerNumber: number, times: number[]): CornerConsistencyStat {
   const samples = times.map((value, i) => ({ lapNumber: i + 2, value }));
   return {
+    turnId: cornerNumber,
+    label: `T${cornerNumber}`,
+    title: '',
+    apexM: 0,
+    lapDistM: cornerNumber * 1000 + 100,
     cornerNumber,
     lapsSampled: samples.length,
-    minDistM: 0,
+    turnInDistM: null,
     time: { count: samples.length, min: 0, max: 0, avg: 0, stdDev: 0, consistencyPct: 0, samples },
     brakingDistM: null,
     throttleOnDistM: null,
@@ -62,7 +69,7 @@ describe('rankDebriefCorners', () => {
     const segments: LapSegmentComparison[] = [corner(1, 12.5, 0.5), corner(5, 28.8, 0.3)];
     const stats = [lapTimes(1, [12.5, 11.95, 11.99, 12.0]), lapTimes(5, [28.8, 28.9, 28.75, 28.85])];
 
-    const ranked = rankDebriefCorners(segments, stats, 1);
+    const ranked = rankDebriefCorners(segments, stats, 1, undefined, { lapNumber: 2 });
 
     expect(ranked.map(c => c.cornerNumber)).toEqual([5, 1]);
     expect(ranked[0]).toMatchObject({ lapsLosing: 4, lapsSampled: 4, repeatability: 1, priority: 0.3 });
@@ -107,41 +114,98 @@ describe('rankDebriefCorners', () => {
     expect(rankDebriefCorners([corner(1, 12.5, 0.3)], null, 1)[0].techniqueLossSec).toBeNull();
   });
 
-  it('leaves passes in traffic out of repeatability and ranks a corner of the analysed lap in traffic lower', () => {
-    // Corner 1 runs 1000-1200 m. Laps 2-5 are timed there; lap 3 had a car in front through it,
-    // lap 4 only after it. The analysed lap 20 had one at the corner entry.
-    const spell = (startStationM: number, endStationM: number) => ({
-      driverName: 'Rui Paiva', carClass: 'GT3', kind: 'multiclass' as const, direction: 'ahead' as const,
-      startSec: 0, endSec: 4, startStationM, endStationM, closestGapSec: 0.3,
+});
+
+function turnPass(lapNumber: number, segment: number, sec: number, extra: Partial<CornerPass> = {}): CornerPass {
+  const entrySec = lapNumber * 100 + segment * 10;
+  return {
+    slot: 1, lapNumber, segment, entrySec, minSpeedSec: entrySec + sec / 2, exitSec: entrySec + sec,
+    entrySpeedKmh: 250, minSpeedKmh: 100, exitSpeedKmh: 180, minSpeedM: 500, brakeM: 400, turnInM: 450, throttleM: 520,
+    aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, ...extra,
+  };
+}
+
+const TURNS: CornerTurn[] = [
+  { id: 1, label: 'T1', title: 'Turn 1', apexM: 500, startM: 300, endM: 700 },
+  { id: 2, label: '', title: 'Unnamed', apexM: 4100, startM: 3900, endM: 4300 },
+];
+
+describe('rankTurnCorners', () => {
+  const noTraffic = () => null;
+
+  it('ranks each official turn by the analysed pass against the reference pass, and how often the session loses there', () => {
+    const passes = [turnPass(5, 1, 4.5), turnPass(6, 1, 4.1), turnPass(7, 1, 4.4), turnPass(5, 2, 6.3), turnPass(6, 2, 6.3)];
+    const ranked = rankTurnCorners({
+      turns: TURNS, passes, lapNumber: 5, repeatLaps: new Set([5, 6, 7]),
+      reference: [turnPass(3, 1, 4.2), turnPass(3, 2, 6.0)], technique: null, trafficOf: noTraffic,
+      cornerNumberAt: turn => (turn.id === 1 ? 4 : null),
     });
-    const traffic = new Map([[3, [spell(1150, 1400)]], [4, [spell(1300, 1500)]], [20, [spell(900, 1010)]]]);
-    const stats = [lapTimes(1, [12.5, 12.6, 12.0, 12.7])];
 
-    const [clean] = rankDebriefCorners([corner(1, 12.5, 0.4)], stats, 1, undefined, { traffic, lapNumber: 7 });
-    const [inTraffic] = rankDebriefCorners([corner(1, 12.5, 0.4)], stats, 1, undefined, { traffic, lapNumber: 20 });
+    expect(ranked.map(c => c.label)).toEqual(['km 4.1', 'T1']);
+    expect(ranked[0]).toMatchObject({ label: 'km 4.1', cornerNumber: null, timeLossSec: 0.3, lapsLosing: 2, lapsSampled: 2, repeatability: 1 });
+    expect(ranked[1]).toMatchObject({ label: 'T1', title: 'Turn 1', cornerNumber: 4, timeLossSec: 0.3, lapsLosing: 2, lapsSampled: 3, entryDistM: 300, minDistM: 500 });
+    expect(ranked[1].repeatability).toBeCloseTo(2 / 3, 5);
+  });
 
-    expect(clean).toMatchObject({ lapsSampled: 3, lapsLosing: 2, lapsInTraffic: 1, confidence: 1, traffic: null });
-    expect(inTraffic.confidence).toBe(0.5);
-    expect(inTraffic.traffic?.driverName).toBe('Rui Paiva');
-    expect(inTraffic.priority).toBeCloseTo(clean.priority / 2, 3);
+  it('describes the turn as the technique lap drives it, and names the half that lost the most', () => {
+    const pass = turnPass(5, 1, 4.6, { minSpeedSec: 512.2, brakeM: 380, turnInM: 440, minSpeedKmh: 92, throttleM: 540 });
+    const [ranked] = rankTurnCorners({
+      turns: TURNS, passes: [pass], lapNumber: 5, repeatLaps: new Set([5]),
+      reference: [turnPass(3, 1, 4.3)], technique: [turnPass(2, 1, 4.0, { brakeM: 410, turnInM: 455, minSpeedKmh: 104, throttleM: 515 })],
+      trafficOf: noTraffic,
+    });
+
+    expect(ranked).toMatchObject({ timeLossSec: 0.3, techniqueLossSec: 0.6, lapsSampled: null, repeatability: 1, worstPhase: 'exit' });
+    expect(ranked.evidence).toEqual(['Brake 30 m later', 'Turn in 15 m later', 'Carry 12 km/h more to the apex', 'Full throttle 25 m earlier']);
+  });
+
+  it('leaves passes with a car close in front out of repeatability and trusts an analysed pass in traffic less', () => {
+    const passes = [turnPass(5, 1, 4.5), turnPass(6, 1, 4.6), turnPass(7, 1, 4.1), turnPass(8, 1, 4.5)];
+    const spell = { driverName: 'Rui Paiva', kind: 'multiclass' as const, direction: 'ahead' as const, startSec: 0, endSec: 1, startStationM: 0, endStationM: 1, closestGapSec: 0.4 };
+    const [ranked] = rankTurnCorners({
+      turns: TURNS, passes, lapNumber: 5, repeatLaps: new Set([5, 6, 7, 8]),
+      reference: [turnPass(3, 1, 4.2)], technique: null,
+      trafficOf: pass => (pass.lapNumber === 5 || pass.lapNumber === 6 ? spell : null),
+    });
+
+    expect(ranked).toMatchObject({ lapsInTraffic: 2, lapsSampled: 2, lapsLosing: 1, repeatability: 0.5, confidence: 0.5 });
+    expect(ranked.traffic?.driverName).toBe('Rui Paiva');
+    expect(ranked.priority).toBeCloseTo(0.3 * 0.5 * 0.5, 4);
+  });
+
+  it('leaves out turns lost by less than 0.03 s, and turns without a reference pass', () => {
+    const ranked = rankTurnCorners({
+      turns: TURNS, passes: [turnPass(5, 1, 4.22), turnPass(5, 2, 7)], lapNumber: 5, repeatLaps: new Set([5]),
+      reference: [turnPass(3, 1, 4.2)], technique: null, trafficOf: noTraffic,
+    });
+    expect(ranked).toEqual([]);
   });
 });
 
-describe('spellCoversCorner', () => {
-  const spell = (startStationM: number, endStationM: number) => ({
-    driverName: 'A', kind: 'battle' as const, direction: 'ahead' as const, startSec: 0, endSec: 3, startStationM, endStationM, closestGapSec: 0.5,
+describe('passTrafficSpell', () => {
+  const cars = [
+    { slot: 1, name: 'Me', carClass: 'Hyper' },
+    { slot: 2, name: 'Rival', carClass: 'Hyper' },
+    { slot: 3, name: 'Slow GT3', carClass: 'GT3' },
+  ];
+  const ahead = (aheadSlot: number, aheadGapSec: number) => turnPass(5, 1, 4, { aheadSlot, aheadGapSec });
+
+  it('is null without a car within a second in front', () => {
+    expect(passTrafficSpell(turnPass(5, 1, 4), TURNS[0], cars, [])).toBeNull();
+    expect(passTrafficSpell(ahead(2, 1.4), TURNS[0], cars, [])).toBeNull();
   });
 
-  it('matches a spell overlapping any part of the corner window', () => {
-    expect(spellCoversCorner(spell(100, 200), 150, 300)).toBe(true);
-    expect(spellCoversCorner(spell(100, 200), 200, 300)).toBe(true);
-    expect(spellCoversCorner(spell(100, 200), 250, 300)).toBe(false);
+  it('tells a battle, a lapping and being lapped from the other car lap through the same turn', () => {
+    const near = (lapNumber: number) => [turnPass(lapNumber, 1, 4, { slot: 2, entrySec: 510.5 }), turnPass(9, 1, 4, { slot: 2, entrySec: 900 })];
+    expect(passTrafficSpell(ahead(2, 0.5), TURNS[0], cars, near(5))).toMatchObject({
+      driverName: 'Rival', kind: 'battle', direction: 'ahead', closestGapSec: 0.5, startStationM: 300, endStationM: 700,
+    });
+    expect(passTrafficSpell(ahead(2, 0.5), TURNS[0], cars, near(4))?.kind).toBe('lapping');
+    expect(passTrafficSpell(ahead(2, 0.5), TURNS[0], cars, near(6))?.kind).toBe('beingLapped');
   });
 
-  it('handles a spell across the timing line', () => {
-    expect(spellCoversCorner(spell(5600, 100), 50, 200)).toBe(true);
-    expect(spellCoversCorner(spell(5600, 100), 5650, 5700)).toBe(true);
-    expect(spellCoversCorner(spell(5600, 100), 300, 500)).toBe(false);
+  it('calls another class multiclass traffic', () => {
+    expect(passTrafficSpell(ahead(3, 0.8), TURNS[0], cars, [])).toMatchObject({ driverName: 'Slow GT3', carClass: 'GT3', kind: 'multiclass' });
   });
 });
 

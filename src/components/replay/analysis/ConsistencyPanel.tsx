@@ -12,7 +12,10 @@ export interface ConsistencyPanelProps {
   stats: LapConsistencyStats;
   cornerStats?: CornerConsistencyStat[];
   isLoadingCornerStats?: boolean;
+  /** Opens the corner the displayed lap detects at a turn (the turn's stat carries it). */
   onSelectCorner?: (cornerNumber: number) => void;
+  /** Why there are no corner stats (passes not built), when known. */
+  cornerStatsUnavailableReason?: string | null;
   onSelectBaselineLap?: (lapNumber: number) => void;
   formatLapTime: (sec?: number | null) => string;
   trackPoints?: ReplayTrajectoryPoint[];
@@ -33,6 +36,7 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
   stats,
   cornerStats = EMPTY_ARRAY,
   isLoadingCornerStats = false,
+  cornerStatsUnavailableReason = null,
   onSelectCorner,
   onSelectBaselineLap,
   formatLapTime,
@@ -53,9 +57,9 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
   }, [cornerStats]);
 
   // Which single metric row (cornerNumber + metric key) is currently drilled down into, if any.
-  const [expandedMetric, setExpandedMetric] = React.useState<{ cornerNumber: number; metric: string } | null>(null);
-  const toggleMetric = (cornerNumber: number, metric: string) => {
-    setExpandedMetric(prev => (prev?.cornerNumber === cornerNumber && prev.metric === metric ? null : { cornerNumber, metric }));
+  const [expandedMetric, setExpandedMetric] = React.useState<{ turnId: number; metric: string } | null>(null);
+  const toggleMetric = (turnId: number, metric: string) => {
+    setExpandedMetric(prev => (prev?.turnId === turnId && prev.metric === metric ? null : { turnId, metric }));
   };
 
   if (stats.lapCount < 2) {
@@ -121,38 +125,38 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
         </div>
 
         {isLoadingCornerStats ? (
-          <div className="px-3 py-4 text-center text-lmu-muted text-xs">Timing every lap through each corner...</div>
+          <div className="px-3 py-4 text-center text-lmu-muted text-xs">Loading your passes through each turn...</div>
         ) : cornerStats.length === 0 ? (
           <div className="px-3 py-4 text-center text-lmu-muted text-xs">
-            Need at least 2 valid laps in this replay to analyze per-corner consistency.
+            {cornerStatsUnavailableReason ?? 'Need at least 2 valid laps in this replay to analyze per-corner consistency.'}
           </div>
         ) : (
           <div className="flex flex-col gap-3 p-3">
             {leastConsistentCorner && leastConsistentCorner.time.consistencyPct > 0.3 && (
-              <LeastConsistentBadge label={`Corner ${leastConsistentCorner.cornerNumber}`} stdDevSec={leastConsistentCorner.time.stdDev} consistencyPct={leastConsistentCorner.time.consistencyPct} />
+              <LeastConsistentBadge label={leastConsistentCorner.label} stdDevSec={leastConsistentCorner.time.stdDev} consistencyPct={leastConsistentCorner.time.consistencyPct} />
             )}
             {cornerStats.map(c => {
               const bestLapNumber = c.time.samples.length > 0
                 ? c.time.samples.reduce((best, s) => (s.value < best.value ? s : best), c.time.samples[0]).lapNumber
                 : undefined;
               return (
-              <div key={c.cornerNumber}>
+              <div key={c.turnId}>
                 <div
-                  className={`flex items-center gap-2 mb-1 ${onSelectCorner ? 'cursor-pointer' : ''}`}
-                  onClick={() => onSelectCorner?.(c.cornerNumber)}
+                  className={`flex items-center gap-2 mb-1 ${onSelectCorner && typeof c.cornerNumber === 'number' ? 'cursor-pointer' : ''}`}
+                  onClick={() => { if (typeof c.cornerNumber === 'number') onSelectCorner?.(c.cornerNumber); }}
                 >
-                  {trackPoints && trackBounds && (
+                  {trackPoints && trackBounds && typeof c.lapDistM === 'number' && (
                     <MiniCornerMap
                       points={trackPoints}
                       bounds={trackBounds}
-                      highlightDistM={c.minDistM}
+                      highlightDistM={c.lapDistM}
                       trackLengthM={trackLengthM}
                       className="w-8 h-8 shrink-0"
                     />
                   )}
-                  <span className="inline-flex items-center gap-1 font-bold text-white text-xs">
+                  <span className="inline-flex items-center gap-1 font-bold text-white text-xs" title={c.title || undefined}>
                     <Flag className="w-3 h-3 text-lmu-muted" />
-                    Corner {c.cornerNumber}
+                    {c.label}
                   </span>
                 </div>
                 <table className="w-full text-[11px] font-mono border-collapse">
@@ -169,16 +173,16 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                   <tbody>
                     <MetricRow
                       label="Time" stat={c.time} unit="s" decimals={3}
-                      isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'time'}
-                      onToggle={() => toggleMetric(c.cornerNumber, 'time')}
+                      isExpanded={expandedMetric?.turnId === c.turnId && expandedMetric.metric === 'time'}
+                      onToggle={() => toggleMetric(c.turnId, 'time')}
                       currentLapNumber={currentLapNumber}
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
                     />
                     <MetricRow
                       label="Brake Pt" stat={c.brakingDistM} unit="m" decimals={0}
-                      isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'brake'}
-                      onToggle={() => toggleMetric(c.cornerNumber, 'brake')}
+                      isExpanded={expandedMetric?.turnId === c.turnId && expandedMetric.metric === 'brake'}
+                      onToggle={() => toggleMetric(c.turnId, 'brake')}
                       currentLapNumber={currentLapNumber}
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
@@ -186,8 +190,8 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                     {c.turnInDistM && (
                       <MetricRow
                         label="Turn-In Pt" stat={c.turnInDistM} unit="m" decimals={0}
-                        isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'turnIn'}
-                        onToggle={() => toggleMetric(c.cornerNumber, 'turnIn')}
+                        isExpanded={expandedMetric?.turnId === c.turnId && expandedMetric.metric === 'turnIn'}
+                        onToggle={() => toggleMetric(c.turnId, 'turnIn')}
                         currentLapNumber={currentLapNumber}
                         bestLapNumber={bestLapNumber}
                         onSelectBaselineLap={onSelectBaselineLap}
@@ -195,42 +199,32 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
                     )}
                     <MetricRow
                       label="Throttle Pt" stat={c.throttleOnDistM} unit="m" decimals={0}
-                      isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'throttle'}
-                      onToggle={() => toggleMetric(c.cornerNumber, 'throttle')}
+                      isExpanded={expandedMetric?.turnId === c.turnId && expandedMetric.metric === 'throttle'}
+                      onToggle={() => toggleMetric(c.turnId, 'throttle')}
                       currentLapNumber={currentLapNumber}
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
                     />
-                    {c.rotationAtThrottlePct && (
-                      <MetricRow
-                        label="Rot% @ Gas" stat={c.rotationAtThrottlePct} unit="%" decimals={0}
-                        isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'rotation'}
-                        onToggle={() => toggleMetric(c.cornerNumber, 'rotation')}
-                        currentLapNumber={currentLapNumber}
-                        bestLapNumber={bestLapNumber}
-                        onSelectBaselineLap={onSelectBaselineLap}
-                      />
-                    )}
                     <MetricRow
                       label="Entry" stat={c.entrySpeedKmh} unit=" km/h" decimals={0}
-                      isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'entry'}
-                      onToggle={() => toggleMetric(c.cornerNumber, 'entry')}
+                      isExpanded={expandedMetric?.turnId === c.turnId && expandedMetric.metric === 'entry'}
+                      onToggle={() => toggleMetric(c.turnId, 'entry')}
                       currentLapNumber={currentLapNumber}
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
                     />
                     <MetricRow
                       label="Apex" stat={c.apexSpeedKmh} unit=" km/h" decimals={0}
-                      isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'apex'}
-                      onToggle={() => toggleMetric(c.cornerNumber, 'apex')}
+                      isExpanded={expandedMetric?.turnId === c.turnId && expandedMetric.metric === 'apex'}
+                      onToggle={() => toggleMetric(c.turnId, 'apex')}
                       currentLapNumber={currentLapNumber}
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
                     />
                     <MetricRow
                       label="Exit" stat={c.exitSpeedKmh} unit=" km/h" decimals={0}
-                      isExpanded={expandedMetric?.cornerNumber === c.cornerNumber && expandedMetric.metric === 'exit'}
-                      onToggle={() => toggleMetric(c.cornerNumber, 'exit')}
+                      isExpanded={expandedMetric?.turnId === c.turnId && expandedMetric.metric === 'exit'}
+                      onToggle={() => toggleMetric(c.turnId, 'exit')}
                       currentLapNumber={currentLapNumber}
                       bestLapNumber={bestLapNumber}
                       onSelectBaselineLap={onSelectBaselineLap}
