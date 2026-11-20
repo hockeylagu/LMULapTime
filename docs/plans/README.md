@@ -3,17 +3,23 @@
 Reviewed 2026-10-25 against source, Git and existing observations; no new real-game acceptance was run.
 Current implementation belongs in [CODE_MAP](../CODE_MAP.md), not in completed delivery plans.
 
-## Corner technique metrics
+## Corner analysis and trends
 
-The old corner-map design is superseded by the turn sequences (each class's map per layout). Its unmerged local
-branch `corner-map` (`eeed3fe1`, not pushed; worktree removed 2026-11-19) is kept only to port its per-corner technique
-catalogue (`shared/types/cornerTechnique.ts` there): brake shape, gears, throttle ramp and lifts, coasting, steering
-corrections, ABS/TC time per corner, and each metric's "same" band and noise-checked useful difference. Its design
-doc (`docs/plans/CORNER_COMPARISON_REWORK.md` on that branch, §9 validation, §11 coaching) holds the rule to keep: a
-computed metric ships only once its lap-to-lap noise sits below the difference worth telling the driver; one that
-cannot is left out with a reason, never shown as a guess. Port onto the sequence windows, on replay laps at full
-rate, with ISO 8855 signs (the branch predates them). Preserve the separate `debrief-first` worktree; its overlap has
-not been assessed here.
+Delivered 2026-11-20: the corner analysis engine (`shared/domain/cornerAnalysis/`: habits against the class best,
+mistakes against the driver's own usual), the debrief's "Watch next session", and the track page's corner trends
+with each corner's habit history. Rules, thresholds and their validation sit in the module comments; ownership in
+[CODE_MAP](../CODE_MAP.md). The old `corner-map` branch's technique cues were scored and only coasting kept; the
+branch is deleted. Open:
+
+- **Ways in to corner trends:** "History here" on the corner card and on the Consistency panel's sequence rows,
+  opening the track page on that corner.
+- **Focus from last time:** at the top of the debrief, last session's first habit and what became of it ("T3, 0.14 s
+  better, still your first"); a habit leaving the top three is a corrected one.
+- **Corner trends speed:** the habit history runs the engine for every session (Le Mans GT3 57 → about 270 ms);
+  first try not reading the passes of older sessions that are not analysed.
+- **Rule ideas (driver, 2026-11-20), each needing a fresh blind held-out set:** habits against the quickest driver in
+  the driver's own car with the class best as the target gap; a gearing check (speed per gear) before gear advice.
+- **Road use** (where the car sits between the white lines): left out until clean road-edge data covers the layouts.
 
 ## Live dashboard and learning
 
@@ -167,8 +173,6 @@ items and the open code-review findings.
 - [Live wetness projection](proposed/LIVE_WETNESS_PROJECTION.md): when the track will reach the next wetness step,
   wetting from rain intensity and drying after it stops, timed from the steps; tyre crossover timing first, then
   pace and fuel. Starts by recording the rain unrounded.
-- [Debrief corner tracking](proposed/DEBRIEF_CORNER_TRACKING.md): each debrief corner against the driver's own
-  previous session at the layout (corner time and cues), to see whether a habit is being corrected.
 - [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
   before revisiting prepared views or grouped columns. One pattern for a car over time: the native lap cache in the
   replay's codec, race positions and poses derived from the laps on demand, any stored derived result disposable.
