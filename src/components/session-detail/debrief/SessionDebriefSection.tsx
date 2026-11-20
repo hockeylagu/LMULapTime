@@ -1,20 +1,23 @@
 import { useState } from 'react';
 import { ChevronDown, ClipboardList } from 'lucide-react';
 import type { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import { resolveVehicle } from '../../../../shared/domain/vehicleMapping.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { SessionDebriefCard } from './SessionDebriefCard.js';
 import { SessionStrategyCard } from './SessionStrategyCard.js';
+import { WatchNextSessionCard } from './WatchNextSessionCard.js';
 
 /**
- * The session's debrief in one collapsed section: opened, the strategy reads at once (the player's own race, from
- * their telemetry recording) and where the time goes waits for its own click (it reads every car's replay).
+ * The player's debrief in one collapsed section, read when opened: what to watch next session (the corner analysis of
+ * the replay's passes) and, for a race, the strategy (from their telemetry recording).
  */
 export function SessionDebriefSection({ session, selectedDriver }: { session: DetailedSession; selectedDriver: DriverData }) {
   const [open, setOpen] = useState(false);
-  const strategy = session.sessionType === 'Race' && selectedDriver.driverOrdinal === session.playerDriver?.driverOrdinal;
-  const timeLoss = Boolean(session.matchingReplayFile);
-  if (!strategy && !timeLoss) return null;
-  const parts = [strategy && 'strategy', timeLoss && 'where the time goes'].filter(Boolean).join(' · ');
+  const player = selectedDriver.driverOrdinal === session.playerDriver?.driverOrdinal;
+  const strategy = player && session.sessionType === 'Race';
+  const watch = player && Boolean(session.matchingReplayFile);
+  if (!strategy && !watch) return null;
+  const parts = [watch && 'watch next session', strategy && 'strategy'].filter(Boolean).join(' · ');
+  const ownCar = resolveVehicle(selectedDriver.carType)?.model ?? selectedDriver.carType;
   return (
     <div className="bg-lmu-card rounded-2xl border border-lmu-border" data-testid="session-debrief-section">
       <button
@@ -32,8 +35,8 @@ export function SessionDebriefSection({ session, selectedDriver }: { session: De
       </button>
       {open && (
         <div className="px-5 pb-5 space-y-4">
+          {watch && <div className="border-t border-lmu-border/60 pt-4"><WatchNextSessionCard session={session} driverName={selectedDriver.name} ownCar={ownCar} /></div>}
           {strategy && <div className="border-t border-lmu-border/60 pt-4"><SessionStrategyCard sessionId={session.id} /></div>}
-          {timeLoss && <div className="border-t border-lmu-border/60 pt-4"><SessionDebriefCard session={session} selectedDriver={selectedDriver} /></div>}
         </div>
       )}
     </div>
