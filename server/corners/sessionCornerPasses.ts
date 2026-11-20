@@ -88,7 +88,7 @@ function sequenceTurns(plan: PlacedLayout, carClass: string, map: StoredSequence
     const exits = !exitText ? '' : exitText === turns ? ', flat on the exit' : `, then ${exitText} flat on the exit`;
     return [{
       id: segment.id, label: `SQ${index + 1}`, apexM: sequence.minM, startM: segment.startM, endM: segment.endM,
-      title: `${turns}${exits}: from where the speed drops for it to where it drops for the next corner`,
+      title: `${turns}${exits}: from where the speed drops for it to where it drops for the next corner`, name: `${turns}${exits}`,
       sequence: { carClass, turnIds: sequence.turnIds },
     }];
   });
@@ -96,8 +96,8 @@ function sequenceTurns(plan: PlacedLayout, carClass: string, map: StoredSequence
 
 /** The layout's official turns, labelled. */
 const officialTurns = (layout: PlacedLayout): CornerTurn[] => layout.turns.map(turn => {
-  const { label, title } = describeTurn(turn);
-  return { id: turn.id, label, title, apexM: turn.apexM, startM: turn.startM, endM: turn.endM };
+  const { label, title, name } = describeTurn(turn);
+  return { id: turn.id, label, title, name, apexM: turn.apexM, startM: turn.startM, endM: turn.endM };
 });
 
 /**
@@ -109,14 +109,23 @@ export function layoutCorners(
   loadTrack?: TrackLoader
 ): LayoutCorners | null {
   const layout = placeLayout(layoutKey, loadTrack);
-  if (!layout) return null;
-  const map = carClass ? getSequenceMap(layoutKey, carClass) : null;
-  const current = map?.mapKey.startsWith(`${mapRuleHash(layout.turnsKey)}:`) ? map : null;
+  return layout ? placedLayoutCorners(layout, carClass, getSequenceMap).corners : null;
+}
+
+/** layoutCorners on a placed layout, with the class's map it read (null when the official turns stand in). */
+export function placedLayoutCorners(
+  layout: PlacedLayout, carClass: string, getSequenceMap: (layoutKey: string, carClass: string) => StoredSequenceMap | null
+): { corners: LayoutCorners; map: StoredSequenceMap | null } {
+  const stored = carClass ? getSequenceMap(layout.layoutKey, carClass) : null;
+  const map = stored?.mapKey.startsWith(`${mapRuleHash(layout.turnsKey)}:`) ? stored : null;
   return {
-    kind: current ? 'sequences' : 'turns',
-    startStationM: layout.startStationM,
-    lengthM: layout.lengthM,
-    corners: current ? sequenceTurns(layout, carClass, current) : officialTurns(layout),
+    map,
+    corners: {
+      kind: map ? 'sequences' : 'turns',
+      startStationM: layout.startStationM,
+      lengthM: layout.lengthM,
+      corners: map ? sequenceTurns(layout, carClass, map) : officialTurns(layout),
+    },
   };
 }
 

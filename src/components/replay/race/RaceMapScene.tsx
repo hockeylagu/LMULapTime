@@ -4,7 +4,7 @@ import { RACE_POSE_CHANNEL_COUNT, racePitSlots, sampleRacePose, type RacePoseWin
 import { useTrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';
 import { BASE_ZOOM, useGpsMapPanZoom } from '../map/useGpsMapPanZoom.js';
 import { hudClearView, type MapView } from '../map/hudClearView.js';
-import { activeTrackBounds } from '../map/display/mapLayers.js';
+import { activeTrackBounds, cornerLayerKind } from '../map/display/mapLayers.js';
 import { useMapLayers } from '../map/display/useMapLayers.js';
 import { GpsMapBackground } from '../map/display/GpsMapBackground.js';
 import { GpsMapControls } from '../map/display/GpsMapControls.js';
@@ -13,7 +13,7 @@ import { GpsBrakeMarkers } from '../map/display/GpsBrakeMarkers.js';
 import { projectSectorMarkers, useTrackMarkerPlacement } from '../map/display/useTrackMarkerPlacement.js';
 import { buildRibbonIndex } from '../map/scene/cornerRibbonClearance.js';
 import { GpsSectorMarkers } from '../map/scene/GpsSectorMarkers.js';
-import { GpsOfficialTurns } from '../map/scene/GpsOfficialTurns.js';
+import { GpsClassCorners, GpsOfficialTurns } from '../map/scene/GpsCornerLayer.js';
 import { GpsStartFinishLine } from '../map/scene/GpsStartFinishLine.js';
 import { FOCUS_RING, SURFACE_FOCUS_RING } from '../../common/buttonStyles.js';
 import { RaceCarMarkers, type RaceCarPosition } from './RaceCarMarkers.js';
@@ -151,6 +151,10 @@ export const RaceMapScene: React.FC<Props> = ({ sessionId, overview, index, cloc
     hudElements(area).forEach(element => observer.observe(element));
     return () => observer.disconnect();
   }, [viewportRef, trackBox, followSlot]);
+  // The Corners layer's sequences are the followed car's class map (the player's car before one is followed).
+  const cornerClass = (followSlot === null ? undefined : cars.get(followSlot))?.carClass
+    ?? overview.cars.find(car => car.isPlayer)?.carClass ?? '';
+  const cornerKind = cornerLayerKind(layers, { sequences: svg.center.length > 0 && cornerClass !== '', official: svg.center.length > 0 });
   const unitsPerMeter = bounds ? (VIEWBOX_SIZE - 2 * PADDING) / Math.max(bounds.spanX, bounds.spanZ, 1) : 0;
   // Only a new request moves the map (the camera's setter changes every render).
   const trackFollowed = useEffectEvent(() => camera.setFollowCar(true));
@@ -174,7 +178,8 @@ export const RaceMapScene: React.FC<Props> = ({ sessionId, overview, index, cloc
                 left={svg.left} right={svg.right} center={svg.center} pathD="" />
               {furniture.placedBrakes.length ? <GpsBrakeMarkers placement={furniture.placedBrakes} markerScale={markerScale}
                 startFinishGate={furniture.placedStart?.gate} timingGates={furniture.sectorGates} obstacles={furniture.markerObstacles} /> : null}
-              {layers.officialTurns && <GpsOfficialTurns geometry={trackGeometry} centerSvg={svg.center} markerScale={markerScale} />}
+              {cornerKind === 'official' && <GpsOfficialTurns geometry={trackGeometry} centerSvg={svg.center} markerScale={markerScale} />}
+              {cornerKind === 'sequences' && <GpsClassCorners geometry={trackGeometry} centerSvg={svg.center} carClass={cornerClass} markerScale={markerScale} />}
               {layers.sectors && <GpsSectorMarkers markers={furniture.placedSectors} markerScale={markerScale} obstacles={furniture.markerObstacles} />}
               {layers.startFinish && <GpsStartFinishLine placement={furniture.placedStart} svgPoints={NO_POINTS} zoomLevel={zoomLevel}
                 markerScale={markerScale} gateLeftSvg={gates?.gateLeftSvg} gateRightSvg={gates?.gateRightSvg} />}
@@ -198,7 +203,7 @@ export const RaceMapScene: React.FC<Props> = ({ sessionId, overview, index, cloc
         {bounds && (
           <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={trackGeometry} bounds={bounds}
             left={svg.left} right={svg.right} center={svg.center} trajectory={[]} orientation="horizontal"
-            hasSectors={sectorMarkers.length > 0} shortcuts="race" fullscreen={false} onToggleView={onToggleView} cornerCard />
+            hasSectors={sectorMarkers.length > 0} hasTurns={cornerClass !== ''} shortcuts="race" fullscreen={false} onToggleView={onToggleView} cornerCard />
         )}
         <RaceCornerCard sessionId={sessionId} clock={clock} followSlot={followSlot} active className="left-3 top-3" />
       </div>

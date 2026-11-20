@@ -6,6 +6,7 @@ export const DEFAULT_MAP_LAYERS = {
   brakeDistance: true, brakeAds: true, brakeDigi: true,
   pit: false, centerline: false, runoff: false, otherRoad: false,
   apron: false, gravel: false, grass: false,
+  // `turns` shows the Corners layer; `officialTurns` switches it from the class's sequences to the official turns.
   sectors: true, turns: true, officialTurns: false, startFinish: true,
 };
 export type MapLayers = typeof DEFAULT_MAP_LAYERS;
@@ -20,11 +21,24 @@ export const RUNOFF_LEGEND = [
   { key: 'grass', label: 'Grass', color: MAP_COLORS.grassSurface },
   { key: 'otherRoad', label: 'Other roads', color: MAP_COLORS.outerRoadSurface },
 ] as const satisfies ReadonlyArray<{ key: typeof RUNOFF_GROUP[number]; label: string; color: string }>;
-export const MAP_LAYER_LABELS: Record<Exclude<MapLayerKey, typeof RUNOFF_GROUP[number] | 'brakeDistance' | 'brakeAds' | 'brakeDigi'> | 'runoff', string> = {
+export const MAP_LAYER_LABELS: Record<Exclude<MapLayerKey, typeof RUNOFF_GROUP[number] | 'brakeDistance' | 'brakeAds' | 'brakeDigi' | 'officialTurns'> | 'runoff', string> = {
   road: 'Active track', kerb: 'Kerbs', runoff: 'Runoff and other roads', pit: 'Pit lane',
-  startFinish: 'Start / finish line', sectors: 'Sector markers', turns: 'Turns', officialTurns: 'Official turns', centerline: 'Centerline guide',
+  startFinish: 'Start / finish line', sectors: 'Sector markers', turns: 'Corners', centerline: 'Centerline guide',
   brakeMarkers: 'Braking markers',
 };
+
+export type CornerLayerKind = 'sequences' | 'official';
+
+/**
+ * What the Corners layer draws (driver, 2026-11-19: one layer, never both at once): the class's sequences, or the
+ * official turns when switched to them; the other kind when the chosen one is unavailable, nothing when neither is.
+ */
+export function cornerLayerKind(layers: MapLayers, available: { sequences: boolean; official: boolean }): CornerLayerKind | null {
+  if (!layers.turns) return null;
+  if (layers.officialTurns && available.official) return 'official';
+  if (available.sequences) return 'sequences';
+  return available.official ? 'official' : null;
+}
 export const MAP_LAYERS_STORAGE_KEY = 'lmu-map-layers-v1';
 
 export function readMapLayers(): MapLayers {

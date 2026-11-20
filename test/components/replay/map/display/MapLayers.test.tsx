@@ -95,7 +95,7 @@ describe('GPS map display layers', () => {
   it('toggles sector, turn and start markers independently and remembers map preferences', () => {
     const props = { points: [...mockPoints, { ...mockPoints[0], timeSec: 1.5 }], bounds: mockBounds, currentIndex: 0,
       trackGeometry: { ...geometry, ...mapDisplay() }, sectors: { s1Frame: 1, s2Frame: 2 },
-      corners: [{ cornerNumber: 1, minDistM: 0 }], onSelectIndex: vi.fn() };
+      corners: [{ cornerNumber: 1, minDistM: 0, entryDistM: 1 }], onSelectIndex: vi.fn() };
     const first = render(<GpsTrackMapScene {...props} />);
     openLayers();
     expect(screen.getByTestId('map-sector-s1')).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe('GPS map display layers', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Sector markers' }));
     expect(screen.queryByTestId('map-sector-s1')).not.toBeInTheDocument();
     expect(screen.getByTestId('corner-flag-1')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Turns' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Corners' }));
     expect(screen.queryByTestId('corner-flag-1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Start / finish line' }));
     expect(screen.queryByTestId('start-finish-line')).not.toBeInTheDocument();
@@ -122,12 +122,35 @@ describe('GPS map display layers', () => {
     expect(screen.getByTestId('start-finish-line')).toBeInTheDocument();
   });
 
+  it('draws one kind of corner at a time and remembers the switch', () => {
+    const props = { points: mockPoints, bounds: mockBounds, currentIndex: 0, trackGeometry: { ...geometry, ...mapDisplay() },
+      corners: [{ cornerNumber: 1, label: 'SQ1', minDistM: 0, entryDistM: 1 }], onSelectIndex: vi.fn() };
+    const first = render(<GpsTrackMapScene {...props} />);
+    // Sequences by default: the badge and a tick where the sequence starts; no official turns.
+    expect(screen.getByTestId('corner-flag-1')).toBeInTheDocument();
+    expect(document.querySelectorAll('[aria-label="Corner starts"] [data-testid="corner-boundary"]')).toHaveLength(1);
+    expect(document.querySelector('[aria-label="Official turns"]')).toBeNull();
+    openLayers();
+    expect(screen.getByRole('radio', { name: 'Sequences' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Official turns' }));
+    expect(screen.queryByTestId('corner-flag-1')).toBeNull();
+    expect(document.querySelector('[aria-label="Corner starts"]')).toBeNull();
+    first.unmount();
+    render(<GpsTrackMapScene {...props} />);
+    expect(screen.queryByTestId('corner-flag-1')).toBeNull();
+    openLayers();
+    expect(screen.getByRole('radio', { name: 'Official turns' })).toBeChecked();
+  });
+
   it('disables missing sector and turn data without inventing map markers', () => {
     render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
       trackGeometry={{ ...geometry, ...mapDisplay() }} sectors={{ s1Frame: NaN, s2Frame: 100 }} />);
     openLayers();
     expect(screen.getByRole('checkbox', { name: 'Sector markers' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'Turns' })).toBeDisabled();
+    // The official turns still come from the centre line: the Corners layer stays, without sequences.
+    expect(screen.getByRole('checkbox', { name: 'Corners' })).toBeEnabled();
+    expect(screen.getByRole('radio', { name: 'Sequences' })).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Official turns' })).toBeChecked();
     expect(screen.queryByTestId('map-sector-s1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('map-sector-s2')).not.toBeInTheDocument();
   });
@@ -197,8 +220,7 @@ describe('GPS map display layers', () => {
       'Pit lane',
       'Start / finish line',
       'Sector markers',
-      'Turns',
-      'Official turns',
+      'Corners',
       'Centerline guide',
       'Braking markers',
     ]);

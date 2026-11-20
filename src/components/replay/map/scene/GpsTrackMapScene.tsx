@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { computeDispersedCornerMarkers, computePedalMarkerPoints, computeBaselineDeltaByIdx } from '../replayMapUtils.js';
+import { computeCornerStartTicks, computeDispersedCornerMarkers, computePedalMarkerPoints, computeBaselineDeltaByIdx } from '../replayMapUtils.js';
 import { HeatmapLegendBar } from '../HeatmapLegendBar.js';
 import { GpsSceneHudOverlay } from './GpsSceneHudOverlay.js';
 import { GpsSceneMarkers } from './GpsSceneMarkers.js';
@@ -11,7 +11,8 @@ import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
 import { buildRibbonIndex } from './cornerRibbonClearance.js';
 import { GpsSectorMarkers } from './GpsSectorMarkers.js';
-import { GpsOfficialTurns } from './GpsOfficialTurns.js';
+import { GpsCornerMarks, GpsOfficialTurns } from './GpsCornerLayer.js';
+import { cornerLayerKind } from '../display/mapLayers.js';
 import { GpsMapBackground } from '../display/GpsMapBackground.js';
 import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
 import { useTrackMarkerPlacement } from '../display/useTrackMarkerPlacement.js';
@@ -125,7 +126,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     layers, brakeMarkers: effectiveGeometry?.brakeMarkers, bounds: effectiveBounds, viewBoxSize: VIEWBOX_SIZE, padding: PADDING,
     markerScale, zoomLevel, ribbon: ribbonIndex, svgPoints, gateLeftSvg, gateRightSvg, sectorMarkers,
   });
-  const visibleCornerMarkers = layers.turns ? cornerMarkers : NO_CORNER_MARKERS;
+  const cornerStartTicks = useMemo(() => computeCornerStartTicks(corners, primaryDists, svgPoints), [corners, primaryDists, svgPoints]);
+  const cornerKind = cornerLayerKind(layers, { sequences: cornerMarkers.length > 0, official: centerlineSvgPoints.length > 0 });
+  const visibleCornerMarkers = cornerKind === 'sequences' ? cornerMarkers : NO_CORNER_MARKERS;
   if (points.length === 0) {
     return <div className={`flex items-center justify-center h-64 text-lmu-muted text-sm ${className}`}>No GPS trajectory data available for this replay recording.</div>;
   }
@@ -174,7 +177,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
             viewBox={cullViewBox}
           />
 
-          {layers.officialTurns && <GpsOfficialTurns geometry={effectiveGeometry} centerSvg={centerlineSvgPoints} markerScale={markerScale} />}
+          {cornerKind === 'official' && <GpsOfficialTurns geometry={effectiveGeometry} centerSvg={centerlineSvgPoints} markerScale={markerScale} />}
+          {cornerKind === 'sequences' && <GpsCornerMarks marks={[]} ticks={cornerStartTicks} markerScale={markerScale} label="Corner starts" />}
           {layers.sectors && <GpsSectorMarkers markers={placedSectors} markerScale={markerScale} obstacles={markerObstacles} />}
           {layers.startFinish && <GpsStartFinishLine placement={placedStart}
             svgPoints={svgPoints} zoomLevel={zoomLevel} markerScale={markerScale}

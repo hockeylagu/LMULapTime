@@ -3,7 +3,7 @@ import { Layers } from 'lucide-react';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../../common/dropdown/dropdownStyles.js';
-import { DEFAULT_MAP_LAYERS, MAP_LAYER_LABELS, RUNOFF_GROUP, RUNOFF_LEGEND, type MapLayers, type MapLayerKey } from './mapLayers.js';
+import { DEFAULT_MAP_LAYERS, MAP_LAYER_LABELS, RUNOFF_GROUP, RUNOFF_LEGEND, cornerLayerKind, type MapLayers, type MapLayerKey } from './mapLayers.js';
 import { EMPTY_ARRAY } from '../../../../utils/emptyDefaults.js';
 
 export interface PedalPointsControl {
@@ -30,6 +30,10 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const id = useId();
+  // The Corners layer: the sequences (`turns`) or the official turns, whichever this map has.
+  const cornerKinds = { sequences: available.turns !== false, official: available.officialTurns !== false };
+  const cornerKind = cornerLayerKind({ ...layers, turns: true }, cornerKinds);
+  const unavailable = (key: MapLayerKey) => (key === 'turns' ? cornerKind === null : available[key] === false);
   useEffect(() => {
     if (!open) return;
     panel.current?.querySelector<HTMLInputElement>('input:not(:disabled)')?.focus();
@@ -80,13 +84,24 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
       {(Object.keys(MAP_LAYER_LABELS) as Array<keyof typeof MAP_LAYER_LABELS>).map(key => (
         <React.Fragment key={key}>
           <label
-            className={`flex gap-2 items-center text-xs select-none ${key === 'startFinish' || key === 'brakeMarkers' ? 'mt-2 border-t border-lmu-border pt-3 pb-1.5' : 'py-1.5'} ${available[key] === false ? 'text-lmu-faint cursor-not-allowed' : 'text-lmu-text-soft cursor-pointer hover:text-lmu-text'}`}>
-            <input type="checkbox" checked={available[key] !== false && layers[key]} disabled={available[key] === false}
+            className={`flex gap-2 items-center text-xs select-none ${key === 'startFinish' || key === 'brakeMarkers' ? 'mt-2 border-t border-lmu-border pt-3 pb-1.5' : 'py-1.5'} ${unavailable(key) ? 'text-lmu-faint cursor-not-allowed' : 'text-lmu-text-soft cursor-pointer hover:text-lmu-text'}`}>
+            <input type="checkbox" checked={!unavailable(key) && layers[key]} disabled={unavailable(key)}
               onChange={e => onChange(key === 'runoff'
                 ? { ...layers, ...Object.fromEntries(RUNOFF_GROUP.map(layer => [layer, e.target.checked])) }
                 : { ...layers, [key]: e.target.checked })}
               className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />{MAP_LAYER_LABELS[key]}
           </label>
+          {key === 'turns' && layers.turns && cornerKind && (
+            <div className="pl-5 py-1 flex flex-col gap-1 border-l border-lmu-border ml-2 mb-1" role="radiogroup" aria-label="Corners shown">
+              {([['sequences', 'Sequences'], ['official', 'Official turns']] as const).map(([kind, label]) => (
+                <label key={kind} className={`flex gap-2 items-center text-[11px] select-none ${cornerKinds[kind] ? 'text-lmu-text-soft cursor-pointer hover:text-lmu-text' : 'text-lmu-faint cursor-not-allowed'}`}>
+                  <input type="radio" name={`${id}-corners`} checked={cornerKind === kind} disabled={!cornerKinds[kind]}
+                    onChange={() => onChange({ ...layers, officialTurns: kind === 'official' })}
+                    className={`accent-lmu-accent w-3 h-3 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />
+                  {label}
+                </label>))}
+            </div>
+          )}
           {key === 'turns' && pedalPoints && <label
             className={`flex gap-2 items-center py-1.5 text-xs select-none ${pedalPoints.available ? 'text-lmu-text-soft cursor-pointer hover:text-lmu-text' : 'text-lmu-faint cursor-not-allowed'}`}>
             <input type="checkbox" checked={pedalPoints.available && pedalPoints.visible} disabled={!pedalPoints.available}

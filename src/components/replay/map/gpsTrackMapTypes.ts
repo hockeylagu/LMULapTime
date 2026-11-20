@@ -6,6 +6,8 @@ export interface GpsTrackMapCorner {
   cornerNumber: number;
   label?: string;
   minDistM: number;
+  /** Where the corner's window starts on the lap (a sequence: where the speed starts to drop for it). */
+  entryDistM?: number;
 }
 
 export interface GpsTrackMapPedalMarker {

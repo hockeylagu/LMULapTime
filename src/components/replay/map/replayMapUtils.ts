@@ -487,6 +487,26 @@ function distanceToPolyline(
 }
 
 /**
+ * Where each corner's window starts on the primary lap's line, with the line's normal there: the Corners layer's
+ * start ticks for the lap's sequences. None at the start of the lap.
+ */
+export function computeCornerStartTicks(
+  corners: Array<{ cornerNumber: number; entryDistM?: number }> | undefined,
+  primaryDists: number[],
+  svgPoints: ProjectedPoint[],
+): Array<{ id: number; at: { sx: number; sy: number }; normal: { sx: number; sy: number } }> {
+  if (!corners?.length || !svgPoints.length) return [];
+  return corners.flatMap(corner => {
+    if (corner.entryDistM === undefined || corner.entryDistM <= 0) return [];
+    const index = Math.min(findIndexAtDistance(primaryDists, corner.entryDistM), svgPoints.length - 1);
+    const prev = svgPoints[Math.max(0, index - 2)], next = svgPoints[Math.min(svgPoints.length - 1, index + 2)];
+    const dx = next.sx - prev.sx, dy = next.sy - prev.sy, length = Math.hypot(dx, dy);
+    if (!length) return [];
+    return [{ id: corner.cornerNumber, at: { sx: svgPoints[index].sx, sy: svgPoints[index].sy }, normal: { sx: -dy / length, sy: dx / length } }];
+  });
+}
+
+/**
  * Calculates corner flag positions on the 2D map with trajectory clearance checking
  * so flags are never placed on top of either the primary racing line or the baseline racing line.
  * Corner apex distances are in the primary lap's frame (see computeLapSegmentComparisons), so
