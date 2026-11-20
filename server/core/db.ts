@@ -66,7 +66,8 @@ import {
   listCornerTrendPasses, listCornerTrendSessions, type CornerTrendPassRow, type CornerTrendScope, type CornerTrendSessionRow,
 } from './replay/dbCornerTrendStore.js';
 import {
-  getAnalysisSession, listAnalysisPasses, listAnalysisSessions, type AnalysisPassRow, type AnalysisSessionRow,
+  getAnalysisSession, listAnalysisSessions, listPlayerAnalysisPasses, listReferenceAnalysisPasses,
+  type AnalysisPassRow, type AnalysisPassScope, type AnalysisSessionRow,
 } from './replay/dbCornerAnalysisStore.js';
 import type { SequenceMapSummary } from '../../shared/types/corners/sequenceMaps.js';
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
@@ -398,8 +399,12 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return listAnalysisSessions(this.db, layoutKey, carClass);
   }
 
-  public listAnalysisPasses(playerSessionIds: readonly string[], layoutKey: string, carClass: string, buildPrefix: string): AnalysisPassRow[] {
-    return listAnalysisPasses(this.db, playerSessionIds, layoutKey, carClass, buildPrefix);
+  public listPlayerAnalysisPasses(scope: AnalysisPassScope): AnalysisPassRow[] {
+    return listPlayerAnalysisPasses(this.db, scope);
+  }
+
+  public listReferenceAnalysisPasses(scope: AnalysisPassScope, minLaps: number): AnalysisPassRow[] {
+    return listReferenceAnalysisPasses(this.db, scope, minLaps);
   }
 
   public listCornerTrendPasses(scope: CornerTrendScope): CornerTrendPassRow[] {

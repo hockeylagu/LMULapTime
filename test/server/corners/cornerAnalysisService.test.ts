@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { layoutPassKey, placeLayout } from '../../../server/corners/cornerPassService.js';
 import { readCornerHabitTrends, readSessionCornerAnalysis, type CornerAnalysisReader } from '../../../server/corners/cornerAnalysisService.js';
-import { getAnalysisSession, listAnalysisPasses, listAnalysisSessions } from '../../../server/core/replay/dbCornerAnalysisStore.js';
+import {
+  getAnalysisSession, listAnalysisSessions, listPlayerAnalysisPasses, listReferenceAnalysisPasses, REFERENCE_OVERALL,
+} from '../../../server/core/replay/dbCornerAnalysisStore.js';
 import { memoryDatabase } from '../../helpers/memoryDatabase.js';
 
 // A square of 100 m sides with its start line 50 m along the centre line.
@@ -18,14 +20,14 @@ const TURN = layout.turns[0].id;
 const KEY = `${layoutPassKey(layout)}|sig`;
 
 /** Sessions at the square, each car with counted laps 2..n through the first turn, braking at `brakeM`. */
-function fixture(): { db: DatabaseType; add: (session: string, ordinal: number, name: string, player: boolean, brakeM: number, toApexMs: number[]) => void } {
+function fixture(): { db: DatabaseType; add: (session: string, ordinal: number, name: string, player: boolean, brakeM: number, toApexMs: number[], lapTime?: number, vehicle?: number) => void } {
   const db = memoryDatabase().getDb();
-  db.prepare("INSERT INTO vehicles (vehicle_id, car_type, car_class) VALUES (1, 'Car A', 'GT3')").run();
+  db.prepare("INSERT INTO vehicles (vehicle_id, car_type, car_class) VALUES (1, 'Car A', 'GT3'), (2, 'Car B', 'GT3')").run();
   const names = new Map<string, number>();
   const sessions = new Set<string>();
   return {
     db,
-    add(session, ordinal, name, player, brakeM, toApexMs) {
+    add(session, ordinal, name, player, brakeM, toApexMs, lapTime, vehicle = 1) {
       const file = `${session}.Vcr`;
       if (!sessions.has(session)) {
         sessions.add(session);
@@ -40,11 +42,11 @@ function fixture(): { db: DatabaseType; add: (session: string, ordinal: number, 
         db.prepare('INSERT INTO drivers (driver_id, name, normalized_name) VALUES (?, ?, ?)').run(names.size, name, name.toLowerCase());
       }
       db.prepare(`INSERT INTO session_drivers (session_id, driver_ordinal, driver_id, vehicle_id, is_player, is_human, driver_class)
-        VALUES (?, ?, ?, 1, ?, 1, 'GT3')`).run(session, ordinal, names.get(name), player ? 1 : 0);
+        VALUES (?, ?, ?, ?, ?, 1, 'GT3')`).run(session, ordinal, names.get(name), vehicle, player ? 1 : 0);
       db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(file, name, ordinal + 10);
       toApexMs.forEach((ms, index) => {
-        db.prepare(`INSERT INTO session_laps (session_id, driver_ordinal, lap_ordinal, lap_number, is_valid, is_pit_stop, is_out_lap, condition_group)
-          VALUES (?, ?, ?, ?, 1, 0, 0, 'dry')`).run(session, ordinal, index, index + 2);
+        db.prepare(`INSERT INTO session_laps (session_id, driver_ordinal, lap_ordinal, lap_number, lap_time, is_valid, is_pit_stop, is_out_lap, condition_group)
+          VALUES (?, ?, ?, ?, ?, 1, 0, 0, 'dry')`).run(session, ordinal, index, index + 2, lapTime ?? null);
         db.prepare(`INSERT INTO replay_corner_passes (filename, driver_slot, lap_number, segment, entry_ms, min_speed_after_ms, duration_ms,
           entry_speed_dkmh, min_speed_dkmh, exit_speed_dkmh, min_speed_dm, brake_dm, min_speed_gear, peak_brake_pm, brake_ms,
           part_throttle_ms, tc_ms, abs_ms) VALUES (?, ?, ?, ?, 0, ?, ?, 1500, 800, 1200, 1000, ?, 3, 900, 1000, 500, 0, 0)`)
@@ -58,7 +60,8 @@ const reader = (db: DatabaseType): CornerAnalysisReader => ({
   getAnalysisSession: sessionId => getAnalysisSession(db, sessionId),
   listAnalysisSessions: (layoutKey, carClass) => listAnalysisSessions(db, layoutKey, carClass),
   getSequenceMap: () => null,
-  listAnalysisPasses: (sessionIds, layoutKey, carClass, prefix) => listAnalysisPasses(db, sessionIds, layoutKey, carClass, prefix),
+  listPlayerAnalysisPasses: scope => listPlayerAnalysisPasses(db, scope),
+  listReferenceAnalysisPasses: (scope, minLaps) => listReferenceAnalysisPasses(db, scope, minLaps),
 });
 
 describe('readSessionCornerAnalysis', () => {
@@ -101,5 +104,25 @@ describe('readSessionCornerAnalysis', () => {
   it('is null without the session or its counted passes', () => {
     const { db } = fixture();
     expect(readSessionCornerAnalysis(reader(db), 'missing', loadTrack)).toBeNull();
+  });
+});
+
+describe('listReferenceAnalysisPasses', () => {
+  it('reads the quickest drivers by usual lap time, the quickest in each car and everyone in the analysed sessions', () => {
+    const { db, add } = fixture();
+    add('s1', 0, 'Ann', true, 90, [2100, 2100], 100);
+    add('s1', 1, 'Slow', false, 100, [2000, 2000], 200);
+    // Other sessions: twelve drivers in car A, one in car B slower than all of them, one on a single lap.
+    for (let i = 0; i < 12; i++) add(`s${10 + i}`, 1, `A${i}`, false, 100, [2000, 2000, 2000], 90 + i);
+    add('s30', 1, 'B0', false, 100, [2000, 2000, 2000], 150, 2);
+    add('s31', 1, 'Once', false, 100, [2000], 50);
+    const names = (minLaps: number) => new Set(listReferenceAnalysisPasses(db, {
+      layoutKey: 'square', carClass: 'GT3', buildPrefix: layoutPassKey(layout), sessionIds: ['s1'],
+    }, minLaps).map(row => row.driverName));
+    const quickest = Array.from({ length: REFERENCE_OVERALL }, (_, i) => `A${i}`);
+    expect([...names(2)].toSorted()).toEqual(['B0', 'Slow', ...quickest].toSorted());
+    // A driver under the minimum laps has no usual and is never shortlisted; at a minimum of one lap, Once is.
+    expect(names(2).has('Once')).toBe(false);
+    expect(names(1).has('Once')).toBe(true);
   });
 });

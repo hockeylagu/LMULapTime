@@ -5,6 +5,7 @@ import { median } from '../../shared/domain/pitStops.js';
 import { SessionDatabase } from '../../server/core/db.js';
 import { readSessionCornerAnalysis } from '../../server/corners/cornerAnalysisService.js';
 import { layoutPassKey, placeLayout } from '../../server/corners/cornerPassService.js';
+import { minTrendPasses } from '../../server/corners/cornerTrends.js';
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 import { turnUsual, type TurnUsual } from '../../shared/domain/cornerAnalysis/turnUsual.js';
 
@@ -50,7 +51,8 @@ for (const sessionId of sessionIds) {
   // The noise: every driver's counted passes at the layout, per turn.
   const layout = placeLayout(analysis.layoutKey);
   if (!layout) continue;
-  const rows = db.listAnalysisPasses([sessionId], analysis.layoutKey, analysis.carClass, layoutPassKey(layout));
+  const scope = { layoutKey: analysis.layoutKey, carClass: analysis.carClass, buildPrefix: layoutPassKey(layout), sessionIds: [sessionId] };
+  const rows = [...db.listPlayerAnalysisPasses(scope), ...db.listReferenceAnalysisPasses(scope, minTrendPasses(layout.lengthM))];
   const groups = new Map<string, CornerPass[]>();
   for (const row of rows) {
     const key = `${row.sessionId}|${row.driverOrdinal}|${row.pass.segment}`;

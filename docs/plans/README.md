@@ -15,8 +15,6 @@ branch is deleted. Open:
   opening the track page on that corner.
 - **Focus from last time:** at the top of the debrief, last session's first habit and what became of it ("T3, 0.14 s
   better, still your first"); a habit leaving the top three is a corrected one.
-- **Corner trends speed:** the habit history runs the engine for every session (Le Mans GT3 57 → about 270 ms);
-  first try not reading the passes of older sessions that are not analysed.
 - **Rule ideas (driver, 2026-11-20), each needing a fresh blind held-out set:** habits against the quickest driver in
   the driver's own car with the class best as the target gap; a gearing check (speed per gear) before gear advice.
 - **Road use** (where the car sits between the white lines): left out until clean road-edge data covers the layouts.
