@@ -8,12 +8,18 @@ const service = vi.hoisted(() => ({
 vi.mock('../../../server/corners/sequenceMapService.js', () => service);
 const corners = vi.hoisted(() => ({ layoutCorners: vi.fn() }));
 vi.mock('../../../server/corners/sessionCornerPasses.js', () => corners);
+const trends = vi.hoisted(() => ({ readCornerTrends: vi.fn() }));
+vi.mock('../../../server/corners/cornerTrends.js', () => trends);
+const analysis = vi.hoisted(() => ({ readSessionCornerAnalysis: vi.fn(), readCornerHabitTrends: vi.fn() }));
+vi.mock('../../../server/corners/cornerAnalysisService.js', () => analysis);
 
 import { createCornerSequenceRouter } from '../../../server/routes/cornerSequenceRoutes.js';
 import type { ServerContext } from '../../../server/core/serverContext.js';
 
-function app(scanRunning = false) {
+function app(scanRunning = false, summariesReady = true) {
   const sessionDb = {
+    isSessionSummaryReady: () => summariesReady,
+    getSessionCatalogStats: () => ({ sessions: 3 }),
     listSequenceMaps: vi.fn(() => [{ layoutKey: 'spa_gp', carClass: 'GT3' }]),
     getSequenceMap: vi.fn((layoutKey: string) => (layoutKey === 'spa_gp' ? { layoutKey } : null)),
   };
@@ -63,6 +69,28 @@ describe('corner sequence routes', () => {
     expect(corners.layoutCorners).toHaveBeenCalledWith('spa_gp', 'GT3', expect.any(Function));
     expect((await request(app()).get('/api/corner-sequences/layout?layoutKey=nowhere&carClass=GT3')).status).toBe(404);
     expect((await request(app()).get('/api/corner-sequences/layout?carClass=GT3')).status).toBe(400);
+  });
+
+  it("serves a layout's corner trends, behind the summary readiness gate", async () => {
+    const body = { layoutKey: 'spa_gp', carClass: 'GT3', kind: 'turns', corners: [{ id: 1, habit: null }, { id: 2, habit: null }], sessions: { total: 0, noReplay: 0, waiting: 0, tooFewPasses: 0 } };
+    trends.readCornerTrends.mockImplementation((_db: unknown, layoutKey: string) => (layoutKey === 'spa_gp' ? body : null));
+    // Each corner's habit over the latest sessions, from the corner analysis.
+    analysis.readCornerHabitTrends.mockReturnValue(new Map([[2, { seen: 3 }]]));
+    expect((await request(app()).get('/api/corner-trends?layoutKey=spa_gp&carClass=GT3&carType=Car%20A')).body)
+      .toEqual({ ...body, corners: [{ id: 1, habit: null }, { id: 2, habit: { seen: 3 } }] });
+    expect(analysis.readCornerHabitTrends).toHaveBeenCalledWith(expect.anything(), 'spa_gp', 'GT3', 'car a');
+    expect(trends.readCornerTrends).toHaveBeenCalledWith(expect.anything(), 'spa_gp', 'GT3', 'Car A');
+    expect((await request(app()).get('/api/corner-trends?layoutKey=nowhere&carClass=GT3')).status).toBe(404);
+    expect((await request(app()).get('/api/corner-trends?layoutKey=spa_gp')).status).toBe(400);
+    expect((await request(app(false, false)).get('/api/corner-trends?layoutKey=spa_gp&carClass=GT3')).status).toBe(503);
+  });
+
+  it("serves a session's corner analysis, behind the summary readiness gate", async () => {
+    const body = { sessionId: 's1', layoutKey: 'spa_gp', carClass: 'GT3', driverOrdinal: 0, laps: 8, corners: [], habits: [], mistakes: [] };
+    analysis.readSessionCornerAnalysis.mockImplementation((_db: unknown, sessionId: string) => (sessionId === 's1' ? body : null));
+    expect((await request(app()).get('/api/session/s1/corner-analysis')).body).toEqual(body);
+    expect((await request(app()).get('/api/session/s2/corner-analysis')).status).toBe(404);
+    expect((await request(app(false, false)).get('/api/session/s1/corner-analysis')).status).toBe(503);
   });
 
   it('refuses a missing map, a bad request and a regenerate during a replay scan', async () => {

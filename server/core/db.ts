@@ -62,6 +62,12 @@ import {
   getSequenceMap, getSequenceMapFreshLaps, listSequenceCandidateLaps, listSequenceMaps, recordSequenceMapCheck, replaceSequenceMap,
   type MapLapRef, type StoredSequenceMap,
 } from './replay/dbSequenceMapStore.js';
+import {
+  listCornerTrendPasses, listCornerTrendSessions, type CornerTrendPassRow, type CornerTrendScope, type CornerTrendSessionRow,
+} from './replay/dbCornerTrendStore.js';
+import {
+  getAnalysisSession, listAnalysisPasses, listAnalysisSessions, type AnalysisPassRow, type AnalysisSessionRow,
+} from './replay/dbCornerAnalysisStore.js';
 import type { SequenceMapSummary } from '../../shared/types/corners/sequenceMaps.js';
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 import type { StoredReplayFileInfo } from './replay/replayStorageTypes.js';
@@ -378,6 +384,26 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
 
   public listSequenceCandidateLaps(filename: string): Array<{ slot: number; lapNumber: number; lapTimeSec: number; passes: number }> {
     return listSequenceCandidateLaps(this.db, filename);
+  }
+
+  public listCornerTrendSessions(scope: CornerTrendScope): CornerTrendSessionRow[] {
+    return listCornerTrendSessions(this.db, scope);
+  }
+
+  public getAnalysisSession(sessionId: string): AnalysisSessionRow | null {
+    return getAnalysisSession(this.db, sessionId);
+  }
+
+  public listAnalysisSessions(layoutKey: string, carClass: string): AnalysisSessionRow[] {
+    return listAnalysisSessions(this.db, layoutKey, carClass);
+  }
+
+  public listAnalysisPasses(playerSessionIds: readonly string[], layoutKey: string, carClass: string, buildPrefix: string): AnalysisPassRow[] {
+    return listAnalysisPasses(this.db, playerSessionIds, layoutKey, carClass, buildPrefix);
+  }
+
+  public listCornerTrendPasses(scope: CornerTrendScope): CornerTrendPassRow[] {
+    return listCornerTrendPasses(this.db, scope);
   }
 
   public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, trajectory: ReplayTrajectoryData, filePath?: string): void {

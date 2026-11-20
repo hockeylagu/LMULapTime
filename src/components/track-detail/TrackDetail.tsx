@@ -6,6 +6,7 @@ import { formatTime, compareSessions, compareSessionsBySortOption, isSessionEmpt
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { ImprovementChart } from './improvement-chart/ImprovementChart.js';
+import { CornerTrendsSection } from './corner-trends/CornerTrendsSection.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
 import { getPaceCategoryForLap, getSessionBestLapPace } from './trackDetailHelpers.js';
@@ -192,6 +193,12 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         }}
         qualifyingAveragePosition={qualifyingAveragePosition}
         finishAveragePosition={finishAveragePosition}
+      />
+
+      <CornerTrendsSection
+        layoutKey={data.summary?.layoutKey && data.summary.layoutKey !== 'unknown' ? data.summary.layoutKey : null}
+        carClass={selectedClass !== 'All' ? selectedClass : data.latestSession?.carClass ?? null}
+        carModel={selectedCarModel}
       />
 
       <TrackSessionsCard

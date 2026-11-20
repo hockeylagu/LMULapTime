@@ -1,9 +1,22 @@
 import type { LayoutCorners } from '../../shared/types/corners/cornerPasses.js';
 import type { SequenceMapsResponse } from '../../shared/types/corners/sequenceMaps.js';
+import type { CornerTrendsResponse } from '../../shared/types/corners/cornerTrends.js';
+import type { SessionCornerAnalysis } from '../../shared/types/corners/cornerAnalysis.js';
 import { fetchJson, postJson } from './apiClient.js';
 
 export function fetchSequenceMaps(signal?: AbortSignal): Promise<SequenceMapsResponse> {
   return fetchJson('/api/corner-sequences/maps', { signal });
+}
+
+/** The driver's time through each corner of a layout, session after session, for a class (and car model). */
+export function fetchCornerTrends(layoutKey: string, carClass: string, carType: string, signal?: AbortSignal): Promise<CornerTrendsResponse> {
+  const query = new URLSearchParams({ layoutKey, carClass, ...(carType ? { carType } : {}) });
+  return fetchJson(`/api/corner-trends?${query.toString()}`, { signal });
+}
+
+/** The session player's corner habits and mistakes (the corner analysis engine, from the stored passes). */
+export function fetchSessionCornerAnalysis(sessionId: string, signal?: AbortSignal): Promise<SessionCornerAnalysis> {
+  return fetchJson(`/api/session/${encodeURIComponent(sessionId)}/corner-analysis`, { signal });
 }
 
 /** A layout's corners for a class: its sequences, else the official turns (any lap's corner windows). */

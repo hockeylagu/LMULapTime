@@ -81,6 +81,8 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     const track = encodeURIComponent(board.layout);
     add(`board-${index}`, '/api/leaderboard', `/api/leaderboard?${query}`);
     add(`track-${index}`, '/api/track/:trackName', `/api/track/${track}?carClass=${encodeURIComponent(board.carClass)}&pageSize=25`);
+    // The track page's corner trends: every stored pass of the class at the layout.
+    add(`corner-trends-${index}`, '/api/corner-trends', `/api/corner-trends?${new URLSearchParams({ layoutKey: board.layout, carClass: board.carClass }).toString()}`);
     if (index === 0) {
       add('board-with-rival', '/api/leaderboard', `/api/leaderboard?${query}&includeRival=true`);
       for (const [id, suffix] of Object.entries({ 'compare-player': 'playerOnly=true', 'compare-all': 'playerOnly=false',
@@ -92,7 +94,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     }
   }
   if (!cohort.boards.length) {
-    for (const [id, route] of [['board', '/api/leaderboard'], ['track', '/api/track/:trackName'], ['compare', '/api/compare/laps'], ['layout-corners', '/api/corner-sequences/layout']]) add(id, route);
+    for (const [id, route] of [['board', '/api/leaderboard'], ['track', '/api/track/:trackName'], ['compare', '/api/compare/laps'], ['layout-corners', '/api/corner-sequences/layout'], ['corner-trends', '/api/corner-trends']]) add(id, route);
   }
   for (const [index, id] of cohort.sessions.entries()) add(`session-${index}`, '/api/session/:id', `/api/session/${encodeURIComponent(id)}`);
   const sessionId = cohort.telemetry?.sessionId ?? cohort.sessions[0];
@@ -117,6 +119,8 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('corner-passes', '/api/session/:sessionId/corner-passes', base ? `${base}/corner-passes` : undefined);
   // Every car's passes through its class's sequences: what the corner card reads.
   add('corner-sequence-passes', '/api/session/:sessionId/corner-passes', base ? `${base}/corner-passes?segments=sequences` : undefined);
+  // The player's corner habits and mistakes: the session's and the layout's other sessions' passes, then the engine.
+  add('corner-analysis', '/api/session/:sessionId/corner-analysis', base ? `${base}/corner-analysis` : undefined);
   add('race-overview', '/api/session/:sessionId/race', base ? `${base}/race` : undefined);
   // The first window: the server resamples its laps on a worker the first time, then serves it from memory.
   add('race-poses', '/api/session/:sessionId/race/poses', base ? `${base}/race/poses?window=0` : undefined);

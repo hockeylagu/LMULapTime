@@ -1,11 +1,14 @@
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { queueCornerWork, refreshLayoutSequencePasses, refreshSequenceMaps } from '../corners/sequenceMapService.js';
 import type { ServerContext } from '../core/serverContext.js';
 import { layoutCorners } from '../corners/sessionCornerPasses.js';
+import { readCornerTrends } from '../corners/cornerTrends.js';
+import { readCornerHabitTrends, readSessionCornerAnalysis } from '../corners/cornerAnalysisService.js';
 import { queryString } from './queryParams.js';
+import { requireSessionSummaries } from './summaryReadiness.js';
 import type { SequenceMapsResponse } from '../../shared/types/corners/sequenceMaps.js';
 
-/** The turn sequence maps (server/corners/sequenceMapService.ts): the list Settings shows, and regenerating one. */
+/** The turn sequence maps (server/corners/sequenceMapService.ts): the list Settings shows, regenerating one, the corner trends and a session's corner analysis. */
 export function createCornerSequenceRouter(context: ServerContext): Router {
   const router = Router();
   // One map regenerates at a time: it re-reads the class's fastest laps, then rebuilds the layout's sequence passes.
@@ -24,6 +27,25 @@ export function createCornerSequenceRouter(context: ServerContext): Router {
     const corners = layoutCorners(layoutKey, carClass, (layout, carClassOf) => context.sessionDb.getSequenceMap(layout, carClassOf));
     if (!corners) return res.status(404).json({ error: `No centre line for ${layoutKey}` });
     res.json(corners);
+  });
+
+  // The driver's time through each corner of a layout, session after session (server/corners/cornerTrends.ts).
+  router.get('/corner-trends', requireSessionSummaries(context), (req, res) => {
+    const layoutKey = queryString(req.query.layoutKey), carClass = queryString(req.query.carClass);
+    if (!layoutKey || !carClass) return res.status(400).json({ error: 'layoutKey and carClass are required' });
+    const carType = queryString(req.query.carType) ?? '';
+    const trends = readCornerTrends(context.sessionDb, layoutKey, carClass, carType);
+    if (!trends) return res.status(404).json({ error: `No centre line for ${layoutKey}` });
+    const habits = readCornerHabitTrends(context.sessionDb, layoutKey, carClass, carType.trim().toLowerCase());
+    res.json({ ...trends, corners: trends.corners.map(corner => ({ ...corner, habit: habits.get(corner.id) ?? null })) });
+  });
+
+  // The session player's corner habits and mistakes (server/corners/cornerAnalysisService.ts); references come from
+  // the layout's other sessions too, so it waits for the summaries like the trends.
+  router.get('/session/:sessionId/corner-analysis', requireSessionSummaries(context), (req: Request<{ sessionId: string }>, res) => {
+    const analysis = readSessionCornerAnalysis(context.sessionDb, req.params.sessionId);
+    if (!analysis) return res.status(404).json({ error: 'No corner analysis for this session' });
+    res.json(analysis);
   });
 
   router.post('/corner-sequences/maps/regenerate', (req, res) => {
