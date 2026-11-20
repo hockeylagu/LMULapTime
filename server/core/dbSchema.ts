@@ -89,6 +89,14 @@ CREATE TABLE IF NOT EXISTS ai_reports (
     );
 `;
 
+/**
+ * A pass's drive cues (`CornerPass`): gear at the slowest point, peak brake (per mille), and the
+ * time braking, on part throttle out of the slowest point, with TC and with ABS (ms), and coasting (ms). Passes are rebuilt offline, so a database
+ * from before them gets the columns from the offline rebuild script, never here.
+ */
+export const DRIVE_CUE_COLUMNS = `min_speed_gear INTEGER, peak_brake_pm INTEGER, brake_ms INTEGER,
+      part_throttle_ms INTEGER, tc_ms INTEGER, abs_ms INTEGER, coast_ms INTEGER,`;
+
 export function initDbSchema(db: DatabaseType): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS peripheral_presets (
@@ -323,6 +331,7 @@ export function initDbSchema(db: DatabaseType): void {
       ahead_gap_ms INTEGER,
       behind_slot INTEGER,
       behind_gap_ms INTEGER,
+      ${DRIVE_CUE_COLUMNS}
       PRIMARY KEY (filename, driver_slot, lap_number, segment)
     ) WITHOUT ROWID;
 
@@ -356,6 +365,7 @@ export function initDbSchema(db: DatabaseType): void {
       ahead_gap_ms INTEGER,
       behind_slot INTEGER,
       behind_gap_ms INTEGER,
+      ${DRIVE_CUE_COLUMNS}
       PRIMARY KEY (filename, driver_slot, lap_number, segment)
     ) WITHOUT ROWID;
 

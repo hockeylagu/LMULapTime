@@ -21,6 +21,21 @@ export interface CornerPass {
   brakeM: number | null;
   turnInM: number | null;
   throttleM: number | null;
+  /** The gear at the slowest point. */
+  minSpeedGear: number | null;
+  /** The hardest braking from the brake point (else the segment's start) to the segment's end (0-1), and the time braking there (s). */
+  peakBrake: number | null;
+  brakeSec: number;
+  /**
+   * From the slowest point to the segment's end, the time on part throttle (10-95 %) with traction control off (s): a lift,
+   * or a slow way back to full throttle; null without a slowest point.
+   */
+  partThrottleSec: number | null;
+  /** Time with traction control, and with ABS, active from the brake point (else the segment's start) to its end (s). */
+  tcSec: number;
+  absSec: number;
+  /** Off both pedals (brake under 5 %, throttle under 10 %) from the end of braking (else the segment's start) to the throttle pick-up (else the segment's end) (s). */
+  coastSec: number;
   /** The closest car ahead and behind during the pass, within 2 s at this car's speed. */
   aheadSlot: number | null;
   aheadGapSec: number | null;
@@ -35,6 +50,8 @@ export interface CornerTurn {
   label: string;
   /** Number, name and how the number was found, for a tooltip. */
   title: string;
+  /** The title's head, without how it was found: "Turn 7 · Lesmo 1", or a sequence's turns ("Lesmo 1, Lesmo 2 (T6–T7)"). */
+  name?: string;
   apexM: number;
   startM: number;
   endM: number;

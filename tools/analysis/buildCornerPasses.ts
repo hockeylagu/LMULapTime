@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { SessionDatabase } from '../../server/core/db.js';
+import { DRIVE_CUE_COLUMNS } from '../../server/core/dbSchema.js';
 import { refreshReplayCornerPasses } from '../../server/corners/cornerPassService.js';
 import { refreshSequenceMaps } from '../../server/corners/sequenceMapService.js';
 
@@ -20,6 +21,13 @@ const { values, positionals } = parseArgs({
 const dbPath = path.resolve(positionals[0] ?? path.join('server', 'lmu_cache.db'));
 if (!fs.existsSync(dbPath)) throw new Error(`No database at ${dbPath}`);
 const db = new SessionDatabase(dbPath);
+// A database from before the passes' drive cues: add their columns (the rebuild below fills them).
+for (const table of ['replay_corner_passes', 'replay_sequence_passes']) {
+  const columns = new Set((db.getDb().prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(column => column.name));
+  for (const column of DRIVE_CUE_COLUMNS.split(',').map(part => part.trim().split(' ')[0]).filter(Boolean)) {
+    if (!columns.has(column)) db.getDb().exec(`ALTER TABLE ${table} ADD COLUMN ${column} INTEGER`);
+  }
+}
 
 const started = Date.now();
 const layouts = values.layout ? [values.layout]

@@ -54,6 +54,45 @@ describe('buildCornerPasses', () => {
     expect(first.aheadSlot).toBeNull();
   });
 
+  it('measures the gear, the braking, the part throttle out of the slowest point and the TC and ABS time', () => {
+    const samples = lap(1);
+    const local = samples.stations;
+    // Part throttle from 320 m to 360 m, with traction control cutting in from 340 m to 350 m; ABS from 250 m to 270 m.
+    samples.throttle = samples.throttle.map((throttle, i) => (local[i] >= 320 && local[i] < 360 ? 0.6 : throttle));
+    samples.tcActive = local.map(m => m >= 340 && m < 350);
+    samples.absActive = local.map(m => m >= 250 && m < 270);
+    samples.gear = local.map(m => (m >= 250 && m < 400 ? 2 : 5));
+    const [corner, straight] = buildCornerPasses([{ slot: 1, laps: [samples] }], SEGMENTS, LENGTH);
+    expect(corner).toMatchObject({ minSpeedGear: 2, peakBrake: 0.8 });
+    // 100 m braking from 50 to 20 m/s.
+    expect(corner.brakeSec).toBeCloseTo(100 / 35, 0);
+    // 30 m of part throttle at about 30 m/s; the 10 m under traction control is not the driver's.
+    expect(corner.partThrottleSec).toBeGreaterThan(0.8);
+    expect(corner.partThrottleSec).toBeLessThan(1.3);
+    // About 10 m at 30 m/s and 20 m at 42 m/s, in whole 0.1 s samples.
+    expect(corner.tcSec).toBeGreaterThan(0.25);
+    expect(corner.tcSec).toBeLessThan(0.45);
+    expect(corner.absSec).toBeGreaterThan(0.4);
+    expect(corner.absSec).toBeLessThan(0.6);
+    expect(straight).toMatchObject({ minSpeedGear: 5, peakBrake: 0, brakeSec: 0, partThrottleSec: 0, tcSec: 0, absSec: 0 });
+  });
+
+  it('measures the coasting between the braking and the throttle pick-up', () => {
+    const [corner, straight] = buildCornerPasses([{ slot: 1, laps: [lap(1)] }], SEGMENTS, LENGTH);
+    // Off both pedals from 300 m to 320 m at 20-26 m/s.
+    expect(corner.coastSec).toBeGreaterThan(0.7);
+    expect(corner.coastSec).toBeLessThan(1.1);
+    expect(straight.coastSec).toBe(0);
+    // A throttle crack (20 %) from 305 m ends the coasting; a light brake held to 320 m leaves none.
+    const samples = lap(1);
+    const local = samples.stations;
+    samples.throttle = samples.throttle.map((throttle, i) => (local[i] >= 305 && local[i] < 320 ? 0.2 : throttle));
+    expect(buildCornerPasses([{ slot: 1, laps: [samples] }], SEGMENTS, LENGTH)[0].coastSec).toBeLessThan(0.5);
+    samples.throttle = lap(1).throttle;
+    samples.brake = samples.brake.map((brake, i) => (local[i] >= 300 && local[i] < 320 ? 0.1 : brake));
+    expect(buildCornerPasses([{ slot: 1, laps: [samples] }], SEGMENTS, LENGTH)[0].coastSec).toBe(0);
+  });
+
   it('reads a sample just short of the line at the lap start as before it', () => {
     const samples = lap(2, 0, -5);
     const passes = buildCornerPasses([{ slot: 1, laps: [samples] }], SEGMENTS, LENGTH);

@@ -15,7 +15,8 @@ function pass(slot: number, lapNumber: number, segment: number, timeSec: number,
     slot, lapNumber, segment, entrySec, minSpeedSec: entrySec + timeSec / 2, exitSec: entrySec + timeSec,
     entrySpeedKmh: 250, minSpeedKmh: 100, exitSpeedKmh: 180,
     minSpeedM: segment === 1 ? 200 : 450, brakeM: segment === 1 ? 150 : 350, turnInM: segment === 1 ? 170 : 380, throttleM: segment === 1 ? 220 : 480,
-    aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, ...extra,
+    aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0,
+  coastSec: 0, ...extra,
   };
 }
 function lap(slot: number, lapNumber: number, extra: Partial<CornerPassLap> = {}): CornerPassLap {

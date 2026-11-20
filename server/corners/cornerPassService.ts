@@ -83,7 +83,12 @@ export function planLayoutCornerPasses(layoutKey: string, lapSignature: string |
   const layout = placeLayout(layoutKey, loadTrack);
   if (!layout) return { reason: `no centre line for ${layoutKey}` };
   if (!lapSignature) return { reason: 'no stored laps' };
-  return { ...layout, versionKey: [`passes v${CORNER_PASS_VERSION}`, layout.turnsKey, lapSignature].join('|') };
+  return { ...layout, versionKey: [layoutPassKey(layout), lapSignature].join('|') };
+}
+
+/** The part of a pass build's key every replay of the layout shares (pass rule, turn lists, centre line). */
+export function layoutPassKey(layout: Pick<PlacedLayout, 'turnsKey'>): string {
+  return [`passes v${CORNER_PASS_VERSION}`, layout.turnsKey].join('|');
 }
 
 /** A short stable digest of a key (12 hex digits). */

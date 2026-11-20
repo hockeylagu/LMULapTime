@@ -5,7 +5,8 @@ import type { CornerPass, SessionCornerPasses } from '../../../shared/types/corn
 // A 1000 m track in two turns (0-500 m, 500-1000 m); the start line 100 m along the centre line.
 const pass = (slot: number, lapNumber: number, segment: number, entrySec: number, exitSec: number, extra: Partial<CornerPass> = {}): CornerPass => ({
   slot, lapNumber, segment, entrySec, minSpeedSec: null, exitSec, entrySpeedKmh: null, minSpeedKmh: null, exitSpeedKmh: null,
-  minSpeedM: null, brakeM: null, turnInM: null, throttleM: null, aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, ...extra,
+  minSpeedM: null, brakeM: null, turnInM: null, throttleM: null, aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0,
+  coastSec: 0, ...extra,
 });
 const data = (passes: CornerPass[]): SessionCornerPasses & { available: true } => ({
   available: true, layoutKey: 'test', startStationM: 100, trackLengthM: 1000,

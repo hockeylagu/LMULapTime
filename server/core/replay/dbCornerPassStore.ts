@@ -33,9 +33,11 @@ export function replaceCornerPasses(
   const insert = db.prepare(`
     INSERT INTO ${table} (filename, driver_slot, lap_number, segment, entry_ms, min_speed_after_ms, duration_ms,
       entry_speed_dkmh, min_speed_dkmh, exit_speed_dkmh, min_speed_dm, brake_dm, turn_in_dm, throttle_dm,
-      ahead_slot, ahead_gap_ms, behind_slot, behind_gap_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ahead_slot, ahead_gap_ms, behind_slot, behind_gap_ms,
+      min_speed_gear, peak_brake_pm, brake_ms, part_throttle_ms, tc_ms, abs_ms, coast_ms)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+  const perMille = (value: number | null): number | null => value === null ? null : Math.round(value * 1000);
   db.transaction(() => {
     db.prepare(`DELETE FROM ${table} WHERE filename = ?`).run(filename);
     for (const pass of passes) {
@@ -44,7 +46,9 @@ export function replaceCornerPasses(
         pass.minSpeedSec === null ? null : Math.round(pass.minSpeedSec * 1000) - entryMs, Math.round(pass.exitSec * 1000) - entryMs,
         tenths(pass.entrySpeedKmh), tenths(pass.minSpeedKmh), tenths(pass.exitSpeedKmh),
         tenths(pass.minSpeedM), tenths(pass.brakeM), tenths(pass.turnInM), tenths(pass.throttleM),
-        pass.aheadSlot, ms(pass.aheadGapSec), pass.behindSlot, ms(pass.behindGapSec));
+        pass.aheadSlot, ms(pass.aheadGapSec), pass.behindSlot, ms(pass.behindGapSec),
+        pass.minSpeedGear, perMille(pass.peakBrake), ms(pass.brakeSec), ms(pass.partThrottleSec),
+        ms(pass.tcSec), ms(pass.absSec), ms(pass.coastSec));
     }
     db.prepare(`
       INSERT INTO ${builds} (filename, version_key, layout_key, pass_count, built_at) VALUES (?, ?, ?, ?, ?)
@@ -54,28 +58,34 @@ export function replaceCornerPasses(
   })();
 }
 
-/** A replay's stored corner passes, back in the builder's units. */
-export function listCornerPasses(db: DatabaseType, filename: string, kind: PassKind = 'turns'): CornerPass[] {
-  const rows = db.prepare(`
-    SELECT driver_slot, lap_number, segment, entry_ms, min_speed_after_ms, duration_ms, entry_speed_dkmh, min_speed_dkmh,
-      exit_speed_dkmh, min_speed_dm, brake_dm, turn_in_dm, throttle_dm, ahead_slot, ahead_gap_ms, behind_slot, behind_gap_ms
-    FROM ${TABLES[kind].passes} WHERE filename = ? ORDER BY driver_slot, lap_number, segment
-  `).all(filename) as Array<Record<string, number | null>>;
+/** A stored pass row's columns (`SELECT p.*` of a pass table). */
+export type CornerPassRow = Record<string, number | null>;
+
+/** A stored pass row back in the builder's units. */
+export function passFromRow(row: CornerPassRow): CornerPass {
   const fromTenths = (value: number | null): number | null => value === null ? null : value / 10;
   const sec = (value: number | null): number | null => value === null ? null : value / 1000;
-  return rows.map(row => {
-    const entryMs = row.entry_ms as number;
-    return {
-      slot: row.driver_slot as number, lapNumber: row.lap_number as number, segment: row.segment as number,
-      entrySec: entryMs / 1000,
-      minSpeedSec: row.min_speed_after_ms === null ? null : (entryMs + row.min_speed_after_ms) / 1000,
-      exitSec: (entryMs + (row.duration_ms as number)) / 1000,
-      entrySpeedKmh: fromTenths(row.entry_speed_dkmh), minSpeedKmh: fromTenths(row.min_speed_dkmh), exitSpeedKmh: fromTenths(row.exit_speed_dkmh),
-      minSpeedM: fromTenths(row.min_speed_dm), brakeM: fromTenths(row.brake_dm), turnInM: fromTenths(row.turn_in_dm),
-      throttleM: fromTenths(row.throttle_dm),
-      aheadSlot: row.ahead_slot, aheadGapSec: sec(row.ahead_gap_ms), behindSlot: row.behind_slot, behindGapSec: sec(row.behind_gap_ms),
-    };
-  });
+  const fromPerMille = (value: number | null): number | null => value === null ? null : value / 1000;
+  const entryMs = row.entry_ms as number;
+  return {
+    slot: row.driver_slot as number, lapNumber: row.lap_number as number, segment: row.segment as number,
+    entrySec: entryMs / 1000,
+    minSpeedSec: row.min_speed_after_ms === null ? null : (entryMs + row.min_speed_after_ms) / 1000,
+    exitSec: (entryMs + (row.duration_ms as number)) / 1000,
+    entrySpeedKmh: fromTenths(row.entry_speed_dkmh), minSpeedKmh: fromTenths(row.min_speed_dkmh), exitSpeedKmh: fromTenths(row.exit_speed_dkmh),
+    minSpeedM: fromTenths(row.min_speed_dm), brakeM: fromTenths(row.brake_dm), turnInM: fromTenths(row.turn_in_dm),
+    throttleM: fromTenths(row.throttle_dm),
+    minSpeedGear: row.min_speed_gear, peakBrake: fromPerMille(row.peak_brake_pm),
+    brakeSec: sec(row.brake_ms) ?? 0, partThrottleSec: sec(row.part_throttle_ms), tcSec: sec(row.tc_ms) ?? 0, absSec: sec(row.abs_ms) ?? 0, coastSec: sec(row.coast_ms) ?? 0,
+    aheadSlot: row.ahead_slot, aheadGapSec: sec(row.ahead_gap_ms), behindSlot: row.behind_slot, behindGapSec: sec(row.behind_gap_ms),
+  };
+}
+
+/** A replay's stored corner passes, back in the builder's units. */
+export function listCornerPasses(db: DatabaseType, filename: string, kind: PassKind = 'turns'): CornerPass[] {
+  const rows = db.prepare(`SELECT * FROM ${TABLES[kind].passes} WHERE filename = ? ORDER BY driver_slot, lap_number, segment`)
+    .all(filename) as CornerPassRow[];
+  return rows.map(passFromRow);
 }
 
 /** The replays whose corner passes were built on a layout. */

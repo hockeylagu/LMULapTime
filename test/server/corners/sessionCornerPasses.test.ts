@@ -13,7 +13,8 @@ for (let i = 0; i < 400; i += 5) {
 const loadTrack = () => ({ centerline: SQUARE, projectionRevision: 'rev1', timingGates: { startFinish: { stationM: 50 } } });
 const pass = (slot: number): CornerPass => ({ slot, lapNumber: 2, segment: 1, entrySec: 61, minSpeedSec: 62, exitSec: 64,
   entrySpeedKmh: 200, minSpeedKmh: 90, exitSpeedKmh: 150, minSpeedM: 140, brakeM: 100, turnInM: 120, throttleM: 160,
-  aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null });
+  aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0,
+  coastSec: 0 });
 const CARS = [{ slot: 0, name: 'A', sessionDriverOrdinal: 0 }, { slot: 4, name: 'B', sessionDriverOrdinal: 1 }];
 
 function reader(versionKey: string | null): CornerPassReader {

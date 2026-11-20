@@ -8,7 +8,7 @@
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 
 /** Bumped when the pass rule or the stored pass row changes: every replay's passes are rebuilt offline. */
-export const CORNER_PASS_VERSION = 17;
+export const CORNER_PASS_VERSION = 19;
 
 /** Samples further apart than this are a gap in the recording: no crossing is read across it. */
 const MAX_SAMPLE_GAP_SEC = 1.5;
@@ -33,6 +33,9 @@ const TURN_IN_STEER = 0.04;
 const THROTTLE_ON = 0.5;
 /** The throttle must come back within this after the slowest point to count. */
 const THROTTLE_SEARCH_SEC = 5;
+/** Throttle from which the car is at full throttle, and under which it is off the throttle (0-1): between is part throttle. */
+const THROTTLE_FULL = 0.95;
+const THROTTLE_OFF = 0.1;
 /** Another car within this gap (seconds at this car's speed), ahead or behind, is recorded as traffic. */
 export const TRAFFIC_RANGE_SEC = 2;
 /**
@@ -54,6 +57,10 @@ export interface PassLapSamples {
   brake: Array<number | null>;
   /** Steering, positive left, as a share of full lock (-1 to 1). */
   steer: Array<number | null>;
+  /** Gear and the TC and ABS lamps; absent when not read (no gear, no TC or ABS time). */
+  gear?: Array<number | null>;
+  tcActive?: boolean[];
+  absActive?: boolean[];
   /** False for samples that are not driving the track (pit lane, garage, teleport, far off it, unreadable). */
   usable: boolean[];
 }
@@ -81,6 +88,9 @@ interface LapTrack {
   throttle: Array<number | null>;
   brake: Array<number | null>;
   steer: Array<number | null>;
+  gear: Array<number | null>;
+  tc: boolean[];
+  abs: boolean[];
   /** Whether sample i follows sample i - 1 without a gap. */
   joined: boolean[];
 }
@@ -90,7 +100,7 @@ const follows = (previousT: number, previousD: number, t: number, d: number) =>
   t > previousT && t - previousT <= MAX_SAMPLE_GAP_SEC && Math.abs(d - previousD) <= MAX_SAMPLE_JUMP_M;
 
 function lapTrack(lap: PassLapSamples, lengthM: number): LapTrack {
-  const track: LapTrack = { lapNumber: lap.lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], joined: [] };
+  const track: LapTrack = { lapNumber: lap.lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], gear: [], tc: [], abs: [], joined: [] };
   for (let i = 0; i < lap.times.length; i++) {
     const time = lap.times[i];
     const station = lap.stations[i];
@@ -110,6 +120,9 @@ function lapTrack(lap: PassLapSamples, lengthM: number): LapTrack {
     track.throttle.push(lap.throttle[i]);
     track.brake.push(lap.brake[i]);
     track.steer.push(lap.steer[i]);
+    track.gear.push(lap.gear?.[i] ?? null);
+    track.tc.push(lap.tcActive?.[i] === true);
+    track.abs.push(lap.absActive?.[i] === true);
     track.joined.push(joined);
   }
   placeOnLap(track, lengthM);
@@ -148,7 +161,7 @@ function placeOnLap(track: LapTrack, lengthM: number): void {
 function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: LapTrack | undefined, lengthM: number, borrowM: number): LapTrack {
   const n = track.t.length;
   if (n === 0) return track;
-  const out: LapTrack = { lapNumber: track.lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], joined: [] };
+  const out: LapTrack = { lapNumber: track.lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], gear: [], tc: [], abs: [], joined: [] };
   const push = (from: LapTrack, i: number, shift: number, joined: boolean) => {
     out.t.push(from.t[i]);
     out.d.push(from.d[i] + shift);
@@ -156,6 +169,9 @@ function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: L
     out.throttle.push(from.throttle[i]);
     out.brake.push(from.brake[i]);
     out.steer.push(from.steer[i]);
+    out.gear.push(from.gear[i]);
+    out.tc.push(from.tc[i]);
+    out.abs.push(from.abs[i]);
     out.joined.push(joined);
   };
   // Only the unbroken run that leads into the lap's first sample, and the one that carries on from its last: other
@@ -271,6 +287,49 @@ function throttleOnIndex(track: LapTrack, slowest: number, first: number, end: n
   return null;
 }
 
+/** The time (s) from sample `from` to sample `to` spent where `holds(i)` is true of the sample starting each step. */
+function timeWhere(track: LapTrack, from: number, to: number, holds: (i: number) => boolean): number {
+  let sec = 0;
+  for (let i = Math.max(0, from); i < to && i + 1 < track.t.length; i++) {
+    if (track.joined[i + 1] && holds(i)) sec += track.t[i + 1] - track.t[i];
+  }
+  return sec;
+}
+
+/** Brake under this (0-1) is off the brake for coasting (the corner-map branch's 5 %). */
+const BRAKE_OFF = 0.05;
+
+/**
+ * Coasting: off both pedals from the end of the braking (else the segment's start) to the throttle pick-up (else the
+ * segment's end) (s). The corner-map branch's coasting; its other technique cues did not survive the blind validation
+ * of 2026-11-20 (shared/domain/cornerAnalysis/analyzeCorners.ts).
+ */
+function coastSec(track: LapTrack, entry: number, exit: number, run: [number, number] | null, throttleOn: number | null): number {
+  return timeWhere(track, run ? run[1] + 1 : entry, throttleOn ?? exit, i => (track.brake[i] ?? 0) < BRAKE_OFF && (track.throttle[i] ?? 0) < THROTTLE_OFF);
+}
+/** How the car drove a pass beyond its points: gear, braking, part throttle out of the slowest point, TC and ABS. */
+function driveCues(track: LapTrack, entry: number, exit: number, slowest: number, brakeStart: number | null) {
+  const from = brakeStart ?? entry;
+  let peakBrake: number | null = null;
+  for (let i = from; i < exit; i++) {
+    const brake = track.brake[i];
+    if (brake !== null && (peakBrake === null || brake > peakBrake)) peakBrake = brake;
+  }
+  return {
+    minSpeedGear: track.gear[slowest],
+    peakBrake,
+    brakeSec: timeWhere(track, from, exit, i => (track.brake[i] ?? 0) >= BRAKE_ON),
+    partThrottleSec: timeWhere(track, slowest, exit, i => {
+      const throttle = track.throttle[i] ?? 0;
+      return throttle >= THROTTLE_OFF && throttle < THROTTLE_FULL && !track.tc[i];
+    }),
+    tcSec: timeWhere(track, from, exit, i => track.tc[i]),
+    absSec: timeWhere(track, from, exit, i => track.abs[i]),
+  };
+}
+
+const NO_DRIVE_CUES = { minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0 };
+
 /** The first sample after `from` up to `to` that does not follow the one before it, or -1. */
 function breakIn(track: LapTrack, from: number, to: number): number {
   for (let i = from + 1; i <= to; i++) if (!track.joined[i]) return i;
@@ -337,6 +396,9 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
     let brakeM: number | null = null;
     let turnInM: number | null = null;
     let throttleM: number | null = null;
+    let brakeStart: number | null = null;
+    let run: [number, number] | null = null;
+    let throttleOn: number | null = null;
     if (slowest >= 0) {
       // The braking for this corner: the last one that starts after the previous corner's slowest point,
       // starts by this one's slowest point and is still on shortly before it.
@@ -346,13 +408,15 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
         if (track.t[slowest] - track.t[runs[r][1]] <= BRAKE_TO_SLOWEST_MAX_SEC) chosen = r;
       }
       if (chosen >= 0) {
-        brakeM = track.d[runs[chosen][0]];
+        run = runs[chosen];
+        brakeStart = run[0];
+        brakeM = track.d[brakeStart];
         nextRun = chosen + 1;
       }
       // Never back into the previous corner: its slowest point, and the throttle point it already took.
       const turnIn = turnInIndex(track, slowest, previousSlowest + 1);
       if (turnIn !== null) turnInM = track.d[turnIn];
-      const throttleOn = throttleOnIndex(track, slowest, Math.max(previousSlowest, previousThrottleOn) + 1, exit.index);
+      throttleOn = throttleOnIndex(track, slowest, Math.max(previousSlowest, previousThrottleOn) + 1, exit.index);
       if (throttleOn !== null) {
         throttleM = track.d[throttleOn];
         previousThrottleOn = throttleOn;
@@ -369,6 +433,8 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
       entrySec: entry.sec, minSpeedSec, exitSec: exit.sec,
       entrySpeedKmh: entry.speedKmh, minSpeedKmh, exitSpeedKmh: exit.speedKmh,
       minSpeedM: onLap(minSpeedM), brakeM: onLap(brakeM), turnInM: onLap(turnInM), throttleM: onLap(throttleM),
+      ...(slowest >= 0 ? driveCues(track, entry.index, exit.index, slowest, brakeStart) : NO_DRIVE_CUES),
+      coastSec: slowest >= 0 ? coastSec(track, entry.index, exit.index, run, throttleOn) : 0,
       aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null,
     });
   }

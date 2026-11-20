@@ -18,7 +18,8 @@ for (let i = 0; i < 400; i += 5) {
 const loadTrack = () => ({ centerline: SQUARE, projectionRevision: 'rev1', timingGates: { startFinish: { stationM: 50 } } });
 const PASS: CornerPass = { slot: 3, lapNumber: 2, segment: 1, entrySec: 61.2345, minSpeedSec: 62.8, exitSec: 64.5,
   entrySpeedKmh: 201.04, minSpeedKmh: 88.26, exitSpeedKmh: null, minSpeedM: 140.04, brakeM: -12.3, turnInM: 60.2,
-  throttleM: null, aheadSlot: 7, aheadGapSec: 0.8124, behindSlot: null, behindGapSec: null };
+  throttleM: null, aheadSlot: 7, aheadGapSec: 0.8124, behindSlot: null, behindGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0,
+  coastSec: 0 };
 const METADATA = { sceneDesc: 'SEBRINGWEC', drivers: [{ name: 'A', slot: 3, carClass: 'GT3' }, { name: 'B', slot: 4, carClass: 'LMP2' }] };
 
 const databases: SessionDatabase[] = [];

@@ -33,9 +33,13 @@ export interface SequenceLapInput {
   startStationM: number;
 }
 
-const PASS_KEYS = ['timeSec', 'x', 'z', 'speedKmh', 'throttle', 'brake', 'steerYaw', 'inPit', 'inGarage', 'isTeleport'];
+const PASS_KEYS = ['timeSec', 'x', 'z', 'speedKmh', 'throttle', 'brake', 'steerYaw', 'inPit', 'inGarage', 'isTeleport', 'gear', 'tcActive', 'absActive'];
 
 const numberOrNull = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null;
+const percentToShare = (value: unknown): number | null => {
+  const percent = numberOrNull(value);
+  return percent === null ? null : percent / 100;
+};
 
 /**
  * Grid cell size and how far from the centre line a sample may be and still be driving the track (metres). The
@@ -74,9 +78,9 @@ export function readPassLap(
   nearTrack: (x: number, z: number) => boolean
 ): PassLapSamples {
   const stored = decodeLapColumns<StoredLap>(blob, PASS_KEYS);
-  const [time, x, z, speed, throttle, brake, steer, inPit, inGarage, teleport] = PASS_KEYS.map(key => channel(stored, key));
+  const [time, x, z, speed, throttle, brake, steer, inPit, inGarage, teleport, gear, tc, abs] = PASS_KEYS.map(key => channel(stored, key));
   const lengthM = index.totalLengthM;
-  const lap: PassLapSamples = { lapNumber, times: [], stations: [], speedKmh: [], throttle: [], brake: [], steer: [], usable: [] };
+  const lap: Required<PassLapSamples> = { lapNumber, times: [], stations: [], speedKmh: [], throttle: [], brake: [], steer: [], gear: [], tcActive: [], absActive: [], usable: [] };
   const points: ReplayTrajectoryPoint[] = [];
   const driving: number[] = [];
   for (let i = 0; i < stored.pointsLength; i++) {
@@ -90,9 +94,13 @@ export function readPassLap(
     lap.times.push(t ?? Number.NaN);
     lap.stations.push(Number.NaN);
     lap.speedKmh.push(numberOrNull(speed[i]));
-    lap.throttle.push(numberOrNull(throttle[i]));
-    lap.brake.push(numberOrNull(brake[i]));
+    // The stored pedals are percent (the replay's n / 63 scaled to 100); the builder reads 0-1.
+    lap.throttle.push(percentToShare(throttle[i]));
+    lap.brake.push(percentToShare(brake[i]));
     lap.steer.push(numberOrNull(steer[i]));
+    lap.gear.push(numberOrNull(gear[i]));
+    lap.tcActive.push(tc[i] === true);
+    lap.absActive.push(abs[i] === true);
     lap.usable.push(usable);
     if (usable) {
       points.push({ x: px, y: 0, z: pz });
