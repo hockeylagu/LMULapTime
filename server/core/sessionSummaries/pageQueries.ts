@@ -44,7 +44,7 @@ export function sessionWhere(options: SessionQuery): { sql: string; values: (str
     const classMatch = carClassMatch(options.carClass);
     if (classMatch.sql !== '1=1') {
       const driverClause = options.driver && options.driver !== 'All'
-        ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(lower(name),lower(?))>0)'
+        ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(normalized_name,lower(?))>0)'
         : '(f.is_player=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
       parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${driverClause} AND ${classMatch.sql})`);
       if (options.driver && options.driver !== 'All') {
@@ -55,16 +55,16 @@ export function sessionWhere(options: SessionQuery): { sql: string; values: (str
   }
   if (options.car && options.car !== 'All') {
     const driverClause = options.driver && options.driver !== 'All'
-      ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(lower(name),lower(?))>0)'
+      ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(normalized_name,lower(?))>0)'
       : '(f.is_player=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
-    parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${driverClause} AND f.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE instr(lower(car_type),lower(?))>0))`);
+    parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${driverClause} AND f.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE instr(car_model,lower(?))>0))`);
     if (options.driver && options.driver !== 'All') {
       values.push(options.driver);
     }
     values.push(options.car);
   }
   if (options.playerCar && options.playerCar !== 'All') { parts.push('s.player_car_type=?'); values.push(options.playerCar); }
-  if (options.driver && options.driver !== 'All') { parts.push('EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(lower(name),lower(?))>0))'); values.push(options.driver); }
+  if (options.driver && options.driver !== 'All') { parts.push('EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(normalized_name,lower(?))>0))'); values.push(options.driver); }
   if (options.search?.trim()) {
     parts.push(`(instr(lower(s.track_venue),lower(?))>0 OR instr(lower(s.track_course),lower(?))>0 OR instr(lower(s.filename),lower(?))>0
       OR instr(lower(coalesce(s.player_car_type,'')),lower(?))>0 OR instr(lower(coalesce(s.player_driver_name,'')),lower(?))>0
@@ -122,9 +122,9 @@ interface ProgressionRow {
 /** Every progression point of the scope, oldest first: the chart's personal-best line, ranges and totals need the whole history. */
 export function queryProgression(db: Database, options: SessionQuery): SessionProgressionPoint[] {
   const where = sessionWhere({...options,driver:undefined});
-  const driver = options.driver && options.driver !== 'All' ? options.driver.toLowerCase() : null;
+  const driver = options.driver && options.driver !== 'All' ? options.driver.trim().toLowerCase() : null;
   const join = `LEFT JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=coalesce(
-    (SELECT x.driver_ordinal FROM session_drivers x JOIN drivers xn ON xn.driver_id=x.driver_id WHERE x.session_id=s.id AND lower(xn.name)=? ORDER BY x.driver_ordinal LIMIT 1),
+    (SELECT x.driver_ordinal FROM session_drivers x JOIN drivers xn ON xn.driver_id=x.driver_id WHERE x.session_id=s.id AND xn.normalized_name=? ORDER BY x.driver_ordinal LIMIT 1),
     CASE WHEN ? IS NULL THEN s.primary_driver_ordinal ELSE 0 END)
     LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id`;
   const rows = db.prepare(`SELECT s.id,s.timestamp,s.track_venue,s.track_course,s.session_type,s.session_name,

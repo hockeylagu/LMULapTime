@@ -39,6 +39,14 @@ export const LAP_DERIVED_COLUMNS = LAP_DERIVED_DEFS.join(', ');
 /** The column names of a list of definitions. */
 export const derivedNames = (defs: readonly string[]): string[] => defs.map(def => def.split(' ')[0]);
 
+/**
+ * A vehicle's car model as filters match it: the car type lowercased and trimmed, computed by SQLite on every write, so
+ * no insert can miss it and queries compare it as it is (`d.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE
+ * car_model=?)`, the argument trimmed and lowercased). Matched per lap row, the expression cost the compare page about
+ * a quarter of its time (Le Mans GT3, 2026-11-20).
+ */
+const VEHICLE_CAR_MODEL = 'car_model TEXT GENERATED ALWAYS AS (lower(trim(car_type))) VIRTUAL';
+
 /** Creates the normalized session tables and the new `sessions` columns. Safe to run on every start. */
 export function initSessionRowsSchema(db: DatabaseType): void {
   const columns = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>;
@@ -62,7 +70,7 @@ export function initSessionRowsSchema(db: DatabaseType): void {
     );
     CREATE INDEX IF NOT EXISTS idx_drivers_normalized_name ON drivers(normalized_name);
     CREATE TABLE IF NOT EXISTS vehicles (
-      vehicle_id INTEGER PRIMARY KEY, car_type TEXT, car_class TEXT
+      vehicle_id INTEGER PRIMARY KEY, car_type TEXT, car_class TEXT, ${VEHICLE_CAR_MODEL}
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicles_unique ON vehicles(ifnull(car_type, char(0)), ifnull(car_class, char(0)));
     CREATE TABLE IF NOT EXISTS teams (

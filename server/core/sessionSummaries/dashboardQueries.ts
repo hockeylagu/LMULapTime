@@ -73,7 +73,7 @@ function benchmarkMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
 
 function dashboardMetrics(db: DatabaseType, entries: Record<string, ReferenceLaptimeEntry>): DashboardMetrics {
   const totals = db.prepare(`
-    SELECT count(DISTINCT s.session_id) sessions_count,coalesce(sum(s.laps_count),0) total_laps,coalesce(sum(s.clean_laps_count),0) clean_laps,
+    SELECT count(*) sessions_count,coalesce(sum(s.laps_count),0) total_laps,coalesce(sum(s.clean_laps_count),0) clean_laps,
       coalesce(sum(s.driving_time_seconds),0) driving_seconds,coalesce(sum(s.pit_stops_count),0) pit_stops,
       coalesce(sum(s.distance_km),0) distance_km
     FROM session_summary_facts s

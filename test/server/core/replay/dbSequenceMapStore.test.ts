@@ -13,8 +13,8 @@ describe('listSequenceCandidateLaps', () => {
     replayLap.run(FILE, 1, 1, 95, 1);
     replayLap.run(FILE, 1, 2, 94, 1);
     replayLap.run(FILE, 1, 3, 93, 0);
-    db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(FILE, 'Ann Driver', 0);
-    db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(FILE, 'Guest', 1);
+    db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(FILE, 'ann driver', 0);
+    db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(FILE, 'guest', 1);
     db.prepare('INSERT INTO session_recordings (session_id, recording_name) VALUES (?, ?)').run('s1', FILE);
     db.prepare('INSERT INTO drivers (driver_id, name, normalized_name) VALUES (?, ?, ?)').run(7, 'ann driver ', 'ann driver');
     db.prepare('INSERT INTO session_drivers (session_id, driver_ordinal, driver_id) VALUES (?, ?, ?)').run('s1', 0, 7);

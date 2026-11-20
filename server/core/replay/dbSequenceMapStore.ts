@@ -92,7 +92,7 @@ export function listSequenceCandidateLaps(db: DatabaseType, filename: string): A
       FROM replay_driver_roster r
       JOIN session_recordings rec ON rec.recording_name = r.filename
       JOIN session_drivers sd ON sd.session_id = rec.session_id
-      JOIN drivers d ON d.driver_id = sd.driver_id AND LOWER(TRIM(d.name)) = LOWER(TRIM(r.driver_name))
+      JOIN drivers d ON d.driver_id = sd.driver_id AND d.normalized_name = r.driver_name
       WHERE r.filename = $filename
     )
     SELECT slot, lapNumber, lapTimeSec, passes FROM (

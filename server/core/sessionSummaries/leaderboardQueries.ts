@@ -17,7 +17,7 @@ interface DriverFact {
   best_s1: number | null; best_s2: number | null; best_s3: number | null; top3_average: number | null;
   representative_laps: number; sessions: number; last_driven: number;
 }
-const scopeSql = `s.layout_key=? AND d.driver_class=? AND (?='' OR lower(trim(v.car_type))=?)`;
+const scopeSql = `s.layout_key=? AND d.driver_class=? AND (?='' OR d.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE car_model=?))`;
 
 function rankValues<T>(items: T[], get: (item: T) => number | null): Array<number | null> {
   const sorted = items.map(get).filter((value): value is number => value !== null).sort((a, b) => a - b);
@@ -32,7 +32,7 @@ function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): Drive
   // deterministic winning locator; all leaderboard aggregates come from compact condition rows.
   const bestRows = db.prepare(`WITH ranked AS (
       SELECT s.id session_id,s.timestamp,s.session_type,s.session_name,s.recording_name,
-        d.driver_ordinal,coalesce(dn.name,'') driver_name,d.is_player,coalesce(v.car_type,'') car_type,c.best_lap_ordinal lap_ordinal,
+        d.driver_ordinal,coalesce(dn.name,'') driver_name,dn.normalized_name driver_key,d.is_player,coalesce(v.car_type,'') car_type,c.best_lap_ordinal lap_ordinal,
         l.lap_number lap_number,c.best_lap_time lap_time,l.s1,l.s2,l.s3,
         row_number() OVER (PARTITION BY coalesce(dn.name,'') ORDER BY c.best_lap_time,s.timestamp,s.id,d.driver_ordinal,c.best_lap_ordinal) best_rank
       -- Keep the layout's sessions first even when a legacy driver-class index exists.
@@ -41,7 +41,7 @@ function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): Drive
       LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       LEFT JOIN session_laps l ON l.session_id=c.session_id AND l.driver_ordinal=c.driver_ordinal AND l.lap_ordinal=c.best_lap_ordinal
       WHERE ${scopeSql} AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL AND d.is_human=1
-    ) SELECT ranked.*,${availableReplayLapSql('ranked.recording_name', 'ranked.driver_name', 'ranked.lap_number')} telemetry_available
+    ) SELECT ranked.*,${availableReplayLapSql('ranked.recording_name', 'ranked.driver_key', 'ranked.lap_number')} telemetry_available
     FROM ranked WHERE best_rank=1`).all(...params) as SummaryRow[];
   const facts = db.prepare(`WITH eligible AS MATERIALIZED (
       SELECT s.id,s.timestamp,d.driver_ordinal,coalesce(n.name,'') driver_name,d.is_player,c.clean_count,c.best_s1,c.best_s2,c.best_s3,
@@ -152,7 +152,7 @@ export function queryCompactPlayerSessionBests(db: DatabaseType, query: Leaderbo
   return db.prepare(`SELECT s.id sessionId,s.session_name sessionName,s.timestamp,c.best_lap_time best
     FROM sessions s CROSS JOIN session_drivers d ON d.session_id=s.id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
     JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal
-    WHERE s.layout_key=? AND d.driver_class=? AND d.is_player=1 AND (?='' OR lower(trim(v.car_type))=?)
+    WHERE s.layout_key=? AND d.driver_class=? AND d.is_player=1 AND (?='' OR d.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE car_model=?))
       AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL
     ORDER BY s.timestamp ASC,s.id ASC`).all(query.layoutKey, query.carClass, carType, carType) as Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }>;
 }

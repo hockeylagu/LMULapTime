@@ -117,8 +117,6 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY (plugin_id, scope_kind, scope_key)
     ) WITHOUT ROWID;
   `);
-  // Match replay names the way replay driver resolution does: trimmed and lowercased.
-  db.function('lmu_driver_key', { deterministic: true }, (name: unknown) => typeof name === 'string' ? name.trim().toLowerCase() : '');
   db.exec(LIVE_CAPTURE_INDEX_SCHEMA);
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (

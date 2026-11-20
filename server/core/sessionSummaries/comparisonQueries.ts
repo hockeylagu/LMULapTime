@@ -85,13 +85,13 @@ function comparisonScope(filters: CompactCompareFilters) {
   const model = filters.carType?.trim().toLowerCase() ?? '';
   const humanParts = filters.humansOnly ? { where: ['d.is_human=1'], args: [] } : { where: [], args: [] };
   let broad = append(append(trackParts, classParts), humanParts);
-  if (model && model !== 'all') broad = append(broad, { where: ['lower(trim(v.car_type))=?'], args: [model] });
+  if (model && model !== 'all') broad = append(broad, { where: ['d.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE car_model=?)'], args: [model] });
   if (filters.telemetryOnly) broad.where.push('s.recording_name IS NOT NULL');
   const driverParts: QueryParts = { where: [], args: [] };
   if (filters.playerOnly) driverParts.where.push('d.is_player=1');
   const driverName = filters.driverName?.trim().toLowerCase() ?? '';
   if (driverName && driverName !== 'all') {
-    driverParts.where.push(filters.driverNameExact ? 'lower(trim(dn.name))=?' : 'instr(lower(dn.name),?)>0'); driverParts.args.push(driverName);
+    driverParts.where.push(filters.driverNameExact ? 'dn.normalized_name=?' : 'instr(dn.normalized_name,?)>0'); driverParts.args.push(driverName);
   }
   const display = append(broad, driverParts);
   // The gold personal best is the driver's fastest lap of the layout and class: any car, any condition,
@@ -125,10 +125,10 @@ function markPagePersonalBests(db: DatabaseType, rows: PageLapFact[], display: Q
   // driver and session is ranked, not every lap.
   const bests = db.prepare(`SELECT session_id,driver_ordinal,lap_ordinal FROM (
       SELECT s.id session_id,d.driver_ordinal,d.best_lap_ordinal lap_ordinal,
-        row_number() OVER (PARTITION BY lower(trim(dn.name))
+        row_number() OVER (PARTITION BY dn.normalized_name
           ORDER BY d.best_lap_time,s.timestamp,s.rowid,d.driver_ordinal) best_rank
       FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
-      WHERE ${whereSql({ where: [...display.where, `lower(trim(dn.name)) IN (${names.map(() => '?').join(',')})`], args: [] })}
+      WHERE ${whereSql({ where: [...display.where, `dn.normalized_name IN (${names.map(() => '?').join(',')})`], args: [] })}
         AND d.best_lap_time>0 AND d.best_lap_ordinal IS NOT NULL
     ) WHERE best_rank=1`).all(...display.args, ...names) as Array<Pick<PageLapFact, 'session_id' | 'driver_ordinal' | 'lap_ordinal'>>;
   const bestKeys = new Set(bests.map(best => `${best.session_id}:${best.driver_ordinal}:${best.lap_ordinal}`));
@@ -151,7 +151,7 @@ export function queryTelemetryComparableLaps(
   const page = Math.max(1, Math.trunc(pageOptions.page ?? 1));
   const pageSize = Math.max(1, Math.min(250, Math.trunc(pageOptions.pageSize ?? 50)));
   const { personalBestScope, selected: scoped } = comparisonScope({ ...filters, telemetryOnly: true });
-  const lapAvailable = availableReplayLapSql('s.recording_name', 'dn.name', 'l.lap_number');
+  const lapAvailable = availableReplayLapSql('s.recording_name', 'dn.normalized_name', 'l.lap_number');
   scoped.where.push(lapAvailable);
   const selected = append(scoped, telemetryViewWhere(filters));
   const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected, true)}`).get(...selected.args) as CountFact).total;
@@ -200,7 +200,7 @@ export function queryCompactComparableLaps(
   const offset = (page - 1) * pageSize;
 
   const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected)}`).get(...selected.args) as CountFact).total;
-  const sessionsCount = (db.prepare(`SELECT count(DISTINCT s.id) total FROM sessions s WHERE ${whereSql(trackParts)}`).get(...trackParts.args) as CountFact).total;
+  const sessionsCount = (db.prepare(`SELECT count(*) total FROM sessions s WHERE ${whereSql(trackParts)}`).get(...trackParts.args) as CountFact).total;
   const baseSql = lapJoinWhere(broad);
   const overallFact = db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player,
       l.lap_ordinal,l.lap_number lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb

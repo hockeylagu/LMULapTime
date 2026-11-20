@@ -13,13 +13,14 @@ const metadata: ReplayMetadata = {
   timeSliceCount: 0, totalEvents: 0, durationSec: 100,
   drivers: [{ slot: 7, name: ' ÉLODIE ' }],
 };
-const availabilitySql = `SELECT ${availableReplayLapSql('s.recording_name', 'dn.name', 'l.lap_number')} available
-  FROM (SELECT ? recording_name) s CROSS JOIN (SELECT ? name) dn CROSS JOIN (SELECT ? lap_number) l`;
+// The driver's name key as `drivers.normalized_name` holds it (sessionRows/dictionaries.ts).
+const availabilitySql = `SELECT ${availableReplayLapSql('s.recording_name', 'dn.normalized_name', 'l.lap_number')} available
+  FROM (SELECT ? recording_name) s CROSS JOIN (SELECT ? normalized_name) dn CROSS JOIN (SELECT ? lap_number) l`;
 
 describe('persisted replay lap availability', () => {
   let db: Database.Database;
   const available = (name = 'Élodie', lapNumber = 20, replayName = filename): boolean =>
-    Boolean((db.prepare(availabilitySql).get(replayName, name, lapNumber) as { available: number }).available);
+    Boolean((db.prepare(availabilitySql).get(replayName, name.trim().toLowerCase(), lapNumber) as { available: number }).available);
   const storeLap = (points = 1, slot = 7, lapNumber = 20): void => {
     upsertReplayTrajectoryCache(db, filename, slot, lapNumber, 1, 1, {
       replayName: filename, currentLap: lapNumber, driverSlot: slot,

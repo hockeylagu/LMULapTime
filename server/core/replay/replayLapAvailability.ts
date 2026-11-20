@@ -50,13 +50,13 @@ export function backfillReplayDriverRosters(db: Database): void {
 
 /**
  * Whether the driver's lap is stored in its linked replay, for SQL expressions of the replay name, the driver's
- * name and the lap number. Both lookups use primary keys: no metadata/trajectory decompression, filesystem checks
- * or decoding. `lmu_driver_key` is the connection function `initDbSchema` registers (every SessionDatabase has it).
+ * name key (`drivers.normalized_name`: trimmed and lowercased, as the roster stores names) and the lap number. Both
+ * lookups use primary keys: no metadata/trajectory decompression, filesystem checks or decoding.
  */
-export function availableReplayLapSql(recordingName: string, driverName: string, lapNumber: string): string {
+export function availableReplayLapSql(recordingName: string, driverKey: string, lapNumber: string): string {
   return `EXISTS (
   SELECT 1 FROM replay_driver_roster rr
   JOIN replay_trajectories rt ON rt.filename=rr.filename AND rt.driver_slot=rr.driver_slot AND rt.lap_key=${lapNumber}
-  WHERE rr.filename=${recordingName} AND rr.driver_name=lmu_driver_key(${driverName}) AND rt.points_count>0
+  WHERE rr.filename=${recordingName} AND rr.driver_name=${driverKey} AND rt.points_count>0
 )`;
 }
