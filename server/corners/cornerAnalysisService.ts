@@ -40,7 +40,10 @@ function driversOf(rows: readonly AnalysisPassRow[]): AnalysisDriver[] {
     }
     lap.passes.push(row.pass);
   }
-  return [...drivers.values()].map(({ byLap: _byLap, ...driver }) => ({ ...driver, laps: driver.laps.toSorted((a, b) => a.lapOrdinal - b.lapOrdinal) }));
+  // In a fixed order: the engine keeps the first of drivers tied on a time, whatever order the query returns rows in.
+  return [...drivers.values()]
+    .toSorted((a, b) => (a.sessionId < b.sessionId ? -1 : a.sessionId > b.sessionId ? 1 : a.driverOrdinal - b.driverOrdinal))
+    .map(({ byLap: _byLap, ...driver }) => ({ ...driver, laps: driver.laps.toSorted((a, b) => a.lapOrdinal - b.lapOrdinal) }));
 }
 
 /**

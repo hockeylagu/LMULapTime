@@ -43,10 +43,10 @@ function fixture(): { db: DatabaseType; add: (session: string, ordinal: number, 
       }
       db.prepare(`INSERT INTO session_drivers (session_id, driver_ordinal, driver_id, vehicle_id, is_player, is_human, driver_class)
         VALUES (?, ?, ?, ?, ?, 1, 'GT3')`).run(session, ordinal, names.get(name), vehicle, player ? 1 : 0);
-      db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(file, name, ordinal + 10);
+      db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(file, name.toLowerCase(), ordinal + 10);
       toApexMs.forEach((ms, index) => {
         db.prepare(`INSERT INTO session_laps (session_id, driver_ordinal, lap_ordinal, lap_number, lap_time, is_valid, is_pit_stop, is_out_lap, condition_group)
-          VALUES (?, ?, ?, ?, ?, 1, 0, 0, 'dry')`).run(session, ordinal, index, index + 2, lapTime ?? null);
+          VALUES (?, ?, ?, ?, ?, 1, 0, 0, 'dry')`).run(session, ordinal, index, index + 2, lapTime ?? 100);
         db.prepare(`INSERT INTO replay_corner_passes (filename, driver_slot, lap_number, segment, entry_ms, min_speed_after_ms, duration_ms,
           entry_speed_dkmh, min_speed_dkmh, exit_speed_dkmh, min_speed_dm, brake_dm, min_speed_gear, peak_brake_pm, brake_ms,
           part_throttle_ms, tc_ms, abs_ms) VALUES (?, ?, ?, ?, 0, ?, ?, 1500, 800, 1200, 1000, ?, 3, 900, 1000, 500, 0, 0)`)
@@ -108,10 +108,12 @@ describe('readSessionCornerAnalysis', () => {
 });
 
 describe('listReferenceAnalysisPasses', () => {
-  it('reads the quickest drivers by usual lap time, the quickest in each car and everyone in the analysed sessions', () => {
+  it('reads the quickest drivers by usual lap time: overall, in each car and in each analysed session', () => {
     const { db, add } = fixture();
     add('s1', 0, 'Ann', true, 90, [2100, 2100], 100);
-    add('s1', 1, 'Slow', false, 100, [2000, 2000], 200);
+    // The analysed session's three quickest and each car's quickest there, however slow; its fourth in car A is left out.
+    ['Slow', 'Slower', 'Slowest', 'Last'].forEach((name, i) => add('s1', i + 1, name, false, 100, [2000, 2000], 200 + i));
+    add('s1', 5, 'Slow B', false, 100, [2000, 2000], 300, 2);
     // Other sessions: twelve drivers in car A, one in car B slower than all of them, one on a single lap.
     for (let i = 0; i < 12; i++) add(`s${10 + i}`, 1, `A${i}`, false, 100, [2000, 2000, 2000], 90 + i);
     add('s30', 1, 'B0', false, 100, [2000, 2000, 2000], 150, 2);
@@ -120,7 +122,7 @@ describe('listReferenceAnalysisPasses', () => {
       layoutKey: 'square', carClass: 'GT3', buildPrefix: layoutPassKey(layout), sessionIds: ['s1'],
     }, minLaps).map(row => row.driverName));
     const quickest = Array.from({ length: REFERENCE_OVERALL }, (_, i) => `A${i}`);
-    expect([...names(2)].toSorted()).toEqual(['B0', 'Slow', ...quickest].toSorted());
+    expect([...names(2)].toSorted()).toEqual(['B0', 'Slow', 'Slow B', 'Slower', 'Slowest', ...quickest].toSorted());
     // A driver under the minimum laps has no usual and is never shortlisted; at a minimum of one lap, Once is.
     expect(names(2).has('Once')).toBe(false);
     expect(names(1).has('Once')).toBe(true);

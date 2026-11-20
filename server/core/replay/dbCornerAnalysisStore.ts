@@ -50,9 +50,10 @@ export interface AnalysisPassScope {
   sessionIds: readonly string[];
 }
 
-/** The reference shortlist: the quickest drivers by usual lap time, overall and in each car. */
+/** The reference shortlist: the quickest drivers by usual lap time, overall, in each car and in each analysed session. */
 export const REFERENCE_OVERALL = 10;
 export const REFERENCE_PER_CAR = 3;
+export const REFERENCE_PER_SESSION = 3;
 
 /**
  * Counted laps follow the corner card's `lapCounts` (dry racing laps after the first); a car is its session driver
@@ -67,7 +68,7 @@ const passQuery = (driverWhere: string, select: string) => `
       LEFT JOIN vehicles v ON v.vehicle_id = d.vehicle_id
       JOIN session_recordings rec ON rec.session_id = s.id
       JOIN replay_corner_pass_builds b ON b.filename = rec.recording_name
-      JOIN replay_driver_roster r ON r.filename = rec.recording_name AND LOWER(TRIM(r.driver_name)) = LOWER(TRIM(n.name))
+      JOIN replay_driver_roster r ON r.filename = rec.recording_name AND r.driver_name = n.normalized_name
       WHERE s.layout_key = $layoutKey AND substr(b.version_key, 1, length($buildPrefix) + 1) = $buildPrefix || '|' AND ${driverWhere}
     ),
     lap AS MATERIALIZED (
@@ -79,10 +80,17 @@ const passQuery = (driverWhere: string, select: string) => `
     )
     ${select}`;
 
-const PASSES = `SELECT l.session_id sessionId, l.driver_ordinal driverOrdinal, l.driver_name driverName, l.car_type carType, l.is_player isPlayer,
-      l.lap_ordinal lapOrdinal, p.*
-    FROM lap l
+/** The passes of the laps in `from` (`lap l`, or the laps joined to a shortlist). */
+const passes = (from: string) => `SELECT l.session_id sessionId, l.driver_ordinal driverOrdinal, l.driver_name driverName, l.car_type carType,
+      l.is_player isPlayer, l.lap_ordinal lapOrdinal, p.*
+    FROM ${from}
     JOIN replay_corner_passes p ON p.filename = l.filename AND p.driver_slot = l.slot AND p.lap_number = l.lap_number`;
+
+/**
+ * The shortlist's laps, the shortlist first (CROSS JOIN keeps SQLite's order): joined from the laps, SQLite read every
+ * candidate's passes before dropping the drivers left out (Daytona GT3, 2026-11-20: 46 -> 29 ms, the same rows).
+ */
+export const SHORTLIST_LAPS = 'pick k CROSS JOIN lap l ON l.session_id = k.session_id AND l.driver_ordinal = k.driver_ordinal';
 
 const IN_SESSIONS = 's.id IN (SELECT value FROM json_each($sessionIds))';
 
@@ -97,14 +105,17 @@ function passRows(db: DatabaseType, sql: string, scope: AnalysisPassScope, extra
 
 /** The player's counted turn passes in the analysed sessions. */
 export function listPlayerAnalysisPasses(db: DatabaseType, scope: AnalysisPassScope): AnalysisPassRow[] {
-  return passRows(db, passQuery(`d.is_player = 1 AND ${IN_SESSIONS}`, PASSES), scope);
+  return passRows(db, passQuery(`d.is_player = 1 AND ${IN_SESSIONS}`, passes('lap l')), scope);
 }
 
 /**
  * The reference candidates' counted turn passes: other human drivers of the class at the layout, shortlisted by
  * overall lap time, not corner by corner (driver, 2026-11-20): the REFERENCE_OVERALL quickest by usual (median) lap
- * over at least `minLaps` counted laps, the REFERENCE_PER_CAR quickest in each car, and everyone in the analysed
- * sessions (the engine prefers a reference from the session). Reading every driver took most of the corner trends' time.
+ * over at least `minLaps` counted laps, the REFERENCE_PER_CAR quickest in each car, and in each analysed session
+ * the REFERENCE_PER_SESSION quickest and each car's quickest (the engine prefers a reference, and a same-car check,
+ * from the session). Reading every driver took most of the corner trends' time; a big online race's whole grid, most
+ * of the rest (Daytona, 2026-11-20). Against every driver, 18 of 2,830 corner references and 3 of 366 same-car
+ * checks changed: a quicker driver by lap time now stands in for one quicker only through the driver's corners.
  */
 export function listReferenceAnalysisPasses(db: DatabaseType, scope: AnalysisPassScope, minLaps: number): AnalysisPassRow[] {
   return passRows(db, passQuery('d.is_player = 0 AND d.is_human = 1', `,
@@ -119,13 +130,14 @@ export function listReferenceAnalysisPasses(db: DatabaseType, scope: AnalysisPas
     ),
     pick AS (
       SELECT session_id, driver_ordinal FROM (
-        SELECT session_id, driver_ordinal, ROW_NUMBER() OVER (ORDER BY usual_time) overall,
-          ROW_NUMBER() OVER (PARTITION BY car_type ORDER BY usual_time) in_car
+        SELECT session_id, driver_ordinal, ROW_NUMBER() OVER (ORDER BY usual_time, session_id, driver_ordinal) overall,
+          ROW_NUMBER() OVER (PARTITION BY car_type ORDER BY usual_time, session_id, driver_ordinal) in_car,
+          ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY usual_time, session_id, driver_ordinal) in_session,
+          ROW_NUMBER() OVER (PARTITION BY session_id, car_type ORDER BY usual_time, session_id, driver_ordinal) in_session_car
         FROM usual
       ) WHERE overall <= $overall OR in_car <= $perCar
-      UNION SELECT session_id, driver_ordinal FROM car WHERE session_id IN (SELECT value FROM json_each($sessionIds))
+        OR ((in_session <= $perSession OR in_session_car = 1) AND session_id IN (SELECT value FROM json_each($sessionIds)))
     )
-    ${PASSES}
-    JOIN pick k ON k.session_id = l.session_id AND k.driver_ordinal = l.driver_ordinal`),
-  scope, { minLaps, overall: REFERENCE_OVERALL, perCar: REFERENCE_PER_CAR });
+    ${passes(SHORTLIST_LAPS)}`),
+  scope, { minLaps, overall: REFERENCE_OVERALL, perCar: REFERENCE_PER_CAR, perSession: REFERENCE_PER_SESSION });
 }

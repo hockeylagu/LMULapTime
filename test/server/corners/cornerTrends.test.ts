@@ -55,11 +55,12 @@ class Fixture {
       VALUES (?, ?, ?, ?, ?, ?, ?)`).run(sessionId, ordinal, this.driverIds.get(name), this.vehicles.get(vehicleKey),
       opts.player ? 1 : 0, opts.human === false ? 0 : 1, carClass);
     const slot = ordinal + 10;
-    if (file) this.db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(file, name, slot);
+    if (file) this.db.prepare('INSERT INTO replay_driver_roster (filename, driver_name, driver_slot) VALUES (?, ?, ?)').run(file, name.trim().toLowerCase(), slot);
     laps.forEach((lap, index) => {
       this.db.prepare(`INSERT INTO session_laps (session_id, driver_ordinal, lap_ordinal, lap_number, is_valid, is_pit_stop, is_out_lap,
-        non_representative_reason, condition_group) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`)
-        .run(sessionId, ordinal, index, lap.lap, lap.valid ?? 1, lap.pit ?? 0, lap.reason ?? null, lap.wet ? 'wet' : 'dry');
+        non_representative_reason, condition_group, lap_time) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`)
+        // The lap goes as the turn goes: the reference shortlist ranks drivers by usual lap time.
+        .run(sessionId, ordinal, index, lap.lap, lap.valid ?? 1, lap.pit ?? 0, lap.reason ?? null, lap.wet ? 'wet' : 'dry', lap.sec * 10);
       if (!file) return;
       for (const table of ['replay_corner_passes', 'replay_sequence_passes']) {
         this.db.prepare(`INSERT INTO ${table} (filename, driver_slot, lap_number, segment, entry_ms, duration_ms)

@@ -47,7 +47,7 @@ const groupBy =<T>(rows: readonly T[], key: (row: T) => string): Map<string, T[]
 /**
  * The driver's corner times at a layout, session by session, for a class (and car model): each corner of the class's
  * map (else the official turns) with a point per session of at least `minTrendPasses` counted dry passes (one in
- * qualifying), and the class's fastest usual by another driver (same minimum) as the reference. Only passes of the
+ * qualifying), and the class's fastest usual by another driver (same minimum; among the quickest by lap time) as the reference. Only passes of the
  * current build and map count; the sessions left out are counted by reason. Null without a centre line.
  */
 export function readCornerTrends(
@@ -56,14 +56,14 @@ export function readCornerTrends(
   const layout = placeLayout(layoutKey, loadTrack);
   if (!layout) return null;
   const { corners, map } = placedLayoutCorners(layout, carClass, (layoutOf, classOf) => reader.getSequenceMap(layoutOf, classOf));
+  const minPasses = minTrendPasses(layout.lengthM);
   const scope: CornerTrendScope = {
     layoutKey, carClass, carType: carType.trim().toLowerCase(), kind: corners.kind,
-    buildPrefix: layoutPassKey(layout), mapMarker: map ? `|${carClass}:${map.mapKey}|` : '',
+    buildPrefix: layoutPassKey(layout), mapMarker: map ? `|${carClass}:${map.mapKey}|` : '', minLaps: minPasses,
   };
   const sessions = reader.listCornerTrendSessions(scope);
   const bySession = new Map(sessions.map(session => [session.sessionId, session]));
   const rows = reader.listCornerTrendPasses(scope);
-  const minPasses = minTrendPasses(layout.lengthM);
 
   const own = groupBy(rows.filter(row => row.isPlayer && bySession.has(row.sessionId)), row => `${row.segment}|${row.sessionId}`);
   const others = groupBy(rows.filter(row => !row.isPlayer), row => `${row.segment}|${row.sessionId}|${row.driverOrdinal}`);
@@ -73,7 +73,8 @@ export function readCornerTrends(
     const { segment, sessionId, timestamp } = passes[0];
     const usualSec = (median(passes.map(pass => pass.durationMs)) ?? 0) / 1000;
     const best = reference.get(segment);
-    if (!best || usualSec < best.usualSec) reference.set(segment, { usualSec, sessionId, timestamp });
+    // Tied: the earlier session id, whatever order the query returns rows in.
+    if (!best || usualSec < best.usualSec || (usualSec === best.usualSec && sessionId < best.sessionId)) reference.set(segment, { usualSec, sessionId, timestamp });
   }
 
   const withPoint = new Set<string>();
