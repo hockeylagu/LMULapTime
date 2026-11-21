@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { serverRetryDelay, useAppData } from '../../src/api/useAppData.js';
+import { ApiError } from '../../src/api/apiClient.js';
 import type { ReferenceBenchmarkDiff, ScanStatus } from '../../shared/types/index.js';
 import { getCachedVehicleLogos, setCachedVehicleLogos } from '../../src/api/vehicles/vehicleLogosApi.js';
 
@@ -175,7 +176,7 @@ describe('app scan freshness', () => {
     let failStatus = false;
     let failRefresh = false;
     fetchMock.mockImplementation((url: string) => {
-      if (url === '/api/scan/status') return failStatus ? Promise.reject(new Error('transient status error')) : reply(idle());
+      if (url === '/api/scan/status') return failStatus ? Promise.reject(new ApiError('transient status error', 500)) : reply(idle());
       if (url === '/api/scan') return failRefresh ? Promise.reject(new Error('refresh data error')) : reply({ success: true });
       if (url === '/api/status') return reply({ sessionsCount: 1 });
       return reply([]);
@@ -209,7 +210,24 @@ describe('app scan freshness', () => {
     const calls = fetchMock.mock.calls.length; await poll(); await poll(); expect(fetchMock).toHaveBeenCalledTimes(calls);
   });
 
-  it('drops a stale running scan when the server stops answering, and backs off the retries', async () => {
+  it('waits quietly for a starting server, asking every second, and loads as soon as it answers', async () => {
+    let up = false;
+    const answer = fetchMock.getMockImplementation()!;
+    count = 3;
+    fetchMock.mockImplementation((url: string) => up ? answer(url)
+      : Promise.resolve({ ok: false, status: 502, json: () => Promise.reject(new Error('not JSON')) }));
+    const { result } = await mount();
+    const statusCalls = () => fetchMock.mock.calls.filter(([url]) => url === '/api/scan/status').length;
+    for (let second = 1; second <= 20; second++) await poll();
+    expect(statusCalls()).toBe(21);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(true);
+    up = true; await poll();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.status?.sessionsCount).toBe(3);
+  });
+
+  it('drops a stale running scan when the server stops answering, shows the outage after 30 s, and backs off the retries', async () => {
     scan.running = true; scan.total = 10; scan.processed = 4;
     const { result } = await mount();
     expect(result.current.replayScanStatus?.running).toBe(true);
@@ -217,16 +235,18 @@ describe('app scan freshness', () => {
     fetchMock.mockImplementation((url: string) => url === '/api/scan/status' ? Promise.reject(new Error('fetch failed')) : reply([]));
     await poll();
     expect(result.current.replayScanStatus).toBeNull();
+    expect(result.current.error).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(result.current.error).toBe('fetch failed');
 
     const statusCalls = () => fetchMock.mock.calls.filter(([url]) => url === '/api/scan/status').length;
-    const afterFirstFailure = statusCalls();
+    const afterOutage = statusCalls();
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-    expect(statusCalls()).toBe(afterFirstFailure + 1);
+    expect(statusCalls()).toBe(afterOutage + 1);
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-    expect(statusCalls()).toBe(afterFirstFailure + 1);
+    expect(statusCalls()).toBe(afterOutage + 1);
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-    expect(statusCalls()).toBe(afterFirstFailure + 2);
+    expect(statusCalls()).toBe(afterOutage + 2);
   });
 
   it('retries after 2 s, 4 s, 8 s and then every 15 s', () => {

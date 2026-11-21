@@ -1,6 +1,6 @@
 import { useState, useEffect, useEffectEvent, useCallback, useRef, startTransition } from 'react';
 import type { AppStatus, ScanStatus } from '../../shared/types/index.js';
-import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
+import { ApiError, fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
 import { sequenceMapsChanged } from './cornerSequenceApi.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
 import { setVehicleLogoSource } from './vehicles/vehicleLogosApi.js';
@@ -10,6 +10,17 @@ import { useAppEvents } from './useAppEvents.js';
 const SERVER_RETRY_MS = 2000;
 /** An unreachable server is asked less and less often, down to once every 15 seconds. */
 const SERVER_RETRY_MAX_MS = 15000;
+/**
+ * A server that stops answering is starting or restarting (the dev watcher restarts it on every server change) for this long: it is
+ * asked every second and no error shows. Past it, the outage shows and the retries back off.
+ */
+const SERVER_START_GRACE_MS = 30_000;
+const SERVER_START_RETRY_MS = 1000;
+
+/** No answer from the server: the request failed, or the dev proxy answered for it (502, 504). */
+function serverUnreachable(error: unknown): boolean {
+  return !(error instanceof ApiError) || error.status === 502 || error.status === 504;
+}
 
 const REFERENCE_SEEN_KEY = 'lmu.referenceUpdateSeen';
 
@@ -56,6 +67,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
   const refreshAbort = useRef<AbortController | null>(null);
   const pollGeneration = useRef(0);
   const pollFailures = useRef(0);
+  const unreachableSince = useRef<number | null>(null);
   const loaded = useRef(false);
   const loadedKey = useRef<string | null>(null);
   const referenceHandled = useRef<string | null>(null);
@@ -97,6 +109,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
         const scan = await fetchJson<ScanStatus>('/api/scan/status', { signal: controller.signal });
         if (!mounted.current || generation !== pollGeneration.current) return;
         pollFailures.current = 0;
+        unreachableSince.current = null;
         setReplayScanStatus(scan);
         setStatusError(null);
         const reference = scan.referenceLaptimes;
@@ -123,9 +136,15 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
         if (active || retry) pollTimer.current = setTimeout(() => { void poll(); }, retry ? SERVER_RETRY_MS : 1000);
       } catch (err: unknown) {
         if (!mounted.current || generation !== pollGeneration.current || isAbortError(err)) return;
-        pollFailures.current += 1;
         // The last progress we saw is out of date once the server stops answering (a restart ends every scan).
         setReplayScanStatus(null);
+        const now = Date.now();
+        unreachableSince.current = serverUnreachable(err) ? unreachableSince.current ?? now : null;
+        if (unreachableSince.current !== null && now - unreachableSince.current < SERVER_START_GRACE_MS) {
+          pollTimer.current = setTimeout(() => { void poll(); }, SERVER_START_RETRY_MS);
+          return;
+        }
+        pollFailures.current += 1;
         setStatusError(apiErrorMessage(err, 'Unable to check processing progress.'));
         pollTimer.current = setTimeout(() => { void poll(); }, serverRetryDelay(pollFailures.current));
       }
