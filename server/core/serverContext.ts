@@ -8,7 +8,7 @@ import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 
 import { SessionReplayLinks } from '../sessions/sessionReplayLinks.js';
-import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from '../../shared/types/index.js';
+import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus } from '../../shared/types/index.js';
 
 import { SessionDatabase } from './db.js';
 import {
@@ -159,10 +159,8 @@ export class ServerContext {
     if (typeof values.replaysDir === 'string' && fs.existsSync(values.replaysDir)) this.currentReplaysDir = values.replaysDir;
     if (typeof values.telemetryDir === 'string' && fs.existsSync(values.telemetryDir)) {
       const telemetryDirectoryChanged = path.normalize(values.telemetryDir).toLowerCase() !== path.normalize(this.currentTelemetryDir).toLowerCase();
-      if (telemetryDirectoryChanged && typeof this.sessionDb.clearTelemetryCache === 'function') {
+      if (telemetryDirectoryChanged) {
         this.sessionDb.clearTelemetryCache();
-      }
-      if (telemetryDirectoryChanged && typeof this.telemetryCatalog?.clear === 'function') {
         this.telemetryCatalog.clear();
       }
       this.currentTelemetryDir = values.telemetryDir;
@@ -179,24 +177,18 @@ export class ServerContext {
   }
 
   public hasActiveFileScan(): boolean {
-    const telemetryRunning = typeof this.telemetryCatalog?.getScanStatus === 'function'
-      ? this.telemetryCatalog.getScanStatus().running
-      : false;
-    return this.sessionScanStatus.running || this.replayScanStatus.running || telemetryRunning ||
+    return this.sessionScanStatus.running || this.replayScanStatus.running || this.telemetryCatalog.getScanStatus().running ||
       this.sessionReplayReconciliationRunning || this.telemetryOwnershipReconciliationRunning;
   }
 
   private configureReplayLookup(): void {
-    if (typeof this.sessionDb.getReplayMatchingEntries === 'function') {
-      this.parser.setReplayLookup(target => this.sessionDb.getReplayMatchingEntries(target));
-    }
+    this.parser.setReplayLookup(target => this.sessionDb.getReplayMatchingEntries(target));
   }
 
   public get serverInstanceId(): string { return this.instanceId; }
 
   private replayByName() {
-    return { get: (name: string) => typeof this.sessionDb.getReplayMatchingEntry === 'function'
-      ? this.sessionDb.getReplayMatchingEntry(name) : this.parser.getReplaysList().find(replay => replay.name === name) };
+    return { get: (name: string) => this.sessionDb.getReplayMatchingEntry(name) };
   }
 
   /**
@@ -209,7 +201,7 @@ export class ServerContext {
       this.replayLinks.linkSessions(sessions, this.parser, this.replayByName());
       this.resetTelemetryLinksIfRuleChanged();
       const catalog = { files: this.sessionDb.getTelemetryFiles(), stored: this.sessionDb.getTelemetryMetadata() };
-      this.storeNewTelemetryLinks(sessions, this.sessionDb.getReplayMatchingEntries?.() ?? this.parser.getReplaysList(), catalog);
+      this.storeNewTelemetryLinks(sessions, this.sessionDb.getReplayMatchingEntries(), catalog);
       for (const session of sessions) this.applySessionTelemetry(session);
     } catch (error) {
       console.warn('[Telemetry Matcher] Error enriching sessions with DuckDB telemetry:', error);
@@ -221,13 +213,13 @@ export class ServerContext {
     const filename = TelemetryLinks.load(this.sessionDb, session.id).forSession(session);
     if (filename) session.duckdbFilename = filename;
     else delete session.duckdbFilename;
-    if (typeof this.sessionDb.updateSessionTelemetryFile === 'function') this.sessionDb.updateSessionTelemetryFile(session.id, filename);
+    this.sessionDb.updateSessionTelemetryFile(session.id, filename);
   }
 
   /** Persist the main file for an owner without hydrating its laps, events, or driver history. */
   private applySessionTelemetryById(sessionId: string): void {
     const filename = TelemetryLinks.load(this.sessionDb, sessionId).forSession({ id: sessionId });
-    if (typeof this.sessionDb.updateSessionTelemetryFile === 'function') this.sessionDb.updateSessionTelemetryFile(sessionId, filename);
+    this.sessionDb.updateSessionTelemetryFile(sessionId, filename);
   }
 
   private resetTelemetryLinksIfRuleChanged(): void {
@@ -362,7 +354,7 @@ export class ServerContext {
       retryFailed,
       onMetadataReady: async () => {
         await this.reconcileSessionReplayLinks();
-        return typeof this.sessionDb.getStoredRecordingNames === 'function' ? this.sessionDb.getStoredRecordingNames() : new Set<string>();
+        return this.sessionDb.getStoredRecordingNames();
       },
       onReplayState: job => { this.replayJobs.set(job.name, job); },
       onReplayStored: async (filename, metadata) => {
@@ -612,19 +604,7 @@ export class ServerContext {
   public getReplayScanStatus(): ReplayScanStatus { return this.replayScanStatus; }
 
   public getScanStatus(): ScanStatus {
-    const defaultTelemetryScan: TelemetryScanStatus = {
-      running: false,
-      processed: 0,
-      total: 0,
-      currentFile: null,
-      startedAt: null,
-      finishedAt: null,
-      result: null,
-      error: null,
-    };
-    const telemetryScan = typeof this.telemetryCatalog?.getScanStatus === 'function'
-      ? this.telemetryCatalog.getScanStatus()
-      : defaultTelemetryScan;
+    const telemetryScan = this.telemetryCatalog.getScanStatus();
     const allComplete = !this.pendingSessionRefresh && !this.replayScanStatus.running && !this.sessionScanStatus.running &&
       !telemetryScan.running && !this.sessionProjectionBackfill.running && !this.sessionReplayReconciliationRunning &&
       !this.telemetryOwnershipReconciliationRunning;
@@ -637,7 +617,7 @@ export class ServerContext {
     const jobs = new Map(this.replayJobs);
     const activeFile = this.replayScanStatus.running ? this.replayScanStatus.currentFile : null;
     if (activeFile) jobs.set(activeFile, { ...jobs.get(activeFile), name: activeFile, status: 'processing' });
-    const owners = this.sessionDb.getRecordingOwners?.([...jobs.keys()]) ?? new Map<string, string>();
+    const owners = this.sessionDb.getRecordingOwners([...jobs.keys()]);
     const sessionReplayJobs = [...jobs.values()].flatMap(({ name, ...job }) => {
       const sessionId = owners.get(name);
       if (!sessionId) return [];
@@ -647,9 +627,9 @@ export class ServerContext {
 
     return {
       // Includes the process identity: a restarted server cannot reuse the previous revision.
-      dataRevision: [this.instanceId, this.sessionDb.getSessionRevision?.() ?? 0,
-        this.sessionDb.getReplayMetadataRevision?.() ?? 0,
-        this.sessionDb.getTelemetryMetadataRevision?.() ?? 0].join(':'),
+      dataRevision: [this.instanceId, this.sessionDb.getSessionRevision(),
+        this.sessionDb.getReplayMetadataRevision(),
+        this.sessionDb.getTelemetryMetadataRevision()].join(':'),
       ...this.replayScanStatus,
       replayJobs: [...this.replayJobs.values()],
       sessionReplayJobs,

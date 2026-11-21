@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionDatabase } from '../../../server/core/db.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import type { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import type { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
+import { withSessionDbDefaults } from '../../helpers/serverContextMocks.js';
 
 function createContext() {
   const metadata = new Map<string, string>();
@@ -27,7 +27,7 @@ function createContext() {
   const telemetryCatalog = { getScanStatus: () => ({ running: false }), refresh: vi.fn(() => Promise.resolve(0)) };
   const context = new ServerContext({
     resultsDir: '', replaysDir: '', telemetryDir: '', parser: new LmuParser(),
-    sessionDb: sessionDb as unknown as SessionDatabase,
+    sessionDb: withSessionDbDefaults(sessionDb),
     telemetryCatalog: telemetryCatalog as unknown as TelemetryCatalog,
     replayRecordings: {} as ReplayRecordingService,
   });

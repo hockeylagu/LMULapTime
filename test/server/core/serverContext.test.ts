@@ -11,6 +11,7 @@ import { ReplayRecordingService } from '../../../server/replay/replayRecordingSe
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
 import { replayIndexEntryFromStored } from '../../../server/sessions/replayMatching.js';
+import { idleTelemetryCatalog, withSessionDbDefaults } from '../../helpers/serverContextMocks.js';
 
 const benchmarkDiff: ReferenceBenchmarkDiff = {
   timestamp: '2026-09-23T00:00:00.000Z',
@@ -30,21 +31,8 @@ const storedTelemetryLinks = {
 };
 
 function createServerContext(options: ConstructorParameters<typeof ServerContext>[0]): ServerContext {
-  const metadata = new Map<string, string>();
-  const sessionDb = options.sessionDb as unknown as Record<string, unknown>;
-  if (typeof sessionDb.getMetadata !== 'function') {
-    sessionDb.getMetadata = vi.fn((key: string) => metadata.get(key) ?? null);
-  }
-  if (typeof sessionDb.setMetadata !== 'function') {
-    sessionDb.setMetadata = vi.fn((key: string, value: string) => { metadata.set(key, value); });
-  }
-  if (typeof sessionDb.invalidateUnresolvedReplayDefaults !== 'function') {
-    sessionDb.invalidateUnresolvedReplayDefaults = vi.fn();
-  }
-  if (typeof sessionDb.reconcileReplayPlayerOwnership !== 'function') {
-    sessionDb.reconcileReplayPlayerOwnership = vi.fn();
-  }
-  return new ServerContext({ ...options, sessionDb: sessionDb as unknown as SessionDatabase });
+  return new ServerContext({ ...options, sessionDb: withSessionDbDefaults(options.sessionDb, options.parser),
+    telemetryCatalog: options.telemetryCatalog instanceof TelemetryCatalog ? options.telemetryCatalog : idleTelemetryCatalog(options.telemetryCatalog) });
 }
 
 function createContext(sessionDb: SessionDatabase = {

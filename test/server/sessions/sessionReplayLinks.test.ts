@@ -20,6 +20,10 @@ function practiceSession(replayName: string): DetailedSession {
   } as unknown as DetailedSession;
 }
 
+// A store with nothing stored: no XML time, no linked sessions, no rejected links.
+const emptyStore = () => ({ updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn(), getSessionXmlMtime: () => undefined,
+  getSessionsLinkedToRecording: () => [], getRejectedReplayLinks: () => new Map() });
+
 describe('SessionReplayLinks', () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -44,7 +48,7 @@ describe('SessionReplayLinks', () => {
     const stat = vi.spyOn(fs, 'statSync')
       .mockImplementationOnce(() => { throw new Error('temporarily unavailable'); })
       .mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
-    const links = new SessionReplayLinks({ updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn() });
+    const links = new SessionReplayLinks(emptyStore());
     const session = practiceSession('Spa P1.Vcr');
     expect(links.xmlMtime(session)).toBeUndefined();
     expect(links.xmlMtime(session)).toBe(xmlMtimeMs);
@@ -55,7 +59,7 @@ describe('SessionReplayLinks', () => {
   it('keeps an identity-valid link while timing is unavailable, then retries timestamp validation', () => {
     vi.spyOn(fs, 'statSync').mockImplementationOnce(() => { throw new Error('locked'); })
       .mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
-    const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn() };
+    const db = emptyStore();
     const links = new SessionReplayLinks(db);
     const session = practiceSession('Spa P1.Vcr');
     const replay = { name: 'Spa P1.Vcr', trackName: 'Spa', sessionCode: 'P1', mtimeMs: xmlMtimeMs } as ReplayFileEntry;
@@ -69,7 +73,7 @@ describe('SessionReplayLinks', () => {
 
   it('withdraws a known layout contradiction when the stored XML timestamp is missing', () => {
     vi.spyOn(fs, 'statSync').mockImplementation(() => { throw new Error('XML deleted'); });
-    const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn(), getSessionXmlMtime: () => undefined };
+    const db = emptyStore();
     const links = new SessionReplayLinks(db);
     const session = practiceSession('Spa P1.Vcr');
     session.trackVenue = 'Fuji Speedway';
@@ -85,7 +89,7 @@ describe('SessionReplayLinks', () => {
   });
 
   it('revalidates reparsed session metadata at the same replay revision', () => {
-    const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn(), getSessionXmlMtime: () => xmlMtimeMs };
+    const db = { ...emptyStore(), getSessionXmlMtime: () => xmlMtimeMs };
     const links = new SessionReplayLinks(db);
     const session = practiceSession('Spa P1.Vcr');
     const replay = { name: 'Spa P1.Vcr', trackName: 'Spa', sessionCode: 'P1', mtimeMs: xmlMtimeMs } as ReplayFileEntry;
@@ -101,7 +105,7 @@ describe('SessionReplayLinks', () => {
 
   it('re-checks stored links again after the parser is replaced, whose revisions restart', () => {
     vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
-    const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn(), getRejectedReplayLinks: () => new Map() };
+    const db = emptyStore();
     const links = new SessionReplayLinks(db);
     const session = practiceSession('Spa R1 1.Vcr');
     const raceReplay = { name: 'Spa R1 1.Vcr', path: '', fileSizeBytes: 1, trackName: 'Spa', sessionCode: 'R1', mtimeMs: xmlMtimeMs } as ReplayFileEntry;

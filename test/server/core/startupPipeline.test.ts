@@ -8,6 +8,7 @@ import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
 import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { FileIngestWorker } from '../../../server/core/ingest/fileIngestWorkerClient.js';
+import { withSessionDbDefaults } from '../../helpers/serverContextMocks.js';
 
 describe('XML-first startup pipeline', () => {
   let dir: string;
@@ -80,7 +81,7 @@ describe('XML-first startup pipeline', () => {
         trackVenue: '', trackCourse: '', trackLengthMeters: null, sessionType: 'Race', sessionName: 'R1', drivers: [],
       } as unknown as import('../../../shared/types/index.js').DetailedSession)),
     };
-    const sessionDb = sessionDbMock as unknown as SessionDatabase;
+    const sessionDb = withSessionDbDefaults(sessionDbMock);
     const context = new ServerContext({ resultsDir: dir, replaysDir: dir, telemetryDir: dir, parser: new LmuParser(),
       sessionDb, telemetryCatalog: new TelemetryCatalog(sessionDb), replayRecordings: new ReplayRecordingService(sessionDb) });
     const reconciliation = context.reconcileSessionReplayLinks();

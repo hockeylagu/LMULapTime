@@ -3,10 +3,10 @@ import type { LmuParser } from './parser.js';
 import type { ReplayFileEntry } from './sessionXmlTypes.js';
 import { pickReplayOwner, replayLinkIdentityRejection, replayLinkRejection, ReplayMatchTarget } from './replayMatching.js';
 import type { SessionDatabase } from '../core/db.js';
-import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason } from '../../shared/types/index.js';
+import { DetailedSession, ReplayLinkRejectionReason } from '../../shared/types/index.js';
 
-type ReplayLinkStore = Pick<SessionDatabase, 'updateSessionMatchingReplay' | 'rejectSessionReplayLink'> &
-  Partial<Pick<SessionDatabase, 'getRejectedReplayLinks' | 'getSessionsLinkedToRecording' | 'getSessionXmlMtime'>>;
+type ReplayLinkStore = Pick<SessionDatabase, 'updateSessionMatchingReplay' | 'rejectSessionReplayLink'
+  | 'getRejectedReplayLinks' | 'getSessionsLinkedToRecording' | 'getSessionXmlMtime'>;
 
 /**
  * Keeps each session's replay link true to the matching rules (replayMatching.ts): links sessions
@@ -18,9 +18,7 @@ export class SessionReplayLinks {
 
   /** Links, re-checks and de-duplicates the replay links of `sessions` against the parser's replay index. */
   public linkSessions(sessions: DetailedSession[], parser: LmuParser, replaysByName: Pick<ReadonlyMap<string, ReplayFileEntry>, 'get'>): void {
-    const rejectedLinks = typeof this.db.getRejectedReplayLinks === 'function'
-      ? this.db.getRejectedReplayLinks(sessions.map(session => session.id))
-      : new Map<string, RejectedReplayLink[]>();
+    const rejectedLinks = this.db.getRejectedReplayLinks(sessions.map(session => session.id));
 
     for (const session of sessions) {
       if (session.matchingReplayFile) {
@@ -49,7 +47,7 @@ export class SessionReplayLinks {
 
   /** Write-once XML end time comes from ingestion; missing stored values fall back to disk and retry failures. */
   public xmlMtime(session: Pick<DetailedSession, 'id' | 'filePath'>): number | undefined {
-    const stored = this.db.getSessionXmlMtime?.(session.id, session.filePath);
+    const stored = this.db.getSessionXmlMtime(session.id, session.filePath);
     if (stored !== undefined) return stored;
     if (!session.filePath) return undefined;
     try {
@@ -165,7 +163,7 @@ export class SessionReplayLinks {
       claimsByReplay.set(name, claims);
     }
     for (const [name, claims] of claimsByReplay) {
-      const byId = new Map((this.db.getSessionsLinkedToRecording?.(name) ?? []).map(session => [session.id, session] as const));
+      const byId = new Map(this.db.getSessionsLinkedToRecording(name).map(session => [session.id, session] as const));
       for (const session of claims) byId.set(session.id, session);
       claimsByReplay.set(name, [...byId.values()]);
     }
