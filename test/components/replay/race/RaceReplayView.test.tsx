@@ -125,7 +125,7 @@ describe('RaceReplayView', () => {
     fireEvent.click(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Bea/ }));
     expect(document.querySelector('[data-race-car="1"]')!.getAttribute('opacity')).toBe('0.4');
     expect(document.querySelector('[data-race-car="2"]')!.getAttribute('opacity')).toBeNull();
-    expect(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Ann/ }).className).toContain('opacity-50');
+    expect(within(screen.getByTestId('race-standings')).getByRole('button', { name: /Ann/ }).className).toContain('text-lmu-faint');
   });
 
   it('follows a car on the map after a double click in the standings', async () => {

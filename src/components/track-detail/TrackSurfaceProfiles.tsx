@@ -75,7 +75,7 @@ export const TrackSurfaceProfiles: React.FC<TrackSurfaceProfilesProps> = React.m
           </div>
         );
       })}
-      <div className="flex justify-between pl-[7.5rem] pr-[7.5rem] text-[9px] font-mono text-lmu-faint">
+      <div className="flex justify-between pl-[7.5rem] pr-[7.5rem] text-[10px] font-mono text-lmu-faint">
         <span>Start / finish</span><span>Station {Math.round(lengthM).toLocaleString()} m</span>
       </div>
     </section>
