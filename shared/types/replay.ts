@@ -1,6 +1,6 @@
 import type { NonRepresentativeReason } from './session.js';
 import type { VehicleDataRecord, VehicleHandlingCalibration } from './dataPlugin.js';
-import type { TrackKerbType, TrackTimingGates } from './trackGeometry.js';
+import type { TrackTimingGates } from './trackGeometry.js';
 import type { ScenerySessionId } from './scenes/scenery.js';
 import type { WeatherCondition } from './session.js';
 import type { LiveCaptureOverlay, LiveDynamicsProvenance, WheelSlip } from './liveEvidence.js';
@@ -144,18 +144,6 @@ export interface ReplayTrajectoryPoint {
   /** Signed car-center distance to the physical road edge; negative means outside. */
   leftRoadDistanceM?: number | null;
   rightRoadDistanceM?: number | null;
-  /** Ground elevation at the reference route in the native local datum, not car-body Y. */
-  roadElevationM?: number | null;
-  roadGradePct?: number | null;
-  /** Positive banking means the left road edge is higher than the right. */
-  roadBankDeg?: number | null;
-  leftKerbWidthM?: number | null;
-  rightKerbWidthM?: number | null;
-  leftKerbHeightM?: number | null;
-  rightKerbHeightM?: number | null;
-  /** Kerb type beside the car's station on each side (flat / sawtooth / other), null without a kerb. */
-  leftKerbType?: TrackKerbType | null;
-  rightKerbType?: TrackKerbType | null;
   /** ISO vehicle X acceleration in g: positive forward, braking negative. */
   accelLonG?: number;
   /** ISO vehicle Y acceleration in g: positive toward the vehicle's left. */

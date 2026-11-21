@@ -125,9 +125,7 @@ describe('geometry revision migration', () => {
       ({ x, y, z, timeSec, tireTemps, tirePressures, brakeTemps, rideHeight })))
       .toEqual(retained.points.map(({ x, y, z, timeSec, tireTemps, tirePressures, brakeTemps, rideHeight }) =>
         ({ x, y, z, timeSec, tireTemps, tirePressures, brakeTemps, rideHeight })));
-    expect(lap.points[1]).toMatchObject({ stationM: 50, lateralOffsetM: -2,
-      leftRoadDistanceM: 7, rightRoadDistanceM: 6, roadElevationM: 20, roadGradePct: 2,
-      roadBankDeg: 3, leftKerbHeightM: 0.05, rightKerbHeightM: null, leftKerbType: 'flat', rightKerbType: null });
+    expect(lap.points[1]).toMatchObject({ stationM: 50, lateralOffsetM: -2, leftRoadDistanceM: 7, rightRoadDistanceM: 6 });
     expect(lap.points[2].stationM).toBe(lap.trackLengthM);
   });
 
@@ -181,14 +179,13 @@ describe('geometry revision migration', () => {
 
   it('reports null for unavailable physical measurements and keeps cache objects isolated', () => {
     const geometry = fixture();
-    for (const key of ['leftWidthM', 'rightWidthM', 'elevationM', 'gradePct', 'bankDeg', 'leftKerbHeightM'] as const) {
+    for (const key of ['leftWidthM', 'rightWidthM'] as const) {
       geometry.surfaceProfile![key] = [null, null, null, null];
     }
     const { store } = storeFor(geometry);
     const lap = archivedLap();
     applyCanonicalProjection(lap, store.get('monza_gp')!);
-    expect(lap.points[1]).toMatchObject({ leftRoadDistanceM: null, rightRoadDistanceM: null,
-      roadElevationM: null, roadGradePct: null, roadBankDeg: null, leftKerbHeightM: null });
+    expect(lap.points[1]).toMatchObject({ leftRoadDistanceM: null, rightRoadDistanceM: null });
     const input = archivedLap();
     const snapshot = structuredClone(input);
     const response = enrichTrajectoryWithTrackGeometry(input, 'Autodromo Nazionale Monza', 'Monza GP');
@@ -221,13 +218,9 @@ describe('geometry revision migration', () => {
     delete geometry.surfaceProfile;
     const { store } = storeFor(geometry);
     const lap = archivedLap();
-    Object.assign(lap.points[1], { leftRoadDistanceM: 9, rightRoadDistanceM: 9,
-      roadElevationM: 30, roadGradePct: 10, roadBankDeg: 10, leftKerbHeightM: 0.2,
-      rightKerbHeightM: 0.2, leftKerbWidthM: 1, rightKerbWidthM: 1, leftKerbType: 'flat', rightKerbType: 'other' });
+    Object.assign(lap.points[1], { leftRoadDistanceM: 9, rightRoadDistanceM: 9 });
     applyCanonicalProjection(lap, store.get('monza_gp')!);
-    for (const key of ['leftRoadDistanceM', 'rightRoadDistanceM', 'roadElevationM', 'roadGradePct',
-      'roadBankDeg', 'leftKerbHeightM', 'rightKerbHeightM', 'leftKerbWidthM', 'rightKerbWidthM',
-      'leftKerbType', 'rightKerbType'] as const) {
+    for (const key of ['leftRoadDistanceM', 'rightRoadDistanceM'] as const) {
       expect(lap.points[1][key]).toBeUndefined();
     }
   });

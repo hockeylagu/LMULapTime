@@ -145,8 +145,8 @@ describe('local data plugin snapshot',()=>{
     publicCopy.geometry.centerline[0][0] = 42;
     expect(shared.centerline[0][0]).not.toBe(42);
     const trajectory:ReplayTrajectoryData={replayName:'Test.Vcr',pointsCount:2,points:definition.centerline.slice(2,4).map(([x,z],i)=>({x,y:0,z,timeSec:i})),bounds:definition.bounds};
-    applyCanonicalProjection(trajectory,definition);expect(trajectory.stationSource).toBe('track');expect(trajectory.points[0].roadBankDeg).toBe(3);expect(trajectory.points[0].leftKerbWidthM).toBe(1);expect(trajectory.points[0].rightKerbWidthM).toBeNull();
-    const without=enrichTrajectoryWithTrackGeometry(trajectory,'Unknown','Unknown');expect(without.stationSource).toBe('odometer');expect(without.points[0].roadBankDeg).toBeUndefined();expect(without.points[0].leftRoadDistanceM).toBeUndefined();
+    applyCanonicalProjection(trajectory,definition);expect(trajectory.stationSource).toBe('track');expect(trajectory.points[0].leftRoadDistanceM).not.toBeUndefined();
+    const without=enrichTrajectoryWithTrackGeometry(trajectory,'Unknown','Unknown');expect(without.stationSource).toBe('odometer');expect(without.points[0].leftRoadDistanceM).toBeUndefined();
   });
   it('serves validated payloads without a local caller restriction and does not expose package files',async()=>{
     const {dir}=fixture();const app=express();app.use('/api/data-plugin',createDataPluginRouter(new DataPlugin(dir)));

@@ -150,7 +150,7 @@ export function applyCanonicalProjection(
       runningDist += (d < 1000 ? d : 0);
     }
     pt.distM = Number(runningDist.toFixed(2));
-    annotateRoadProfile(pt, trackDef);
+    annotateRoadDistance(pt, trackDef);
   }
 
   trajectory.layoutKey = trackDef.layoutKey;
@@ -165,35 +165,18 @@ export function applyCanonicalProjection(
   trajectory.stationSource = 'track';
 }
 
-function annotateRoadProfile(point: ReplayTrajectoryPoint, definition: CachedTrackDefinition | null): void {
+/** The car's distance to each road edge, from the track's surface profile. */
+function annotateRoadDistance(point: ReplayTrajectoryPoint, definition: CachedTrackDefinition | null): void {
   if (!definition?.surfaceProfile) {
     delete point.leftRoadDistanceM;
     delete point.rightRoadDistanceM;
-    delete point.roadElevationM;
-    delete point.roadGradePct;
-    delete point.roadBankDeg;
-    delete point.leftKerbWidthM;
-    delete point.rightKerbWidthM;
-    delete point.leftKerbHeightM;
-    delete point.rightKerbHeightM;
-    delete point.leftKerbType;
-    delete point.rightKerbType;
     return;
   }
-  const profile = definition ? sampleTrackSurfaceProfile(definition, point.stationM ?? NaN) : null;
+  const profile = sampleTrackSurfaceProfile(definition, point.stationM ?? NaN);
   const offset = point.lateralOffsetM;
   // Lateral offset is positive to the left: moving left shrinks the distance to the left edge.
   point.leftRoadDistanceM = profile?.leftWidthM != null && offset !== undefined ? profile.leftWidthM - offset : null;
   point.rightRoadDistanceM = profile?.rightWidthM != null && offset !== undefined ? profile.rightWidthM + offset : null;
-  point.roadElevationM = profile?.elevationM ?? null;
-  point.roadGradePct = profile?.gradePct ?? null;
-  point.roadBankDeg = profile?.bankDeg ?? null;
-  point.leftKerbWidthM = profile?.leftKerbWidthM ?? null;
-  point.rightKerbWidthM = profile?.rightKerbWidthM ?? null;
-  point.leftKerbHeightM = profile?.leftKerbHeightM ?? null;
-  point.rightKerbHeightM = profile?.rightKerbHeightM ?? null;
-  point.leftKerbType = profile?.leftKerbType ?? null;
-  point.rightKerbType = profile?.rightKerbType ?? null;
 }
 
 /** Drops the server-internal recording either side of the lap (see ReplayTrajectoryData.leadInPoints). */
@@ -221,7 +204,7 @@ function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
     points[i].distM = dist;
     points[i].stationM = dist;
     points[i].lateralOffsetM = 0;
-    annotateRoadProfile(points[i], null);
+    annotateRoadDistance(points[i], null);
   }
 
   const totalLength = Number(runningDist.toFixed(2));
