@@ -154,20 +154,24 @@ describe('readCornerHabitTrends', () => {
       add(session, 0, 'Ann', true, brakeM, [toApex, toApex, toApex, toApex]);
       add(session, 1, 'Bob', false, 100, [2000, 2000, 2000]);
     }
-    const trends = readCornerHabitTrends(reader(db), 'square', 'GT3', '', loadTrack);
-    const trend = trends.get(TURN);
+    const { habits, target } = readCornerHabitTrends(reader(db), 'square', 'GT3', '', loadTrack);
+    const trend = habits.get(TURN);
+    // The target the cost is against, for the corner trends' reference.
+    expect(target).toEqual({ sessionId: 's1', driverOrdinal: 1 });
     expect(trend).toMatchObject({ session: { sessionId: 's3' }, habit: null, focus: 'focus', pinTurnId: TURN, slipping: false, gap: null });
     expect(trend?.series.map(point => [point.session.sessionId, Number(point.costSec.toFixed(2)), point.gap])).toEqual([['s1', 0.1, null], ['s2', 0.08, null], ['s3', 0, null]]);
     expect(trend?.view).toMatchObject({ lap: { sessionId: 's3' }, reference: { name: 'Bob' } });
     // Up to s2 the habit stands, and its gap is followed over the sessions.
     db.prepare("DELETE FROM session_drivers WHERE session_id = 's3'").run();
-    const before = readCornerHabitTrends(reader(db), 'square', 'GT3', 'car a', loadTrack).get(TURN);
+    const before = readCornerHabitTrends(reader(db), 'square', 'GT3', 'car a', loadTrack).habits.get(TURN);
     expect(before).toMatchObject({ habit: { rule: 'brakeEarly' }, gap: { rule: 'brakeEarly', unit: 'm' }, series: [{ gap: 10 }, { gap: 8 }] });
+    // A turn the circuit neither numbers nor names goes by its distance, as the trend row names it, never by an index.
+    expect(before?.gap?.turnLabel).toMatch(/^km \d+\.\d$/);
     // Pinned by the driver.
     addHabitFocusPin(db, { ...PIN, turnId: TURN }, 1);
-    expect(readCornerHabitTrends(reader(db), 'square', 'GT3', '', loadTrack).get(TURN)?.focus).toBe('pinned');
+    expect(readCornerHabitTrends(reader(db), 'square', 'GT3', '', loadTrack).habits.get(TURN)?.focus).toBe('pinned');
     expect(readSessionCornerAnalysis(reader(db), 's2', noTarget, loadTrack)?.focus.corners).toMatchObject([{ cornerId: TURN, pinned: true }]);
-    expect(readCornerHabitTrends(reader(db), 'square', 'GT3', 'car b', loadTrack)).toEqual(new Map());
+    expect(readCornerHabitTrends(reader(db), 'square', 'GT3', 'car b', loadTrack)).toEqual({ habits: new Map(), target: null });
   });
 });
 

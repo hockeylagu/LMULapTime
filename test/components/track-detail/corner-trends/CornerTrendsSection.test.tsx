@@ -34,13 +34,13 @@ const response = (corners: CornerTrend[], sessions: Partial<CornerTrendsResponse
 });
 
 describe('cornerTrendRow', () => {
-  it('fits the direction of the last five sessions, and compares the latest with the class', () => {
+  it('fits the direction of the last five sessions, and compares the latest with the target', () => {
     // A slow start (11.9, 11.0) is left out: the last five drop 0.1 s a session.
     const usuals = [11.9, 11.0, 10.6, 10.5, 10.4, 10.3, 10.2];
     const row = cornerTrendRow(corner(1, usuals.map((usual, i) => point(`s${i + 1}`, usual)), 9.9));
     expect(row).toMatchObject({ latestSec: 10.2, recentFrom: 2 });
     expect(row.recentChangeSec).toBeCloseTo(-0.4);
-    expect(row.vsClassSec).toBeCloseTo(0.3);
+    expect(row.vsTargetSec).toBeCloseTo(0.3);
     // One odd session neither makes a trend (a slow last one) nor hides one (a slow one in the middle).
     const change = (usuals: number[]) => cornerTrendRow(corner(1, usuals.map((usual, i) => point(`s${i + 1}`, usual)))).recentChangeSec;
     expect(change([10.0, 10.0, 10.0, 10.0, 10.3])).toBeCloseTo(0);
@@ -49,7 +49,7 @@ describe('cornerTrendRow', () => {
     expect(cornerTrendRow(corner(1, [point('s1', 10.5), point('s2', 10.1)], 10))).toMatchObject({ recentFrom: null, recentChangeSec: null });
   });
 
-  it('tops each graph at the class line and gives every graph the same height in seconds', () => {
+  it('tops each graph at the target line and gives every graph the same height in seconds', () => {
     const behind = corner(1, [point('s1', 10.6), point('s2', 10.4)], 9.9);
     const ahead = corner(2, [point('s1', 8.0), point('s2', 8.2)], 8.1);
     expect([graphTopSec(behind), graphTopSec(ahead), graphTopSec(corner(3, []))]).toEqual([9.9, 8.0, null]);
@@ -64,8 +64,8 @@ describe('cornerTrendRow', () => {
     const rows = [corner(1, [point('s1', 10.0)], 9.5), corner(2, []), corner(3, [point('s1', 10.0)], 9.2), corner(4, [point('s1', 10.0)], 9.5)]
       .map(cornerTrendRow);
     const order = (sort: CornerSort) => sortCornerRows(rows, sort).map(row => row.corner.id);
-    expect(order({ key: 'vsClass', descending: true })).toEqual([3, 1, 4, 2]);
-    expect(order({ key: 'vsClass', descending: false })).toEqual([1, 4, 3, 2]);
+    expect(order({ key: 'vsTarget', descending: true })).toEqual([3, 1, 4, 2]);
+    expect(order({ key: 'vsTarget', descending: false })).toEqual([1, 4, 3, 2]);
     expect(order({ key: 'corner', descending: true })).toEqual([4, 3, 2, 1]);
   });
 
@@ -89,7 +89,7 @@ describe('cornerTrendRow', () => {
 describe('CornerTrendsSection', () => {
   beforeEach(() => { api.fetchCornerTrends.mockReset(); api.pinHabitFocus.mockReset(); api.unpinHabitFocus.mockReset(); });
 
-  it('draws a row per corner with a dot per session and the class line', async () => {
+  it('draws a row per corner with a dot per session and the target line', async () => {
     api.fetchCornerTrends.mockResolvedValue(response([
       corner(1, [point('s1', 10.5, 'Practice'), point('s2', 10.3, 'Qualifying'), point('s3', 10.1)], 9.9), corner(2, []),
     ], { noReplay: 2 }));
@@ -110,8 +110,8 @@ describe('CornerTrendsSection', () => {
     // A corner without any session says so once, in the graph's place; "Need 3 sessions" is for one with too few.
     expect(within(rows[1]).queryByText('Need 3 sessions')).toBeNull();
     expect(within(rows[1]).getByText('No reference')).toBeInTheDocument();
-    // The gap to the class is plain: the focus comes from the habits, not from this column.
-    expect(within(rows[0]).getByLabelText('Against the class\'s fastest usual +0.200 s')).not.toHaveClass('text-lmu-loss');
+    // The gap to the target is plain: the focus comes from the habits, not from this column.
+    expect(within(rows[0]).getByLabelText('Gap to target +0.200 s')).not.toHaveClass('text-lmu-loss');
     expect(rows[1]).toHaveTextContent('No session with enough clean laps');
     expect(screen.getByText('2 of 4 sessions have no corner times: 2 without a replay.')).toBeInTheDocument();
   });
@@ -149,9 +149,9 @@ describe('CornerTrendsSection', () => {
     expect(await labels()).toEqual(['SQ1', 'SQ2', 'SQ3']);
     // One session each: too few for a trend.
     expect(screen.getAllByText('Need 3 sessions')).toHaveLength(3);
-    fireEvent.click(screen.getByRole('button', { name: 'Ref. gap (s): sort descending' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gap to target (s): sort descending' }));
     expect(await labels()).toEqual(['SQ2', 'SQ3', 'SQ1']);
-    fireEvent.click(screen.getByRole('button', { name: 'Ref. gap (s): sort ascending' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Gap to target (s): sort ascending' }));
     expect(await labels()).toEqual(['SQ1', 'SQ3', 'SQ2']);
     fireEvent.click(screen.getByRole('button', { name: 'Corner: sort ascending' }));
     expect(await labels()).toEqual(['SQ1', 'SQ2', 'SQ3']);

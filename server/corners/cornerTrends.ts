@@ -18,6 +18,9 @@ export const minTrendPasses = (lengthM: number): number => (lengthM >= LONG_LAYO
 /** A qualifying session's point can be its one flying lap (driver, 2026-11-19); the class reference stays a usual. */
 const QUALIFYING_MIN_TREND_PASSES = 1;
 
+/** The driver a corner's cost is against (`CornerAnalysis.target`): one car of another session. */
+export interface TrendTarget { sessionId: string; driverOrdinal: number }
+
 export interface CornerTrendReader {
   getSequenceMap(layoutKey: string, carClass: string): StoredSequenceMap | null;
   listCornerTrendSessions(scope: CornerTrendScope): CornerTrendSessionRow[];
@@ -47,11 +50,13 @@ const groupBy =<T>(rows: readonly T[], key: (row: T) => string): Map<string, T[]
 /**
  * The driver's corner times at a layout, session by session, for a class (and car model): each corner of the class's
  * map (else the official turns) with a point per session of at least `minTrendPasses` counted dry passes (one in
- * qualifying), and the class's fastest usual by another driver (same minimum; among the quickest by lap time) as the reference. Only passes of the
- * current build and map count; the sessions left out are counted by reason. Null without a centre line.
+ * qualifying), and as the reference the target's usual through the corner (the driver the habit's cost is against,
+ * measured here the way the points are), else the class's fastest usual by another driver (same minimum; among the
+ * quickest by lap time), as the cost falls back to it. Only passes of the current build and map count; the sessions
+ * left out are counted by reason. Null without a centre line.
  */
 export function readCornerTrends(
-  reader: CornerTrendReader, layoutKey: string, carClass: string, carType = '', loadTrack?: TrackLoader
+  reader: CornerTrendReader, layoutKey: string, carClass: string, carType = '', loadTrack?: TrackLoader, target: TrendTarget | null = null,
 ): CornerTrendsResponse | null {
   const layout = placeLayout(layoutKey, loadTrack);
   if (!layout) return null;
@@ -68,10 +73,12 @@ export function readCornerTrends(
   const own = groupBy(rows.filter(row => row.isPlayer && bySession.has(row.sessionId)), row => `${row.segment}|${row.sessionId}`);
   const others = groupBy(rows.filter(row => !row.isPlayer), row => `${row.segment}|${row.sessionId}|${row.driverOrdinal}`);
   const reference = new Map<number, { usualSec: number; sessionId: string }>();
+  const targetUsual = new Map<number, number>();
   for (const passes of others.values()) {
     if (passes.length < minPasses) continue;
-    const { segment, sessionId } = passes[0];
+    const { segment, sessionId, driverOrdinal } = passes[0];
     const usualSec = (median(passes.map(pass => pass.durationMs)) ?? 0) / 1000;
+    if (target && sessionId === target.sessionId && driverOrdinal === target.driverOrdinal) targetUsual.set(segment, usualSec);
     const best = reference.get(segment);
     // Tied: the earlier session id, whatever order the query returns rows in.
     if (!best || usualSec < best.usualSec || (usualSec === best.usualSec && sessionId < best.sessionId)) reference.set(segment, { usualSec, sessionId });
@@ -85,10 +92,10 @@ export function readCornerTrends(
       if (point) withPoint.add(session.sessionId);
       return point ? [point] : [];
     });
-    const classBest = reference.get(corner.id);
+    const usualSec = targetUsual.get(corner.id) ?? reference.get(corner.id)?.usualSec;
     return {
       id: corner.id, label: corner.label, title: corner.title, name: corner.name || corner.label || corner.title, points,
-      reference: classBest ? { usualSec: classBest.usualSec } : null,
+      reference: usualSec === undefined ? null : { usualSec },
       // The route adds it from the corner analysis (readCornerHabitTrends), which reads these minimums from here.
       habit: null,
     };

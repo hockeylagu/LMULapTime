@@ -27,14 +27,14 @@ const SessionMarkGlyph: React.FC<{ mark: SessionMark; large?: boolean }> = ({ ma
  * The driver's usual time through a corner, one mark per session in date order, quicker higher, in grey; only the
  * latest mark wears the row's trend colour (`toneClass`), as a whole red or green line read as too loud (driver,
  * 2026-11-19), and no band behind the recent sessions. Each mark's shape is its session type and it names the session
- * on hover. The class's fastest usual is the dashed line.
+ * on hover. The reference (the target's usual) is the dashed line.
  */
 export const CornerTrendSparkline: React.FC<{ corner: CornerTrend; toneClass: string; spanSec: number }> = ({ corner, toneClass, spanSec }) => {
   const { points, reference } = corner;
   const top = graphTopSec(corner) ?? 0;
   const x = (index: number) => (points.length < 2 ? WIDTH / 2 : PAD_X + (index / (points.length - 1)) * (WIDTH - 2 * PAD_X));
-  // Quicker higher, the class line on top as the goal (driver, 2026-11-19); every row shares `spanSec`
-  // (`sharedGraphSpanSec`), so a mark's distance below the line is its gap to the class, the same height on every row.
+  // Quicker higher, the reference line on top as the goal (driver, 2026-11-19; the target since 2026-11-21); every row
+  // shares `spanSec` (`sharedGraphSpanSec`), so a mark's distance below the line is its gap, the same height on every row.
   const y = (sec: number) => PAD_Y + Math.min(1, (sec - top) / spanSec) * (HEIGHT - 2 * PAD_Y);
   const line = points.map((point, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(point.usualSec).toFixed(1)}`).join(' ');
 

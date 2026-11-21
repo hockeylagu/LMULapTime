@@ -1,5 +1,4 @@
 import { sessionKindOf } from '../../shared/domain/compareLapScope.js';
-import { describeTurn } from '../../shared/domain/circuitTurns/turnLabel.js';
 import { resolveVehicle } from '../../shared/domain/vehicleMapping.js';
 import { analyzeCorners } from '../../shared/domain/cornerAnalysis/analyzeCorners.js';
 import { cornerFocusTrends, habitFocus, type AnalysedSession } from '../../shared/domain/cornerAnalysis/habitFocus.js';
@@ -9,8 +8,9 @@ import type { HabitFocusScope } from '../core/dbHabitFocusStore.js';
 import type { AnalysisPassRow, AnalysisPassScope, AnalysisSessionRow } from '../core/replay/dbCornerAnalysisStore.js';
 import type { StoredSequenceMap } from '../core/replay/dbSequenceMapStore.js';
 import { layoutPassKey, placeLayout, type TrackLoader } from './cornerPassService.js';
-import { minTrendPasses } from './cornerTrends.js';
+import { minTrendPasses, type TrendTarget } from './cornerTrends.js';
 import { placedLayoutCorners } from './sessionCornerPasses.js';
+import { turnName } from '../../shared/domain/cornerSequences/sequenceLabel.js';
 
 export interface CornerAnalysisReader {
   getAnalysisSession(sessionId: string): AnalysisSessionRow | null;
@@ -66,7 +66,9 @@ function layoutAnalyser(reader: CornerAnalysisReader, layoutKey: string, carClas
   const analysisCorners = corners.corners.map(corner => ({
     id: corner.id, label: corner.label, name: corner.name || corner.label, turnIds: corner.sequence?.turnIds ?? [corner.id],
   }));
-  const turns = layout.turns.map(turn => ({ id: turn.id, label: describeTurn(turn).label || `turn ${turn.id + 1}` }));
+  // A bend the circuit neither numbers nor names goes by its distance ("km 0.9"), as the corner trends name it, never by
+  // an index that would read as the circuit's own turn number.
+  const turns = layout.turns.map(turn => ({ id: turn.id, label: turnName(turn) }));
   const analyse = (analysed: readonly AnalysisSessionRow[]): AnalysedSession[] => {
     if (!analysed.length) return [];
     const others = driversOf(reader.listReferenceAnalysisPasses(scope, minLaps));
@@ -121,19 +123,30 @@ export function readSessionCornerAnalysis(
 }
 
 
+/** Each corner's habit (`cornerFocusTrends`), and the target its cost is against: the corner trends measure their gap to it too. */
+export interface CornerHabitTrends {
+  habits: Map<number, CornerHabitTrend>;
+  /** The layout's target in the latest analysed session (the same driver for every session); null without one. */
+  target: TrendTarget | null;
+}
+
 /**
  * Each corner's habit over the player's analysed sessions at the layout in the class (filtered to `carType`, lower case,
  * when given; '' merges every car of the class), with the same focus walk as the debrief. Empty without any.
  */
 export function readCornerHabitTrends(
   reader: CornerAnalysisReader, layoutKey: string, carClass: string, carType: string, loadTrack?: TrackLoader,
-): Map<number, CornerHabitTrend> {
+): CornerHabitTrends {
   const sessions = reader.listAnalysisSessions(layoutKey, carClass)
     .filter(session => !carType || (session.carType ?? '').trim().toLowerCase() === carType);
   const analyser = sessions.length ? layoutAnalyser(reader, layoutKey, carClass, sessions, loadTrack) : null;
-  if (!analyser) return new Map();
+  if (!analyser) return { habits: new Map(), target: null };
   const analysed = analyser.analyse(sessions.filter(analyser.hasPasses));
-  return cornerFocusTrends(analysed, analyser.corners, analyser.pinnedCorners());
+  const target = analysed.at(-1)?.analysis.target ?? null;
+  return {
+    habits: cornerFocusTrends(analysed, analyser.corners, analyser.pinnedCorners()),
+    target: target && { sessionId: target.sessionId, driverOrdinal: target.driverOrdinal },
+  };
 }
 
 /**

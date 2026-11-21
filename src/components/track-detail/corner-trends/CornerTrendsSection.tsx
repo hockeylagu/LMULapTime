@@ -25,9 +25,9 @@ export interface CornerTrendsSectionProps {
 }
 
 /** The corner label and name share the first column, with a leading space for the disclosure. */
-const COLUMNS = 'grid grid-cols-[minmax(10rem,1.15fr)_minmax(7rem,1fr)_9rem_8.5rem_7.25rem] items-center gap-x-3 px-1.5';
+const COLUMNS = 'grid grid-cols-[minmax(10rem,1.15fr)_minmax(7rem,1fr)_9rem_8.5rem_8rem] items-center gap-x-3 px-1.5';
 
-/** A gap in seconds; only the recent trend wears a colour, the class gap stays in text ink. */
+/** A gap in seconds; only the recent trend wears a colour, the gap to the target stays in text ink. */
 const Delta: React.FC<{ value: number | null; label: string; toneClass?: string }> = ({ value, label, toneClass = 'text-lmu-text-soft' }) => (
   <span className={`text-right font-mono text-xs tabular-nums ${value === null ? 'text-lmu-muted' : toneClass}`}
     aria-label={value === null ? undefined : `${label} ${formatCornerDelta(value)} s`}>
@@ -97,7 +97,7 @@ const Row: React.FC<RowProps> = ({ row, link, spanSec, pin }) => {
         </div>
         {row.corner.reference === null
           ? <span className="text-right text-[11px] text-lmu-muted">No reference</span>
-          : <Delta value={row.vsClassSec} label="Against the class's fastest usual" />}
+          : <Delta value={row.vsTargetSec} label="Gap to target" />}
         {habit && open && (
           <CornerHabitLine trend={habit} id={adviceId} to={link} pin={pin}
             className="col-span-full -mx-1.5 -mb-2 mt-2 cursor-auto border-t border-lmu-border/50 bg-lmu-bg/60 py-3 pr-3 pl-[1.625rem]" />
@@ -108,8 +108,8 @@ const Row: React.FC<RowProps> = ({ row, link, spanSec, pin }) => {
 
 /**
  * Corner trends on the track page: the driver's usual time through each corner of the class's map (else the official
- * turns), one mark per session, with the direction of the last sessions (`cornerTrendRow`), the gap to the class's
- * fastest, and the corner's habit over the latest sessions (`CornerHabitLine`), closed until the row is opened. The 2
+ * turns), one mark per session, with the direction of the last sessions (`cornerTrendRow`), the gap to the
+ * target, and the corner's habit over the latest sessions (`CornerHabitLine`), closed until the row is opened. The 2
  * focus corners carry a mark (the same walk as the debrief), and an opened row makes its corner a focus or unpins it.
  */
 export const CornerTrendsSection: React.FC<CornerTrendsSectionProps> = ({ layoutKey, carClass, carModel }) => {

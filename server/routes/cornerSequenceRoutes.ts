@@ -47,9 +47,10 @@ export function createCornerSequenceRouter(context: ServerContext): Router {
     const layoutKey = queryString(req.query.layoutKey), carClass = queryString(req.query.carClass);
     if (!layoutKey || !carClass) return res.status(400).json({ error: 'layoutKey and carClass are required' });
     const carType = queryString(req.query.carType) ?? '';
-    const trends = readCornerTrends(context.sessionDb, layoutKey, carClass, carType);
+    // The habits first: their target is the trends' reference, so a corner's gap and its cost are against one driver.
+    const { habits, target } = readCornerHabitTrends(context.sessionDb, layoutKey, carClass, carType.trim().toLowerCase());
+    const trends = readCornerTrends(context.sessionDb, layoutKey, carClass, carType, undefined, target);
     if (!trends) return res.status(404).json({ error: `No centre line for ${layoutKey}` });
-    const habits = readCornerHabitTrends(context.sessionDb, layoutKey, carClass, carType.trim().toLowerCase());
     res.json({ ...trends, corners: trends.corners.map(corner => ({ ...corner, habit: habits.get(corner.id) ?? null })) });
   });
 

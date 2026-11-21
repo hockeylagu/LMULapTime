@@ -78,12 +78,13 @@ describe('corner sequence routes', () => {
   it("serves a layout's corner trends, behind the summary readiness gate", async () => {
     const body = { corners: [{ id: 1, habit: null }, { id: 2, habit: null }], sessions: { total: 0, noReplay: 0, waiting: 0, tooFewPasses: 0 } };
     trends.readCornerTrends.mockImplementation((_db: unknown, layoutKey: string) => (layoutKey === 'spa_gp' ? body : null));
-    // Each corner's habit and focus over the latest sessions, from the corner analysis.
-    analysis.readCornerHabitTrends.mockReturnValue(new Map([[2, { focus: 'pinned' }]]));
+    // Each corner's habit and focus over the latest sessions, from the corner analysis; its target is the trends' reference.
+    const target = { sessionId: 's9', driverOrdinal: 3 };
+    analysis.readCornerHabitTrends.mockReturnValue({ habits: new Map([[2, { focus: 'pinned' }]]), target });
     expect((await request(app()).get('/api/corner-trends?layoutKey=spa_gp&carClass=GT3&carType=Car%20A')).body)
       .toEqual({ ...body, corners: [{ id: 1, habit: null }, { id: 2, habit: { focus: 'pinned' } }] });
     expect(analysis.readCornerHabitTrends).toHaveBeenCalledWith(expect.anything(), 'spa_gp', 'GT3', 'car a');
-    expect(trends.readCornerTrends).toHaveBeenCalledWith(expect.anything(), 'spa_gp', 'GT3', 'Car A');
+    expect(trends.readCornerTrends).toHaveBeenCalledWith(expect.anything(), 'spa_gp', 'GT3', 'Car A', undefined, target);
     expect((await request(app()).get('/api/corner-trends?layoutKey=nowhere&carClass=GT3')).status).toBe(404);
     expect((await request(app()).get('/api/corner-trends?layoutKey=spa_gp')).status).toBe(400);
     expect((await request(app(false, false)).get('/api/corner-trends?layoutKey=spa_gp&carClass=GT3')).status).toBe(503);

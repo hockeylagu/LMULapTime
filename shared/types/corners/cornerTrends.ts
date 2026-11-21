@@ -20,7 +20,7 @@ export interface CornerTrend {
   name: string;
   title: string;
   points: CornerTrendPoint[];
-  /** The class's fastest usual through the corner by another driver, any session at the layout; null without one. */
+  /** The target's usual through the corner (the driver the habit's cost is against), else the class's fastest usual by another driver; null without either. */
   reference: { usualSec: number } | null;
   /** The corner's habit and focus over the latest analysed sessions (shared/domain/cornerAnalysis/habitFocus.ts); null without one. */
   habit: CornerHabitTrend | null;

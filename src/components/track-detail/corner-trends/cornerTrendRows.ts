@@ -17,8 +17,8 @@ export interface CornerTrendRow {
    * session). Null below MIN_TREND_SESSIONS sessions.
    */
   recentChangeSec: number | null;
-  /** Latest against the class's fastest usual; null without one. */
-  vsClassSec: number | null;
+  /** Latest against the reference (the target's usual, else the class's fastest); null without one. */
+  vsTargetSec: number | null;
 }
 
 /**
@@ -41,7 +41,7 @@ export function cornerTrendRow(corner: CornerTrend): CornerTrendRow {
     latestSec,
     recentFrom,
     recentChangeSec: recentFrom === null ? null : fittedChange(usuals.slice(recentFrom)),
-    vsClassSec: latestSec !== null && corner.reference ? latestSec - corner.reference.usualSec : null,
+    vsTargetSec: latestSec !== null && corner.reference ? latestSec - corner.reference.usualSec : null,
   };
 }
 
@@ -50,14 +50,14 @@ const MIN_GRAPH_SPAN_SEC = 0.3;
 /** ...and never over this, so one wild corner cannot flatten the others; slower points sit on the bottom edge. */
 const MAX_GRAPH_SPAN_SEC = 1.5;
 
-/** The top of a corner's graph: the class's fastest usual, or the driver's quickest usual when that is quicker or there is none. */
+/** The top of a corner's graph: the reference (the target's usual), or the driver's quickest usual when that is quicker or there is none. */
 export function graphTopSec(corner: CornerTrend): number | null {
   const values = [...corner.points.map(point => point.usualSec), ...(corner.reference ? [corner.reference.usualSec] : [])];
   return values.length ? Math.min(...values) : null;
 }
 
 /**
- * One height in seconds for every corner's graph, so the same gap to the class is the same height on each row: the
+ * One height in seconds for every corner's graph, so the same gap to the target is the same height on each row: the
  * largest gap between a corner's top and its slowest usual, within MIN_GRAPH_SPAN_SEC and MAX_GRAPH_SPAN_SEC.
  */
 export function sharedGraphSpanSec(corners: readonly CornerTrend[]): number {
@@ -99,14 +99,14 @@ export function sessionMark(sessionType: string, sessionName: string): SessionMa
 }
 
 /** The columns the corner rows sort by: lap order, or one of the numbers. */
-export type CornerSortKey = 'corner' | 'latest' | 'recent' | 'vsClass';
+export type CornerSortKey = 'corner' | 'latest' | 'recent' | 'vsTarget';
 export interface CornerSort { key: CornerSortKey; descending: boolean }
 export const LAP_ORDER: CornerSort = { key: 'corner', descending: false };
 
 const SORT_VALUE: Record<Exclude<CornerSortKey, 'corner'>, (row: CornerTrendRow) => number | null> = {
   latest: row => row.latestSec,
   recent: row => row.recentChangeSec,
-  vsClass: row => row.vsClassSec,
+  vsTarget: row => row.vsTargetSec,
 };
 
 /** The rows (in lap order) in the asked order. Rows without the number go last either way; ties keep lap order (a stable sort). */
@@ -130,5 +130,5 @@ export function missingSessionsText(trends: CornerTrendsResponse): string | null
   ].filter((part): part is string => part !== null);
   if (!parts.length) return null;
   const left = noReplay + waiting + tooFewPasses;
-  return `${left} of ${trends.sessions.total} sessions have no corner times: ${parts.join(', ')}.`;
+  return `${left} of ${trends.sessions.total} sessions ${left === 1 ? 'has' : 'have'} no corner times: ${parts.join(', ')}.`;
 }

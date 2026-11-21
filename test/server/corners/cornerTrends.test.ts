@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { layoutPassKey, mapRuleHash, placeLayout } from '../../../server/corners/cornerPassService.js';
-import { minTrendPasses, readCornerTrends, type CornerTrendReader } from '../../../server/corners/cornerTrends.js';
+import { minTrendPasses, readCornerTrends, type CornerTrendReader, type TrendTarget } from '../../../server/corners/cornerTrends.js';
 import { listCornerTrendPasses, listCornerTrendSessions } from '../../../server/core/replay/dbCornerTrendStore.js';
 import type { StoredSequenceMap } from '../../../server/core/replay/dbSequenceMapStore.js';
 import { memoryDatabase } from '../../helpers/memoryDatabase.js';
@@ -120,6 +120,11 @@ describe('readCornerTrends', () => {
     }]);
     // Bob's usual in s4 (8.65 s, four passes) is the class's fastest; any model of the class counts.
     expect(turn?.reference).toEqual({ usualSec: 8.65 });
+    // The habits' target (Bob in s1) is the reference instead, measured the same way; one with no usual there leaves the class's fastest.
+    const referenceWith = (target: TrendTarget) => readCornerTrends(fixture.reader(), 'square', 'GT3', 'car a', loadTrack, target)
+      ?.corners.find(corner => corner.id === TURN)?.reference;
+    expect(referenceWith({ sessionId: 's1', driverOrdinal: 1 })).toEqual({ usualSec: 9.2 });
+    expect(referenceWith({ sessionId: 's1', driverOrdinal: 2 })).toEqual({ usualSec: 8.65 });
     // Every model of the class: s5's car joins.
     expect(readCornerTrends(fixture.reader(), 'square', 'GT3', '', loadTrack)?.corners.find(corner => corner.id === TURN)?.points
       .map(point => point.sessionId)).toEqual(['s1', 's5', 's6']);
