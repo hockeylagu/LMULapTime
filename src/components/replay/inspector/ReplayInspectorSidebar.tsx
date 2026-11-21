@@ -14,6 +14,7 @@ import { CornerSpeedTable } from '../analysis/CornerSpeedTable.js';
 import { ConsistencyPanel } from '../analysis/ConsistencyPanel.js';
 import type { LapConsistencyOption } from '../analysis/LapSelectorDropdown.js';
 import { CornerApexChart } from '../analysis/CornerApexChart.js';
+import { CornerConclusionBlock } from '../analysis/conclusion/CornerConclusionBlock.js';
 import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
@@ -253,6 +254,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                       trackCourse={trackCourse}
                       layoutKey={layoutKey}
                       onClose={() => handleSelectCorner(null)}
+                      footer={<CornerConclusionBlock trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory : null} cornerNumber={selectedCorner.cornerNumber} />}
                       className="shrink-0"
                     />
                   ) : null

@@ -66,6 +66,17 @@ describe('CornerApexChart', () => {
     expect(screen.getByText('150')).toBeInTheDocument();
   });
 
+  it('puts its footer under the phase cards of the full detail, not in the compact strip', () => {
+    const footer = <p>Session corner analysis</p>;
+    const full = render(<CornerApexChart corner={corner} primaryPoints={primaryPoints} primaryDists={primaryDists} footer={footer} />);
+    const cards = screen.getByText(/Exit Phase/i);
+    expect(cards.compareDocumentPosition(screen.getByText('Session corner analysis')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    full.unmount();
+
+    render(<CornerApexChart corner={corner} primaryPoints={primaryPoints} primaryDists={primaryDists} footer={footer} compact />);
+    expect(screen.queryByText('Session corner analysis')).not.toBeInTheDocument();
+  });
+
   it('does not render a close button when onClose is omitted', () => {
     render(
       <CornerApexChart

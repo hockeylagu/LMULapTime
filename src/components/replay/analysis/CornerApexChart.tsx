@@ -24,6 +24,8 @@ export interface CornerApexChartProps {
   trackGeometry?: TrackBoundaryGeometry | null;
   onOpenCornersTab?: () => void;
   onClose?: () => void;
+  /** Under the phase cards of the full detail: the session's corner analysis. */
+  footer?: React.ReactNode;
   className?: string;
 }
 
@@ -39,6 +41,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
   onSelectIndex,
   onOpenCornersTab,
   onClose,
+  footer,
   className = '',
 }) => {
   const currentDistM = currentIndex !== undefined && currentIndex >= 0 && currentIndex < primaryDists.length
@@ -140,6 +143,7 @@ export const CornerApexChart: React.FC<CornerApexChartProps> = ({
 
       {/* Comprehensive Phase-Based Telemetry & Technique Deck */}
       <CornerTechniqueDeck corner={corner} isCompareMode={isCompareMode} />
+      {footer}
     </div>
   );
 };
