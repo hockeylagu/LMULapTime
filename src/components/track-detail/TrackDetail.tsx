@@ -158,7 +158,6 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       <TrackDetailHeader
         trackName={trackName}
         trackCourse={data.latestSession?.trackCourse ?? data.sessions[0]?.trackCourse}
-        sessionsCount={data.total ?? data.sessionsCount}
         onBack={onBack}
         selectedClass={selectedClass}
         setSelectedClass={setSelectedClass}

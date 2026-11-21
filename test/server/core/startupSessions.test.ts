@@ -13,7 +13,7 @@ import type { Worker } from 'node:worker_threads';
 import { FileIngestWorker } from '../../../server/core/ingest/fileIngestWorkerClient.js';
 import { createSessionRouter } from '../../../server/routes/sessionRoutes.js';
 
-// What the web app shows: /api/sessions, reloaded once the session scan finishes (useAppData).
+// What the web app shows: the session page of /api/dashboard, reloaded once the session scan finishes (useAppData).
 const fixture = fs.readFileSync(path.join(process.cwd(), 'test', 'fixtures', 'results', '2026_05_28_P1.xml'));
 
 describe('sessions on the web after a server start', () => {
@@ -46,7 +46,7 @@ describe('sessions on the web after a server start', () => {
 
   const writeSession = (name: string, content: Buffer = fixture) => fs.writeFileSync(path.join(resultsDir, name), content);
   const shownSessions = async (): Promise<string[]> =>
-    ((await request(app).get('/api/sessions').expect(200)).body as { sessions: Array<{ filename: string }> }).sessions.map(s => s.filename).sort();
+    ((await request(app).get('/api/dashboard').expect(200)).body as { sessions: Array<{ filename: string }> }).sessions.map(s => s.filename).sort();
   const scanFinished = () => vi.waitFor(() => expect(context.getScanStatus().allComplete).toBe(true), { timeout: 10_000 });
 
   it('shows every session that is new since the last run once the startup scan finishes', async () => {

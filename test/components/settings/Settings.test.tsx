@@ -17,7 +17,6 @@ describe('Settings component', () => {
     telemetryExist: true,
     playerName: 'Player1',
     sessionsCount: 15,
-    tracksCount: 5,
     referenceLaptimes: {
       lastUpdated: '2026-05-28T12:00:00Z',
       entriesCount: 186,
@@ -27,7 +26,7 @@ describe('Settings component', () => {
   beforeEach(() => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/scan')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, count: 20, tracksCount: 5 }) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
       }
       if (url.includes('/api/reference-laptimes/refresh')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, entriesCount: 190 }) });
@@ -157,8 +156,6 @@ describe('Settings component', () => {
     const statusWithCache = {
       ...mockStatus,
       sqliteCache: {
-        enabled: true,
-        dbPath: 'C:\\LMU\\server\\lmu_cache.db',
         sessionsCount: 42,
         lastSyncedAt: '2026-06-01T10:30:00Z',
         dbSizeBytes: 524288,

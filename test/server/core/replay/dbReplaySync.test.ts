@@ -144,7 +144,7 @@ describe('Replay startup sync pipeline', () => {
         playerName: 'Player',
         onMetadataReady: async () => {
           expect(db.getReplaysCount()).toBe(2);
-          expect(db.getCacheStats().replayTrajectoriesCount).toBe(0);
+          expect(db.getDb().prepare('SELECT count(*) FROM replay_trajectories').pluck().get()).toBe(0);
           await new Promise<void>((resolve) => setImmediate(resolve));
           return new Set(['associated.Vcr']);
         },

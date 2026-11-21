@@ -240,7 +240,7 @@ Reconciliation requires unique compatible layout/session/player/car identity and
 anchors. A verified attachment inherits `GameVersion` from the results XML; it is unknown before then.
 Existing immutable XML ingestion rules are unchanged. Ambiguous or stale links cannot supply evidence.
 
-`GET /api/live/capture` exposes capture health/channel metadata. Session detail exposes `liveCaptures`.
+Session detail exposes `liveCaptures`.
 `GET /api/session/:sessionId/live-evidence` selects exact driver/lap ordinals, reads through a bounded
 read-only worker off track (two at once, two more queued), and rechecks XML/link ownership and the exact
 requested lap after the read. While the recorder still has a file open it answers `busy` without reading.

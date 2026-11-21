@@ -21,12 +21,6 @@ function mockApi() {
         trends:{hasData:false,driverName:'Player',latestOuting:null,todayActivity:null,recentPaceTrend:[],paceDelta:null,
           paceTrendDirection:'none',paceTrendClass:null,recentCleanRate:null,recentConsistency:null,recentNetPositions:0}
       })});
-    if (url.includes('/api/session-snapshot')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [], progression: [] }) });
-    }
-    if (url.includes('/api/sessions')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-    }
     if (url.includes('/api/scan/status')) {
       return Promise.resolve({
         ok: true,

@@ -9,16 +9,15 @@ function file(directory = 'C:\\fake', filename = 'Spa_P.duckdb'): DuckDbFileInfo
 }
 
 describe('TelemetryCatalog', () => {
-  it('does not materialize metadata at construction or for status; reads current SQLite rows on demand', () => {
+  it('does not materialize metadata at construction; reads current SQLite rows on demand', () => {
     const db = memoryDatabase();
     const read = vi.spyOn(db, 'getTelemetryFiles');
-    const catalog = new TelemetryCatalog(db);
+    new TelemetryCatalog(db);
     expect(read).not.toHaveBeenCalled();
-    expect(catalog.getStatus('C:\\fake').filesCount).toBe(0);
-    expect(read).not.toHaveBeenCalled();
+    expect(db.getCacheStats().telemetryFilesCount).toBe(0);
     db.upsertTelemetryMetadata(file());
     expect(db.getTelemetryFiles()).toEqual([file()]);
-    expect(catalog.getStatus('C:\\fake').filesCount).toBe(1);
+    expect(db.getCacheStats().telemetryFilesCount).toBe(1);
     db.clearTelemetryCache();
     expect(db.getTelemetryFiles()).toEqual([]);
   });
@@ -105,7 +104,6 @@ describe('TelemetryCatalog', () => {
     resolvers.get(oldDirectory)?.([oldFile]);
     await oldRefresh;
     expect(db.getTelemetryFiles()).toEqual([newFile]);
-    expect(catalog.getStatus(newDirectory).directory).toBe(newDirectory);
   });
 
   it('yields during bulk publication and stops a stale scan before publishing more files', async () => {

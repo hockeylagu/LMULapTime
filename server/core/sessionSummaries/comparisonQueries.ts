@@ -105,7 +105,7 @@ function comparisonScope(filters: CompactCompareFilters) {
   if (filters.lapOrdinal !== undefined) { selected.where.push('l.lap_ordinal=?'); selected.args.push(filters.lapOrdinal); }
   if (filters.lapNumber !== undefined) { selected.where.push('l.lap_number=?'); selected.args.push(filters.lapNumber); }
   if (filters.excludeLap) { selected.where.push('NOT (s.id=? AND l.lap_ordinal=?)'); selected.args.push(filters.excludeLap.sessionId, filters.excludeLap.lapOrdinal); }
-  return { trackParts, broad, display, selected, personalBestScope };
+  return { broad, display, selected, personalBestScope };
 }
 
 type PageLapFact = Pick<LapFact, 'session_id' | 'driver_ordinal' | 'lap_ordinal' | 'driver_name' | 'is_all_time_pb'>;
@@ -188,7 +188,7 @@ export function queryTelemetryComparableLaps(
   return { laps, total, page, pageSize, carTypes };
 }
 
-/** SQL-scoped comparison reads; only the result page and three exact best laps are materialized. */
+/** SQL-scoped comparison reads; only the result page and two exact best laps are materialized. */
 export function queryCompactComparableLaps(
   db: DatabaseType,
   filters: CompactCompareFilters,
@@ -196,23 +196,15 @@ export function queryCompactComparableLaps(
 ): CompactCompareResult {
   const page = Math.max(1, Math.trunc(pageOptions.page ?? 1));
   const pageSize = Math.max(1, Math.min(250, Math.trunc(pageOptions.pageSize ?? 100)));
-  const { trackParts, broad, display, selected, personalBestScope } = comparisonScope(filters);
+  const { broad, display, selected, personalBestScope } = comparisonScope(filters);
   const offset = (page - 1) * pageSize;
 
   const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected)}`).get(...selected.args) as CountFact).total;
-  const sessionsCount = (db.prepare(`SELECT count(*) total FROM sessions s WHERE ${whereSql(trackParts)}`).get(...trackParts.args) as CountFact).total;
   const baseSql = lapJoinWhere(broad);
   const overallFact = db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player,
       l.lap_ordinal,l.lap_number lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
     ${baseSql} AND l.is_valid=1 AND l.lap_time>0 ORDER BY l.lap_time,s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal LIMIT 1`).get(...broad.args) as LapFact | undefined ?? null;
-  const representativeBest = db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player,
-      l.lap_ordinal,l.lap_number lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
-    FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
-      JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal AND c.condition_group='dry'
-      JOIN session_laps l ON l.session_id=c.session_id AND l.driver_ordinal=c.driver_ordinal AND l.lap_ordinal=c.best_lap_ordinal
-    WHERE ${whereSql(display)} AND c.best_lap_time>0 ORDER BY c.best_lap_time,s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal LIMIT 1`).get(...display.args) as LapFact | undefined ?? null;
-  const playerScopeMatches = filters.playerOnly && !filters.sessionId && (!filters.driverName?.trim() || filters.driverName.trim().toLowerCase() === 'all');
-  const playerBest = playerScopeMatches ? representativeBest : db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player,
+  const playerBest = db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player,
       l.lap_ordinal,l.lap_number lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
     FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal AND c.condition_group='dry'
@@ -231,26 +223,24 @@ export function queryCompactComparableLaps(
   markPagePersonalBests(db, rows, personalBestScope);
 
   const selectedLaps = readComparisonLapRows(db, [...rows,
-    ...[overallFact, representativeBest, playerBest].filter((fact): fact is LapFact => fact !== null)]);
+    ...[overallFact, playerBest].filter((fact): fact is LapFact => fact !== null)]);
   const toDto = (fact: LapFact | null): ComparableLap | null => {
     const lap = fact && selectedLaps.get(comparisonLapKey(fact));
     return lap && fact ? { ...lap, isAllTimePB: Boolean(fact.is_all_time_pb) } : null;
   };
   const laps = rows.flatMap(row => { const dto = toDto(row); return dto ? [dto] : []; });
   const bestValidDto = toDto(overallFact);
-  const allTimeDto = toDto(representativeBest);
   const playerDto = toDto(playerBest);
   const bestS1 = sector.s1; const bestS2 = sector.s2; const bestS3 = sector.s3;
   const theoreticalBestSec = computeTheoreticalBest(bestS1, bestS2, bestS3);
-  const tagged = (lap: ComparableLap | null, kind: 'overall' | 'all-time' | 'player'): ComparableLap | null => {
+  const tagged = (lap: ComparableLap | null, kind: 'overall' | 'player'): ComparableLap | null => {
     if (!lap) return null;
     if (kind === 'overall') return { ...lap, isOverallTrackBest: true, tag: `🏆 All-Time Best (${lap.driverName})` };
-    if (kind === 'all-time') return { ...lap, isAllTimePB: true, tag: '⭐ All-Time Best Lap' };
     return { ...lap, isAllTimePB: true, isPlayer: true, tag: '⭐ Personal Best' };
   };
   return {
-    laps, allTimeBestLap: tagged(allTimeDto, 'all-time'), playerBestLap: tagged(playerDto, 'player'), overallTrackBestLap: tagged(bestValidDto, 'overall'),
+    laps, playerBestLap: tagged(playerDto, 'player'), overallTrackBestLap: tagged(bestValidDto, 'overall'),
     bestS1, bestS2, bestS3,
-    theoreticalBestSec, sessionsCount, page, pageSize, total,
+    theoreticalBestSec, page, pageSize, total,
   };
 }

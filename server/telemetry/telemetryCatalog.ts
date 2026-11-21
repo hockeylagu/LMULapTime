@@ -6,15 +6,7 @@ import { DuckDbFileInfo, enrichDuckDbDirectory } from './telemetryMatcher.js';
 
 type EnrichDuckDbDirectory = typeof enrichDuckDbDirectory;
 
-export interface TelemetryCatalogStatus {
-  directory: string;
-  updatedAt: string | null;
-  filesCount: number;
-}
-
 export class TelemetryCatalog {
-  private directory = '';
-  private updatedAt: string | null = null;
   private refreshPromise: Promise<number> | null = null;
   private refreshDirectory: string | null = null;
   private refreshGeneration = 0;
@@ -35,14 +27,6 @@ export class TelemetryCatalog {
     private readonly enrichDirectory: EnrichDuckDbDirectory = enrichDuckDbDirectory
   ) {}
 
-  public getStatus(currentDirectory: string): TelemetryCatalogStatus {
-    return {
-      directory: this.directory || currentDirectory,
-      updatedAt: this.updatedAt,
-      filesCount: this.sessionDb.getTelemetryFilesCount(),
-    };
-  }
-
   public getScanStatus(): TelemetryScanStatus {
     return this.scanStatus;
   }
@@ -51,8 +35,6 @@ export class TelemetryCatalog {
     this.refreshGeneration++;
     this.refreshPromise = null;
     this.refreshDirectory = null;
-    this.directory = '';
-    this.updatedAt = null;
     this.scanStatus = {
       running: false,
       processed: 0,
@@ -113,8 +95,6 @@ export class TelemetryCatalog {
     })
       .then(async (files) => {
         if (generation !== this.refreshGeneration) return files.length;
-        this.directory = directory;
-        this.updatedAt = new Date().toISOString();
         const sliceUsed = startYieldSlice();
         for (const file of files) {
           const prev = cachedMap.get(file.filePath);

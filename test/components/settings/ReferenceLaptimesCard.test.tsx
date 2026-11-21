@@ -11,7 +11,6 @@ describe('ReferenceLaptimesCard component', () => {
     replaysDir: 'C:\\LMU\\Replays',
     replaysExist: true,
     sessionsCount: 5,
-    tracksCount: 2,
     referenceLaptimes: {
       lastUpdated: '2026-10-01T10:00:00Z',
       entriesCount: 187,
@@ -34,7 +33,6 @@ describe('ReferenceLaptimesCard component', () => {
         newAlienSec: 125.0,
         impact: {
           affectedSessionsCount: 0,
-          affectedLapsCount: 0,
           categoryShiftsCount: 0,
           categoryShifts: [],
         },
@@ -53,7 +51,6 @@ describe('ReferenceLaptimesCard component', () => {
         newAlienSec: 118.5,
         impact: {
           affectedSessionsCount: 3,
-          affectedLapsCount: 8,
           categoryShiftsCount: 1,
           categoryShifts: [
             {
@@ -90,7 +87,6 @@ describe('ReferenceLaptimesCard component', () => {
         newAlienSec: 117.0,
         impact: {
           affectedSessionsCount: 1,
-          affectedLapsCount: 4,
           categoryShiftsCount: 0,
           categoryShifts: [],
         },

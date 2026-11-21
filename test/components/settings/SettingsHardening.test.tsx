@@ -17,7 +17,6 @@ const status: AppStatus = {
   telemetryExist: true,
   playerName: 'Player1',
   sessionsCount: 15,
-  tracksCount: 5,
 };
 
 const json = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
@@ -236,7 +235,7 @@ describe('Overview card', () => {
   const cacheStatus = (telemetryFilesCount?: number, sessions = 3): AppStatus => ({
     ...status,
     sessionsCount: sessions,
-    sqliteCache: { enabled: true, dbPath: 'x.db', sessionsCount: sessions, lastSyncedAt: null, dbSizeBytes: 1024, telemetryFilesCount },
+    sqliteCache: { sessionsCount: sessions, lastSyncedAt: null, dbSizeBytes: 1024, telemetryFilesCount },
   });
   const renderCard = (appStatus: AppStatus | null, extra: Partial<React.ComponentProps<typeof OverviewCard>> = {}) =>
     render(<OverviewCard status={appStatus} replay={replay} ai={ai} isClearingCache={false} onClearCache={vi.fn()} cacheMessage={null} {...extra} />);

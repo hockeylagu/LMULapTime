@@ -40,7 +40,6 @@ describe('CompareLapPicker in the compare card', () => {
       ok: true,
       json: () => Promise.resolve({
         laps,
-        allTimeBestLap: null,
         playerBestLap: { ...laps[5], tag: 'Personal best' },
         overallTrackBestLap: null,
         bestS1: null, bestS2: null, bestS3: null,

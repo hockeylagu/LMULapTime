@@ -13,7 +13,6 @@ const status: AppStatus = {
   telemetryExist: true,
   playerName: 'Player1',
   sessionsCount: 1,
-  tracksCount: 1,
 };
 
 function setup(initial: AppStatus | null) {

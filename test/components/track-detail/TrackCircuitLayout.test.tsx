@@ -170,7 +170,6 @@ describe('TrackCircuitLayout', () => {
     render(
       <TrackDetailHeader
         trackName="Circuit de Spa-Francorchamps"
-        sessionsCount={5}
         onBack={onBack}
         selectedClass="All"
         setSelectedClass={setSelectedClass}

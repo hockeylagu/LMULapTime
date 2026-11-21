@@ -142,7 +142,7 @@ describe('session telemetry routes', () => {
     db.getDb().prepare("UPDATE session_drivers SET finish_status='DNF' WHERE session_id=?").run('session-1');
     const overview = await request(app).get('/api/session/session-1/race');
     expect(overview.status).toBe(200);
-    expect(overview.body).toMatchObject({ replayName: 'Route_Test_P1.Vcr', poseHz: 10, windowSec: 60, laps: [], runningOrder: [] });
+    expect(overview.body).toMatchObject({ replayName: 'Route_Test_P1.Vcr', windowSec: 60, laps: [], runningOrder: [] });
     const cars = (overview.body as RaceReplayOverview).cars;
     expect(cars.map(car => car.name)).toEqual(['Route Driver']);
     expect(cars[0]).toMatchObject({ name: 'Route Driver', carNumber: '21', sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0 }, retired: 'DNF' });

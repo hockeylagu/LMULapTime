@@ -12,7 +12,6 @@ describe('FolderPathsCard component', () => {
     telemetryExist: true,
     playerName: 'Samuel Lague',
     sessionsCount: 10,
-    tracksCount: 5,
     referenceLaptimes: undefined,
   };
 

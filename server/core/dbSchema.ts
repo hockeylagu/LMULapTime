@@ -25,13 +25,10 @@ CREATE INDEX IF NOT EXISTS idx_live_capture_interval ON live_capture_index(start
 `;
 
 export interface CacheStats {
-  enabled: boolean;
-  dbPath: string;
   sessionsCount: number;
   lastSyncedAt: string | null;
   dbSizeBytes: number;
   replaysCount: number;
-  replayTrajectoriesCount: number;
   telemetryFilesCount: number;
   liveTelemetryFilesCount: number;
 }

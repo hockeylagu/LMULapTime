@@ -28,7 +28,6 @@ describe('SessionDatabase (SQLite Cache)', () => {
 
   it('initializes schema and returns initial empty stats', () => {
     const stats = db.getCacheStats();
-    expect(stats.enabled).toBe(true);
     expect(stats.sessionsCount).toBe(0);
     expect(stats.lastSyncedAt).toBeNull();
   });

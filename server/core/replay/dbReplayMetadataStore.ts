@@ -146,7 +146,7 @@ export function getReplaysCount(db: DatabaseType): number {
 
 export function getReplayCacheList(db: DatabaseType, replaysDir?: string): ReplayCacheSummary[] {
   const rows = db.prepare(`
-    SELECT rm.filename, rm.file_path, rm.file_size_bytes, rm.file_mtime_ms, rm.parser_version, rm.metadata_br, rm.updated_at,
+    SELECT rm.filename, rm.file_path, rm.file_size_bytes, rm.file_mtime_ms, rm.parser_version, rm.metadata_br,
            COUNT(rt.filename) as trajectories_cached,
            LENGTH(rm.metadata_br) + COALESCE(SUM(rt.trajectory_bytes), 0) as compressed_size
     FROM replay_metadata rm
@@ -160,7 +160,6 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
     file_mtime_ms: number;
     parser_version: string;
     metadata_br: Buffer;
-    updated_at: number;
     trajectories_cached: number;
     compressed_size: number;
   }[];
@@ -192,7 +191,6 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
       filename: row.filename,
       fileSizeBytes: row.file_size_bytes,
       compressedSizeBytes: row.compressed_size,
-      updatedAt: row.updated_at,
       replayDateMs: row.file_mtime_ms,
       trackName: meta.displayTrack || meta.trackName || meta.trackCourse,
       driversCount: meta.drivers?.length || 0,
@@ -226,7 +224,6 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
         filename,
         fileSizeBytes: stat.size,
         compressedSizeBytes: 0,
-        updatedAt: Math.floor(stat.mtimeMs),
         replayDateMs: Math.floor(stat.mtimeMs),
         driversCount: 0,
         trajectoriesCached: 0,

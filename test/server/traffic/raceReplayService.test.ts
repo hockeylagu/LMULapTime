@@ -46,7 +46,7 @@ describe('RaceReplayService', () => {
       daylight: { raceStartMinute: 840, cloudCover: [[0, 0.2]], cloudField: null, cloudVariants: null },
     });
 
-    expect(overview).toMatchObject({ startSec: 0, endSec: 100, poseHz: 10, windowSec: 60, sessionType: 'Race', cars: [{ slot: 1, name: 'A' }] });
+    expect(overview).toMatchObject({ startSec: 0, endSec: 100, windowSec: 60, sessionType: 'Race', cars: [{ slot: 1, name: 'A' }] });
     expect(overview.layoutKey).toBe('sarthe_full');
     // Car 2 is not asked for (as the pace car is left out): neither its laps nor its place come with the race.
     expect(overview.laps.map(lap => lap.slot)).toEqual([1, 1]);

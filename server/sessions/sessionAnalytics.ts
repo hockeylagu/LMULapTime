@@ -77,12 +77,10 @@ export function toComparableLap(
 
 export interface ComparableLapsResult {
   laps: ComparableLap[];
-  allTimeBestLap: ComparableLap | null;
   playerBestLap?: ComparableLap | null;
   overallTrackBestLap: ComparableLap | null;
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;
   theoreticalBestSec: number | null;
-  sessionsCount: number;
 }

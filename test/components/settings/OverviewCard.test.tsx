@@ -11,8 +11,7 @@ const status = (sessions: number): AppStatus => ({
   replaysDir: 'C:\\LMU\\Replays',
   replaysExist: true,
   sessionsCount: sessions,
-  tracksCount: 1,
-  sqliteCache: { enabled: true, dbPath: 'x.db', sessionsCount: sessions, lastSyncedAt: null, dbSizeBytes: 1024, telemetryFilesCount: 3 },
+  sqliteCache: { sessionsCount: sessions, lastSyncedAt: null, dbSizeBytes: 1024, telemetryFilesCount: 3 },
 });
 
 const replay = { counts: { total: 4, archived: 1 } } as unknown as ReplayCacheState;

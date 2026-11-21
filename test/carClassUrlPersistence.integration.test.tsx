@@ -45,19 +45,11 @@ function mockApi() {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ resultsExist: true, replaysExist: true, sessionsCount: 1 }) });
     }
     if (url.startsWith('/api/tracks')) return Promise.resolve({ok:true,json:()=>Promise.resolve({tracks:Object.values(aggregateTrackSummaries([session]))})});
-    if (url.includes('/api/session-snapshot')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [session], progression: [] }) });
-    }
-    if (url.includes('/api/sessions')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([session]) });
-    }
     if (url.includes('/api/track/')) {
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({
           trackName: 'Algarve International Circuit',
-          normalizedTrackName: 'Algarve International Circuit',
-          sessionsCount: 1,
           sessions: [session],
           benchmarks: [],
         }),

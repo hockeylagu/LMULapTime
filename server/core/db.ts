@@ -157,7 +157,6 @@ import {
   readCompactSession, type SessionSummaryBackfillBatch,
 } from './sessionSummaries/store.js';
 import type { SessionCard, SessionProjectionState } from '../../shared/types/sessionSummaries.js';
-import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import {
   SessionXmlSyncParser,
   SessionSyncHost,
@@ -610,11 +609,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return new Set(rows.map(row => row.recording_name));
   }
 
-  public getSessionCatalogStats(): { sessionsCount: number; tracksCount: number; summariesReadyCount: number } {
-    const sessionsCount = this.getSessionsCount();
-    const rows = this.db.prepare('SELECT DISTINCT track_venue, track_course FROM sessions').all() as Array<{ track_venue: string; track_course: string }>;
-    const summariesReadyCount = countReadySessionSummaries(this.db);
-    return { sessionsCount, tracksCount: new Set(rows.map(row => getDisplayTrackName(row.track_venue, row.track_course)).filter(Boolean)).size, summariesReadyCount };
+  public getSessionCatalogStats(): { sessionsCount: number; summariesReadyCount: number } {
+    return { sessionsCount: this.getSessionsCount(), summariesReadyCount: countReadySessionSummaries(this.db) };
   }
 
   public upsertSession(session: DetailedSession, filePath: string, mtimeMs: number, fileSizeBytes: number): void {
@@ -741,8 +737,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     const count = this.getSessionsCount();
     const lastSyncedAt = this.getMetadata('last_synced_at');
     const replaysCount = this.getReplaysCount();
-    const replayTrajectoriesCount = (this.db.prepare('SELECT COUNT(*) as count FROM replay_trajectories').get() as { count: number }).count;
-    const telemetryFilesCount = (this.db.prepare('SELECT COUNT(*) as count FROM telemetry_metadata').get() as { count: number }).count;
+    const telemetryFilesCount = this.getTelemetryFilesCount();
 
     const liveTelemetryFilesCount = getAvailableLiveCaptureCount(this.db);
 
@@ -756,13 +751,10 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     }
 
     return {
-      enabled: true,
-      dbPath: this.dbPath,
       sessionsCount: count,
       lastSyncedAt,
       dbSizeBytes,
       replaysCount,
-      replayTrajectoriesCount,
       telemetryFilesCount,
       liveTelemetryFilesCount,
     };

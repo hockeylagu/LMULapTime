@@ -135,7 +135,6 @@ describe('benchmarkImpact engine', () => {
 
       const actual = enrichBenchmarkDiffWithCompactImpact(diff, database.getDb()).updated[0].impact;
       expect(actual).toEqual(expected);
-      expect(actual?.affectedLapsCount).toBe(lapTimes.length);
     } finally {
       database.close();
     }
@@ -164,7 +163,7 @@ describe('benchmarkImpact engine', () => {
     };
 
     const enriched = enrichBenchmarkDiffWithCompactImpact(diff, database.getDb());
-    expect(enriched.updated[0].impact).toMatchObject({ affectedSessionsCount: 2, affectedLapsCount: 40, categoryShiftsCount: 40 });
+    expect(enriched.updated[0].impact).toMatchObject({ affectedSessionsCount: 2, categoryShiftsCount: 40 });
     expect(enriched.updated[0].impact?.categoryShifts).toHaveLength(25);
     expect(enriched.totalAffectedSessions).toBe(2);
     expect(enriched.totalCategoryShifts).toBe(40);
@@ -188,7 +187,6 @@ describe('benchmarkImpact engine', () => {
     const impact = computeBenchmarkItemImpact(item, mockSessions);
 
     expect(impact.affectedSessionsCount).toBe(1);
-    expect(impact.affectedLapsCount).toBe(2);
     expect(impact.categoryShiftsCount).toBe(2);
     expect(impact.categoryShifts).toHaveLength(2);
 
@@ -223,7 +221,6 @@ describe('benchmarkImpact engine', () => {
 
     const impact = computeBenchmarkItemImpact(item, mockSessions);
     expect(impact.affectedSessionsCount).toBe(0);
-    expect(impact.affectedLapsCount).toBe(0);
     expect(impact.categoryShiftsCount).toBe(0);
     expect(impact.categoryShifts).toEqual([]);
   });
@@ -274,7 +271,7 @@ describe('benchmarkImpact engine', () => {
     };
     const impact = computeBenchmarkItemImpact(item, mockSessions);
     expect(impact.categoryShifts.map(shift => shift.driverName)).not.toContain('Rival GT3');
-    expect(impact.affectedLapsCount).toBe(2);
+    expect(impact.categoryShiftsCount).toBe(2);
   });
 
   it('marks an enriched diff with the current impact rule', () => {

@@ -10,10 +10,10 @@ import { SETTINGS_FIELDS, WEATHER_FIELDS } from '../sessionRows/specs.js';
 import { group } from '../sessionRows/reader.js';
 
 export interface SessionQuery {
-  track?: string; car?: string; carClass?: string; driver?: string; sessionType?: string;
+  track?: string; car?: string; carClass?: string; sessionType?: string;
   trackVenue?: string; trackCourse?: string;
   hideEmpty?: boolean; hasReplay?: boolean; search?: string; sort?: string;
-  page?: number; pageSize?: number; from?: number; to?: number;
+  page?: number; pageSize?: number;
   playerCar?: string;
 }
 
@@ -23,6 +23,9 @@ export function carClassMatch(targetClass?: string): SqlFragment {
   if (!targetClass || targetClass === 'All') return { sql: '1=1', values: [] };
   return { sql: 'f.driver_class = ?', values: [targetClass] };
 }
+
+/** The session's own driver: the player, or the primary driver of a session without one. */
+const PLAYER_DRIVER = '(f.is_player=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
 
 /** All values are parameters; only fixed SQL fragments enter the query. */
 export function sessionWhere(options: SessionQuery): { sql: string; values: (string | number)[] } {
@@ -43,28 +46,15 @@ export function sessionWhere(options: SessionQuery): { sql: string; values: (str
   if (options.carClass && options.carClass !== 'All') {
     const classMatch = carClassMatch(options.carClass);
     if (classMatch.sql !== '1=1') {
-      const driverClause = options.driver && options.driver !== 'All'
-        ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(normalized_name,lower(?))>0)'
-        : '(f.is_player=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
-      parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${driverClause} AND ${classMatch.sql})`);
-      if (options.driver && options.driver !== 'All') {
-        values.push(options.driver);
-      }
+      parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${PLAYER_DRIVER} AND ${classMatch.sql})`);
       values.push(...classMatch.values);
     }
   }
   if (options.car && options.car !== 'All') {
-    const driverClause = options.driver && options.driver !== 'All'
-      ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(normalized_name,lower(?))>0)'
-      : '(f.is_player=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
-    parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${driverClause} AND f.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE instr(car_model,lower(?))>0))`);
-    if (options.driver && options.driver !== 'All') {
-      values.push(options.driver);
-    }
+    parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${PLAYER_DRIVER} AND f.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE instr(car_model,lower(?))>0))`);
     values.push(options.car);
   }
   if (options.playerCar && options.playerCar !== 'All') { parts.push('s.player_car_type=?'); values.push(options.playerCar); }
-  if (options.driver && options.driver !== 'All') { parts.push('EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(normalized_name,lower(?))>0))'); values.push(options.driver); }
   if (options.search?.trim()) {
     parts.push(`(instr(lower(s.track_venue),lower(?))>0 OR instr(lower(s.track_course),lower(?))>0 OR instr(lower(s.filename),lower(?))>0
       OR instr(lower(coalesce(s.player_car_type,'')),lower(?))>0 OR instr(lower(coalesce(s.player_driver_name,'')),lower(?))>0
@@ -72,8 +62,6 @@ export function sessionWhere(options: SessionQuery): { sql: string; values: (str
       OR instr(lower(coalesce(s.weather_string,'')),lower(?))>0)`);
     values.push(...Array<string>(8).fill(options.search.trim()));
   }
-  if (options.from !== undefined && Number.isFinite(options.from)) { parts.push('s.timestamp >= ?'); values.push(options.from); }
-  if (options.to !== undefined && Number.isFinite(options.to)) { parts.push('s.timestamp <= ?'); values.push(options.to); }
   return { sql: parts.length ? `WHERE ${parts.join(' AND ')}` : '', values };
 }
 
@@ -121,11 +109,8 @@ interface ProgressionRow {
 
 /** Every progression point of the scope, oldest first: the chart's personal-best line, ranges and totals need the whole history. */
 export function queryProgression(db: Database, options: SessionQuery): SessionProgressionPoint[] {
-  const where = sessionWhere({...options,driver:undefined});
-  const driver = options.driver && options.driver !== 'All' ? options.driver.trim().toLowerCase() : null;
-  const join = `LEFT JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=coalesce(
-    (SELECT x.driver_ordinal FROM session_drivers x JOIN drivers xn ON xn.driver_id=x.driver_id WHERE x.session_id=s.id AND xn.normalized_name=? ORDER BY x.driver_ordinal LIMIT 1),
-    CASE WHEN ? IS NULL THEN s.primary_driver_ordinal ELSE 0 END)
+  const where = sessionWhere(options);
+  const join = `LEFT JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=s.primary_driver_ordinal
     LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id`;
   const rows = db.prepare(`SELECT s.id,s.timestamp,s.track_venue,s.track_course,s.session_type,s.session_name,
     a.time_string,${[...WEATHER_FIELDS, ...SETTINGS_FIELDS].map(field => `s.${field.col}`).join(',')},
@@ -133,7 +118,7 @@ export function queryProgression(db: Database, options: SessionQuery): SessionPr
     d.best_lap_time,d.best_s1,d.best_s2,d.best_s3,d.avg_lap_time,d.top3_average,d.consistency_score,
     EXISTS(SELECT 1 FROM session_laps l WHERE l.session_id=s.id AND l.driver_ordinal=d.driver_ordinal) has_lap_rows
     FROM sessions s ${join} JOIN session_summary_facts a ON a.session_id=s.id ${where.sql}
-    ORDER BY s.timestamp ASC,s.id ASC`).all(driver,driver,...where.values) as Array<ProgressionRow & Record<string, unknown>>;
+    ORDER BY s.timestamp ASC,s.id ASC`).all(...where.values) as Array<ProgressionRow & Record<string, unknown>>;
   return rows.map((r): SessionProgressionPoint => {
     const theoreticalBest=computeTheoreticalBest(r.best_s1,r.best_s2,r.best_s3);
     return {sessionId:r.id,timestamp:r.timestamp,timeString:r.time_string,sessionType:r.session_type,sessionName:r.session_name,

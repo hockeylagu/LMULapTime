@@ -262,7 +262,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 | Feature | Server | Shared Domain | Client |
 |---|---|---|---|
 | Dashboard | `/api/dashboard` (`sessionSummaries/dashboardQueries.ts`) | `trackSummaryUtils.ts`, `paceCategory.ts` | `components/dashboard/` (`useDashboardData.ts`, `Dashboard.tsx`) |
-| Session list | `/api/sessions` (`sessionSummaries/pageQueries.ts`, `cards.ts`) | | `components/session-list/` (`SessionList.tsx`, `SessionGridCard.tsx`) |
+| Session list | `/api/dashboard` (its `sessions` page: `sessionSummaries/pageQueries.ts`, `cards.ts`) | | `components/session-list/` (`SessionList.tsx`, `SessionGridCard.tsx`) |
 | Tracks | `/api/tracks`, `/api/track/:trackName` (`sessionSummaries/trackQueries.ts`) | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/`, `components/track-detail/` |
 | Leaderboard & rivals | `leaderboardRoutes.ts`, `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`rivals/useRival.ts` with `includeRival=true`) |
 | Lap comparison | `/api/compare/laps` (`comparisonQueries.ts`, `comparisonLapRows.ts`) | `lapComparison.ts`, `compareLapScope.ts` | `components/leaderboard/`, `src/utils/telemetryCompareLink.ts` |

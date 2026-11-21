@@ -176,9 +176,6 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       if (url === '/api/session/2026_05_28_R1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({...raceSession,historyContext:{personalBests:[],relatedSessions:[{type:"qualifying",target:qualiSummary}]}}) });
       }
-      if (url.includes('/api/sessions')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([qualiSummary, raceSession]) });
-      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
 
@@ -204,9 +201,6 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url === '/api/session/2026_05_28_Q1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({...qualiSession,historyContext:{personalBests:[],relatedSessions:[{type:"race",target:raceSession}]}}) });
-      }
-      if (url.includes('/api/sessions')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([qualiSession, raceSession]) });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });

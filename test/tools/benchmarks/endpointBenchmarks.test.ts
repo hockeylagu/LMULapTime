@@ -158,7 +158,7 @@ describe('endpoint benchmark coverage and comparisons', () => {
       expect(server.store.isSessionSummaryReady()).toBe(true);
       expect(server.store.getDb().prepare('SELECT projection_version FROM sessions WHERE id = ?').get(fixture.id))
         .toEqual({ projection_version: SESSION_SUMMARY_PROJECTION_VERSION });
-      const response = await measureRequest(server.baseUrl, '/api/sessions?page=1&pageSize=5');
+      const response = await measureRequest(server.baseUrl, '/api/dashboard?page=1&pageSize=5');
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ sessions: [{ id: fixture.id }] });
       // Every production router is mounted, the corner sequences' included.

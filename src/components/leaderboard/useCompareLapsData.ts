@@ -16,7 +16,6 @@ import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 /** The /api/compare/laps response. */
 interface CompareLapsApiData {
   laps: ComparableLap[];
-  allTimeBestLap: ComparableLap | null;
   playerBestLap?: ComparableLap | null;
   overallTrackBestLap?: ComparableLap | null;
   bestS1: number | null;
@@ -97,7 +96,6 @@ export interface LapPickerTarget {
 
 const NO_COMPARE_LAPS: CompareLapsApiData = {
   laps: [],
-  allTimeBestLap: null,
   playerBestLap: null,
   overallTrackBestLap: null,
   bestS1: null,

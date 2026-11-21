@@ -97,7 +97,7 @@ export function extractComparableLaps(
     /** Leaves out the AI drivers of offline sessions, for the track records too. */
     humansOnly?: boolean;
   }
-): ComparableLapsResult {
+): ComparableLapsResult & { allTimeBestLap: ComparableLap | null; sessionsCount: number } {
   const normTrack = (filters.trackName || '').toLowerCase().trim();
   const targetClass = (filters.carClass || '').trim();
   const targetModel = (filters.carType || '').toLowerCase().trim();

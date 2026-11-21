@@ -15,8 +15,8 @@ import { createSystemRouter } from '../../../server/routes/systemRoutes.js';
 import type { ServerContext } from '../../../server/core/serverContext.js';
 
 const cacheStats = {
-  enabled: true, dbPath: ':memory:', sessionsCount: 3, lastSyncedAt: null, dbSizeBytes: 0,
-  replaysCount: 1, replayTrajectoriesCount: 1, telemetryFilesCount: 0, liveTelemetryFilesCount: 12,
+  sessionsCount: 3, lastSyncedAt: null, dbSizeBytes: 0,
+  replaysCount: 1, telemetryFilesCount: 0, liveTelemetryFilesCount: 12,
 };
 
 function fakeContext(dir: string) {
@@ -33,14 +33,10 @@ function fakeContext(dir: string) {
     ]),
     sessionDb: {
       getCacheStats: vi.fn(() => cacheStats),
-      getSessionCatalogStats: vi.fn(() => ({ sessionsCount: 3, tracksCount: 2, summariesReadyCount: 3 })),
-      getIngestErrors: vi.fn(() => [{ filePath: 'bad.xml', error: 'truncated' }]),
+      getSessionCatalogStats: vi.fn(() => ({ sessionsCount: 3, summariesReadyCount: 3 })),
       clearCache: vi.fn(),
     },
-    telemetryCatalog: {
-      getStatus: vi.fn(() => ({ running: false })),
-      clear: vi.fn(),
-    },
+    telemetryCatalog: { clear: vi.fn() },
     hasActiveFileScan: vi.fn(() => false),
     configureDirectories: vi.fn(() => true),
     runSessionSyncInBackground: vi.fn(() => true),
@@ -68,16 +64,16 @@ describe('system routes', () => {
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
   describe('GET /api/status', () => {
-    it('reports which folders exist, the session and track counts and the cache', async () => {
+    it('reports which folders exist, the session and replay counts and the cache', async () => {
       const res = await request(app).get('/api/status');
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
         serverInstanceId: 'instance-test', dataPlugin: { revision: expect.any(String) as unknown },
         resultsExist: true, replaysExist: false, telemetryExist: true,
-        playerName: 'Test Player', sessionsCount: 3, tracksCount: 2,
+        playerName: 'Test Player', sessionsCount: 3, replaysCount: 1,
         referenceLaptimes: { lastUpdated: null, entriesCount: 0, lastUpdateDiff: null },
-        sqliteCache: { sessionsCount: 3, replaysCount: 1, liveTelemetryFilesCount: 12, telemetryCatalog: { running: false }, ingestErrors: [{ filePath: 'bad.xml' }] },
+        sqliteCache: { sessionsCount: 3, liveTelemetryFilesCount: 12 },
       });
       expect(context.loadSessions).not.toHaveBeenCalled();
     });
@@ -90,10 +86,10 @@ describe('system routes', () => {
   });
 
   describe('POST /api/cache/clear', () => {
-    it('clears the cache and reports it empty', async () => {
+    it('clears the cache', async () => {
       const res = await request(app).post('/api/cache/clear');
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ success: true, sessionsCount: 0 });
+      expect(res.body).toEqual({ success: true });
       expect(context.sessionDb.clearCache).toHaveBeenCalledTimes(1);
     });
 
@@ -162,7 +158,7 @@ describe('system routes', () => {
       const res = await request(app).post('/api/scan').send(folders);
 
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ success: true, sessionScanStarted: true, replayScanStarted: true, telemetryScanStarted: true, sessionsCount: 3 });
+      expect(res.body).toEqual({ success: true, playerName: 'Test Player' });
       expect(context.configureDirectories).toHaveBeenCalledWith(folders);
       expect(context.telemetryCatalog.clear).toHaveBeenCalled();
       expect(context.runTelemetryScanInBackground).not.toHaveBeenCalledWith(false, true);
@@ -183,7 +179,7 @@ describe('system routes', () => {
       const res = await request(app).post('/api/scan').send({});
 
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({ success: true, sessionScanStarted: true });
+      expect(res.body).toHaveProperty('success', true);
       expect(context.configureDirectories).not.toHaveBeenCalled();
       expect(context.telemetryCatalog.clear).not.toHaveBeenCalled();
       expect(context.runTelemetryScanInBackground).not.toHaveBeenCalled();

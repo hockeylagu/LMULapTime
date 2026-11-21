@@ -15,8 +15,6 @@ const readSort = (value: string | null): TrackDetailSortOption =>
 
 export interface TrackDetailData {
   trackName: string;
-  normalizedTrackName: string;
-  sessionsCount: number;
   sessions: SessionCard[];
   benchmarks: ReferenceLaptimeEntry[];
   summary?: TrackSummary;

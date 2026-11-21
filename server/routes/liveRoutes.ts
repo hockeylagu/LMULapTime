@@ -6,8 +6,6 @@ import type { LiveService } from '../live/liveService.js';
 import { isPedalTraceSeconds, isReserveSeconds, loadLiveSettings, saveLiveSettings } from '../live/liveSettings.js';
 import { SSE_HEADERS, writeSseEvent } from '../live/sse.js';
 import type { LiveCaptureController } from '../live/capture/controller.js';
-import { LIVE_CAPTURE_CHANNELS } from '../live/capture/channels.js';
-import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SCHEMA_VERSION } from '../../shared/types/liveCapture.js';
 import { LearningReadinessError, LearningReadinessReader } from '../live/learning/readinessReader.js';
 import type { ReadLearningReadiness } from '../live/learning/readinessReader.js';
 import type { LiveLearningReadiness } from '../../shared/types/liveLearning.js';
@@ -18,7 +16,7 @@ function openStream(res: Response): void {
 }
 
 export function createLiveRouter(context: ServerContext, live: LiveService,
-  capture?: Pick<LiveCaptureController, 'directory' | 'status'> & Partial<Pick<LiveCaptureController, 'hasOpenRecordingHandle' | 'diagnostics'>>,
+  capture?: Partial<Pick<LiveCaptureController, 'hasOpenRecordingHandle' | 'diagnostics'>>,
   readReadiness?: ReadLearningReadiness): Router {
   const router = Router();
   const readinessReader = new LearningReadinessReader();
@@ -45,14 +43,6 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
         .json({ error: error instanceof Error ? error.message : 'Unable to check learning evidence.' });
     } finally { stopLoaded(); res.off('close', cancel); }
   });
-  router.get('/live/capture', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.json({ source: 'live-capture', schemaVersion: LIVE_CAPTURE_SCHEMA_VERSION,
-      normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION, directory: capture?.directory ?? null,
-      ...(capture?.status() ?? { state: 'idle', recordingId: null, samples: 0, droppedSamples: 0, pendingBatches: 0, error: null }),
-      channels: LIVE_CAPTURE_CHANNELS });
-  });
-
   router.get('/live/stream', (req, res) => {
     openStream(res);
     const remove = live.addClient(res);

@@ -38,7 +38,6 @@ export interface LapCategoryShift {
 
 export interface BenchmarkItemImpact {
   affectedSessionsCount: number;
-  affectedLapsCount: number;
   categoryShiftsCount: number;
   categoryShifts: LapCategoryShift[];
 }

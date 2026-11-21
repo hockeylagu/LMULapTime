@@ -9,10 +9,7 @@ vi.mock('../../../server/benchmarks/referenceLaptimes.js', async importOriginal 
   loadReferenceLaptimesFromCache: referenceCache.load,
 }));
 
-import {
-  createSessionRouter,
-  parseSessionFilters,
-} from '../../../server/routes/sessionRoutes.js';
+import { createSessionRouter } from '../../../server/routes/sessionRoutes.js';
 import { DetailedSession, ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { SessionDatabase } from '../../../server/core/db.js';
@@ -141,39 +138,6 @@ describe('sessionRoutes and filterSessions', () => {
     },
   ];
 
-  describe('parseSessionFilters', () => {
-    it('parses valid query parameters into SessionFilterOptions', () => {
-      const filters = parseSessionFilters({
-        track: 'Spa',
-        car: 'Ferrari',
-        carClass: 'Hyper',
-        driver: 'Alpha',
-        sessionType: 'Practice',
-        hideEmpty: 'true',
-      });
-
-      expect(filters.track).toBe('Spa');
-      expect(filters.car).toBe('Ferrari');
-      expect(filters.carClass).toBe('Hyper');
-      expect(filters.driver).toBe('Alpha');
-      expect(filters.sessionType).toBe('Practice');
-      expect(filters.hideEmpty).toBe(true);
-    });
-
-    it('treats a repeated or nested parameter as absent', () => {
-      const filters = parseSessionFilters({ track: ['Spa', 'Monza'], driver: { name: 'Alpha' }, carClass: 'Hyper' });
-      expect(filters.track).toBeUndefined();
-      expect(filters.driver).toBeUndefined();
-      expect(filters.carClass).toBe('Hyper');
-    });
-
-    it('handles filterEmpty alias and undefined fields', () => {
-      const filters = parseSessionFilters({ filterEmpty: 'true' });
-      expect(filters.hideEmpty).toBe(true);
-      expect(filters.track).toBeUndefined();
-    });
-  });
-
   describe('filterSessions', () => {
     it('filters out empty sessions when hideEmpty is true', () => {
       const result = filterSessions(mockSessions, { hideEmpty: true });
@@ -193,12 +157,6 @@ describe('sessionRoutes and filterSessions', () => {
       expect(result[0].id).toBe('sess_2');
     });
 
-    it('filters sessions by driver name', () => {
-      const result = filterSessions(mockSessions, { driver: 'Beta' });
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('sess_2');
-    });
-
     it('filters sessions by car model substring', () => {
       const result = filterSessions(mockSessions, { car: 'Ferrari' });
       expect(result).toHaveLength(1);
@@ -210,7 +168,6 @@ describe('sessionRoutes and filterSessions', () => {
         track: 'All',
         car: 'All',
         carClass: 'All',
-        driver: 'All',
         sessionType: 'All',
       });
       expect(result).toHaveLength(3);
@@ -239,8 +196,8 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.status).toBe(404);
     });
 
-    it('GET /api/sessions returns a compact filtered page and total count', async () => {
-      const res = await request(app).get('/api/sessions?track=Spa&page=1&pageSize=1');
+    it('GET /api/dashboard returns a compact filtered page and total count', async () => {
+      const res = await request(app).get('/api/dashboard?track=Spa&type=Practice&hideEmpty=true&page=1&pageSize=1');
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('total', 1);
       expect(res.body).toHaveProperty('sessions', expect.objectContaining({ length: 1 }));
@@ -252,7 +209,7 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.body).toHaveProperty('pageSize', 1);
     });
 
-    it('GET /api/sessions leaves out lap stewards and traffic records without touching the cached session', () => {
+    it('a session page leaves out lap stewards and traffic records without touching the cached session', () => {
       const session = structuredClone(mockSessions[0]);
       const player = session.playerDriver!;
       const lapRecords = { traffic: { passed: [], passedBy: [] }, incidents: [{ elapsedTime: 1 }], trackLimits: [{ elapsedTime: 2 }] };
@@ -272,8 +229,8 @@ describe('sessionRoutes and filterSessions', () => {
       expect(session.drivers).toHaveLength(1);
     });
 
-    it('GET /api/sessions safely ignores repeated filters', async () => {
-      const res = await request(app).get('/api/sessions?track=Spa&track=Monza&driver=Alpha&driver=Beta');
+    it('GET /api/dashboard treats a repeated filter as absent', async () => {
+      const res = await request(app).get('/api/dashboard?track=Spa&track=Monza&carClass=Hyper&carClass=GT3');
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('sessions', expect.objectContaining({ length: 3 }));
       expect(res.body).toHaveProperty('total', 3);
@@ -336,7 +293,7 @@ describe('sessionRoutes and filterSessions', () => {
     });
     it('does not report incomplete summaries as complete totals',async()=>{
       sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0 WHERE id=?').run('sess_1');
-      expect((await request(app).get('/api/sessions')).status).toBe(503);
+      expect((await request(app).get('/api/dashboard')).status).toBe(503);
       expect((await request(app).get('/api/session/sess_1')).status).toBe(200);
     });
     it('holds only its history reads while summaries rebuild, not routers mounted after it',async()=>{
@@ -373,7 +330,7 @@ describe('sessionRoutes and filterSessions', () => {
       const res = await request(app).get('/api/track/Monza');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveProperty('sessionsCount', 1);
+      expect(res.body).toHaveProperty('total', 1);
       expect(res.body).toHaveProperty('sessions', [expect.objectContaining({ id: 'sess_2' })]);
       expect(res.body).not.toHaveProperty('sessions.0.drivers');
       expect(res.body).toHaveProperty('benchmarks', [expect.objectContaining({ trackName: 'Monza' })]);
@@ -400,7 +357,7 @@ describe('sessionRoutes and filterSessions', () => {
     it('GET /api/track/:trackName has no benchmarks before the table is first downloaded', async () => {
       referenceCache.load.mockReturnValue(null);
       const res = await request(app).get('/api/track/Spa');
-      expect(res.body).toHaveProperty('sessionsCount', 1);
+      expect(res.body).toHaveProperty('total', 1);
       expect(res.body).toHaveProperty('benchmarks', []);
     });
 
@@ -426,7 +383,7 @@ describe('sessionRoutes and filterSessions', () => {
       const response = await request(app).get('/api/compare/laps?track=Spa&telemetryOnly=true');
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({ laps: [], total: 0, page: 1, pageSize: 50 });
-      expect(response.body).not.toHaveProperty('allTimeBestLap');
+      expect(response.body).not.toHaveProperty('playerBestLap');
       expect(response.body).not.toHaveProperty('benchmarks');
       expect(referenceCache.load).not.toHaveBeenCalled();
       expect(readSession).not.toHaveBeenCalled();

@@ -15,7 +15,6 @@ export function computeBenchmarkItemImpact(
   sessions: DetailedSession[]
 ): BenchmarkItemImpact {
   let affectedSessionsCount = 0;
-  let affectedLapsCount = 0;
   const categoryShifts: LapCategoryShift[] = [];
 
   for (const session of sessions) {
@@ -38,8 +37,6 @@ export function computeBenchmarkItemImpact(
         if (!lap.lapTime || lap.lapTime <= 0 || lap.isValid === false) {
           continue;
         }
-
-        affectedLapsCount++;
 
         // Determine if this lap changed pace category between old and new targets
         if (item.oldAlienSec && item.oldAlienSec > 0 && item.newAlienSec && item.newAlienSec > 0) {
@@ -71,7 +68,6 @@ export function computeBenchmarkItemImpact(
 
   return {
     affectedSessionsCount,
-    affectedLapsCount,
     categoryShiftsCount: categoryShifts.length,
     categoryShifts: categoryShifts.slice(0, MAX_STORED_SAMPLE_SHIFTS),
   };

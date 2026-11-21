@@ -256,12 +256,9 @@ describe('Replay domain services and transforms', () => {
 
       const validated = applyPureOfficialLapValidation(original, session, driver);
       expect(validated.laps?.[0].validatedTimeSec).toBe(89.5);
-      expect(validated.laps?.[0].timeDiffSec).toBe(0.5);
-      expect(validated.validation?.driverName).toBe('Official Driver');
 
       // Verify original lap was not mutated
       expect(originalLap).not.toHaveProperty('validatedTimeSec');
-      expect(originalLap).not.toHaveProperty('timeDiffSec');
     });
 
     it('uses parser classification for pit, out and invalid laps even when replay flags disagree', () => {

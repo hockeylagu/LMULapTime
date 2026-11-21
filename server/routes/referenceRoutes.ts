@@ -55,9 +55,7 @@ export function createReferenceRouter(context: ServerContext): Router {
       const updatedCache = await fetchAndCacheReferenceLaptimes();
       res.json({
         success: true,
-        lastUpdated: updatedCache.lastUpdated,
         entriesCount: updatedCache.entriesCount,
-        sessionsCount: context.sessionDb.getSessionsCount(),
         diff: updatedCache.lastUpdateDiff || null,
       });
     } catch (error: unknown) {

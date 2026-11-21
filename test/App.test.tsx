@@ -17,7 +17,6 @@ describe('App component', () => {
     replaysExist: true,
     playerName: 'Player',
     sessionsCount: 2,
-    tracksCount: 1,
     referenceLaptimes: { lastUpdated: '2026-05-28', entriesCount: 10 },
   };
 
@@ -69,20 +68,12 @@ describe('App component', () => {
           paceTrendDirection:'none',paceTrendClass:null,recentCleanRate:null,recentConsistency:null,recentNetPositions:0}
       })});
       if (url.startsWith('/api/tracks')) return Promise.resolve({ok:true,json:()=>Promise.resolve({tracks:Object.values(aggregateTrackSummaries(mockSessions))})});
-      if (url.includes('/api/session-snapshot')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: mockSessions, progression: [] }) });
-      }
-      if (url.includes('/api/sessions')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockSessions) });
-      }
       if (url.includes('/api/track/')) {
         return Promise.resolve({
           ok: true,
           json: () =>
             Promise.resolve({
               trackName: 'Spa',
-              normalizedTrackName: 'Spa',
-              sessionsCount: 1,
               sessions: mockSessions,
               benchmarks: [],
             }),
@@ -192,7 +183,7 @@ describe('App component', () => {
         return reply({ layoutKey: 'spa_gp', layoutName: '', carClass: 'LMGT3', scope: 'class', carType: null, entries: [], player: null, benchmark: null });
       }
       if (url.startsWith('/api/rivals')) return reply({ rival: null, rivalEntry: null, gap: null, progress: null, theoreticalGap: null, beaten: [], nextUp: [], trend: [] });
-      if (url.startsWith('/api/compare/laps')) return reply({ laps: [], allTimeBestLap: null, benchmarks: [] });
+      if (url.startsWith('/api/compare/laps')) return reply({ laps: [], benchmarks: [] });
       return defaultAnswer(url);
     });
     window.location.hash = '#/compare?track=Spa&carClass=LMGT3&sessionId=sess1';

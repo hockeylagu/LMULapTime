@@ -12,24 +12,18 @@ export interface AppStatus {
   telemetryExist?: boolean;
   playerName?: string;
   sessionsCount: number;
-  tracksCount: number;
   referenceLaptimes?: {
     lastUpdated: string | null;
     entriesCount: number;
     lastUpdateDiff?: ReferenceBenchmarkDiff | null;
   };
   sqliteCache?: {
-    enabled: boolean;
-    dbPath: string;
     sessionsCount: number;
     lastSyncedAt: string | null;
     dbSizeBytes: number;
-    replaysCount?: number;
-    replayTrajectoriesCount?: number;
     telemetryFilesCount?: number;
     /** Available supplemental live DuckDB recordings, including unlinked sessions. */
     liveTelemetryFilesCount?: number;
-    sessionSummariesReadyCount?: number;
   };
 }
 

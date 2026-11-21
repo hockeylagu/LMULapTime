@@ -78,9 +78,8 @@ export interface ReplayCacheSummary {
   filename: string;
   fileSizeBytes: number;
   compressedSizeBytes: number;
-  updatedAt: number;
   // The .Vcr file's on-disk modification time - the closest proxy we have for when the
-  // replay/session actually took place, as opposed to `updatedAt` (when it was cached).
+  // replay/session actually took place.
   replayDateMs: number;
   trackName?: string;
   driversCount: number;
@@ -238,31 +237,7 @@ export interface ReplayLapSummary {
   endFrame?: number;
   // Validation info from matched session log (if available)
   validatedTimeSec?: number | null;
-  validatedS1Sec?: number | null;
-  validatedS2Sec?: number | null;
-  validatedS3Sec?: number | null;
-  timeDiffSec?: number | null;
   nonRepresentativeReason?: NonRepresentativeReason;
-}
-
-export interface ReplayTrajectoryValidation {
-  matchedSessionId: string;
-  sessionType?: string;
-  trackName?: string;
-  driverName?: string;
-  totalSessionLaps: number;
-  officialBestLapTime?: number | null;
-  officialLaps?: Array<{
-    lapNumber: number;
-    lapTimeSec?: number | null;
-    s1Sec?: number | null;
-    s2Sec?: number | null;
-    s3Sec?: number | null;
-    isValid?: boolean;
-    isPitStop?: boolean;
-    isOutLap?: boolean;
-    nonRepresentativeReason?: NonRepresentativeReason;
-  }>;
 }
 
 /**
@@ -359,7 +334,6 @@ export interface ReplayTrajectoryData {
   trackTemp?: number;
   tireCompounds?: [number, number, number, number];
   standingsHistory?: ReplayStandingsSnapshot[];
-  validation?: ReplayTrajectoryValidation | null;
   wheelTelemetryAvailable?: boolean;
   energyTelemetryAvailable?: boolean;
   layoutKey?: string;
@@ -464,8 +438,7 @@ export interface RaceReplayOverview {
   /** The replay clock span the laps cover, in seconds. */
   startSec: number;
   endSec: number;
-  /** Pose samples per second and seconds per pose window (`/race/poses?window=`). */
-  poseHz: number;
+  /** Seconds per pose window (`/race/poses?window=`). */
   windowSec: number;
   /** The circuit layout (circuitSpecs) the replay was driven on, when known. */
   layoutKey?: string;

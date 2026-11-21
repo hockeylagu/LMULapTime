@@ -16,7 +16,6 @@ const status: AppStatus = {
   telemetryExist: true,
   playerName: 'Player1',
   sessionsCount: 35,
-  tracksCount: 6,
   referenceLaptimes: { lastUpdated: '2026-10-01T10:00:00Z', entriesCount: 187 },
 };
 

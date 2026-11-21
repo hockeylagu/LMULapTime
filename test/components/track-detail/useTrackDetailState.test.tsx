@@ -31,8 +31,6 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 describe('useTrackDetailState', () => {
   const mockTrackData = {
     trackName: 'Autodromo Nazionale Monza',
-    normalizedTrackName: 'Monza',
-    sessionsCount: 2,
     sessions: [
       {
         id: 'sess-1',

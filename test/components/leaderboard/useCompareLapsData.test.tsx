@@ -49,7 +49,6 @@ describe('useCompareLapsData selection fallbacks', () => {
       ok: true,
       json: () => Promise.resolve({
         laps,
-        allTimeBestLap: null,
         playerBestLap: laps[1],
         overallTrackBestLap: laps[2],
         bestS1: 28,
@@ -85,7 +84,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        laps, allTimeBestLap: null, playerBestLap: null, overallTrackBestLap: null,
+        laps, playerBestLap: null, overallTrackBestLap: null,
         bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [],
       }),
     });
@@ -110,7 +109,6 @@ describe('useCompareLapsData selection fallbacks', () => {
       ok: true,
       json: () => Promise.resolve({
         laps,
-        allTimeBestLap: null,
         playerBestLap: null,
         overallTrackBestLap: laps[2],
         bestS1: 28,
@@ -140,7 +138,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       urls.push(requestUrl(input));
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({
-        laps, allTimeBestLap: null, playerBestLap: null, overallTrackBestLap: null,
+        laps, playerBestLap: null, overallTrackBestLap: null,
         bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [],
       }) });
     }));
@@ -159,7 +157,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url.includes('track=Monza')
       ? { ok: false, status: 500, json: () => Promise.resolve({ error: 'database is locked' }) }
-      : { ok: true, status: 200, json: () => Promise.resolve({ laps, allTimeBestLap: null, overallTrackBestLap: laps[2], bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [] }) })));
+      : { ok: true, status: 200, json: () => Promise.resolve({ laps, overallTrackBestLap: laps[2], bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [] }) })));
 
     const { result } = renderHook(
       () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
@@ -180,8 +178,8 @@ describe('useCompareLapsData selection fallbacks', () => {
     const monzaLap = { ...laps[1], id: 'monza-player', sessionId: 'session-3', lapTime: 107 };
     const reply = (data: unknown) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(data) });
     vi.stubGlobal('fetch', vi.fn((url: string) => url.includes('track=Monza')
-      ? new Promise(resolve => setTimeout(() => resolve(reply({ laps: [monzaLap], allTimeBestLap: null, playerBestLap: monzaLap, benchmarks: [] })), 20))
-      : reply({ laps, allTimeBestLap: null, playerBestLap: laps[1], benchmarks: [] })));
+      ? new Promise(resolve => setTimeout(() => resolve(reply({ laps: [monzaLap], playerBestLap: monzaLap, benchmarks: [] })), 20))
+      : reply({ laps, playerBestLap: laps[1], benchmarks: [] })));
 
     const { result } = renderHook(
       () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
@@ -220,7 +218,7 @@ describe('the laps compared', () => {
   it('applies the picks and pairs the leaderboard asks for', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ laps, allTimeBestLap: null, playerBestLap: laps[1], benchmarks: [] }),
+      json: () => Promise.resolve({ laps, playerBestLap: laps[1], benchmarks: [] }),
     });
     let compareRequest: CompareRequest | null = null;
     const { result, rerender } = renderHook(

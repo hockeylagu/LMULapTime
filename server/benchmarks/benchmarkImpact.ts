@@ -16,7 +16,7 @@ const MAX_STORED_SAMPLE_SHIFTS = 25;
 export const BENCHMARK_IMPACT_RULE = 4;
 
 interface CompactImpactLap {
-  affected_sessions: number; affected_laps: number; category_shifts_count: number;
+  affected_sessions: number; category_shifts_count: number;
   session_id: string | null; session_name: string | null; session_type: string | null;
   driver_name: string | null; lap_number: number | null; lap_time: number | null;
   old_category: PaceCategory | null; new_category: PaceCategory | null;
@@ -70,7 +70,7 @@ export function enrichBenchmarkDiffWithCompactImpact(diff: ReferenceBenchmarkDif
         FROM scope JOIN session_laps l ON l.session_id=scope.session_id AND l.driver_ordinal=scope.driver_ordinal
         WHERE l.is_valid=1 AND l.lap_time>0
       ), stats AS (
-        SELECT (SELECT count(DISTINCT session_id) FROM scope) affected_sessions,count(*) affected_laps,
+        SELECT (SELECT count(DISTINCT session_id) FROM scope) affected_sessions,
           sum(CASE WHEN old_category<>new_category THEN 1 ELSE 0 END) category_shifts_count FROM rated
       ), samples AS (
         SELECT * FROM rated WHERE old_category<>new_category
@@ -87,7 +87,7 @@ export function enrichBenchmarkDiffWithCompactImpact(diff: ReferenceBenchmarkDif
       sessionId: row.session_id ?? '', sessionName: row.session_name || row.session_type || 'Session',
       lapNumber: row.lap_number ?? 0, oldCategory: row.old_category as PaceCategory, newCategory: row.new_category as PaceCategory,
     }));
-    item.impact = { affectedSessionsCount: stats?.affected_sessions ?? 0, affectedLapsCount: stats?.affected_laps ?? 0,
+    item.impact = { affectedSessionsCount: stats?.affected_sessions ?? 0,
       categoryShiftsCount: stats?.category_shifts_count ?? 0, categoryShifts };
     totalCategoryShifts += item.impact.categoryShiftsCount;
   }

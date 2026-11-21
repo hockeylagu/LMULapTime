@@ -59,25 +59,17 @@ export function createSystemRouter(context: ServerContext): Router {
       playerName: context.currentParser.configuredPlayerName,
       sessionsCount: catalog.sessionsCount,
       replaysCount: cacheStats.replaysCount,
-      tracksCount: catalog.tracksCount,
       referenceLaptimes: {
         lastUpdated: refCache?.lastUpdated || null,
         entriesCount: refCache?.entriesCount || 0,
         lastUpdateDiff: refCache?.lastUpdateDiff || null,
       },
       sqliteCache: {
-        enabled: cacheStats.enabled,
-        dbPath: cacheStats.dbPath,
         sessionsCount: cacheStats.sessionsCount,
         lastSyncedAt: cacheStats.lastSyncedAt,
         dbSizeBytes: cacheStats.dbSizeBytes,
-        replaysCount: cacheStats.replaysCount,
-        replayTrajectoriesCount: cacheStats.replayTrajectoriesCount,
         telemetryFilesCount: cacheStats.telemetryFilesCount,
         liveTelemetryFilesCount: cacheStats.liveTelemetryFilesCount,
-        sessionSummariesReadyCount: catalog.summariesReadyCount,
-        telemetryCatalog: context.telemetryCatalog.getStatus(context.telemetryDir),
-        ingestErrors: context.sessionDb.getIngestErrors(),
       },
     });
   });
@@ -88,12 +80,7 @@ export function createSystemRouter(context: ServerContext): Router {
     }
     try {
       context.sessionDb.clearCache();
-      res.json({
-        success: true,
-        message: 'SQLite cache cleared successfully',
-        sqliteCache: context.sessionDb.getCacheStats(),
-        sessionsCount: 0,
-      });
+      res.json({ success: true });
     } catch (error: unknown) {
       console.error('Failed to clear SQLite cache:', error);
       const message = error instanceof Error ? error.message : 'Failed to clear cache';
@@ -127,22 +114,7 @@ export function createSystemRouter(context: ServerContext): Router {
     // A manual refresh: replays that failed every attempt are decoded once more.
     const sessionScanStarted = context.runSessionSyncInBackground(false, true);
     if (!sessionScanStarted && !hasConfig) context.requestSessionRefresh();
-    const catalog = context.sessionDb.getSessionCatalogStats();
-
-    res.json({
-      success: true,
-      resultsDir: context.resultsDir,
-      replaysDir: context.replaysDir,
-      telemetryDir: context.telemetryDir,
-      telemetryExist: fs.existsSync(context.telemetryDir),
-      playerName: context.currentParser.configuredPlayerName,
-      sessionsCount: catalog.sessionsCount,
-      sessionScanStarted: sessionScanStarted || !hasConfig,
-      replayScanStarted: true,
-      telemetryScanStarted: true,
-      telemetryFilesScanned: null,
-      sqliteCache: context.sessionDb.getCacheStats(),
-    });
+    res.json({ success: true, playerName: context.currentParser.configuredPlayerName });
   });
 
   router.get('/scan/status', (_req, res) => {

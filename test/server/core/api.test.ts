@@ -37,7 +37,7 @@ describe('Server API wiring', () => {
   it.each([
     ['system', '/api/status'],
     ['system', '/api/scan/status'],
-    ['session', '/api/sessions'],
+    ['session', '/api/dashboard'],
     ['session', '/api/track/Spa'],
     ['session', '/api/compare/laps?track=Spa'],
     ['reference', '/api/reference-laptimes'],
@@ -86,7 +86,7 @@ describe('Server API wiring', () => {
     await waitForFileScans();
     const cleared = await request(app).post('/api/cache/clear');
     expect(cleared.status).toBe(200);
-    expect(cleared.body).toHaveProperty('sqliteCache.sessionsCount', 0);
+    expect((await request(app).get('/api/status')).body).toHaveProperty('sqliteCache.sessionsCount', 0);
 
   });
 
@@ -113,7 +113,7 @@ describe('Server API wiring', () => {
           playerName: 'Api Test Driver',
         });
       expect(scanRes.status).toBe(200);
-      expect(scanRes.body).toHaveProperty('replayScanStarted', true);
+      expect(scanRes.body).toHaveProperty('success', true);
 
       // Replay trajectory extraction runs in the background - poll the scan status
       // endpoint until it finishes instead of asserting on the immediate scan response.

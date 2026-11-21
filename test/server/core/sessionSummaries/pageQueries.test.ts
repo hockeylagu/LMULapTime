@@ -61,13 +61,13 @@ describe('paged session queries', () => {
     } finally { db.close(); }
   });
 
-  it('normalizes class filters, tolerates absent pace targets and ignores invalid date bounds', () => {
+  it('normalizes class filters and tolerates absent pace targets', () => {
     const db = new Database(':memory:');
     try {
       initDbSchema(db);
       const session = fixture('one', 1);
       upsertSession(db, session, session.filePath, 1, 1);
-      const page = querySessionPage(db, { carClass: 'Hyper', sort: 'pace-asc', from: Number.NaN });
+      const page = querySessionPage(db, { carClass: 'Hyper', sort: 'pace-asc' });
       expect(page.total).toBe(1);
       expect(page.sessions[0].playerDriver).not.toHaveProperty('laps');
       expect(page.sessions[0].playerDriver).toMatchObject({ driverOrdinal: 0, bestLapOrdinal: 0 });

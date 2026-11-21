@@ -46,7 +46,6 @@ describe('CompareLaps component', () => {
 
   const mockCompareData = {
     laps: [lap(1, 122.5, [30.5, 45.5, 46.5]), lap(2, 121.8, [30.2, 45.1, 46.5])],
-    allTimeBestLap: { ...lap(2, 121.8, [30.2, 45.1, 46.5]), tag: '⭐ All-Time Best Lap' },
     playerBestLap: { ...lap(2, 121.8, [30.2, 45.1, 46.5]), tag: '⭐ Personal Best' },
     overallTrackBestLap: {
       ...lap(5, 120.5, [29.9, 44.8, 45.8]),
@@ -252,7 +251,6 @@ describe('CompareLaps component', () => {
   it('disables Compare Telemetry when a selected lap is unavailable', async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({
       ...mockCompareData, laps: mockCompareData.laps.map(item => ({ ...item, telemetryAvailable: false })),
-      allTimeBestLap: { ...mockCompareData.allTimeBestLap, telemetryAvailable: false },
       playerBestLap: { ...mockCompareData.playerBestLap, telemetryAvailable: false },
     }) });
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="GT3" initialSessionId="sess1" initialLapNumber={1} />);

@@ -31,7 +31,7 @@ const LAYOUTS = [
 ];
 
 const EMPTY_LAPS = {
-  laps: [], allTimeBestLap: null, playerBestLap: null, overallTrackBestLap: null,
+  laps: [], playerBestLap: null, overallTrackBestLap: null,
   bestS1: null, bestS2: null, bestS3: null, theoreticalBestSec: null, benchmarks: [],
 };
 

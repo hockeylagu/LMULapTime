@@ -67,7 +67,6 @@ export class RaceReplayService {
       sessionType: request.sessionType,
       startSec: starts.length ? Math.min(...starts) : 0,
       endSec: ends.length ? Math.max(...ends) : 0,
-      poseHz: RACE_POSE_HZ,
       windowSec: RACE_POSE_WINDOW_SEC,
       layoutKey: layoutKey !== 'unknown' ? layoutKey : undefined,
       trackVenue: request.trackVenue,

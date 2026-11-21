@@ -13,7 +13,6 @@ const okStatus: AppStatus = {
   telemetryExist: true,
   playerName: 'Player1',
   sessionsCount: 15,
-  tracksCount: 5,
 };
 
 const toc = () => screen.getByRole('navigation', { name: /settings table of contents/i });

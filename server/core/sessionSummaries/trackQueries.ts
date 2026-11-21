@@ -168,7 +168,7 @@ export function queryTrackPositionAverages(db: Database, trackName: string, carC
 }
 
 function trackScope(trackName: string, options: SessionQuery, trackCourse = ''): SessionQuery {
-  return { ...options, track: trackName, trackVenue: trackName, trackCourse, search: undefined, sessionType: undefined, hideEmpty: false, hasReplay: false, from: undefined, to: undefined };
+  return { ...options, track: trackName, trackVenue: trackName, trackCourse, search: undefined, sessionType: undefined, hideEmpty: false, hasReplay: false };
 }
 
 /** Query a compact, SQL-aggregated track summary for the selected canonical layout/class/model. */

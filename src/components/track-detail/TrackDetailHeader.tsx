@@ -13,7 +13,6 @@ import { linkClickHandler } from '../../utils/linkClick.js';
 export interface TrackDetailHeaderProps {
   trackName: string;
   trackCourse?: string;
-  sessionsCount: number;
   onBack: () => void;
   selectedClass: string;
   setSelectedClass: (cls: string) => void;
@@ -29,7 +28,6 @@ export interface TrackDetailHeaderProps {
 export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
   trackName,
   trackCourse,
-  sessionsCount: _sessionsCount,
   onBack,
   selectedClass,
   setSelectedClass,

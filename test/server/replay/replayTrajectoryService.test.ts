@@ -243,11 +243,7 @@ describe('ReplayTrajectoryService', () => {
       allowDuckDb: false,
     });
 
-    expect(traj.validation).toBeDefined();
-    expect(traj.validation?.matchedSessionId).toBe('daytona-session-1');
-    expect(traj.validation?.officialBestLapTime).toBe(95.8);
     expect(traj.laps?.[0].validatedTimeSec).toBe(95.8);
-    expect(traj.laps?.[0].timeDiffSec).toBe(0.2);
   });
 
   it('standardizes layoutKey from circuitSpec when geometry lookup completes', async () => {
@@ -296,7 +292,7 @@ describe('ReplayTrajectoryService', () => {
     sessions.push(session);
     const service = new ReplayTrajectoryService('/mock/replays', replayRecordings, { configuredPlayerName: player.name }, telemetryService);
     const result = await service.getTrajectory({ session, driverOrdinal: 1, lapOrdinal: 0, allowDuckDb: true, maxPoints: 0 });
-    expect(result.validation?.driverName).toBe(player.name);
+    expect(result.laps?.[0].validatedTimeSec).toBe(96);
     expect(telemetry.mock.calls[0][0].isPlayer).toBe(true);
     await service.getTrajectory({ session, driverOrdinal: 0, lapOrdinal: 0, allowDuckDb: true, maxPoints: 0 });
     expect(telemetry.mock.calls[1][0].isPlayer).toBe(false);

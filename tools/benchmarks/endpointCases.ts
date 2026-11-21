@@ -54,17 +54,15 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     id, route, ...(url ? { url } : { skip }), ...(collections[route] ? { requiredCollection: collections[route] } : {}),
   });
   for (const [id, url] of Object.entries({
-    status: '/api/status', peripherals: '/api/peripherals', scan: '/api/scan/status', 'ai-settings': '/api/ai/settings', 'ai-reports': '/api/ai/reports?limit=50',
+    status: '/api/status', peripherals: '/api/peripherals', scan: '/api/scan/status', 'ai-settings': '/api/ai/settings', 'ai-reports': '/api/ai/reports',
     logos: '/api/data-plugin/vehicles/logos',
     references: '/api/reference-laptimes', 'reference-diffs': '/api/reference-laptimes/diffs',
-    'sessions-page-1': '/api/sessions?page=1&pageSize=25&hideEmpty=true', 'sessions-page-2': '/api/sessions?page=2&pageSize=25&hideEmpty=true',
-    dashboard: '/api/dashboard?page=1&pageSize=25&hideEmpty=true', tracks: '/api/tracks',
+    dashboard: '/api/dashboard?page=1&pageSize=25&hideEmpty=true', 'dashboard-page-2': '/api/dashboard?page=2&pageSize=25&hideEmpty=true', tracks: '/api/tracks',
     'leaderboard-layouts': '/api/leaderboard/layouts',
     'replay-cache': '/api/replays/cache',
     'corner-sequence-maps': '/api/corner-sequences/maps',
     'live-settings': '/api/live/settings',
     'live-learning': '/api/live/learning',
-    'live-capture': '/api/live/capture',
   })) add(id, url.split('?')[0], url);
   add('live-stream', '/api/live/stream', undefined, 'Server-sent event stream: stays open, has no response time.');
   for (const resource of ['devices', 'presets', 'mappings', 'loaded-presets']) add(`peripheral-${resource}`, `/api/peripherals/:id/${resource}`, undefined, 'Requires enabled hardware integration; covered by fake-plugin route tests.');

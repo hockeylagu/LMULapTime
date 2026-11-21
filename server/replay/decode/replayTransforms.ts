@@ -5,7 +5,6 @@ import {
 import type { ReplaySessionContext, ReplayContextDriver, ReplayTimingLap } from '../replayServiceTypes.js';
 import { downsampleReplayTrajectory } from './replayParser.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../tracks/serverTrackSync.js';
-import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 
 export function downsampleTrajectoryResponse(
   trajectory: ReplayTrajectoryData,
@@ -41,17 +40,7 @@ export function applyPureOfficialLapValidation(
     return trajectory;
   }
 
-  const officialLaps = matchedDriver.laps.map((lap: ReplayTimingLap) => ({
-    lapNumber: lap.lapNumber,
-    lapTimeSec: lap.lapTime,
-    s1Sec: lap.s1,
-    s2Sec: lap.s2,
-    s3Sec: lap.s3,
-    isValid: lap.isValid,
-    isPitStop: lap.isPitStop,
-    isOutLap: lap.isOutLap,
-    nonRepresentativeReason: lap.nonRepresentativeReason,
-  }));
+  const officialLaps: ReplayTimingLap[] = matchedDriver.laps;
 
   const clonedLaps = trajectory.laps
     ? trajectory.laps.map((lap): ReplayLapSummary => {
@@ -64,30 +53,12 @@ export function applyPureOfficialLapValidation(
             isOutLap: Boolean(match.isOutLap),
             isBest: match.isPitStop || match.isOutLap || !match.isValid ? false : lap.isBest,
             nonRepresentativeReason: match.nonRepresentativeReason,
-            ...(typeof match.lapTimeSec === 'number' && match.lapTimeSec > 0 ? {
-              validatedTimeSec: Number(match.lapTimeSec.toFixed(3)),
-              validatedS1Sec: typeof match.s1Sec === 'number' ? Number(match.s1Sec.toFixed(3)) : null,
-              validatedS2Sec: typeof match.s2Sec === 'number' ? Number(match.s2Sec.toFixed(3)) : null,
-              validatedS3Sec: typeof match.s3Sec === 'number' ? Number(match.s3Sec.toFixed(3)) : null,
-              timeDiffSec: Number((lap.lapTimeSec - match.lapTimeSec).toFixed(3)),
-            } : {}),
+            ...(typeof match.lapTime === 'number' && match.lapTime > 0 ? { validatedTimeSec: Number(match.lapTime.toFixed(3)) } : {}),
           };
         }
         return { ...lap };
       })
     : undefined;
 
-  return {
-    ...trajectory,
-    laps: clonedLaps,
-    validation: {
-      matchedSessionId: matchedSession.id,
-      sessionType: matchedSession.sessionType,
-      trackName: getDisplayTrackName(matchedSession.trackVenue, matchedSession.trackCourse),
-      driverName: matchedDriver.name,
-      totalSessionLaps: matchedSession.totalLapsCount || officialLaps.length,
-      officialBestLapTime: matchedDriver.bestLapTime,
-      officialLaps,
-    },
-  };
+  return { ...trajectory, laps: clonedLaps };
 }

@@ -7,8 +7,6 @@ import { requestUrl } from '../../fixtures/requestUrl.js';
 describe('TrackDetail component', () => {
   const mockTrackDataWithMultipleClasses = {
     trackName: 'Spa',
-    normalizedTrackName: 'Spa',
-    sessionsCount: 3,
     sessions: [
       {
         id: 'sess-hypercar-1',
@@ -112,8 +110,6 @@ describe('TrackDetail component', () => {
 
   const mockTrackDataNoBenchmarks = {
     trackName: 'CustomModCircuit',
-    normalizedTrackName: 'CustomModCircuit',
-    sessionsCount: 1,
     sessions: [
       {
         id: 'sess-custom-1',
@@ -566,8 +562,6 @@ describe('TrackDetail component', () => {
       ok: true,
       json: () => Promise.resolve({
         trackName: 'Spa',
-        normalizedTrackName: 'Spa',
-        sessionsCount: 3,
         sessions: [
           {
             id: 'sess-practice-p1', filename: 'practice.xml', trackVenue: 'Spa', trackCourse: 'GP',

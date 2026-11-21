@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { COMPARE_LAP_SORTS, SESSION_TYPE_BY_KIND, WEATHER_CONDITIONS, type SessionKind } from '../../shared/domain/compareLapScope.js';
 import { findMatchingTrackBenchmarkEntries } from '../../shared/domain/paceCategory.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
-import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { ServerContext } from '../core/serverContext.js';
 import { queryString } from './queryParams.js';
 import { requireSessionSummaries } from './summaryReadiness.js';
@@ -17,30 +16,6 @@ import { getSessionLiveCaptures } from '../core/live/dbLiveCaptureStore.js';
 import { readSessionStrategy } from '../sessions/sessionStrategy.js';
 import { readSessionRacePlan } from '../core/live/dbRacePlanStore.js';
 
-export interface SessionFilterOptions {
-  track?: string;
-  trackVenue?: string;
-  trackCourse?: string;
-  car?: string;
-  carClass?: string;
-  driver?: string;
-  sessionType?: string;
-  hideEmpty?: boolean;
-}
-
-export function parseSessionFilters(query: Record<string, unknown>): SessionFilterOptions {
-  return {
-    track: queryString(query.track),
-    trackVenue: queryString(query.trackVenue),
-    trackCourse: queryString(query.trackCourse),
-    car: queryString(query.car),
-    carClass: queryString(query.carClass),
-    driver: queryString(query.driver),
-    sessionType: queryString(query.sessionType),
-    hideEmpty: query.hideEmpty === 'true' || query.filterEmpty === 'true',
-  };
-}
-
 function pageNumber(value: unknown, fallback: number, max = 500): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 1 ? Math.min(max, Math.floor(parsed)) : fallback;
@@ -50,14 +25,13 @@ export function createSessionRouter(context: ServerContext): Router {
   const router = Router();
   const db = context.sessionDb.getDb();
   const options = (query: Record<string, unknown>): SessionQuery => ({
-    ...parseSessionFilters(query), search: queryString(query.q), hasReplay: query.hasReplay === 'true',
-    sessionType: queryString(query.type) ?? queryString(query.sessionType), sort: queryString(query.sort),
+    track: queryString(query.track), car: queryString(query.car), carClass: queryString(query.carClass),
+    hideEmpty: query.hideEmpty === 'true', search: queryString(query.q), hasReplay: query.hasReplay === 'true',
+    sessionType: queryString(query.type), sort: queryString(query.sort),
     page: pageNumber(query.page, 1, 1000000), pageSize: pageNumber(query.pageSize, 25, 100),
-    from: query.from === undefined ? undefined : Number(query.from), to: query.to === undefined ? undefined : Number(query.to),
   });
   const revision = () => context.getScanStatus().dataRevision;
-  router.use(['/sessions', '/dashboard', '/tracks', '/track', '/compare'], requireSessionSummaries(context));
-  router.get('/sessions', (req, res) => res.json({...querySessionPage(db,options(req.query)),revision:revision()}));
+  router.use(['/dashboard', '/tracks', '/track', '/compare'], requireSessionSummaries(context));
   router.get('/dashboard',(req,res)=>res.json(queryCompactDashboard(db,{...options(req.query),revision:revision(),referenceEntries:loadReferenceLaptimesFromCache()?.entries ?? {}})));
   router.get('/session/:id', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -87,23 +61,21 @@ export function createSessionRouter(context: ServerContext): Router {
   });
   router.get('/tracks', (req,res) => res.json({tracks:queryTrackSummaries(db,queryString(req.query.carClass)),revision:revision()}));
   router.get('/track/:trackName', (req,res) => {
-    const trackVenue = queryString(req.query.trackVenue) ?? req.params.trackName;
-    const trackCourse = queryString(req.query.trackCourse) ?? '';
-    const selected={...options(req.query),track:req.params.trackName,trackVenue,trackCourse,playerCar:queryString(req.query.car)};
+    const trackName = req.params.trackName;
+    const selected={...options(req.query),track:trackName,playerCar:queryString(req.query.car)};
     const page=querySessionPage(db,selected);
-    const latestSession=queryTrackLatestSessionContext(db,trackVenue,selected.carClass,queryString(req.query.car),trackCourse);
+    const latestSession=queryTrackLatestSessionContext(db,trackName,selected.carClass,queryString(req.query.car));
     const course=latestSession.trackCourse ?? page.sessions[0]?.trackCourse ?? '';
     const references=loadReferenceLaptimesFromCache();
     const progression=queryProgression(db,selected);
-    const filters=queryTrackDetailFilters(db,trackVenue,selected.carClass,queryString(req.query.car),trackCourse);
-    res.json({...page, sessionsCount:page.total, trackName:req.params.trackName,
-      normalizedTrackName:getCircuitSpecification(req.params.trackName,course).benchmarkName,
-      summary:queryTrackDetailSummary(db,trackVenue,selected.carClass,queryString(req.query.car),trackCourse),
+    const filters=queryTrackDetailFilters(db,trackName,selected.carClass,queryString(req.query.car));
+    res.json({...page, trackName,
+      summary:queryTrackDetailSummary(db,trackName,selected.carClass,queryString(req.query.car)),
       filters,
       latestSession,
-      positions:queryTrackPositionAverages(db,trackVenue,selected.carClass,queryString(req.query.car),trackCourse),
+      positions:queryTrackPositionAverages(db,trackName,selected.carClass,queryString(req.query.car)),
       progression,
-      benchmarks:references ? findMatchingTrackBenchmarkEntries(references.entries,req.params.trackName,course) : [],revision:revision()});
+      benchmarks:references ? findMatchingTrackBenchmarkEntries(references.entries,trackName,course) : [],revision:revision()});
   });
   router.get('/compare/laps',(req,res) => {
     const ordinal = (name: 'driverOrdinal' | 'lapOrdinal' | 'lapNumber' | 'excludeLapOrdinal', max: number): number | undefined => {
