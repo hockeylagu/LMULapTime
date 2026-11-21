@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/genai';
 import {
   AiAnalyzeRequest,
   AiAnalyzeResponse,
@@ -199,7 +198,6 @@ function parseUpstreamError(status: number, providerDetail?: string): Error & { 
 }
 
 function getSdkErrorStatus(cause: unknown): number | null {
-  if (cause instanceof ApiError) return cause.status;
   if (cause && typeof cause === 'object' && 'status' in cause && typeof cause.status === 'number') return cause.status;
   return null;
 }
@@ -214,6 +212,8 @@ async function generateReport(evidence: AiLapEvidence): Promise<AiAnalyzeRespons
   const apiKey = getApiKey();
   if (!apiKey) throw error('not_configured', 'Configure a Gemini API key before generating a report.');
   try {
+    // Loaded on the first report: the SDK and its auth library are ~100 modules the server would otherwise load before it can listen.
+    const { FinishReason, GoogleGenAI, ThinkingLevel } = await import('@google/genai');
     const ai = new GoogleGenAI({
       apiKey,
       httpOptions: {
