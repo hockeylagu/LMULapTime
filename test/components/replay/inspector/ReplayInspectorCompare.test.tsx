@@ -71,7 +71,7 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {
@@ -115,7 +115,7 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
   it('reports a comparison lap without samples and loads it again on Retry', async () => {
     let baselineRequests = 0;
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      if (url.endsWith('/replay')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       if (url.includes('/telemetry?')) {
         const isBaseline = url.includes('lapOrdinal=2');
         if (isBaseline) baselineRequests++;
@@ -158,16 +158,16 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('Other_Spa_Replay.vcr') && url.includes('/metadata')) {
+      if (url.includes('Other_Spa_Replay.vcr') && url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(otherMeta) });
       }
       if (url.includes('Other_Spa_Replay.vcr') && url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(otherTraj) });
       }
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/replays') && !url.includes('/telemetry?') && !url.includes('/metadata')) {
+      if (url.includes('/replays') && !url.includes('/telemetry?') && !url.endsWith('/replay')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve([
@@ -232,7 +232,7 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
   it('queries compare laps using the resolved track layout rather than raw mod venue ID', async () => {
     let capturedCompareUrl = '';
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -291,7 +291,7 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
       matchingReplayFile: 'Other_Spa_Replay.vcr',
     };
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('compare/laps')) {
@@ -354,7 +354,7 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
       requestedUrls.push(url);
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -422,7 +422,7 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
       requestedUrls.push(url);
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(metaWithDuck) });
       }
       if (url.includes('/telemetry?')) {
@@ -484,7 +484,7 @@ describe('ReplayInspectorContent - Comparison & Source Modes', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       const request = new URL(url, 'http://localhost');
       const reference = request.pathname.includes('/session-2/');
-      if (url.includes('/metadata')) return Promise.resolve({ ok: true, json: () => Promise.resolve(reference ? referenceMeta : mockMeta) });
+      if (url.endsWith('/replay')) return Promise.resolve({ ok: true, json: () => Promise.resolve(reference ? referenceMeta : mockMeta) });
       if (url.includes('/telemetry?')) {
         requests.push(request);
         const ordinal = Number(request.searchParams.get('lapOrdinal'));

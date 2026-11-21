@@ -62,7 +62,7 @@ describe('rival store', () => {
 
   it('keeps the rivals when the session cache is cleared: they are the player history, not a cache', () => {
     create(GT3, driverTarget('Rival', 99.7));
-    db.clearCache();
+    db.clearSessions();
     expect(db.getActiveRival(GT3)?.driverName).toBe('Rival');
   });
 });

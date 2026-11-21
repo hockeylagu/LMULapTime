@@ -25,7 +25,7 @@ describe('Settings component', () => {
 
   beforeEach(() => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/scan')) {
+      if (url.includes('/api/settings/folders') || url.includes('/api/scan')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
       }
       if (url.includes('/api/reference-laptimes/refresh')) {
@@ -131,7 +131,7 @@ describe('Settings component', () => {
 
   it('displays error notification when scan fails', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/scan')) {
+      if (url.includes('/api/settings/folders') || url.includes('/api/scan')) {
         return Promise.reject(new Error('Network failure during scan'));
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -164,7 +164,7 @@ describe('Settings component', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/cache/clear')) {
+      if (url.includes('/api/sessions/clear')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ success: true, message: 'SQLite cache cleared', sessionsCount: 0 }),
@@ -341,7 +341,7 @@ describe('Settings component', () => {
     expect(screen.getByRole('heading', { name: 'Learning', level: 3 })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Live Dashboard' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check evidence' })).toBeInTheDocument();
-    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => url === '/api/live/learning')).toBe(false);
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => url === '/api/live/learning/readiness')).toBe(false);
   });
 
   it('shows empty state when no settings match and clears via empty state button', async () => {

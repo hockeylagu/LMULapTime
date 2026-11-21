@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import type { CornerHabit, SessionCornerAnalysis } from '../../../../shared/types/corners/cornerAnalysis.js';
-import { clearLayoutCornersCache } from '../../../../src/api/cornerSequenceApi.js';
+import { clearLayoutCornersCache } from '../../../../src/api/cornerApi.js';
 
 export const ME = 'Ann Driver';
 
@@ -106,7 +106,7 @@ export function mockWatchServer(analysisStatus = 200, body: unknown = analysis) 
   const fetchMock = vi.fn((input: string, _init?: RequestInit) => {
     const url = String(input);
     if (url.startsWith('/api/session/R1/corner-analysis')) return analysisStatus === 200 ? json(body) : json({ error: 'Session summaries are rebuilding' }, analysisStatus);
-    if (url.startsWith('/api/corner-sequences/layout?')) return json(layout);
+    if (url.startsWith('/api/corners?')) return json(layout);
     if (url.startsWith('/api/session/R1/strategy')) return json({ strategy: null, plan: null });
     if (url === '/api/habit-focus/unpin') return json({ pinned: false });
     return json({ error: 'Not found' }, 404);

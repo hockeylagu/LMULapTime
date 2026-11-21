@@ -8,7 +8,7 @@ import { findIndexAtDistance, getDistancesInReferenceFrame, getTrajectoryDistanc
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { useRequest } from '../../../api/useRequest.js';
-import { fetchSessionTelemetry, fetchSessionTelemetryMetadata } from '../../../api/replayApi.js';
+import { fetchSessionTelemetry, fetchSessionReplayMetadata } from '../../../api/replayApi.js';
 import { CompareLapFilter } from './compare/ReplayCompareLapPicker.js';
 import { replayCompareScope } from './compare/compareLapsQuery.js';
 import { DEFAULT_COMPARE_CONTROLS, type CompareLapControls } from './compare/compareLapControls.js';
@@ -227,7 +227,7 @@ export function useReplayInspectorData({
     let trajectoryError: string | null = null;
 
     Promise.all([
-      fetchSessionTelemetryMetadata(activeSessionId).catch((err: unknown) => {
+      fetchSessionReplayMetadata(activeSessionId).catch((err: unknown) => {
         metadataError = `Could not load metadata for session ${activeSessionId}: ${apiErrorMessage(err, 'request failed')}`;
         return null;
       }),
@@ -423,7 +423,7 @@ export function useReplayInspectorData({
     const fetchMeta = !request.fetchMetadata
       ? Promise.resolve(null)
       // Its metadata only labels the lap: a failed fetch must not drop a lap that loaded.
-      : fetchSessionTelemetryMetadata(request.sessionId, { signal }).catch((err: unknown) => {
+      : fetchSessionReplayMetadata(request.sessionId, { signal }).catch((err: unknown) => {
         if (isAbortError(err)) throw err;
         return null;
       });

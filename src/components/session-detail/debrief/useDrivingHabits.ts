@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { DetailedSession } from '../../../../shared/types/index.js';
 import { ApiError, apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
-import { fetchSessionCornerAnalysis, loadLayoutCorners, onSequenceMapsChanged, unpinHabitFocus } from '../../../api/cornerSequenceApi.js';
+import { fetchSessionCornerAnalysis, loadLayoutCorners, onSequenceMapsChanged, unpinHabitFocus } from '../../../api/cornerApi.js';
 import { useSessionDataContext } from '../../../api/sessionDataContext.js';
 import { cornerNumbering, drivingHabits, type DrivingHabits } from './drivingHabits.js';
 

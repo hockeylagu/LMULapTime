@@ -56,7 +56,8 @@ describe('useSettingsActions scan in demo mode', () => {
     vi.stubGlobal('fetch', fetchMock);
     window.history.replaceState(null, '', '/?demo=1#/settings');
     const { result } = setup(status);
-    await act(async () => { result.current.handleScanPaths({ preventDefault: () => {} } as React.FormEvent); });
+    await act(async () => { result.current.handleSaveFolders({ preventDefault: () => {} } as React.FormEvent); });
     expect(fetchMock).toHaveBeenCalledWith('/api/scan', expect.objectContaining({ method: 'POST', body: undefined }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/settings/folders', expect.anything());
   });
 });

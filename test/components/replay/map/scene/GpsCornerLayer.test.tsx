@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { GpsClassCorners, GpsOfficialTurns, projectOfficialTurns } from '../../../../../src/components/replay/map/scene/GpsCornerLayer.js';
-import { loadLayoutCorners } from '../../../../../src/api/cornerSequenceApi.js';
+import { loadLayoutCorners } from '../../../../../src/api/cornerApi.js';
 
-vi.mock('../../../../../src/api/cornerSequenceApi.js', () => ({ loadLayoutCorners: vi.fn() }));
+vi.mock('../../../../../src/api/cornerApi.js', () => ({ loadLayoutCorners: vi.fn() }));
 import type { TrackBoundaryGeometry } from '../../../../../shared/types/trackGeometry.js';
 
 /** A rounded square, 200 m sides and 40 m corners, centred on the origin, sampled every 2 m. */

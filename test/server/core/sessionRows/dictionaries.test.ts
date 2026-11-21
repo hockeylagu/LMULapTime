@@ -63,7 +63,7 @@ describe('session dictionaries', () => {
     db.upsertSession(sessionWith('a', ['Alex', 'Ai One']), 'a.xml', 1, 10);
     const plan = rows("EXPLAIN QUERY PLAN SELECT driver_id FROM drivers WHERE normalized_name = 'alex'").map(row => String(row.detail)).join(' ');
     expect(plan).toContain('idx_drivers_normalized_name');
-    db.clearCache();
+    db.clearSessions();
     for (const table of ['drivers', 'vehicles', 'teams']) expect(rows(`SELECT count(*) AS n FROM ${table}`)).toEqual([{ n: 0 }]);
   });
 });

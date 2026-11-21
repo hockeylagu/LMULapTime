@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CornerTrendsResponse } from '../../../../shared/types/corners/cornerTrends.js';
 import { isAbortError } from '../../../api/apiClient.js';
-import { fetchCornerTrends, onSequenceMapsChanged } from '../../../api/cornerSequenceApi.js';
+import { fetchCornerTrends, onSequenceMapsChanged } from '../../../api/cornerApi.js';
 import { useSessionDataContext } from '../../../api/sessionDataContext.js';
 
 export interface CornerTrendsState {

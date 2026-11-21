@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { sequenceMapsChanged } from '../../../../src/api/cornerSequenceApi.js';
+import { sequenceMapsChanged } from '../../../../src/api/cornerApi.js';
 import { fetchSessionSequencePasses } from '../../../../src/api/replayApi.js';
 import { RaceCornerCard } from '../../../../src/components/replay/cornerCard/RaceCornerCard.js';
 import { CornerCardButton } from '../../../../src/components/replay/cornerCard/CornerInsightCard.js';

@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { RaceReplayOverview, RaceReplayProgress, ReplayMetadata } from '../../../../shared/types/index.js';
-import { fetchRaceOverview, fetchRacePoseWindow, lastRaceOverview, fetchRaceDistances, fetchSessionTelemetryMetadata, lastSessionTelemetryMetadata } from '../../../api/replayApi.js';
+import { fetchRaceOverview, fetchRacePoseWindow, lastRaceOverview, fetchRaceDistances, fetchSessionReplayMetadata, lastSessionReplayMetadata } from '../../../api/replayApi.js';
 import { loadedRace3DView, loadRace3DView } from './raceModeContext.js';
 import { racePitSlots } from '../../../../shared/domain/raceReplay/poseWindow.js';
 import { isNonRaceSession } from '../../../../shared/domain/raceTraffic.js';
@@ -64,17 +64,17 @@ export const RaceReplayView: React.FC<RaceReplayViewProps> = (props) => {
   // The replay's metadata names the track, the conditions and each car's model in the header; the race shows without it.
   // The lap view already fetched it: reuse it so the header does not blank out on the switch.
   const [metadata, setMetadata] = useState<{ sessionId: string; value: ReplayMetadata } | null>(() => {
-    const value = lastSessionTelemetryMetadata(sessionId);
+    const value = lastSessionReplayMetadata(sessionId);
     return value ? { sessionId, value } : null;
   });
   useEffect(() => {
-    if (lastSessionTelemetryMetadata(sessionId)) return;
+    if (lastSessionReplayMetadata(sessionId)) return;
     const controller = new AbortController();
-    fetchSessionTelemetryMetadata(sessionId, { signal: controller.signal }).then(value => setMetadata({ sessionId, value }), () => {});
+    fetchSessionReplayMetadata(sessionId, { signal: controller.signal }).then(value => setMetadata({ sessionId, value }), () => {});
     return () => controller.abort();
   }, [sessionId]);
   // The cache covers a session changed to whose metadata the lap view already fetched (the effect above skips it).
-  const replayMetadata = metadata?.sessionId === sessionId ? metadata.value : lastSessionTelemetryMetadata(sessionId);
+  const replayMetadata = metadata?.sessionId === sessionId ? metadata.value : lastSessionReplayMetadata(sessionId);
 
   return (
     <div className="flex h-screen min-w-[1480px] flex-col bg-lmu-bg text-lmu-text">

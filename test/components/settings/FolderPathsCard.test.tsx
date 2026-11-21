@@ -25,8 +25,8 @@ describe('FolderPathsCard component', () => {
     setTelemetryDirInput: vi.fn(),
     playerNameInput: 'Samuel Lague',
     setPlayerNameInput: vi.fn(),
-    isScanning: false,
-    onScanPaths: vi.fn(),
+    isSavingFolders: false,
+    onSaveFolders: vi.fn(),
     pathMessage: null,
   };
 
@@ -96,10 +96,10 @@ describe('FolderPathsCard component', () => {
   });
 
   it('saves an edited path through the form submit', () => {
-    const onScanPaths = vi.fn((e: React.FormEvent) => e.preventDefault());
-    render(<FolderPathsCard {...defaultProps} replaysDirInput="D:\\Replays" onScanPaths={onScanPaths} />);
+    const onSaveFolders = vi.fn((e: React.FormEvent) => e.preventDefault());
+    render(<FolderPathsCard {...defaultProps} replaysDirInput="D:\\Replays" onSaveFolders={onSaveFolders} />);
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
-    expect(onScanPaths).toHaveBeenCalled();
+    expect(onSaveFolders).toHaveBeenCalled();
   });
 
   it('offers Save and Discard for an edited driver name, and Discard resets every field', () => {
@@ -120,7 +120,7 @@ describe('FolderPathsCard component', () => {
   });
 
   it('displays scanning state and path messages when active', () => {
-    render(<FolderPathsCard {...defaultProps} playerNameInput="Someone Else" isScanning={true} pathMessage={{ tone: 'ok', text: 'Paths saved successfully.' }} />);
+    render(<FolderPathsCard {...defaultProps} playerNameInput="Someone Else" isSavingFolders={true} pathMessage={{ tone: 'ok', text: 'Paths saved successfully.' }} />);
 
     const scanBtn = screen.getByRole('button', { name: /Saving/i });
     expect(scanBtn).toBeDisabled();

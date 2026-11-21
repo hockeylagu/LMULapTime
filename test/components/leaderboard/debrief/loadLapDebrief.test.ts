@@ -4,7 +4,7 @@ import type { LayoutCorners } from '../../../../shared/types/corners/cornerPasse
 
 const api = vi.hoisted(() => ({ fetchSessionTelemetry: vi.fn(), loadLayoutCorners: vi.fn() }));
 vi.mock('../../../../src/api/replayApi.js', () => ({ fetchSessionTelemetry: api.fetchSessionTelemetry }));
-vi.mock('../../../../src/api/cornerSequenceApi.js', () => ({ loadLayoutCorners: api.loadLayoutCorners }));
+vi.mock('../../../../src/api/cornerApi.js', () => ({ loadLayoutCorners: api.loadLayoutCorners }));
 
 import { loadLapPairDebrief } from '../../../../src/components/leaderboard/debrief/loadLapDebrief.js';
 

@@ -34,7 +34,7 @@ function fakeContext(dir: string) {
     sessionDb: {
       getCacheStats: vi.fn(() => cacheStats),
       getSessionCatalogStats: vi.fn(() => ({ sessionsCount: 3, summariesReadyCount: 3 })),
-      clearCache: vi.fn(),
+      clearSessions: vi.fn(),
     },
     telemetryCatalog: { clear: vi.fn() },
     hasActiveFileScan: vi.fn(() => false),
@@ -85,32 +85,32 @@ describe('system routes', () => {
     });
   });
 
-  describe('POST /api/cache/clear', () => {
+  describe('POST /api/sessions/clear', () => {
     it('clears the cache', async () => {
-      const res = await request(app).post('/api/cache/clear');
+      const res = await request(app).post('/api/sessions/clear');
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ success: true });
-      expect(context.sessionDb.clearCache).toHaveBeenCalledTimes(1);
+      expect(context.sessionDb.clearSessions).toHaveBeenCalledTimes(1);
     });
 
     it('refuses while a file scan is running, and leaves the cache alone', async () => {
       context.hasActiveFileScan.mockReturnValue(true);
-      const res = await request(app).post('/api/cache/clear');
+      const res = await request(app).post('/api/sessions/clear');
       expect(res.status).toBe(409);
       expect(res.body).toHaveProperty('error', expect.stringMatching(/file scan is already running/i));
-      expect(context.sessionDb.clearCache).not.toHaveBeenCalled();
+      expect(context.sessionDb.clearSessions).not.toHaveBeenCalled();
     });
 
     it("answers 500 with the database's message when clearing fails", async () => {
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
-      context.sessionDb.clearCache.mockImplementation(() => { throw new Error('database is locked'); });
-      const res = await request(app).post('/api/cache/clear');
+      context.sessionDb.clearSessions.mockImplementation(() => { throw new Error('database is locked'); });
+      const res = await request(app).post('/api/sessions/clear');
       expect(res.status).toBe(500);
       expect(res.body).toEqual({ error: 'database is locked' });
     });
   });
 
-  describe('POST /api/scan', () => {
+  describe('POST /api/settings/folders', () => {
     let folders: { resultsDir: string; replaysDir: string; telemetryDir: string; playerName: string };
     beforeEach(() => {
       fs.mkdirSync(path.join(dir, 'replays'));
@@ -123,7 +123,7 @@ describe('system routes', () => {
         telemetryDir: folders.telemetryDir,
         playerName: '  Zoë O\u2019Brien \u{1F3CE}\n',
       };
-      const res = await request(app).post('/api/scan').send(pasted);
+      const res = await request(app).post('/api/settings/folders').send(pasted);
 
       expect(res.status).toBe(200);
       expect(context.configureDirectories).toHaveBeenCalledWith({
@@ -135,18 +135,18 @@ describe('system routes', () => {
 
     it('accepts a well-formed folder that does not exist and saves it', async () => {
       const missingDir = path.join(dir, 'nope');
-      const res = await request(app).post('/api/scan').send({ replaysDir: missingDir });
+      const res = await request(app).post('/api/settings/folders').send({ replaysDir: missingDir });
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('success', true);
       expect(context.configureDirectories).toHaveBeenCalledWith({ replaysDir: missingDir });
     });
 
     it('answers 400 with the field when a folder has forbidden characters or is not text', async () => {
-      const forbidden = await request(app).post('/api/scan').send({ resultsDir: 'C:\\lmu\\re*sults' });
+      const forbidden = await request(app).post('/api/settings/folders').send({ resultsDir: 'C:\\lmu\\re*sults' });
       expect(forbidden.status).toBe(400);
       expect(forbidden.body).toMatchObject({ field: 'resultsDir' });
 
-      const notText = await request(app).post('/api/scan').send({ telemetryDir: 42 });
+      const notText = await request(app).post('/api/settings/folders').send({ telemetryDir: 42 });
       expect(notText.status).toBe(400);
       expect(notText.body).toMatchObject({ field: 'telemetryDir' });
 
@@ -154,27 +154,29 @@ describe('system routes', () => {
       expect(context.runSessionSyncInBackground).not.toHaveBeenCalled();
     });
 
-    it('applies the folders and starts XML before associated telemetry scanning', async () => {
-      const res = await request(app).post('/api/scan').send(folders);
+    it('applies the folders and the driver name without starting a scan', async () => {
+      const res = await request(app).post('/api/settings/folders').send(folders);
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ success: true, playerName: 'Test Player' });
       expect(context.configureDirectories).toHaveBeenCalledWith(folders);
       expect(context.telemetryCatalog.clear).toHaveBeenCalled();
-      expect(context.runTelemetryScanInBackground).not.toHaveBeenCalledWith(false, true);
-      expect(context.runSessionSyncInBackground).toHaveBeenCalled();
+      expect(context.runSessionSyncInBackground).not.toHaveBeenCalled();
       expect(context.loadSessions).not.toHaveBeenCalled();
     });
 
     it('refuses to change folders while a scan is running, and starts nothing', async () => {
       context.configureDirectories.mockReturnValue(false);
-      const res = await request(app).post('/api/scan').send(folders);
+      const res = await request(app).post('/api/settings/folders').send(folders);
 
       expect(res.status).toBe(409);
       expect(context.telemetryCatalog.clear).not.toHaveBeenCalled();
       expect(context.runSessionSyncInBackground).not.toHaveBeenCalled();
     });
 
+  });
+
+  describe('POST /api/scan', () => {
     it('starts XML before its associated replay and telemetry scans without reconfiguring directories', async () => {
       const res = await request(app).post('/api/scan').send({});
 

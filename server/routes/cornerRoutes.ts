@@ -22,7 +22,7 @@ function pinOf(body: unknown): HabitFocusPin | null {
  * The turn sequence maps (server/corners/sequenceMapService.ts): the list Settings shows, regenerating one, the corner
  * trends and a session's corner analysis, with the habit focus's pins.
  */
-export function createCornerSequenceRouter(context: ServerContext): Router {
+export function createCornerRouter(context: ServerContext): Router {
   const router = Router();
   // One map regenerates at a time: it re-reads the class's fastest laps, then rebuilds the layout's sequence passes.
   let regenerating: string | null = null;
@@ -34,7 +34,7 @@ export function createCornerSequenceRouter(context: ServerContext): Router {
   });
 
   // A layout's corners for a class (its map, else the official turns): the lap view's corner windows, for any lap.
-  router.get('/corner-sequences/layout', (req, res) => {
+  router.get('/corners', (req, res) => {
     const layoutKey = queryString(req.query.layoutKey), carClass = queryString(req.query.carClass) ?? '';
     if (!layoutKey) return res.status(400).json({ error: 'layoutKey is required' });
     const corners = layoutCorners(layoutKey, carClass, (layout, carClassOf) => context.sessionDb.getSequenceMap(layout, carClassOf));

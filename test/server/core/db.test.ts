@@ -138,7 +138,7 @@ describe('SessionDatabase (SQLite Cache)', () => {
     db.syncSessionsFromDir(resultsDir, parser);
     expect(db.getSessionsCount()).toBeGreaterThan(0);
 
-    db.clearCache();
+    db.clearSessions();
     expect(db.getSessionsCount()).toBe(0);
     const stats = db.getCacheStats();
     expect(stats.sessionsCount).toBe(0);

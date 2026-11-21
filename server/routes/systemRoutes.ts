@@ -74,12 +74,12 @@ export function createSystemRouter(context: ServerContext): Router {
     });
   });
 
-  router.post('/cache/clear', (_req, res) => {
+  router.post('/sessions/clear', (_req, res) => {
     if (context.hasActiveFileScan()) {
       return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before clearing the cache.' });
     }
     try {
-      context.sessionDb.clearCache();
+      context.sessionDb.clearSessions();
       res.json({ success: true });
     } catch (error: unknown) {
       console.error('Failed to clear SQLite cache:', error);
@@ -88,7 +88,8 @@ export function createSystemRouter(context: ServerContext): Router {
     }
   });
 
-  router.post('/scan', (req, res) => {
+  // Saves the folders and player name from Settings; the client then asks for a scan (POST /scan).
+  router.post('/settings/folders', (req, res) => {
     const body = (req.body || {}) as { resultsDir?: unknown; replaysDir?: unknown; telemetryDir?: unknown; playerName?: unknown };
     // Paths arrive as people paste them (quotes, forward slashes, a trailing backslash): normalize, then reject
     // what cannot be a folder, naming the field so the form can show the reason under it.
@@ -104,17 +105,17 @@ export function createSystemRouter(context: ServerContext): Router {
     if (typeof body.playerName === 'string') {
       body.playerName = body.playerName.replace(CONTROL_CHARS, '').trim().slice(0, MAX_PLAYER_NAME_LENGTH);
     }
-    const hasConfig = Boolean(body.resultsDir || body.replaysDir || body.telemetryDir || body.playerName);
-    if (hasConfig) {
-      if (!context.configureDirectories(body)) {
-        return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before changing directories.' });
-      }
+    if (!context.configureDirectories(body)) {
+      return res.status(409).json({ error: 'A file scan is already running. Wait for it to finish before changing directories.' });
     }
-    if (hasConfig) context.telemetryCatalog.clear();
-    // A manual refresh: replays that failed every attempt are decoded once more.
-    const sessionScanStarted = context.runSessionSyncInBackground(false, true);
-    if (!sessionScanStarted && !hasConfig) context.requestSessionRefresh();
+    context.telemetryCatalog.clear();
     res.json({ success: true, playerName: context.currentParser.configuredPlayerName });
+  });
+
+  // A manual refresh: replays that failed every attempt are decoded once more. A scan already running takes the request when it ends.
+  router.post('/scan', (_req, res) => {
+    if (!context.runSessionSyncInBackground(false, true)) context.requestSessionRefresh();
+    res.json({ success: true });
   });
 
   router.get('/scan/status', (_req, res) => {

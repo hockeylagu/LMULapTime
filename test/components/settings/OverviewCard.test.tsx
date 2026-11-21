@@ -17,24 +17,24 @@ const status = (sessions: number): AppStatus => ({
 const replay = { counts: { total: 4, archived: 1 } } as unknown as ReplayCacheState;
 const ai = { settings: null, loadError: null } as unknown as AiSettingsState;
 
-const renderCard = (sessions: number, onClearCache = vi.fn()) =>
-  render(<OverviewCard status={status(sessions)} replay={replay} ai={ai} isClearingCache={false} onClearCache={onClearCache} cacheMessage={null} />);
+const renderCard = (sessions: number, onClearSessions = vi.fn()) =>
+  render(<OverviewCard status={status(sessions)} replay={replay} ai={ai} isClearingSessions={false} onClearSessions={onClearSessions} sessionsMessage={null} />);
 
 describe('OverviewCard', () => {
   it('shows supplemental live recording files separately from native telemetry', () => {
     const appStatus = status(3);
     appStatus.sqliteCache!.liveTelemetryFilesCount = 12;
     const { rerender } = render(<OverviewCard status={appStatus} replay={replay} ai={ai}
-      isClearingCache={false} onClearCache={vi.fn()} cacheMessage={null} />);
+      isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} />);
     expect(within(screen.getByText('Live telemetry files').parentElement!).getByText('12')).toBeInTheDocument();
     expect(within(screen.getByText('Telemetry files').parentElement!).getByText('3')).toBeInTheDocument();
     appStatus.sqliteCache!.liveTelemetryFilesCount = 0;
     rerender(<OverviewCard status={appStatus} replay={replay} ai={ai}
-      isClearingCache={false} onClearCache={vi.fn()} cacheMessage={null} />);
+      isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} />);
     expect(screen.getByText('No live recordings yet')).toBeInTheDocument();
     delete appStatus.sqliteCache!.liveTelemetryFilesCount;
     rerender(<OverviewCard status={appStatus} replay={replay} ai={ai}
-      isClearingCache={false} onClearCache={vi.fn()} cacheMessage={null} />);
+      isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} />);
     expect(screen.getByText('Live telemetry files').nextElementSibling).toHaveTextContent('—');
   });
 

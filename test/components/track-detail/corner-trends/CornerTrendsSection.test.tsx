@@ -7,7 +7,7 @@ import type { CornerHabit, CornerHabitTrend } from '../../../../shared/types/cor
 const api = vi.hoisted(() => ({
   fetchCornerTrends: vi.fn(), onSequenceMapsChanged: vi.fn(() => () => {}), pinHabitFocus: vi.fn(), unpinHabitFocus: vi.fn(),
 }));
-vi.mock('../../../../src/api/cornerSequenceApi.js', () => api);
+vi.mock('../../../../src/api/cornerApi.js', () => api);
 
 import { CornerTrendsSection } from '../../../../src/components/track-detail/corner-trends/CornerTrendsSection.js';
 import { cornerHabitText } from '../../../../src/components/track-detail/corner-trends/cornerHabitText.js';

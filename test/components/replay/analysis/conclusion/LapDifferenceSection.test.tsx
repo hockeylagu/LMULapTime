@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/index.js';
 import type { CornerPass, SessionCornerPasses } from '../../../../../shared/types/corners/cornerPasses.js';
-import { clearLayoutCornersCache } from '../../../../../src/api/cornerSequenceApi.js';
+import { clearLayoutCornersCache } from '../../../../../src/api/cornerApi.js';
 import { LapDifferenceSection } from '../../../../../src/components/replay/analysis/conclusion/LapDifferenceSection.js';
 import { lapPass } from './lapPassFixtures.js';
 
@@ -27,7 +27,7 @@ function mockServer(mine: SessionCornerPasses | string, theirs: SessionCornerPas
   const fetchMock = vi.fn((input: string) => {
     if (input.startsWith('/api/session/A/corner-passes?driverOrdinal=2')) return answer(mine);
     if (input.startsWith('/api/session/B/corner-passes?driverOrdinal=4')) return answer(theirs);
-    if (input.startsWith('/api/corner-sequences/layout?')) return json(layout);
+    if (input.startsWith('/api/corners?')) return json(layout);
     return Promise.resolve(new Response(JSON.stringify({ error: 'Not found' }), { status: 404 }));
   });
   vi.stubGlobal('fetch', fetchMock);

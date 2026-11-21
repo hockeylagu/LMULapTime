@@ -82,7 +82,7 @@ describe('session telemetry routes', () => {
   });
 
   it('resolves metadata only through a session ID and exposes source-order locators', async () => {
-    const response = await request(app).get('/api/session/session-1/telemetry/metadata');
+    const response = await request(app).get('/api/session/session-1/replay');
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ filename: 'Route_Test_P1.Vcr', trackVenue: 'Test Venue' });

@@ -6,7 +6,7 @@ import { exclusionSummary, LEARNING_GATE_LABELS } from './readinessCopy.js';
 import { SettingsPanel } from '../SettingsPanel.js';
 
 /** Manual, off-track evidence review; opening Settings never starts evaluation or polling. */
-export const LiveLearningPanel: React.FC = () => {
+export const LearningReadinessPanel: React.FC = () => {
   const [report, setReport] = useState<LiveLearningReadiness | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export const LiveLearningPanel: React.FC = () => {
     const request = new AbortController(); active.current = request;
     setLoading(true); setError(null); setReport(null);
     try {
-      const result = await fetchJson<LiveLearningReadiness>('/api/live/learning', { signal: request.signal });
+      const result = await fetchJson<LiveLearningReadiness>('/api/live/learning/readiness', { signal: request.signal });
       if (!request.signal.aborted) setReport(result);
     } catch (failure) {
       if (!request.signal.aborted && !isAbortError(failure)) setError(apiErrorMessage(failure, 'Unable to check learning evidence.'));

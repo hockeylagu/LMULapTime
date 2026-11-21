@@ -22,7 +22,7 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
   const readinessReader = new LearningReadinessReader();
   const deferredReadiness = (): LiveLearningReadiness => ({ state: 'deferred', historicalCorrectionsEnabled: false,
     message: 'Evidence checks resume after you leave the game session and its recording closes.' });
-  router.get('/live/learning', async (req, res) => {
+  router.get('/live/learning/readiness', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     if (Object.keys(req.query).length) return res.status(400).json({ error: 'Learning readiness does not accept query parameters.' });
     const blocked = (): boolean => live.isSessionLoaded() || capture?.hasOpenRecordingHandle === true;

@@ -647,7 +647,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
   it('opens replay with lap number when clicking row Replay button and updates URL params', async () => {
     window.location.hash = '#/session/sess123';
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -692,7 +692,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
   it('does not open replay UI from legacy session URL parameters', async () => {
     window.location.hash = '#/session/sess123?lap=3';
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -729,7 +729,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
   it('expands a lap row and opens telemetry from the best lap time in the summary', async () => {
     window.location.hash = '#/session/sess123';
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({

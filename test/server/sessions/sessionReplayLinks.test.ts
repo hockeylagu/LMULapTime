@@ -39,7 +39,7 @@ describe('SessionReplayLinks', () => {
       expect(db.getSessionXmlMtime(session.id, 'another.xml')).toBeUndefined();
       db.upsertSession(session, session.filePath, xmlMtimeMs + 1000, 1);
       expect(links.xmlMtime(session)).toBe(xmlMtimeMs + 1000);
-      db.clearCache();
+      db.clearSessions();
       expect(links.xmlMtime(session)).toBeUndefined();
     } finally { db.close(); }
   });

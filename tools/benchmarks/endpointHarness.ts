@@ -15,7 +15,7 @@ import { createAiRouter } from '../../server/routes/aiRoutes.js';
 import { createDataPluginRouter } from '../../server/routes/dataPluginRoutes.js';
 import { createSystemRouter } from '../../server/routes/systemRoutes.js';
 import { createReferenceRouter } from '../../server/routes/referenceRoutes.js';
-import { createCornerSequenceRouter } from '../../server/routes/cornerSequenceRoutes.js';
+import { createCornerRouter } from '../../server/routes/cornerRoutes.js';
 import { createSessionRouter } from '../../server/routes/sessionRoutes.js';
 import { createLeaderboardRouter } from '../../server/routes/leaderboardRoutes.js';
 import { createReplayRouter } from '../../server/routes/replayRoutes.js';
@@ -64,7 +64,7 @@ export async function startBenchmarkServer(snapshot: string) {
   app.use('/api/ai', createAiRouter(store));
   app.use('/api', createSystemRouter(context));
   app.use('/api', createReferenceRouter(context));
-  app.use('/api', createCornerSequenceRouter(context));
+  app.use('/api', createCornerRouter(context));
   app.use('/api', createSessionRouter(context));
   app.use('/api', createLeaderboardRouter(context));
   app.use('/api', createReplayRouter(context));

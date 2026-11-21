@@ -34,7 +34,7 @@ it.each([false, true])('swaps exact session and lap locators through route updat
     const url = new URL(requestUrl(input), 'http://localhost');
     if (url.pathname.includes('/compare/laps')) return Response.json({ laps: [] });
     const sessionId = decodeURIComponent(url.pathname.split('/')[3]);
-    if (url.pathname.endsWith('/metadata')) {
+    if (url.pathname.endsWith('/replay')) {
       const metadata: ReplayMetadata = {
         filename: `${sessionId}.Vcr`, filePath: sessionId, fileSizeBytes: 1, mtimeMs: 1,
         trackName: 'Spa', displayTrack: 'Spa', sessionType: 'Practice',

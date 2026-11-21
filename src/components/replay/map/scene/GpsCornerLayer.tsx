@@ -4,7 +4,7 @@ import { LAYOUT_TURN_LISTS } from '../../../../../shared/domain/circuitTurns/tur
 import { describeTurn } from '../../../../../shared/domain/circuitTurns/turnLabel.js';
 import type { LayoutCorners } from '../../../../../shared/types/corners/cornerPasses.js';
 import type { TrackBoundaryGeometry } from '../../../../../shared/types/trackGeometry.js';
-import { loadLayoutCorners } from '../../../../api/cornerSequenceApi.js';
+import { loadLayoutCorners } from '../../../../api/cornerApi.js';
 import { LMU_COLORS, MAP_COLORS } from '../../../../utils/themeColors.js';
 
 type Point = { sx: number; sy: number };

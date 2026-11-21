@@ -74,7 +74,7 @@ export interface CornerTurn {
 export type CornerSegmentKind = 'turns' | 'sequences';
 
 /**
- * GET /api/corner-sequences/layout: a layout's corners for a class, any lap's (no replay needed): the class's sequences,
+ * GET /api/corners: a layout's corners for a class, any lap's (no replay needed): the class's sequences,
  * or the official turns when the class has no map there. Distances from the start line; `startStationM` puts them on
  * the centre line.
  */

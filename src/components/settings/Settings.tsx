@@ -9,7 +9,7 @@ import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
 import { LiveDashboardCard } from './LiveDashboardCard.js';
 import { PeripheralsCard } from './peripherals/PeripheralsCard.js';
-import { LiveLearningPanel } from './learning/LiveLearningPanel.js';
+import { LearningReadinessPanel } from './learning/LearningReadinessPanel.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
 import { SequenceMapsCard } from './sequences/SequenceMapsCard.js';
@@ -95,10 +95,10 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
             status={status}
             replay={replay}
             ai={ai}
-            isClearingCache={actions.isClearingCache}
+            isClearingSessions={actions.isClearingSessions}
             isScanRunning={isScanRunning}
-            onClearCache={actions.handleClearCache}
-            cacheMessage={actions.cacheMessage}
+            onClearSessions={actions.handleClearSessions}
+            sessionsMessage={actions.sessionsMessage}
           />
         );
       case 'replay-cache':
@@ -110,7 +110,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       case 'peripherals':
         return <PeripheralsCard />;
       case 'learning':
-        return <LiveLearningPanel />;
+        return <LearningReadinessPanel />;
       case 'ai-settings':
         return <AISettingsCard ai={ai} />;
       case 'reference-benchmarks':
@@ -135,10 +135,10 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
             setTelemetryDirInput={actions.setTelemetryDirInput}
             playerNameInput={actions.playerNameInput}
             setPlayerNameInput={actions.setPlayerNameInput}
-            isScanning={actions.isScanning}
+            isSavingFolders={actions.isSavingFolders}
             isScanRunning={isScanRunning}
             pathErrors={actions.pathErrors}
-            onScanPaths={actions.handleScanPaths}
+            onSaveFolders={actions.handleSaveFolders}
             pathMessage={actions.pathMessage}
             sessionScanStatus={sessionScanStatus}
           />

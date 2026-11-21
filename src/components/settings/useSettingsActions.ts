@@ -57,17 +57,17 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
     status?.playerName || ''
   );
   const [pathErrors, setPathErrors] = useState<PathErrors>({});
-  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [isSavingFolders, setIsSavingFolders] = useState<boolean>(false);
   const [isUpdatingLaptimes, setIsUpdatingLaptimes] = useState<boolean>(false);
-  const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
+  const [isClearingSessions, setIsClearingSessions] = useState<boolean>(false);
   const [pathMessage, setPathMessage] = useState<SettingsFeedback | null>(null);
   const [laptimesMessage, setLaptimesMessage] = useState<SettingsFeedback | null>(null);
-  const [cacheMessage, setCacheMessage] = useState<SettingsFeedback | null>(null);
+  const [sessionsMessage, setSessionsMessage] = useState<SettingsFeedback | null>(null);
   const [updateDiff, setUpdateDiff] = useState<ReferenceBenchmarkDiff | null>(
     status?.referenceLaptimes?.lastUpdateDiff || null
   );
   // A state flag lags one render behind a fast second click; these refs close that gap.
-  const inFlight = useRef({ scan: false, laptimes: false, cache: false });
+  const inFlight = useRef({ folders: false, laptimes: false, sessions: false });
 
   // Each input follows its saved server value only when that value changes, and only while the user has not
   // edited it away from the previous saved value, so clearing a field to retype it survives status refreshes.
@@ -95,9 +95,9 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
   const setReplaysDirInput = folderSetter('replaysDir', setReplaysDirInputState);
   const setTelemetryDirInput = folderSetter('telemetryDir', setTelemetryDirInputState);
 
-  const handleScanPaths = (e: React.FormEvent) => {
+  const handleSaveFolders = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inFlight.current.scan || isScanRunning) return;
+    if (inFlight.current.folders || isScanRunning) return;
 
     const folders: Record<FolderField, string> = {
       resultsDir: normalizeFolderPath(resultsDirInput),
@@ -117,11 +117,15 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
     }
     const playerName = playerNameInput.replace(/\p{Cc}/gu, '').trim().slice(0, MAX_PLAYER_NAME_LENGTH);
 
-    inFlight.current.scan = true;
-    setIsScanning(true);
+    inFlight.current.folders = true;
+    setIsSavingFolders(true);
 
     // Demo inputs hold display aliases and masked paths: scan the saved configuration without replacing it.
-    postJson<{ success?: boolean; playerName?: string }>('/api/scan', isDemoMode() ? undefined : { ...folders, playerName })
+    const saved = isDemoMode()
+      ? Promise.resolve<{ success?: boolean; playerName?: string }>({ success: true })
+      : postJson<{ success?: boolean; playerName?: string }>('/api/settings/folders', { ...folders, playerName });
+    saved
+      .then(async (data) => data.success ? { ...data, success: (await postJson<{ success?: boolean }>('/api/scan')).success } : data)
       .then((data) => {
         if (data.success) {
           // Show the saved form of what was typed: no quotes, no trailing backslash, no stray spaces.
@@ -150,8 +154,8 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
         setPathMessage({ tone: 'error', text: `Scan failed: ${apiErrorMessage(err, 'request failed')}` });
       })
       .finally(() => {
-        inFlight.current.scan = false;
-        setIsScanning(false);
+        inFlight.current.folders = false;
+        setIsSavingFolders(false);
       });
   };
 
@@ -183,28 +187,28 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
       });
   };
 
-  const handleClearCache = () => {
-    if (inFlight.current.cache || isScanRunning) return;
-    inFlight.current.cache = true;
-    setIsClearingCache(true);
-    setCacheMessage(null);
+  const handleClearSessions = () => {
+    if (inFlight.current.sessions || isScanRunning) return;
+    inFlight.current.sessions = true;
+    setIsClearingSessions(true);
+    setSessionsMessage(null);
 
-    postJson<{ success?: boolean }>('/api/cache/clear')
+    postJson<{ success?: boolean }>('/api/sessions/clear')
       .then((data) => {
         if (data.success) {
           onUpdatePaths();
           invalidateReferenceLaptimes();
-          setCacheMessage({ tone: 'ok', text: 'Session cache cleared. Sessions are read again from your XML logs on the next scan.' });
+          setSessionsMessage({ tone: 'ok', text: 'Session cache cleared. Sessions are read again from your XML logs on the next scan.' });
         } else {
-          setCacheMessage({ tone: 'error', text: 'The session cache was not cleared.' });
+          setSessionsMessage({ tone: 'error', text: 'The session cache was not cleared.' });
         }
       })
       .catch((err: unknown) => {
-        setCacheMessage({ tone: 'error', text: `Clearing the cache failed: ${apiErrorMessage(err, 'request failed')}` });
+        setSessionsMessage({ tone: 'error', text: `Clearing the cache failed: ${apiErrorMessage(err, 'request failed')}` });
       })
       .finally(() => {
-        inFlight.current.cache = false;
-        setIsClearingCache(false);
+        inFlight.current.sessions = false;
+        setIsClearingSessions(false);
       });
   };
 
@@ -218,15 +222,15 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
     playerNameInput,
     setPlayerNameInput,
     pathErrors,
-    isScanning,
-    handleScanPaths,
+    isSavingFolders,
+    handleSaveFolders,
     pathMessage,
     isUpdatingLaptimes,
     handleUpdateReferenceLaptimes,
     laptimesMessage,
     updateDiff,
-    isClearingCache,
-    handleClearCache,
-    cacheMessage,
+    isClearingSessions,
+    handleClearSessions,
+    sessionsMessage,
   };
 }

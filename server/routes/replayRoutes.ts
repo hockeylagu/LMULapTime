@@ -87,7 +87,7 @@ export function createReplayRouter(context: ServerContext): Router {
     return { replayName, metadata, composed, session };
   };
 
-  router.get('/session/:sessionId/telemetry/metadata', (req, res) => {
+  router.get('/session/:sessionId/replay', (req, res) => {
     try {
       const replay = sessionReplayMetadata(req.params.sessionId);
       if (!replay) return res.status(404).json({ error: 'Session replay is unavailable' });

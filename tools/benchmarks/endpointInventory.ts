@@ -11,8 +11,9 @@ const prefixes: Record<string, string> = { aiRoutes: '/api/ai', dataPluginRoutes
 const exclusions: Record<string, string> = {
   '/api/ai/settings': 'Changes AI configuration.',
   '/api/ai/analyze-lap': 'Calls a paid external AI service; latency needs a separate controlled benchmark.',
-  '/api/cache/clear': 'Destroys the benchmark dataset.',
+  '/api/sessions/clear': 'Destroys the benchmark dataset.',
   '/api/scan': 'Starts ingestion and changes the dataset.',
+  '/api/settings/folders': 'Changes the configured folders and driver name.',
   '/api/reference-laptimes/refresh': 'Calls Google Sheets and changes benchmark targets.',
   '/api/corner-sequences/maps/regenerate': 'Rebuilds a sequence map and the sequence passes of its layout.',
   '/api/rivals/pin': 'Changes the selected rival.',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiErrorMessage } from '../../../api/apiClient.js';
-import { onSequenceMapsChanged } from '../../../api/cornerSequenceApi.js';
+import { onSequenceMapsChanged } from '../../../api/cornerApi.js';
 import { fetchSessionSequencePasses } from '../../../api/replayApi.js';
 import { indexCornerInsight, type CornerInsightIndex } from './cornerInsight.js';
 

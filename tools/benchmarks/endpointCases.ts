@@ -62,7 +62,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     'replay-cache': '/api/replays/cache',
     'corner-sequence-maps': '/api/corner-sequences/maps',
     'live-settings': '/api/live/settings',
-    'live-learning': '/api/live/learning',
+    'live-learning': '/api/live/learning/readiness',
   })) add(id, url.split('?')[0], url);
   add('live-stream', '/api/live/stream', undefined, 'Server-sent event stream: stays open, has no response time.');
   for (const resource of ['devices', 'presets', 'mappings', 'loaded-presets']) add(`peripheral-${resource}`, `/api/peripherals/:id/${resource}`, undefined, 'Requires enabled hardware integration; covered by fake-plugin route tests.');
@@ -88,11 +88,11 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
         add(id, '/api/compare/laps', `/api/compare/laps?track=${track}&carClass=${encodeURIComponent(board.carClass)}&pageSize=50&${suffix}`);
       }
       // The lap view's corner windows: the class's map (or the official turns) placed on the layout.
-      add('layout-corners', '/api/corner-sequences/layout', `/api/corner-sequences/layout?${new URLSearchParams({ layoutKey: board.layout, carClass: board.carClass }).toString()}`);
+      add('layout-corners', '/api/corners', `/api/corners?${new URLSearchParams({ layoutKey: board.layout, carClass: board.carClass }).toString()}`);
     }
   }
   if (!cohort.boards.length) {
-    for (const [id, route] of [['board', '/api/leaderboard'], ['track', '/api/track/:trackName'], ['compare', '/api/compare/laps'], ['layout-corners', '/api/corner-sequences/layout'], ['corner-trends', '/api/corner-trends']]) add(id, route);
+    for (const [id, route] of [['board', '/api/leaderboard'], ['track', '/api/track/:trackName'], ['compare', '/api/compare/laps'], ['layout-corners', '/api/corners'], ['corner-trends', '/api/corner-trends']]) add(id, route);
   }
   for (const [index, id] of cohort.sessions.entries()) add(`session-${index}`, '/api/session/:id', `/api/session/${encodeURIComponent(id)}`);
   const sessionId = cohort.telemetry?.sessionId ?? cohort.sessions[0];
@@ -109,7 +109,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   const locator = cohort.telemetry;
   const base = locator ? `/api/session/${encodeURIComponent(locator.sessionId)}` : undefined;
   add('live-evidence', '/api/session/:sessionId/live-evidence', locator ? `${base}/live-evidence?driverOrdinal=${locator.driverOrdinal}&lapOrdinal=${locator.lapOrdinal}` : undefined);
-  add('telemetry-metadata', '/api/session/:sessionId/telemetry/metadata', base ? `${base}/telemetry/metadata` : undefined);
+  add('session-replay', '/api/session/:sessionId/replay', base ? `${base}/replay` : undefined);
   for (const source of ['auto', 'vcr']) {
     add(`telemetry-${source}`, '/api/session/:sessionId/telemetry', locator ? `${base}/telemetry?driverOrdinal=${locator.driverOrdinal}&lapOrdinal=${locator.lapOrdinal}&pointSpacingM=2${source === 'vcr' ? '&source=vcr' : ''}` : undefined);
   }

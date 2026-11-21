@@ -24,11 +24,12 @@ const apiFailure = (code: number, body: unknown) => Promise.resolve({ ok: false,
 
 interface ScanCall { body: Record<string, unknown> }
 
-/** Settings with every card's request answered; `/api/scan` is handled by `onScan`. */
+/** Settings with every card's request answered; saving the folders (`/api/settings/folders`) is handled by `onScan`, the scan after it succeeds. */
 function mockServer(onScan: (call: ScanCall) => Promise<unknown>) {
   const scans: ScanCall[] = [];
   global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
-    if (url === '/api/scan') {
+    if (url === '/api/scan') return json({ success: true });
+    if (url === '/api/settings/folders') {
       const call = { body: JSON.parse(requestBody(init?.body ?? '{}')) as Record<string, unknown> };
       scans.push(call);
       return onScan(call);
@@ -238,7 +239,7 @@ describe('Overview card', () => {
     sqliteCache: { sessionsCount: sessions, lastSyncedAt: null, dbSizeBytes: 1024, telemetryFilesCount },
   });
   const renderCard = (appStatus: AppStatus | null, extra: Partial<React.ComponentProps<typeof OverviewCard>> = {}) =>
-    render(<OverviewCard status={appStatus} replay={replay} ai={ai} isClearingCache={false} onClearCache={vi.fn()} cacheMessage={null} {...extra} />);
+    render(<OverviewCard status={appStatus} replay={replay} ai={ai} isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} {...extra} />);
   const strip = () => screen.getByRole('group', { name: 'Settings status' });
 
   it('shows the telemetry files total with thousands separators, in the same readout style as the others', () => {
@@ -278,10 +279,10 @@ describe('Overview card', () => {
 
   it('moves focus to the section heading when the confirmed action leaves the button disabled', () => {
     const onClear = vi.fn();
-    const { rerender } = renderCard(cacheStatus(2), { onClearCache: onClear });
+    const { rerender } = renderCard(cacheStatus(2), { onClearSessions: onClear });
     fireEvent.click(screen.getByRole('button', { name: /clear parsed sessions/i }));
     onClear.mockImplementation(() => {
-      rerender(<OverviewCard status={cacheStatus(2)} replay={replay} ai={ai} isClearingCache={true} onClearCache={onClear} cacheMessage={null} />);
+      rerender(<OverviewCard status={cacheStatus(2)} replay={replay} ai={ai} isClearingSessions={true} onClearSessions={onClear} sessionsMessage={null} />);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onClear).toHaveBeenCalledTimes(1);

@@ -29,14 +29,14 @@ export function sessionTelemetryPath(sessionId: string, request: SessionTelemetr
 // The race replay opens with the lap view's header already filled.
 let lastMetadata: { sessionId: string; value: ReplayMetadata } | null = null;
 
-export async function fetchSessionTelemetryMetadata(sessionId: string, init?: RequestInit): Promise<ReplayMetadata> {
-  const value = await fetchJson<ReplayMetadata>(`/api/session/${encodeURIComponent(sessionId)}/telemetry/metadata`, init);
+export async function fetchSessionReplayMetadata(sessionId: string, init?: RequestInit): Promise<ReplayMetadata> {
+  const value = await fetchJson<ReplayMetadata>(`/api/session/${encodeURIComponent(sessionId)}/replay`, init);
   lastMetadata = { sessionId, value };
   return value;
 }
 
 /** The metadata last fetched for this session, if any. */
-export function lastSessionTelemetryMetadata(sessionId: string): ReplayMetadata | null {
+export function lastSessionReplayMetadata(sessionId: string): ReplayMetadata | null {
   return lastMetadata?.sessionId === sessionId ? lastMetadata.value : null;
 }
 

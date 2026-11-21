@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiErrorMessage } from '../../../api/apiClient.js';
-import { fetchSequenceMaps, regenerateSequenceMap, sequenceMapsChanged } from '../../../api/cornerSequenceApi.js';
+import { fetchSequenceMaps, regenerateSequenceMap, sequenceMapsChanged } from '../../../api/cornerApi.js';
 import { useRequest } from '../../../api/useRequest.js';
 import type { SettingsFeedback } from '../SettingsPanel.js';
 

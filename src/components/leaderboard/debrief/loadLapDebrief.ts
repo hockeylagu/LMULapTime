@@ -1,7 +1,7 @@
 import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
-import { loadLayoutCorners } from '../../../api/cornerSequenceApi.js';
+import { loadLayoutCorners } from '../../../api/cornerApi.js';
 import { fetchSessionTelemetry } from '../../../api/replayApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/segmentComparisons.js';
 import { comparisonConfidence, DebriefCorner, rankDebriefCorners } from '../../../utils/sessionDebrief.js';

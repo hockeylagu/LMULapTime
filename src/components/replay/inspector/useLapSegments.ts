@@ -4,7 +4,7 @@ import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.
 import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import type { LayoutCorners } from '../../../../shared/types/corners/cornerPasses.js';
-import { loadLayoutCorners } from '../../../api/cornerSequenceApi.js';
+import { loadLayoutCorners } from '../../../api/cornerApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/segmentComparisons.js';
 
 /**

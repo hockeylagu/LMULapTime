@@ -23,7 +23,7 @@ export function fetchSessionCornerAnalysis(sessionId: string, signal?: AbortSign
 /** A layout's corners for a class: its sequences, else the official turns (any lap's corner windows). */
 export function fetchLayoutCorners(layoutKey: string, carClass: string, signal?: AbortSignal): Promise<LayoutCorners> {
   const query = new URLSearchParams({ layoutKey, carClass });
-  return fetchJson(`/api/corner-sequences/layout?${query.toString()}`, { signal });
+  return fetchJson(`/api/corners?${query.toString()}`, { signal });
 }
 
 // A layout's corners for a class change only when a map is (re)built: one fetch per layout and class until a scan

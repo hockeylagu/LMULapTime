@@ -137,7 +137,7 @@ export function getSessionsCount(db: DatabaseType): number {
   return row.count;
 }
 
-export function clearSessionCache(db: DatabaseType): void {
+export function clearSessions(db: DatabaseType): void {
   db.transaction(() => {
     db.exec('DELETE FROM session_driver_condition_summaries; DELETE FROM session_summary_facts;');
     for (const table of [...SESSION_ROW_TABLES, ...SESSION_DICTIONARY_TABLES]) db.exec(`DELETE FROM ${table}`);

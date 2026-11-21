@@ -139,7 +139,7 @@ import {
   getSessionXmlMtime,
   restoreStoredSessionLinks,
   updateSessionTelemetryFile,
-  clearSessionCache,
+  clearSessions,
 } from './dbSessionStore.js';
 import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbReplayLinkStore.js';
 import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
@@ -704,9 +704,9 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return fetchSessionsCount(this.db);
   }
 
-  public clearCache(): void {
+  public clearSessions(): void {
     this.markSessionDataChanged();
-    clearSessionCache(this.db);
+    clearSessions(this.db);
   }
 
   // --- Reference Lap times & Alien Benchmarks ---

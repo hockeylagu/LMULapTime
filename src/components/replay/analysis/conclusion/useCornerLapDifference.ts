@@ -3,7 +3,7 @@ import { areComparableCarClasses, resolveDriverCarClass } from '../../../../../s
 import type { ReplayTrajectoryData } from '../../../../../shared/types/index.js';
 import type { CornerPass, CornerTurn } from '../../../../../shared/types/corners/cornerPasses.js';
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
-import { loadLayoutCorners } from '../../../../api/cornerSequenceApi.js';
+import { loadLayoutCorners } from '../../../../api/cornerApi.js';
 import { fetchSessionCornerPasses } from '../../../../api/replayApi.js';
 import { cornerLapDifference, type CornerLapDifference } from './cornerLapDifference.js';
 

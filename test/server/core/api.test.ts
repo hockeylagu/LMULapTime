@@ -77,14 +77,15 @@ describe('Server API wiring', () => {
   });
 
   it('refuses to clear the cache while the scan it just started is running, then clears it', async () => {
-    const scan = await request(app).post('/api/scan').send(fixtureFolders);
+    expect((await request(app).post('/api/settings/folders').send(fixtureFolders)).status).toBe(200);
+    const scan = await request(app).post('/api/scan');
     expect(scan.status).toBe(200);
 
-    const refused = await request(app).post('/api/cache/clear');
+    const refused = await request(app).post('/api/sessions/clear');
     expect(refused.status).toBe(409);
 
     await waitForFileScans();
-    const cleared = await request(app).post('/api/cache/clear');
+    const cleared = await request(app).post('/api/sessions/clear');
     expect(cleared.status).toBe(200);
     expect((await request(app).get('/api/status')).body).toHaveProperty('sqliteCache.sessionsCount', 0);
 
@@ -105,13 +106,15 @@ describe('Server API wiring', () => {
     );
 
     try {
-      const scanRes = await request(app)
-        .post('/api/scan')
+      const saved = await request(app)
+        .post('/api/settings/folders')
         .send({
           resultsDir: tempReplaysDir,
           replaysDir: tempReplaysDir,
           playerName: 'Api Test Driver',
         });
+      expect(saved.status).toBe(200);
+      const scanRes = await request(app).post('/api/scan');
       expect(scanRes.status).toBe(200);
       expect(scanRes.body).toHaveProperty('success', true);
 

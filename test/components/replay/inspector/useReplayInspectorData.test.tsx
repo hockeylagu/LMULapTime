@@ -60,7 +60,7 @@ describe('useReplayInspectorData session locators', () => {
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       return response(url.includes('source=vcr') || url.includes('pointSpacingM=4') ? sparse : dense);
     });
@@ -91,7 +91,7 @@ describe('useReplayInspectorData session locators', () => {
     let completeSource: ((value: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       if (url.includes('source=vcr')) return new Promise<Response>(resolve => { completeSource = resolve; });
       return response(trajectory);
@@ -115,7 +115,7 @@ describe('useReplayInspectorData session locators', () => {
       isValid: true, isPitStop: false, isOutLap: false } as ComparableLap;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) {
         const params = new URL(url, 'http://localhost').searchParams;
         urls.push(params);
@@ -142,7 +142,7 @@ describe('useReplayInspectorData session locators', () => {
     const urls: URLSearchParams[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response({ ...metadata, weatherCondition: 'Wet' });
+      if (url.endsWith('/replay')) return response({ ...metadata, weatherCondition: 'Wet' });
       if (url.includes('/compare/laps')) {
         urls.push(new URL(url, 'http://localhost').searchParams);
         // The server lists the car types on page 1 only.
@@ -184,7 +184,7 @@ describe('useReplayInspectorData session locators', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
       urls.push(url);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       return response(trajectory);
     });
@@ -195,7 +195,7 @@ describe('useReplayInspectorData session locators', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.trajectory?.sessionId).toBe('session-1');
-    expect(urls).toContain('/api/session/session-1/telemetry/metadata');
+    expect(urls).toContain('/api/session/session-1/replay');
     expect(urls.some(url => url.startsWith('/api/session/session-1/telemetry?') &&
       url.includes('driverOrdinal=0') && url.includes('lapOrdinal=0'))).toBe(true);
     expect(urls.some(url => url.includes('Inspector_Test_P1.Vcr/trajectory'))).toBe(false);
@@ -206,7 +206,7 @@ describe('useReplayInspectorData session locators', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
       urls.push(url);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       if (url.includes('driverOrdinal=1')) return response({
         ...trajectory, driverOrdinal: 1, driverSlot: 3, driverName: 'Other Driver',
@@ -232,9 +232,9 @@ describe('useReplayInspectorData session locators', () => {
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [candidate] });
-      if (url.startsWith('/api/session/session-2/telemetry/metadata')) return response(metadata);
+      if (url.startsWith('/api/session/session-2/replay')) return response(metadata);
       if (url.startsWith('/api/session/session-2/telemetry?')) return response({
         ...trajectory, sessionId: 'session-2', driverOrdinal: 2, lapOrdinal: 4, driverName: 'Baseline Driver',
       });
@@ -255,7 +255,7 @@ describe('useReplayInspectorData session locators', () => {
   it("opens from the race replay at its moment of the lap, and gives the race the cursor's lap time", async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       return response({ ...trajectory, driverOrdinal: 0, lapOrdinal: 0, pointsCount: 101,
         points: Array.from({ length: 101 }, (_, index) => ({ x: index, y: 0, z: 0, timeSec: index / 10 })),
@@ -273,7 +273,7 @@ describe('useReplayInspectorData session locators', () => {
   it('samples React playback updates while keeping the cursor exact and synchronizing on pause', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       return response({ ...trajectory, pointsCount: 101,
         points: Array.from({ length: 101 }, (_, index) => ({ x: index, y: 0, z: 0, timeSec: index / 100 })),
@@ -312,7 +312,7 @@ describe('useReplayInspectorData session locators', () => {
   it('repeats a looped stretch past its end and past the lap end', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       return response({ ...trajectory, pointsCount: 101,
         points: Array.from({ length: 101 }, (_, index) => ({ x: index, y: 0, z: 0, timeSec: index / 100 })),
@@ -347,7 +347,7 @@ describe('useReplayInspectorData session locators', () => {
   it('preserves the interpolated playback position when pausing so the car does not rewind', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);
-      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.endsWith('/replay')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       return response({
         ...trajectory,

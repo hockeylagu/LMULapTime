@@ -2,7 +2,7 @@ import React, { useId, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ChevronRight, Route } from 'lucide-react';
 import { apiErrorMessage } from '../../../api/apiClient.js';
-import { pinHabitFocus, unpinHabitFocus } from '../../../api/cornerSequenceApi.js';
+import { pinHabitFocus, unpinHabitFocus } from '../../../api/cornerApi.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
 import { FocusTag, SlippingTag } from '../../common/HabitTags.js';

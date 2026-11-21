@@ -72,7 +72,7 @@ describe('ReplayInspectorContent', () => {
 
   it('plays with Space from the chart, pauses on manual seek and leaves native controls alone', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true,
-      json: () => Promise.resolve(url.includes('/metadata') ? mockMeta : url.includes('/telemetry?') ? mockTraj : { laps: [] }),
+      json: () => Promise.resolve(url.endsWith('/replay') ? mockMeta : url.includes('/telemetry?') ? mockTraj : { laps: [] }),
     }));
     render(<ReplayInspectorContent isOpen onClose={vi.fn()} sessionId="session-1" />);
     const chart = await screen.findByLabelText('Telemetry charts');
@@ -86,7 +86,7 @@ describe('ReplayInspectorContent', () => {
 
   it('replays from marker A with Backspace, and does nothing without a marker', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true,
-      json: () => Promise.resolve(url.includes('/metadata') ? mockMeta : url.includes('/telemetry?') ? mockTraj : { laps: [] }),
+      json: () => Promise.resolve(url.endsWith('/replay') ? mockMeta : url.includes('/telemetry?') ? mockTraj : { laps: [] }),
     }));
     // Marker A is shared through the page's provider, as in the app.
     function Shared({ children }: { children: ReactNode }) {
@@ -108,7 +108,7 @@ describe('ReplayInspectorContent', () => {
 
   it('fetches and displays metadata and telemetry when open', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {
@@ -154,13 +154,13 @@ describe('ReplayInspectorContent', () => {
     const traj = { ...mockTraj, layoutKey: 'test_layout', points: mockTraj.points.map((point, i) => ({ ...point, stationM: i * 50 })) };
     const corners = { kind: 'turns', startStationM: 0, lengthM: 1000, corners: [{ id: 1, label: 'T1', title: 'Turn 1', apexM: 60, startM: 40, endM: 80 }] };
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(traj) });
       }
-      if (url.includes('/corner-sequences/layout?layoutKey=test_layout')) {
+      if (url.includes('/api/corners?layoutKey=test_layout')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(corners) });
       }
       return Promise.reject(new Error('Unknown URL'));
@@ -185,7 +185,7 @@ describe('ReplayInspectorContent', () => {
 
   it('allows switching drivers from the selector and reloads trajectory', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('driverOrdinal=1')) {
@@ -222,7 +222,7 @@ describe('ReplayInspectorContent', () => {
   it('returns through the single Back control', async () => {
     const handleClose = vi.fn();
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {
@@ -247,7 +247,7 @@ describe('ReplayInspectorContent', () => {
 
   it('selects the current driver in the header dropdown and reloads telemetry', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('driverOrdinal=1')) {
@@ -295,10 +295,10 @@ describe('ReplayInspectorContent', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/replays') && !url.includes('/telemetry?') && !url.includes('/metadata')) {
+      if (url.includes('/replays') && !url.includes('/telemetry?') && !url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([
           { name: 'Other_Spa_Replay.vcr', trackName: 'Spa-Francorchamps', eventTitle: 'LMGT3 Fixed' }
         ]) });
@@ -332,7 +332,7 @@ describe('ReplayInspectorContent', () => {
 
   it('renders playback speed options 0.5x, 1x, and 2x while omitting 5x', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {
@@ -372,7 +372,7 @@ describe('ReplayInspectorContent', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {
@@ -403,7 +403,7 @@ describe('ReplayInspectorContent', () => {
     const requests: string[] = [];
     global.fetch = vi.fn().mockImplementation((url: string) => {
       requests.push(url);
-      const data = url.includes('/metadata') ? mockMeta
+      const data = url.endsWith('/replay') ? mockMeta
         : url.includes('/telemetry?') ? traj
         : url.includes('/leaderboard') ? { entries: [{ isPlayer: true, bestLap: { sessionId, driverOrdinal: 0, lapOrdinal } }] } : null;
       return data ? Promise.resolve({ ok: true, json: () => Promise.resolve(data) }) : Promise.reject(new Error('Unknown URL'));
@@ -480,7 +480,7 @@ describe('ReplayInspectorContent', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) {
+      if (url.endsWith('/replay')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
       if (url.includes('/telemetry?')) {

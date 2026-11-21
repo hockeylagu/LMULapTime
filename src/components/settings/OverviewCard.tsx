@@ -33,18 +33,18 @@ export interface OverviewCardProps {
   status: AppStatus | null;
   replay: ReplayCacheState;
   ai: AiSettingsState;
-  isClearingCache: boolean;
+  isClearingSessions: boolean;
   /** A file scan is running on the server; clearing waits for it. */
   isScanRunning?: boolean;
-  onClearCache: () => void;
-  cacheMessage: SettingsFeedback | null;
+  onClearSessions: () => void;
+  sessionsMessage: SettingsFeedback | null;
 }
 
 /**
  * The page's one status card: what the app has found and stored, and the way to clear the session cache.
  * Benchmark figures live in their own card, so each number appears once on the page.
  */
-export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, isClearingCache, isScanRunning = false, onClearCache, cacheMessage }) => {
+export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, isClearingSessions, isScanRunning = false, onClearSessions, sessionsMessage }) => {
   const { isOpen: isConfirmOpen, triggerRef, open: openConfirm, cancel: cancelConfirm, confirm } = useInlineConfirm('overview-heading');
   const missing = getMissingPaths(status);
   const cache = status?.sqliteCache;
@@ -108,7 +108,7 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, 
             label="Confirm clearing the session cache"
             message={`Clear ${sessionsLabel}?`}
             confirmIcon={<Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
-            onConfirm={() => confirm(onClearCache)}
+            onConfirm={() => confirm(onClearSessions)}
             onCancel={cancelConfirm}
           />
         ) : (
@@ -116,17 +116,17 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, 
             ref={triggerRef}
             type="button"
             onClick={openConfirm}
-            disabled={isClearingCache || isScanRunning || sessionsCount === 0}
+            disabled={isClearingSessions || isScanRunning || sessionsCount === 0}
             title={isScanRunning ? 'Wait for the running scan to finish' : undefined}
             className={`${SECONDARY_BUTTON} shrink-0`}
           >
             <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-            {isClearingCache ? 'Clearing…' : 'Clear parsed sessions'}
+            {isClearingSessions ? 'Clearing…' : 'Clear parsed sessions'}
           </button>
         )}
       </div>
 
-      <FeedbackMessage feedback={cacheMessage} />
+      <FeedbackMessage feedback={sessionsMessage} />
     </SettingsPanel>
   );
 };

@@ -9,8 +9,8 @@ import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../shared
 import type { RaceReplayOverview } from '../../../../shared/types/index.js';
 
 vi.mock('../../../../src/api/replayApi.js', () => ({ fetchRaceOverview: vi.fn(), fetchRacePoseWindow: vi.fn(), lastRaceOverview: vi.fn(() => null),fetchRaceDistances: vi.fn(() => Promise.reject(Error('No centreline'))),
-  fetchSessionTelemetryMetadata: vi.fn(() => Promise.reject(Error('No metadata'))),
-  lastSessionTelemetryMetadata: vi.fn(() => null),
+  fetchSessionReplayMetadata: vi.fn(() => Promise.reject(Error('No metadata'))),
+  lastSessionReplayMetadata: vi.fn(() => null),
   fetchSessionSequencePasses: vi.fn(() => Promise.resolve({ available: false, reason: 'Corner times are not built for this replay yet.' })) }));
 // The 3D view needs WebGL: a stand-in shows which car it follows and switches back.
 vi.mock('../../../../src/components/replay/race/Race3DView.js', () => ({

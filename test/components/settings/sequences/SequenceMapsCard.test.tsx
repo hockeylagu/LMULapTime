@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { onSequenceMapsChanged } from '../../../../src/api/cornerSequenceApi.js';
+import { onSequenceMapsChanged } from '../../../../src/api/cornerApi.js';
 import { SequenceMapsCard } from '../../../../src/components/settings/sequences/SequenceMapsCard.js';
 import type { SequenceMapSummary, SequenceMapsResponse } from '../../../../shared/types/corners/sequenceMaps.js';
 

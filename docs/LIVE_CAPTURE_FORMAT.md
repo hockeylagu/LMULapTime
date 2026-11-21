@@ -440,7 +440,7 @@ alone never enables corrections. Recording, fitting, prospective acceptance and 
 automatically without this button; it only refreshes the displayed status. Available corrections
 still require current-run patch trust and an exact live match before use.
 
-`GET /api/live/learning` supplies this compact status from the same canonical evaluation as the CLI.
+`GET /api/live/learning/readiness` supplies this compact status from the same canonical evaluation as the CLI.
 It returns aggregate counts and reasons. The audit checkpoints remain available directly in DuckDB.
 The server defers work while a game session is loaded or capture writer handles remain open. A new
 session or client disconnect cancels an in-flight check. Evaluation uses one independent read-only

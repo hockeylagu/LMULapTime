@@ -19,12 +19,12 @@ export interface FolderPathsCardProps {
   setTelemetryDirInput: (val: string) => void;
   playerNameInput: string;
   setPlayerNameInput: (val: string) => void;
-  isScanning: boolean;
+  isSavingFolders: boolean;
   /** Errors by field, shown under each input. */
   pathErrors?: PathErrors;
   /** A scan the server is already running (not started here): Saving waits for it. */
   isScanRunning?: boolean;
-  onScanPaths: (e: React.FormEvent) => void;
+  onSaveFolders: (e: React.FormEvent) => void;
   pathMessage: SettingsFeedback | null;
   sessionScanStatus?: SessionScanStatus | null;
 }
@@ -42,10 +42,10 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
   setTelemetryDirInput,
   playerNameInput,
   setPlayerNameInput,
-  isScanning,
+  isSavingFolders,
   pathErrors = EMPTY_RECORD,
   isScanRunning = false,
-  onScanPaths,
+  onSaveFolders,
   pathMessage,
   sessionScanStatus,
 }) => {
@@ -58,8 +58,8 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
     normalizeFolderPath(telemetryDirInput) !== (status?.telemetryDir ?? '') ||
     playerNameInput.trim() !== (status?.playerName ?? '').trim();
   // Stay visible while the save is in flight, even if the fields already match the saved values.
-  const showActions = isDirty || isScanning;
-  const busy = isScanning || isScanRunning;
+  const showActions = isDirty || isSavingFolders;
+  const busy = isSavingFolders || isScanRunning;
   const discard = () => {
     setResultsDirInput(status?.resultsDir ?? '');
     setReplaysDirInput(status?.replaysDir ?? '');
@@ -101,7 +101,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
         </div>
       )}
 
-      <form onSubmit={onScanPaths} className="space-y-4">
+      <form onSubmit={onSaveFolders} className="space-y-4">
         <PathField
           id="player-name"
           label="Driver name"
@@ -163,9 +163,9 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
                   className={PRIMARY_BUTTON}
                 >
                   <Save className="w-4 h-4" aria-hidden="true" />
-                  {isScanning ? 'Saving…' : isScanRunning ? 'Scan in progress…' : 'Save changes'}
+                  {isSavingFolders ? 'Saving…' : isScanRunning ? 'Scan in progress…' : 'Save changes'}
                 </button>
-                <button type="button" onClick={discard} disabled={isScanning} className={SECONDARY_BUTTON}>
+                <button type="button" onClick={discard} disabled={isSavingFolders} className={SECONDARY_BUTTON}>
                   <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
                   Discard
                 </button>

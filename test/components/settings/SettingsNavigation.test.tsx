@@ -27,7 +27,7 @@ describe('Settings navigation', () => {
     window.location.hash = '#/settings';
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
-      if (url.includes('/api/scan') && options?.method === 'POST') {
+      if ((url.includes('/api/settings/folders') || url.includes('/api/scan')) && options?.method === 'POST') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: false }) });
       }
       if (url.includes('/api/ai/settings')) {
