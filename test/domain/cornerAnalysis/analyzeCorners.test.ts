@@ -170,7 +170,7 @@ describe('analyzeCorners', () => {
       action: { type: 'reachInside', gap: 2, line: 'Get much closer to the inside at the apex' },
       // What else can be tried, for a try that gives no gain.
       otherActions: [{ type: 'turnInEarlier', gap: 6, line: 'Turn in 6 m earlier' }],
-      detail: 'Apex 85 km/h, target 90 km/h · tighter arc: 80 m radius against 90 m',
+      detail: 'Apex 85 km/h, target 90 km/h · tighter arc (80 m radius against 90 m)',
     });
     expect(tighter.measures[0].actions).toMatchObject({ turnInEarlier: 6, reachInside: 2 });
     // Turning right, the inside is the other way: the same road positions read mirrored.
@@ -193,7 +193,7 @@ describe('analyzeCorners', () => {
       // What the action says is not said again; the brake point is.
       causes: [{ type: 'brakePoint', gap: 8, line: 'braking 8 m earlier' }],
     });
-    expect(grip.habits[0].detail).toContain('same arc, less grip used: 0.63 g against 0.71 g');
+    expect(grip.habits[0].detail).toContain('same arc, less grip used (0.63 g against 0.71 g)');
 
     // Half the gap in the arc, half in the grip: both kinds' actions are offered.
     const both = atT1({ toApex: 2.2, min: 85, arc: 84.7, brakeSec: 1.5, apexLat: 1 }, { arc: 89.7, apexLat: 1.4 });
@@ -302,7 +302,7 @@ describe('compareLapTurn', () => {
   it('names the lower minimum speed first, with the kind of loss and the pedals under it', () => {
     const slow = pass(0, 2, { min: 86, toApex: 2.2, arc: 80, brakeM: 690, brakeSec: 1.4 });
     const [difference] = compareLapTurn(slow, pass(0, 3, { arc: 87 }), 5000, true)?.differences ?? [];
-    expect(difference).toMatchObject({ half: 'in', rule: 'overSlowing', gap: 4, kindLine: 'tighter arc: 80 m radius against 87 m' });
+    expect(difference).toMatchObject({ half: 'in', rule: 'overSlowing', gap: 4, kindLine: 'tighter arc (80 m radius against 87 m)' });
     expect(difference.causes.map(cause => cause.line)).toEqual(['braking 10 m earlier', 'braking 0.4 s longer']);
   });
 

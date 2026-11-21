@@ -25,8 +25,8 @@ describe('watchNextSession', () => {
     ]);
     // The speeds to hit and the kind of loss, the one thing to try, and what else was measured.
     expect(watch.focus[0]).toMatchObject({
-      name: 'T1–T2', speedLine: 'Apex 96 → 100 km/h', diagnosis: 'tighter arc: 80 m radius against 87 m',
-      detail: 'Apex 96 km/h, target 100 km/h · tighter arc: 80 m radius against 87 m', tryLine: 'Get closer to the inside at the apex',
+      name: 'T1–T2', speedLine: 'Apex 96 → 100 km/h', diagnosis: 'tighter arc (80 m radius against 87 m)',
+      detail: 'Apex 96 km/h, target 100 km/h · tighter arc (80 m radius against 87 m)', tryLine: 'Get closer to the inside at the apex',
       tryTitle: 'The target is 1.2 m closer to the inside at the apex than you', pinTurnId: 1,
     });
     expect(watch.focus[0].causes.map(cause => cause.line)).toEqual(['braking 0.4 s longer', '0.2 s more coasting']);

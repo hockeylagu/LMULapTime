@@ -246,10 +246,10 @@ const kmh = (value: number | null): string => (value === null ? '–' : `${Math.
 const percent = (share: number | null): string => `${Math.round((share ?? 0) * 100)} %`;
 
 const KIND_TEXT: Record<LossKind, (arc: TurnArc | null) => string> = {
-  tighterArc: arc => (arc ? `tighter arc: ${Math.round(arc.radiusM)} m radius against ${Math.round(arc.targetRadiusM)} m` : 'tighter arc'),
-  lessGrip: arc => (arc ? `same arc, less grip used: ${arc.latG.toFixed(2)} g against ${arc.targetLatG.toFixed(2)} g` : 'same arc, less grip used'),
+  tighterArc: arc => (arc ? `tighter arc (${Math.round(arc.radiusM)} m radius against ${Math.round(arc.targetRadiusM)} m)` : 'tighter arc'),
+  lessGrip: arc => (arc ? `same arc, less grip used (${arc.latG.toFixed(2)} g against ${arc.targetLatG.toFixed(2)} g)` : 'same arc, less grip used'),
   arcAndGrip: arc => (arc
-    ? `tighter arc and less grip used: ${Math.round(arc.radiusM)} m and ${arc.latG.toFixed(2)} g against ${Math.round(arc.targetRadiusM)} m and ${arc.targetLatG.toFixed(2)} g`
+    ? `tighter arc and less grip used (${Math.round(arc.radiusM)} m and ${arc.latG.toFixed(2)} g against ${Math.round(arc.targetRadiusM)} m and ${arc.targetLatG.toFixed(2)} g)`
     : 'tighter arc and less grip used'),
   exitOnly: () => 'no action is measured for a slower exit alone',
 };

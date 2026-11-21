@@ -40,7 +40,7 @@ const since = { sessionId: 'P1', timestamp: Date.UTC(2026, 9, 21, 12), sessionTy
 /** T2: 4 km/h slower at the slowest point on a tighter arc; the apex is the thing to try. */
 const overSlowing = habit(5, 2, 'Carry 4 km/h more through T2', {
   rule: 'overSlowing', gap: 4, repeatability: 1, kind: 'tighterArc', arc: { radiusM: 80, targetRadiusM: 87, latG: 0.9, targetLatG: 0.9 },
-  detail: 'Apex 96 km/h, target 100 km/h · tighter arc: 80 m radius against 87 m',
+  detail: 'Apex 96 km/h, target 100 km/h · tighter arc (80 m radius against 87 m)',
   action: { type: 'reachInside', gap: 1.2, line: 'Get closer to the inside at the apex' },
   causes: [{ type: 'brakeLonger', gap: 0.4, line: 'braking 0.4 s longer' }, { type: 'coast', gap: 0.2, line: '0.2 s more coasting' }],
 });

@@ -147,7 +147,7 @@ export interface LapTurnDifference {
   rule: HabitRule | null;
   /** The rule's gap between the two laps: metres, km/h or brake points, as the rule measures it. */
   gap: number | null;
-  /** How the lap's lower minimum speed came about ("tighter arc: 34 m radius against 42 m"); null when the speeds are level or no arc is measured. */
+  /** How the lap's lower minimum speed came about ("tighter arc (34 m radius against 42 m)"); null when the speeds are level or no arc is measured. */
   kindLine: string | null;
   /** What else differs in the half, without what the headline already says. */
   causes: HabitCause[];

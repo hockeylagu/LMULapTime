@@ -32,7 +32,7 @@ describe('strategy debrief', () => {
     render(<Card sessionId="le-mans" />);
     const open = await screen.findByRole('button', { name: 'View full strategy' });
     expect(screen.getByTestId('session-strategy')).toHaveTextContent('Pit stops2laps 2, 13');
-    expect(screen.getByTestId('session-strategy')).toHaveTextContent('VE at finish2.9 %est. 0.4 laps');
+    expect(screen.getByTestId('session-strategy')).toHaveTextContent('VE at finish2.9 %est. 0.4 laps of use');
     expect(screen.queryByText('8.11 %')).toBeNull();
     open.focus();
     fireEvent.click(open);
@@ -40,7 +40,7 @@ describe('strategy debrief', () => {
     const close = within(dialog).getByRole('button', { name: 'Close strategy' });
     expect(close).toHaveFocus();
     expect(within(dialog).getByText('8.11 %')).toBeInTheDocument();
-    expect(dialog).toHaveTextContent('Left at the flag2.9 %0.4 laps of use · started on 100 %');
+    expect(dialog).toHaveTextContent('Left at the flag2.9 %est. 0.4 laps of use · started on 100 %');
     expect(dialog).toHaveTextContent('Fuel ratio0.840.83 covers every clean lap');
     expect(dialog).toHaveTextContent('Tyre wear1.14 % / lapfront left, the most worn · Medium');
     expect(dialog).toHaveTextContent('Tread at the flag83 %');
@@ -80,7 +80,7 @@ describe('strategy debrief', () => {
       perLap: { fuel: 2.32, ve: null, laps: 6 }, fuelRatio: { set: null, needed: null }, stops: [] });
     render(<Card sessionId="algarve" />);
     const open = await screen.findByRole('button', { name: 'View full strategy' });
-    expect(screen.getByTestId('session-strategy')).toHaveTextContent('Pit stops0noneFuel at finish3.0 Lest. 1.3 laps');
+    expect(screen.getByTestId('session-strategy')).toHaveTextContent('Pit stops0noneFuel at finish3.0 Lest. 1.3 laps of use');
     fireEvent.click(open);
     expect(screen.getByText('2.32 L')).toBeInTheDocument();
     expect(screen.getByText('No pit stops · 12 laps on one load')).toBeInTheDocument();

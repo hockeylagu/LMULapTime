@@ -26,7 +26,7 @@ export interface CornerConclusion {
     tryTitle: string | undefined;
     /** "Apex 96 → 100 km/h": the driver's, then the target's. */
     speedCue: string | null;
-    /** The kind of loss ("tighter arc: 34 m radius against 42 m"). */
+    /** The kind of loss ("tighter arc (34 m radius against 42 m)"). */
     diagnosis: string | null;
     /** What else was measured there: "braking 0.4 s longer". */
     causes: string[];

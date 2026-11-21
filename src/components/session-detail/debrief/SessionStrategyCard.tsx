@@ -37,11 +37,11 @@ function StrategyMetrics({ strategy }: { strategy: SessionStrategy }) {
       <Stat label={`${ve ? 'VE' : 'Fuel'} per lap`} note={`median of ${strategy.perLap.laps} clean laps${ve && strategy.perLap.fuel !== null ? ` · ${amount(strategy.perLap.fuel, 'L', 2)} fuel` : ''}`}>
         {amount(used, ve ? '%' : 'L', 2)}
       </Stat>
-      <Stat label="Left at the flag" note={strategy.flag.laps !== null ? `${strategy.flag.laps.toFixed(1)} laps of use · started on ${amount(ve ? strategy.start.ve : strategy.start.fuel, ve ? '%' : 'L', 0)}` : undefined}>
+      <Stat label="Left at the flag" note={strategy.flag.laps !== null ? `est. ${strategy.flag.laps.toFixed(1)} laps of use · started on ${amount(ve ? strategy.start.ve : strategy.start.fuel, ve ? '%' : 'L', 0)}` : undefined}>
         {amount(left, ve ? '%' : 'L')}
       </Stat>
       {ve && (
-        <Stat label="Fuel ratio" note={fuelRatio.needed !== null ? `${fuelRatio.needed.toFixed(2)} covers every clean lap` : undefined}>
+        <Stat label="Fuel ratio" note={fuelRatio.needed === null ? undefined : fuelRatio.set !== null && fuelRatio.set.toFixed(2) === fuelRatio.needed.toFixed(2) ? 'covers every clean lap' : `${fuelRatio.needed.toFixed(2)} covers every clean lap`}>
           {fuelRatio.set === null ? '—' : fuelRatio.set.toFixed(2)}
         </Stat>
       )}
@@ -133,7 +133,7 @@ function StrategySummary({ strategy }: { strategy: SessionStrategy }) {
       <SummaryStat
         label={`${label} at finish`}
         value={remaining === null ? '—' : amount(remaining, ve ? '%' : 'L')}
-        hint={strategy.flag.laps !== null ? `est. ${strategy.flag.laps.toFixed(1)} laps` : undefined}
+        hint={strategy.flag.laps !== null ? `est. ${strategy.flag.laps.toFixed(1)} laps of use` : undefined}
       />
     </div>
   );

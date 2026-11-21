@@ -22,7 +22,7 @@ describe('SessionHabitSection', () => {
     expect(block).toHaveTextContent('+0.20 s/lap');
     expect(block).toHaveTextContent('Carry 4 km/h more through T2');
     expect(block).toHaveTextContent('Try: Get closer to the inside at the apex·Apex 96 → 100 km/h');
-    expect(block).toHaveTextContent('tighter arc: 80 m radius against 87 m');
+    expect(block).toHaveTextContent('tighter arc (80 m radius against 87 m)');
     expect(block).toHaveTextContent('Also measured: braking 0.4 s longer · 0.2 s more coasting');
     expect(block).toHaveTextContent('Over-slowing · 100% of laps');
     expect(screen.getByText('Over-slowing')).toHaveAttribute('title', expect.stringContaining("under the target's"));

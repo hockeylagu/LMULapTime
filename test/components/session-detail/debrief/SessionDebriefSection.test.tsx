@@ -35,9 +35,9 @@ describe('SessionDebriefSection', () => {
     // Diagnostics are hidden by default until Details is expanded.
     expect(within(items[0]).queryByTestId('debrief-focus-details')).toBeNull();
     expect(items[0]).not.toHaveTextContent('Other differences vs target:');
-    fireEvent.click(within(items[0]).getByRole('button', { name: 'Details' }));
+    fireEvent.click(within(items[0]).getByRole('button', { name: /^Details for / }));
     const details = within(items[0]).getByTestId('debrief-focus-details');
-    expect(details).toHaveTextContent('Why vs target: tighter arc: 80 m radius against 87 m');
+    expect(details).toHaveTextContent('Why vs target: tighter arc (80 m radius against 87 m)');
     expect(details).toHaveTextContent('Progress since Oct 21 Practice: Minimum speed at T2: 7 km/h under → 4 km/h under');
     expect(details).toHaveTextContent('Other differences vs target: braking 0.4 s longer · 0.2 s more coasting');
     expect(within(details).getByTitle(/off both pedals/)).toHaveTextContent('0.2 s more coasting');
@@ -54,7 +54,7 @@ describe('SessionDebriefSection', () => {
     expect(within(items[1]).getByTitle('Your usual time lost to the target through the whole corner')).toHaveTextContent('+0.10 s/lap');
     expect(items[1]).not.toHaveTextContent('Try:');
     expect(items[1]).toHaveTextContent(/Slipping.*Your pick.*Unpin/);
-    expect(within(items[0]).getByRole('link', { name: 'Carry 4 km/h more through T2' })).toHaveAttribute('href', expect.stringContaining('corner=2'));
+    expect(within(items[0]).getByRole('link', { name: 'T1–T2: Carry 4 km/h more through T2' })).toHaveAttribute('href', expect.stringContaining('corner=2'));
 
     // Corners that recently left the top 2 appear in their own compact section, showing what was corrected.
     const left = screen.getByRole('region', { name: 'No longer in your top 2' });
@@ -76,7 +76,7 @@ describe('SessionDebriefSection', () => {
     const fetchMock = mockWatchServer();
     renderSection({ session, selectedDriver: me });
     const analysisReads = () => fetchMock.mock.calls.filter(([url]) => url.includes('/corner-analysis')).length;
-    fireEvent.click(await screen.findByRole('button', { name: 'Unpin' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Unpin / }));
     await vi.waitFor(() => expect(analysisReads()).toBe(2));
     const unpin = fetchMock.mock.calls.find(([url]) => url === '/api/habit-focus/unpin');
     expect(JSON.parse(requestBody(unpin?.[1]?.body))).toEqual({ layoutKey: 'test_gp', carClass: 'Hyper', turnId: 4 });

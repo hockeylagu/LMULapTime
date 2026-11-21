@@ -10,7 +10,7 @@ describe('cornerConclusion', () => {
       habit: {
         line: 'Carry 4 km/h more through T2', rule: 'overSlowing', share: 1,
         tryLine: 'Get closer to the inside at the apex', tryTitle: 'The target is 1.2 m closer to the inside at the apex than you',
-        speedCue: 'Apex 96 → 100 km/h', diagnosis: 'tighter arc: 80 m radius against 87 m',
+        speedCue: 'Apex 96 → 100 km/h', diagnosis: 'tighter arc (80 m radius against 87 m)',
         causes: ['braking 0.4 s longer', '0.2 s more coasting'],
       },
       mistake: { turnLabel: 'T2', lossSec: 0.3, cause: 'slowExit' },

@@ -19,10 +19,10 @@ function TelemetryLink({ to, children }: { to: string; children: string }) {
 }
 
 /** A row's text that opens its corner in telemetry: one link per row, no repeated action line. */
-function RowLink({ to, title, children }: { to: string | null; title: string; children: string }) {
+function RowLink({ to, title, label, children }: { to: string | null; title: string; label?: string; children: string }) {
   if (!to) return children;
   return (
-    <Link to={to} title={title} className={`group inline-flex items-baseline gap-1 rounded underline-offset-2 hover:underline ${FOCUS_RING}`}>
+    <Link to={to} title={title} aria-label={label} className={`group inline-flex items-baseline gap-1 rounded underline-offset-2 hover:underline ${FOCUS_RING}`}>
       {children}<ArrowUpRight aria-hidden="true" className="size-3.5 self-center text-lmu-muted group-hover:text-white" />
     </Link>
   );
@@ -91,7 +91,7 @@ function FocusRow({ item, progress, onUnpin }: { item: WatchFocus; progress: Wat
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="flex flex-wrap items-baseline gap-x-1.5 text-sm font-semibold text-white">
           {showCornerPrefix && <span className="text-lmu-text-soft">{item.name} ·</span>}
-          <RowLink to={item.link} title="Compare in telemetry">{item.line}</RowLink>
+          <RowLink to={item.link} title="Compare in telemetry" label={showCornerPrefix ? `${item.name}: ${item.line}` : undefined}>{item.line}</RowLink>
         </p>
         {progress ? (
           <CostChange item={progress} />
@@ -114,11 +114,11 @@ function FocusRow({ item, progress, onUnpin }: { item: WatchFocus; progress: Wat
           <>
             {(item.tryLine || summary || item.slipping) && <span aria-hidden="true" className="text-lmu-muted">·</span>}
             <span className="inline-flex items-center gap-1 text-lmu-text-soft"><Pin aria-hidden="true" className="size-3 self-center" />Your pick</span>
-            {onUnpin && <button type="button" onClick={() => onUnpin(item.pinTurnId)} className={toggleClass}>Unpin</button>}
+            {onUnpin && <button type="button" onClick={() => onUnpin(item.pinTurnId)} aria-label={`Unpin ${item.name}`} className={toggleClass}>Unpin</button>}
           </>
         )}
         {hasDetails && (
-          <button type="button" aria-expanded={expanded} onClick={() => setExpanded(open => !open)} className={`${toggleClass} ml-auto`}>
+          <button type="button" aria-expanded={expanded} aria-label={`${expanded ? 'Hide details' : 'Details'} for ${item.name}`} onClick={() => setExpanded(open => !open)} className={`${toggleClass} ml-auto`}>
             <span>{expanded ? 'Hide details' : 'Details'}</span>
             <ChevronDown aria-hidden="true" className={`size-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
           </button>
@@ -233,7 +233,7 @@ export function OneOffLoss({ mistake }: { mistake: WatchMistake }) {
     <section aria-labelledby="debrief-one-off" className="space-y-1">
       <SectionHeading id="debrief-one-off" icon={Zap} tone="text-lmu-loss">One-off</SectionHeading>
       <p className="text-xs text-lmu-text-soft">
-        {mistake.turnLabel}{mistake.cause && <> · <Term explanation={mistake.cause.explanation}>{mistake.cause.label}</Term></>} · <span className="font-mono font-bold tabular-nums text-lmu-loss">+{mistake.lossSec.toFixed(2)} s</span> vs. your usual
+        {mistake.turnLabel}{mistake.cause && <> · <Term explanation={mistake.cause.explanation}>{mistake.cause.label}</Term></>} · <span className="font-mono font-semibold tabular-nums text-lmu-text">+{mistake.lossSec.toFixed(2)} s</span> vs. your usual
       </p>
       {mistake.link && <TelemetryLink to={mistake.link}>{mistake.lapNumber === null ? 'Replay this lap' : `Replay lap ${mistake.lapNumber}`}</TelemetryLink>}
     </section>

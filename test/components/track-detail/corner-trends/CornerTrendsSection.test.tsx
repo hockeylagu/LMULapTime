@@ -163,7 +163,7 @@ describe('CornerTrendsSection', () => {
     speeds: { minKmh: 96, targetMinKmh: 100, exitKmh: 150, targetExitKmh: 150 }, kind: 'tighterArc', arc: null,
     action: { type: 'reachInside', gap: 1.2, line: 'Get closer to the inside at the apex' }, otherActions: [], causes: [],
     repeatability: 1, confidence: 1, priority: 0.12, line: 'Carry 4 km/h more through T5',
-    detail: 'Apex 96 km/h, Ref Driver 100 km/h · tighter arc: 80 m radius against 87 m', ...extra,
+    detail: 'Apex 96 km/h, Ref Driver 100 km/h · tighter arc (80 m radius against 87 m)', ...extra,
   });
   /** T5's over-slowing over 3 sessions, the second without the gap measured. */
   const trendOf = (extra: Partial<CornerHabitTrend> = {}): CornerHabitTrend => ({
@@ -202,7 +202,7 @@ describe('CornerTrendsSection', () => {
     const lines = within(rows[0]).getByTestId('corner-habit');
     // The habit leads, the speeds and the kind of loss on its hover; the corner's cost against the target sits beside it.
     const advice = within(lines).getByText('Carry 4 km/h more through T5');
-    expect(advice).toHaveAttribute('title', 'Apex 96 km/h, Ref Driver 100 km/h · tighter arc: 80 m radius against 87 m');
+    expect(advice).toHaveAttribute('title', 'Apex 96 km/h, Ref Driver 100 km/h · tighter arc (80 m radius against 87 m)');
     expect(within(lines).getByText('+0.22 s a lap vs target')).toHaveClass('font-mono');
     expect(within(lines).getByTitle('The target is 1.2 m closer to the inside at the apex than you')).toHaveTextContent('Try: Get closer to the inside at the apex');
     // The cost sparkline (start → latest) and the habit's own gap over the last sessions: a gap that closes while the cost stays shows here.

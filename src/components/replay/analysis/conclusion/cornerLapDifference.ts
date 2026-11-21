@@ -11,7 +11,7 @@ export interface LapDifferenceLine {
   where: string;
   /** "This lap braked 12 m earlier": the slower lap is the subject. */
   text: string;
-  /** "tighter arc: 34 m radius against 42 m", the slower lap's first. */
+  /** "tighter arc (34 m radius against 42 m)", the slower lap's first. */
   kindLine: string | null;
   /** What else the slower lap did differently: "braking 0.2 s longer". */
   causes: string[];
