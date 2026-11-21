@@ -73,7 +73,7 @@ Set the backend-only setting in your ignored `.env.local`:
 LMU_PLUGIN_ROOT=C:/LocalData/package-v1
 ```
 
-Run `npm start`. The backend reads and validates one immutable snapshot at startup.
+Run `npm start`. The backend reads the manifest and catalogs of one immutable package at startup, and each track file the first time it is asked for.
 To change packages, select a new folder, restart the backend and reload the app. A
 missing or invalid package disables detailed features; it does not reuse a previous
 package's measurements. Local paths never enter frontend configuration or status responses.
@@ -90,12 +90,12 @@ The manifest is exactly these three keys; the catalogs sit at fixed paths (`trac
 format: any other `schemaVersion` (including 8 and 10) invalidates the package, with no fallback. The file shapes, path rules and
 parsers are the pipeline's contract module (its `shared/contract/`), copied here verbatim as `shared/packageContract/` by the
 pipeline's `npm run package -- sync-contract` (never edited here; `sync-contract --check` there verifies the copy). The app's
-loader adds only what needs this machine: contained, size-checked file reads and the hash checks below. The whole package is
-validated before activation.
+loader adds only what needs this machine: contained, size-checked file reads and the hash checks below. The pipeline validates the whole package before it publishes;
+at startup the app parses the catalogs and checks each layout file's identity, and does not re-check the layouts' contents.
 
 Track catalogs use the existing canonical layout identities. Geometry files sit beside
 the catalog as `<layoutKey>.json` (keys in the contract's order, map `surfaces` and `brakeMarkers` included). Geometry and projection
-revisions must match their contents (`TRACK_GEOMETRY_KEYS` of the contract names the keys the geometry revision covers). The same
+revisions match their contents, checked by the pipeline (`TRACK_GEOMETRY_KEYS` of the contract names the keys the geometry revision covers). The same
 provider supplies backend projection, profiles and frontend geometry. Null samples
 remain unavailable, including measured widths, kerb profiles and banking.
 
@@ -153,13 +153,13 @@ and all its primitives share one vertex layout). The app draws each opaque mater
 (`src/components/replay/view3d/scenery/sceneryBatches.ts`); which materials draw together is the app's choice. A chunk has no path, neighbours or totals: its file is `scenery/<sha256>.glb`, a texture is `scenery/textures/<sha256>.ktx2.zst`
 (a KTX2 without supercompression, compressed as one zstd file), and a chunk's `textures` are indices into its layout's reference list.
 The loader (`server/plugins/scenePackage.ts`) expands each row (`expandSceneryCatalog` of the contract) into the layout the client
-gets: `asset` paths rebuilt, chunk texture lists as paths, the shared parameters and the rendering profiles attached. The layout must
-exist in the track catalog (every track has scenery) and its `sourceGeometryRevision` must equal that geometry's revision; main sector
-lap ranges are ordered and inside the route (a venue-shared `v...` chunk may overlap them and wrap past the line); every file exists
-with its catalogued size.
+gets: `asset` paths rebuilt, chunk texture lists as paths, the shared parameters and the rendering profiles attached. The layouts must
+be exactly the track catalog's (every track has scenery). The pipeline checks before it publishes that each `sourceGeometryRevision`
+equals that geometry's revision, that main sector lap ranges are ordered and inside the route (a venue-shared `v...` chunk may overlap
+them and wrap past the line) and that every file exists with its catalogued size.
 
 `rendering/index.json` holds `camera`, `sky` and `shading`, shared by every layout and attached to each layout the client gets (the
-parsers are the contract's; `server/plugins/renderingPackage.ts` loads the cloud map files). In the sky, `sun.layouts` and
+parser is the contract's `parseRenderingIndex`; the cloud map files are served as is). In the sky, `sun.layouts` and
 `hosek.layoutAltitudeM` are keyed by layout key, exactly one per catalog layout; the loader narrows them to the layout's own `sky.sun.grid`
 and `sky.hosek.altitudeM`.
 
@@ -221,8 +221,8 @@ either `splitsM` (the split scheme `resolveShadowSplits` gives, ending at the re
 resolve new splits). Casters draw with WebGL's polygon offset: factor `slopeBias`, units `depthBias` · 2^23 rounded, a unit of the 24-bit
 shadow depth; a set with a non-zero `biasClamp` has no WebGL equivalent and is refused.
 
-Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Only the small cloud
-map files are hashed, once at load. Package files
+Startup does not touch the scenery, cloud map and car model files: checking that each of ~23,000 files existed with its catalogued size kept the
+server from listening for over 13 s. A missing file is a 404 when the viewer asks for it. Package files
 are pregenerated, content-named and published by folder swap, so they are never rewritten in place: the backend serves them as is,
 with no hash or change check. A hash check can come back if a real failure ever needs one.
 
@@ -250,11 +250,10 @@ Each body row lists `folder`, `vehicleIds` (every VEH id it serves, sorted, uppe
 `descriptorSha256`, `sha256`/`byteLength`/`triangles`/`vertices` of its GLB (`vehicles/<sha256>.glb`), `interior` and `textures`
 (`vehicles/textures/<sha256>.ktx2.zst`). The descriptor is at `vehicles/bodies/<folder>.json`; paths are derived, never stated.
 Bodies are sorted by folder and no id is in two. `GET /api/data-plugin/vehicles/:identity/body` looks the body up by VEH id through
-that list (`normalizeVehicleId` of the contract: any case, with or without `.veh`). The descriptor is read and its hash checked at
-startup and validated against the body's row (`parseBodyDescriptor`): there is one appearance per vehicle id, every texture it names
-is declared by the body, and its `cameras` hold a `frame` and `cockpitViewRule` statement and well-formed `cockpit`, `hood` and `roof`
-cameras. Whether the GLB holds the nodes it names, the wheel rig and the lamp state rules are the pipeline's file-content checks, not
-the app's startup.
+that list (`normalizeVehicleId` of the contract: any case, with or without `.veh`). The descriptor is served as is: the
+pipeline validates it against the body's row before it publishes (`parseBodyDescriptor`: one appearance per vehicle id, every texture
+it names declared by the body, well-formed `cockpit`, `hood` and `roof` cameras), along with the file-content checks (the GLB holds the
+nodes it names, the wheel rig, the lamp state rules). Startup does not read it (reading and checking the 41 descriptors cost 0.2 s).
 
 A body carries its entries' part alternatives (number plates, lights, displays, some
 body panels and tyre versions). The descriptor's `optionNodes` lists them, sorted and unique, each a mesh-only GLB node named

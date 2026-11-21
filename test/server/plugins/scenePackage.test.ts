@@ -5,7 +5,7 @@ import express from 'express';
 import request from 'supertest';
 import { DataPlugin } from '../../../server/plugins/dataPlugin.js';
 import { createDataPluginRouter } from '../../../server/routes/dataPluginRoutes.js';
-import { bodyDescriptorPath, bodyGlbPath, bodyTexturePath, PACKAGE_FILES, renderingBinPath, sceneryChunkPath, sceneryTexturePath } from '../../../shared/packageContract/index.js';
+import { bodyDescriptorPath, bodyGlbPath, bodyTexturePath, PACKAGE_FILES, sceneryChunkPath, sceneryTexturePath } from '../../../shared/packageContract/index.js';
 import { glb, syntheticPackage } from '../../helpers/scenes/syntheticPackage.js';
 import type { SceneryCloudLight, SceneryCloudsFile } from '../../../shared/types/scenes/clouds.js';
 import { cloudMapFiles, loadClouds } from '../../../shared/domain/scenery/cloudMaps.js';
@@ -194,10 +194,7 @@ describe('scenery validation', () => {
     ['sky colour profiles out of order', (built: Package) => { built.rendering.sky.colourProfiles.profiles.reverse(); }],
     ['a negative sky colour gain', (built: Package) => { built.rendering.sky.colourProfiles.profiles[0].clear.gain[1] = -0.1; }],
     ['a zero sky weather power', (built: Package) => { built.rendering.sky.colourProfiles.profiles[1].weatherLerpPower = 0; }],
-    ['a stale geometry revision', (built: Package) => { built.scenery.sourceGeometryRevision = 'old'; }],
     ['a chunk hash that is not a hash', (built: Package) => { built.scenery.sectors[0].sha256 = 'S0'; }],
-    ['a chunk of the wrong size', (built: Package) => { built.scenery.sectors[0].byteLength += 1; }],
-    ['a missing chunk file', (built: Package) => { fs.rmSync(path.join(built.dir, sceneryChunkPath(built.scenery.sectors[1].sha256))); }],
     ['sectors out of lap order', (built: Package) => { built.scenery.sectors.reverse(); }],
     ['prev/next links the compact catalog no longer has', (built: Package) => { Object.assign(built.scenery.sectors[0], { next: 's0' }); }],
     ['catalog totals the compact catalog no longer has', (built: Package) => { Object.assign(built.scenery, { totals: { triangles: 30 } }); }],
@@ -207,7 +204,6 @@ describe('scenery validation', () => {
     ['sectors out of lap order', (built: Package) => { Object.assign(built.scenery.sectors[0], {lapStartM: built.scenery.routeLengthM / 2 + 1, lapEndM: built.scenery.routeLengthM}); }],
     ['duplicate chunk ids', (built: Package) => { built.scenery.sectors[1].id = 's0'; }],
     ['a texture missing from the layout list', (built: Package) => { built.scenery.sectors[0].textures = [1]; }],
-    ['a texture file of the wrong size', (built: Package) => { built.sceneryShared.textures[0].byteLength = (built.sceneryShared.textures[0].byteLength as number) + 1; }],
     ['a layout texture naming no table entry', (built: Package) => { built.scenery.textures[0].texture = 5; }],
     ['non-finite bounds', (built: Package) => { built.scenery.horizon.bounds.min[0] = Infinity; }],
     ['a layout without track geometry', (built: Package) => { built.scenery.layoutKey = 'spa_wec'; }],
@@ -287,17 +283,13 @@ describe('car validation', () => {
 
   it.each([
     ['a body without its interior field', (built: Package) => { delete (built.car as Partial<typeof built.car>).interior; }],
-    ['an interior file the package does not hold', (built: Package) => { Object.assign(built.car, {interior: {sha256: '1'.repeat(64), byteLength: 1, triangles: 1, vertices: 3}}); }],
     ['an interior-only mark that is not true', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), interiorOnly: false}]}); }],
-    ['a texture start file the package does not hold', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), ...FULL_2048, start: {...built.rowOf(startFile(built, 'vehicles', 256, 9)), sha256: '3'.repeat(64)}}]}); }],
     ['a texture start file without the full size beside it', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), start: built.rowOf(startFile(built, 'vehicles', 256, 9))}]}); }],
     ['a full size without a start file', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), ...FULL_2048}]}); }],
     ['a start file at the wrong level for its full size', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), ...FULL_2048, start: built.rowOf(startFile(built, 'vehicles', 512, 10))}]}); }],
     ['a body that states its path (derived from the hash)', (built: Package) => { Object.assign(built.car, {asset: bodyGlbPath(built.car.sha256)}); }],
     ['a body that states its descriptor path', (built: Package) => { Object.assign(built.car, {descriptor: bodyDescriptorPath(built.car.folder)}); }],
     ['a body hash that is not a hash', (built: Package) => { built.car.sha256 = 'GLB'; }],
-    ['a body file of the wrong size', (built: Package) => { built.car.byteLength += 1; }],
-    ['a descriptor whose bytes differ from the catalog hash', (built: Package) => { built.commit(); built.write(bodyDescriptorPath(built.car.folder), Buffer.from(JSON.stringify(built.descriptor) + ' ')); built.commit = () => {}; }],
   ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
 
   /** Replaces the vehicle catalog written by `commit()` with raw records and bodies. */
@@ -306,44 +298,6 @@ describe('car validation', () => {
     built.write('vehicles/index.json', change(built, built.record(built.vehicles[0])) as object);
     return state(built);
   };
-
-  it.each([
-    ['aliases the descriptor no longer states', (built: Package) => { built.descriptor.aliases = ['TEST_CAR']; }],
-    ['a retired vehicle folder field', (built: Package) => { built.descriptor.vehicleFolder = 'Test_Car'; }],
-    ['a retired wheel rig', (built: Package) => { built.descriptor.wheelRig = { passed: true, rigs: 4, maxRestVertexErrorM: 0 }; }],
-    ['retired wheel pivots', (built: Package) => { built.descriptor.wheelPivots = {}; }],
-    ['appearances that do not cover the ids', (built: Package) => { built.descriptor.appearances = []; }],
-    ['an appearance without its number', (built: Package) => { delete (built.descriptor.appearances as Array<{ number?: unknown }>)[0].number; }],
-    ['no option node list', (built: Package) => { delete built.descriptor.optionNodes; }],
-    ['unsorted option nodes', (built: Package) => { built.descriptor.optionNodes = ['option_NumplateB', 'option_NumplateA']; }],
-    ['an option node three.js would rename', (built: Package) => { built.descriptor.optionNodes = ['option_Numplate.A']; }],
-    ['an entry showing an option the body lacks', (built: Package) => { (built.descriptor.appearances as Array<{ optionNodes: string[] }>)[0].optionNodes = ['option_Spoiler']; }],
-    ['an entry without its option list', (built: Package) => { delete (built.descriptor.appearances as Array<{ optionNodes?: string[] }>)[0].optionNodes; }],
-    ['an undeclared texture', (built: Package) => { (built.descriptor.appearances as Array<{ materialTextures?: unknown }>)[0].materialTextures = { body: 'textures/' + '1'.repeat(64) + '.ktx2.zst' }; }],
-    ['a descriptor schema version', (built: Package) => { built.descriptor.schemaVersion = 1; }],
-    ['an unknown descriptor field', (built: Package) => { built.descriptor.extra = true; }],
-    ['cameras without the driver camera', (built: Package) => { const cameras = built.descriptor.cameras as { list: Array<{ name: string }> }; built.descriptor.cameras = { ...cameras, list: cameras.list.filter(camera => camera.name !== 'cockpit') }; }],
-    ['cameras without their frame statement', (built: Package) => { delete (built.descriptor.cameras as Record<string, unknown>).frame; }],
-    ['a camera with an inverted clip range', (built: Package) => { (built.descriptor.cameras as { list: Array<{ clipPlanes: number[] }> }).list[0].clipPlanes = [5, 1]; }],
-    ['no lamp list', (built: Package) => { delete built.descriptor.lamps; }],
-    ['an unknown lamp role', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].role = 'fog'; }],
-    ['a lamp frame that is neither a texture path nor null', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].frames = ['lamp.png']; }],
-    ['a lamp state past its frames', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].states = { off: 1, on: null, brake: null }; }],
-    ['a lamp animation frame past its frames', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].animation = { method: 'loop', rate: 1, sequence: [0, 3] }; }],
-    ['a lamp without its cockpit reading', (built: Package) => { delete (built.descriptor.lamps as Array<Record<string, unknown>>)[0].hiddenInOwnCockpit; }],
-    ['an unknown lamp blend', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].blend = 'additive'; }],
-    ['a brake glow range on a headlight', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].brakeGlowRange = [640, 950]; }],
-    ['no glow material list', (built: Package) => { delete built.descriptor.glowMaterialIds; }],
-    ['a glow material the body does not list', (built: Package) => { built.descriptor.glowMaterialIds = ['m2']; }],
-    ['a non-boolean paint flag',(built: Package) => { (built.descriptor.materials as Array<{ paint: unknown }>)[0].paint = 'yes'; }],
-    ['a car texture of the wrong size', (built: Package) => { built.car.textures[0].byteLength = (built.car.textures[0].byteLength as number) + 1; }],
-  ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
-
-  it('accepts a lamp the game draws with a lit shader: no emission', () => {
-    const built = build();
-    (built.descriptor.lamps as Array<Record<string, unknown>>)[0].emission = null; built.commit();
-    expect(new DataPlugin(built.dir).body('TEST_CAR')).not.toBeNull();
-  });
 
   it.each([
     ['a body serving ids outside its records', (built: Package, vehicle: Record<string, unknown>) => ({ vehicles: [vehicle], bodies: [{ ...built.car, vehicleIds: ['OTHER_CAR'] }] })],
@@ -363,7 +317,7 @@ describe('car validation', () => {
     expect(state(built)).toBe('invalid');
   });
 
-  it('loads a further geometry of a car folder, named <folder>.<hash>, from its installed folder descriptor', () => {
+  it('loads a further geometry of a car folder, named <folder>.<hash>', () => {
     const built = build();
     built.car.folder = 'Test_Car.0a1b2c3d'; built.commit();
     const plugin = new DataPlugin(built.dir);
@@ -421,18 +375,6 @@ describe('scenery, car and rendering routes', () => {
 });
 
 describe('cloud map files', () => {
-  it('rejects a cloud map file whose bytes differ from its hash', () => {
-    const built = build(), [hash] = built.cloudMaps.files.keys();
-    fs.writeFileSync(path.join(built.dir, renderingBinPath(hash)), Buffer.from('tampered'));
-    expect(state(built)).toBe('invalid');
-  });
-
-  it('rejects a missing cloud map file', () => {
-    const built = build(), [hash] = built.cloudMaps.files.keys();
-    fs.rmSync(path.join(built.dir, renderingBinPath(hash)));
-    expect(state(built)).toBe('invalid');
-  });
-
   it('rejects a cloud map whose mip lengths do not add up to its size', () => {
     const built = build(), map = Object.values(built.rendering.sky.clouds.maps)[0];
     map.mipByteLengths = [...map.mipByteLengths].reverse().slice(1);

@@ -1,4 +1,3 @@
-import {trackRevisions} from '../../server/plugins/trackPackage.js';
 import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
 /** Invented circle for projection/timing regressions; canonical key is a routing identity only. */
 export function syntheticTrack(layoutKey='monza_gp'):TrackBoundaryGeometry {
@@ -13,5 +12,5 @@ export function syntheticTrack(layoutKey='monza_gp'):TrackBoundaryGeometry {
     surfaceProfile:{stationM:Array.from({length:n},(_,i)=>i/n*Math.PI*2*radius),leftWidthM:values(6),rightWidthM:values(7),
       elevationM:values(20),gradePct:values(2),bankDeg:values(3),leftElevationM:values(20),rightElevationM:values(20),
       leftKerbWidthM:values(1),rightKerbWidthM:values(null),leftKerbHeightM:values(.05),rightKerbHeightM:values(null)}};
-  return {...geometry,...trackRevisions(geometry as unknown as Record<string,unknown>)};
+  return geometry;
 }

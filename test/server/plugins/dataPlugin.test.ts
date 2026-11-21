@@ -10,7 +10,6 @@ import {syntheticPackage} from '../../helpers/scenes/syntheticPackage.js';
 import {TrackGeometryStore} from '../../../server/tracks/trackGeometryStore.js';
 import {applyCanonicalProjection,enrichTrajectoryWithTrackGeometry} from '../../../server/tracks/serverTrackSync.js';
 import type {ReplayTrajectoryData} from '../../../shared/types/replay.js';
-import {trackRevisions} from '../../../server/plugins/trackPackage.js';
 
 const directories:string[]=[];
 afterEach(()=>{for(const dir of directories.splice(0))fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:50});});
@@ -98,12 +97,10 @@ describe('local data plugin snapshot',()=>{
     expect(track.geometry.surfaces).toEqual(geometry.surfaces);expect(track.geometry.brakeMarkers).toEqual(geometry.brakeMarkers);
     expect(fs.existsSync(path.join(dir,'tracks-display'))).toBe(false);
   });
-  it('keeps geometryRevision when only surfaces or brake markers change, and rejects malformed ones',()=>{
+  it('keeps geometryRevision when only surfaces or brake markers change',()=>{
     const {dir,write,geometry}=fixture();
     write('tracks/monza_gp.json',{...geometry,surfaces:{road:[[[[0,0],[1,0],[1,1],[0,0]]]],kerb:[],runoff:[]},brakeMarkers:[]});
     const changed=new DataPlugin(dir);expect(changed.status.state).toBe('ready');expect(changed.track('monza_gp')!.geometry.geometryRevision).toBe(geometry.geometryRevision);
-    write('tracks/monza_gp.json',{...geometry,surfaces:{road:[]}});expect(new DataPlugin(dir).status.state).toBe('invalid');
-    write('tracks/monza_gp.json',{...geometry,brakeMarkers:[{id:'x',center:[0,0],stationM:1,side:'middle'}]});expect(new DataPlugin(dir).status.state).toBe('invalid');
   });
   it.each([{lengthM:1},{pointsCount:2048},{bounds:{}},{startFinish:[0,0]}])('rejects a catalog row carrying the schema 3 field %j',extra=>{
     const {dir,write}=fixture();
@@ -119,28 +116,23 @@ describe('local data plugin snapshot',()=>{
     for(const record of [{...catalog.vehicles[0],dimensions:{lengthM:NaN,widthM:2}},{...catalog.vehicles[0],outlineXZ:[[-1,-2.5],[1,2.5],[1,-2.5],[-1,2.5]]},{...catalog.vehicles[0],source:'private'}])expect(()=>parseVehicleCatalog({...catalog,vehicles:[record]})).toThrow();
     expect(()=>parseVehicleCatalog({...catalog,vehicles:[...catalog.vehicles,{...catalog.vehicles[0],id:'second'}]})).toThrow();
   });
-  it('rejects changed content under old revisions and unsupported track fields',()=>{
-    const a=fixture();a.write('tracks/monza_gp.json',{...a.geometry,lengthM:a.geometry.lengthM+1});expect(new DataPlugin(a.dir).status.state).toBe('invalid');
-    const b=fixture();b.write('tracks/monza_gp.json',{...b.geometry,source:'private'});expect(new DataPlugin(b.dir).status.state).toBe('invalid');
-  });
-  it.each(['collapsed','duplicate','length'] as const)('rejects a correctly hashed but unusable route (%s)',kind=>{
-    const {dir,write,geometry}=fixture();
-    if(kind==='collapsed') geometry.centerline=geometry.centerline.map(()=>[0,0]);
-    if(kind==='duplicate') geometry.centerline[1]=[...geometry.centerline[0]];
-    if(kind==='length') geometry.lengthM+=100;
-    Object.assign(geometry,trackRevisions(geometry as unknown as Record<string,unknown>));
-    write('tracks/monza_gp.json',geometry);
+  it('reads a track file on first use and gives no geometry for a file naming another layout',()=>{
+    const {dir,write,geometry}=fixture();write('tracks/monza_gp.json',{...geometry,layoutKey:'monza_curva_grande'});
     const plugin=new DataPlugin(dir);
-    expect(plugin.status.state).toBe('invalid');
-    expect(plugin.track(geometry.layoutKey)).toBeNull();
+    expect(plugin.status.state).toBe('ready');
+    expect(plugin.trackKeys()).toEqual(['monza_gp']);
+    expect(plugin.track('monza_gp')).toBeNull();
+  });
+  it('rejects a track catalog row that differs from the circuit definitions',()=>{
+    const {dir,write}=fixture();
+    write('tracks/index.json',[{layoutKey:'monza_gp',circuitId:'monza',layoutId:'curva_grande',trackVenue:'V',trackCourse:'C',hasElevation:true,hasPitLane:false}]);
+    expect(new DataPlugin(dir).status.state).toBe('invalid');
   });
   it('feeds the same metric geometry into banking and kerb enrichment while missing profiles remain null',()=>{
     const {dir}=fixture();const p=new DataPlugin(dir),store=new TrackGeometryStore(key=>p.trackGeometry(key)),definition=store.get('monza_gp')!;
     const shared = p.trackGeometry('monza_gp')!;
     expect(definition.centerline).toBe(shared.centerline);
     expect(definition.surfaceProfile).toBe(shared.surfaceProfile);
-    expect(Object.isFrozen(shared.centerline[0])).toBe(true);
-    expect(() => { shared.centerline[0][0] = 42; }).toThrow(TypeError);
     const publicCopy = p.track('monza_gp')!;
     publicCopy.geometry.centerline[0][0] = 42;
     expect(shared.centerline[0][0]).not.toBe(42);

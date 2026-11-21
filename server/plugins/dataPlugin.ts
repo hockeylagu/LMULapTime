@@ -2,27 +2,37 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';
-import { MANIFEST_FILE, PACKAGE_FILES, normalizeVehicleId, parseLogos, parseManifest, parseTrackCatalog, parseVehicleCatalog, trackLayoutPath } from '../../shared/packageContract/index.js';
+import { MANIFEST_FILE, PACKAGE_FILES, normalizeVehicleId, parseLogos, parseManifest, parseRenderingIndex, parseTrackCatalog, parseVehicleCatalog, trackLayoutPath, type TrackCatalogRow } from '../../shared/packageContract/index.js';
 import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
-import { validateTrackPackage } from './trackPackage.js';
 import { loadScenePackage, type SceneryStore } from './scenePackage.js';
 import { loadBodyPackage, type BodyStore } from './bodyPackage.js';
-import { loadRenderingPackage } from './renderingPackage.js';
 import type { SceneryLayoutPayload } from '../../shared/types/scenes/scenery.js';
 import type { BodyResource } from '../../shared/types/scenes/car.js';
 
-/** Shared internal geometry is immutable at every nested array/object boundary. */
-function freezeGeometry(value: unknown): void {
-  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return;
-  for (const child of Object.values(value)) freezeGeometry(child);
-  Object.freeze(value);
+/** Layouts whose package layout id differs from the circuit definition's. */
+const LAYOUT_ID_ALIASES: Record<string, string> = {daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'};
+
+/** A package JSON file, contained in the package folder (a junction cannot point outside it) and at most `max` bytes. */
+function readPackageJson(base: string, relative: string, max: number): Buffer {
+  if (path.isAbsolute(relative) || relative.includes('\\') || relative.includes(':') || relative.split('/').some(p=>!p||p==='.'||p==='..') || !relative.endsWith('.json')) throw Error('Invalid resource path');
+  const file=fs.realpathSync(path.join(base,relative));
+  const escaped=path.relative(base,file);
+  if (escaped.startsWith('..') || path.isAbsolute(escaped)) throw Error('Escaping resource');
+  const stat=fs.statSync(file);
+  if (!stat.isFile() || stat.size>max) throw Error('Oversized resource');
+  return fs.readFileSync(file);
 }
 
-/** A fully validated startup snapshot of a schema 12 package. Scenery, body and cloud map files are served as is from `filesRoot()`. */
+/**
+ * A schema 12 package, checked by the pipeline before it publishes (`npm run package -- validate`): startup parses the manifest and catalogs, and each
+ * track file is read the first time it is asked for (parsing all 32 cost about 0.3 s before the server could listen). Scenery, body and cloud map
+ * files are served as is from `filesRoot()`.
+ */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
-  private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry}>();
+  /** By layout key: the catalog row, and the geometry once read (null when its file could not be read or names another layout). */
+  private readonly tracks = new Map<string, {row:TrackCatalogRow; geometry?:TrackBoundaryGeometry|null}>();
   private readonly records: VehicleDataRecord[] = [];
   private readonly logoRecords = new Map<string, string>();
   private scenery: SceneryStore | null = null;
@@ -32,36 +42,26 @@ export class DataPlugin {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
     if (!root) return;
     try {
-      const base = fs.realpathSync(root), digest=createHash('sha256'); let bytes=0;
+      const base = fs.realpathSync(root), digest=createHash('sha256');
       this.root = base;
+      // The revision covers the manifest and catalogs; a geometry change shows in the scenery catalog (`sourceGeometryRevision`).
       const read = (relative: string, max=16_000_000): unknown => {
-        if (path.isAbsolute(relative) || relative.includes('\\') || relative.includes(':') || relative.split('/').some(p=>!p||p==='.'||p==='..') || !relative.endsWith('.json')) throw Error('Invalid resource path');
-        const file=fs.realpathSync(path.join(base,relative));
-        const escaped=path.relative(base,file);
-        if (escaped.startsWith('..') || path.isAbsolute(escaped)) throw Error('Escaping resource');
-        const stat=fs.statSync(file); bytes+=stat.size;
-        if (!stat.isFile() || stat.size>max || bytes>256_000_000) throw Error('Oversized resource');
-        const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
+        const buffer=readPackageJson(base,relative,max); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
       const manifest=parseManifest(read(MANIFEST_FILE,64_000));
       const catalog=parseTrackCatalog(read(PACKAGE_FILES.tracks));
       for (const row of catalog) {
-        const key=row.layoutKey, spec=CIRCUIT_SPECIFICATIONS[key];
-        if (!spec) throw Error('Invalid layout identity');
-        const raw=read(trackLayoutPath(key));
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw Error('Expected object');
-        const geometry=validateTrackPackage(raw as Record<string,unknown>,key);
-        if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId) throw Error('Layout/catalog mismatch');
-        freezeGeometry(geometry);
-        this.tracks.set(key,{geometry});
+        const spec=CIRCUIT_SPECIFICATIONS[row.layoutKey];
+        if (!spec || row.circuitId!==spec.circuitId || ![spec.layoutId, LAYOUT_ID_ALIASES[row.layoutKey]].includes(row.layoutId)) throw Error('Layout/catalog mismatch');
+        this.tracks.set(row.layoutKey,{row});
       }
       const vehicleCatalog=parseVehicleCatalog(read(PACKAGE_FILES.vehicles));
       this.records.push(...vehicleCatalog.vehicles);
-      this.bodies = loadBodyPackage(base, vehicleCatalog.bodies);
+      this.bodies = loadBodyPackage(vehicleCatalog.bodies);
       for (const [k, v] of Object.entries(parseLogos(read(PACKAGE_FILES.logos)).logos)) this.logoRecords.set(k, v);
       const trackKeys=catalog.map(row=>row.layoutKey);
-      const rendering=loadRenderingPackage(base, read(PACKAGE_FILES.rendering), trackKeys);
-      this.scenery = loadScenePackage(base, read(PACKAGE_FILES.scenery, 32_000_000), rendering, key => this.trackGeometry(key));
+      const rendering=parseRenderingIndex(read(PACKAGE_FILES.rendering), {layoutKeys: trackKeys});
+      this.scenery = loadScenePackage(read(PACKAGE_FILES.scenery, 32_000_000), rendering);
       // Every track has current scenery (docs/PACKAGE_FORMAT.md, Manifest).
       if ([...this.scenery.layouts.keys()].join() !== trackKeys.join()) throw Error('Scenery layouts differ from the track layouts');
       this.status = {
@@ -91,18 +91,32 @@ export class DataPlugin {
   }
   /**
    * The package folder that scenery (`scenery/`), vehicle body (`vehicles/`) and cloud map (`rendering/`) files are served from, or null without a valid package.
-   * They are pregenerated, content-named and published by folder swap, so they are served as is: no hash or change check (the cloud maps' hashes are
-   * checked once at load, `loadRenderingPackage`).
+   * They are pregenerated, content-named and published by folder swap, so they are served as is: no hash or change check.
    */
   public filesRoot(): string | null { return this.status.state === 'ready' ? this.root : null; }
   public body(identity: string): BodyResource | null {
     const row = this.bodies?.rows.get(normalizeVehicleId(identity));
     return row ? { ...structuredClone(row), packageRevision: this.status.revision } : null;
   }
-  public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
+  public track(key:string) {const geometry=this.trackGeometry(key);return geometry?{geometry:structuredClone(geometry)}:null;}
   public trackKeys(): string[] { return Array.from(this.tracks.keys()); }
-  /** Internal immutable geometry view; API callers use the defensive track() snapshot. */
-  public trackGeometry(key: string): TrackBoundaryGeometry | null { return this.tracks.get(key)?.geometry ?? null; }
+  /**
+   * The shared geometry, read only by convention (not frozen: freezing every point cost a quarter second at startup); API callers get the track() copy.
+   * Read on first use and kept; a file that cannot be read or names another layout leaves the layout without geometry.
+   */
+  public trackGeometry(key: string): TrackBoundaryGeometry | null {
+    const entry=this.tracks.get(key);
+    if (!entry) return null;
+    if (entry.geometry===undefined) {
+      try {
+        const geometry=JSON.parse(readPackageJson(this.root,trackLayoutPath(key),16_000_000).toString('utf8')) as TrackBoundaryGeometry;
+        const {row}=entry;
+        entry.geometry=geometry.layoutKey===key && geometry.circuitId===row.circuitId && geometry.layoutId===row.layoutId ? geometry : null;
+      } catch { entry.geometry=null; }
+      if (!entry.geometry) console.warn(`[Data Plugin] Track file unreadable or not ${key}; the layout has no geometry.`);
+    }
+    return entry.geometry;
+  }
   public vehicles(): VehicleDataRecord[] {return structuredClone(this.records);}
   public logos(): Record<string, string> {return Object.fromEntries(this.logoRecords);}
   public logo(brand: string): string|null {return this.logoRecords.get(brand) ?? null;}
