@@ -23,14 +23,17 @@ interface CostSparklineProps {
   testId?: string;
 }
 
-/** Inline 5-session cost sparkline (lower on screen = lower cost = faster): muted line, only the latest dot wears the trend colour. */
+/**
+ * Inline 5-session cost sparkline (higher on screen = lower cost = faster, the same way up as the corner trend graph):
+ * muted line, only the latest dot wears the trend colour.
+ */
 export function CostSparkline({ costs, tone, testId = 'cost-sparkline' }: CostSparklineProps) {
   if (costs.length < 2) return null;
   const w = 52, h = 16, pad = 2.5;
   const min = Math.min(...costs), max = Math.max(...costs), span = max - min;
   const coords = costs.map((value, index) => {
     const x = pad + (index / (costs.length - 1)) * (w - pad * 2);
-    const y = span < 1e-4 ? h / 2 : pad + ((max - value) / span) * (h - pad * 2);
+    const y = span < 1e-4 ? h / 2 : pad + ((value - min) / span) * (h - pad * 2);
     return [x, y] as const;
   });
   const points = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
