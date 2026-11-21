@@ -87,8 +87,8 @@ export function renameTargetedReplay(
   oldFilename: string,
   newFilename: string,
   newPath: string,
-  updatedAt = Date.now()
 ): void {
+  const updatedAt = Date.now();
   db.transaction(() => {
     db.prepare('UPDATE session_recordings SET recording_name = ?, path = ? WHERE recording_name = ?')
       .run(newFilename, newPath, oldFilename);

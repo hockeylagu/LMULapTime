@@ -33,10 +33,10 @@ export function uvShift(animation: SurfaceUvAnimation, timeSec: number, out = ne
   return out.set(u - Math.floor(u), v - Math.floor(v));
 }
 
-/** The uniform holding a map's UV shift at the clock's time. */
-export function uvShiftUniform(animation: SurfaceUvAnimation, clock: { value: number } = sceneryClock): IUniform<Vector2> {
+/** The uniform holding a map's UV shift at the scenery clock's time. */
+export function uvShiftUniform(animation: SurfaceUvAnimation): IUniform<Vector2> {
   const out = new Vector2();
-  return { get value() { return uvShift(animation, clock.value, out); } };
+  return { get value() { return uvShift(animation, sceneryClock.value, out); } };
 }
 
 /** Whether a package UV animation is well formed. */

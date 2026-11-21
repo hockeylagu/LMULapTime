@@ -162,7 +162,9 @@ export function slowestDistInRange(points: ReplayTrajectoryPoint[], dists: numbe
   return slowest;
 }
 
-export function getHeadingAtDistance(points: ReplayTrajectoryPoint[], dists: number[], d: number, spanM = 4): number {
+/** The heading at distance d, from the points 4 m either side. */
+export function getHeadingAtDistance(points: ReplayTrajectoryPoint[], dists: number[], d: number): number {
+  const spanM = 4;
   if (points.length < 2 || dists.length < 2) return 0;
   const maxD = dists[dists.length - 1] || d;
   const pPrev = interpolatePointAtDistance(points, dists, Math.max(0, d - spanM));

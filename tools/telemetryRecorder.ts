@@ -357,11 +357,10 @@ export function formatMetaRecord(
   trackName: string,
   telCal: Calibration | null,
   scoCal: Calibration,
-  recordedAt = new Date().toISOString(),
 ) {
   return JSON.stringify({
     t: 'meta',
-    recordedAt,
+    recordedAt: new Date().toISOString(),
     track: trackName,
     trackLengthM: round(info.lapDist, 3),
     player: info.playerName,

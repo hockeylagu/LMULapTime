@@ -4,7 +4,7 @@ import { fetchJson, postJson } from './apiClient.js';
 const ROOT = '/api/peripherals';
 export function fetchPeripherals(signal?: AbortSignal): Promise<PeripheralStatus[]> { return fetchJson(ROOT, { signal }); }
 export function refreshPeripheralHealth(signal?: AbortSignal): Promise<PeripheralStatus> { return postJson(`${ROOT}/simagic/health/refresh`, undefined, { signal }); }
-export function fetchPeripheralDevices(signal?: AbortSignal): Promise<PeripheralDevice[]> { return fetchJson(`${ROOT}/simagic/devices`, { signal }); }
+export function fetchPeripheralDevices(): Promise<PeripheralDevice[]> { return fetchJson(`${ROOT}/simagic/devices`); }
 export function fetchLoadedPresets(signal?: AbortSignal): Promise<LoadedPeripheralPresets> { return fetchJson(`${ROOT}/simagic/loaded-presets`, { signal }); }
 export function fetchPresetCatalog(signal?: AbortSignal): Promise<DeviceCatalog | null> { return fetchJson(`${ROOT}/simagic/presets`, { signal }); }
 export function fetchPresetMappings(signal?: AbortSignal): Promise<MappingData> { return fetchJson(`${ROOT}/simagic/mappings`, { signal }); }

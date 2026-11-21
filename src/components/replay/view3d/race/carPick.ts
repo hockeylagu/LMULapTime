@@ -122,8 +122,8 @@ function eachPart(car: Object3D, visit: (geometry: Mesh['geometry'], matrix: Mat
 }
 
 /** A car model's body bounds in its envelope's frame, over its parts where they hang; a point at the origin without parts. */
-export function envelopeBounds(car: Object3D, box = new Box3()): Box3 {
-  box.makeEmpty();
+export function envelopeBounds(car: Object3D): Box3 {
+  const box = new Box3();
   eachPart(car, (geometry, matrix) => {
     if (!geometry.boundingBox) geometry.computeBoundingBox();
     box.union(triangle.copy(geometry.boundingBox!).applyMatrix4(matrix));

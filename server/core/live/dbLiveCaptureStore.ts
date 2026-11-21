@@ -144,8 +144,8 @@ export function setLiveCaptureMatch(
   sessionId: string | null,
   gameVersion: string | null,
   status: 'verified' | 'pending',
-  ruleVersion = LIVE_CAPTURE_MATCH_RULE_VERSION,
 ): boolean {
+  const ruleVersion = LIVE_CAPTURE_MATCH_RULE_VERSION;
   const row = db.prepare('SELECT manifest_json, session_id, game_version, match_version, match_status, match_rule_version FROM live_capture_index WHERE recording_id = ?')
     .get(recordingId) as { manifest_json: string; session_id: string | null; game_version: string | null; match_status: string; match_rule_version: number } | undefined;
   if (!row) return false;
