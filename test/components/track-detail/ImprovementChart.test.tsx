@@ -56,6 +56,18 @@ describe('ImprovementChart component', () => {
     },
   ];
 
+  it('keeps the stats row with dashes when the class has no session here', () => {
+    render(
+      <ImprovementChart progression={[]} tracks={['Spa']} selectedTrack="Spa" setSelectedTrack={vi.fn()}
+        selectedCarClass="Hyper" setSelectedCarClass={vi.fn()} />
+    );
+    expect(screen.getByText('Total Sessions').nextSibling).toHaveTextContent('0');
+    expect(screen.getByText('Quali Avg Pos').nextSibling).toHaveTextContent('—');
+    expect(screen.getByText('Finish Avg Pos').nextSibling).toHaveTextContent('—');
+    expect(screen.getByText('Overall Pace Improvement').nextSibling).toHaveTextContent('—');
+    expect(screen.getByText('Top 3 Lap True Pace').nextSibling).toHaveTextContent('—');
+  });
+
   it('renders improvement stats banner and metric switcher', () => {
     const setSelectedTrack = vi.fn();
     const setSelectedCarClass = vi.fn();

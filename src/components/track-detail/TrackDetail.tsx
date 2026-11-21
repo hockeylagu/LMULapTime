@@ -142,7 +142,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const qualifyingAveragePosition = data.positions?.qualifyingAveragePosition ?? averagePosition('Qualifying');
   const finishAveragePosition = data.positions?.finishAveragePosition ?? averagePosition('Race');
   const currentClassDriverStats = {
-    bestTimeStr: bestLapSec ? formatTime(bestLapSec) : '--:--.---',
+    bestTimeStr: bestLapSec ? formatTime(bestLapSec) : '—',
     bestPaceCat: paceInfo?.category || null,
     bestPacePct: paceInfo?.percentage || null,
   };

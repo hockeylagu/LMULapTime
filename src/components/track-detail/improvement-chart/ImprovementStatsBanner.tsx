@@ -24,8 +24,11 @@ export interface ImprovementStatsBannerProps {
   finishAveragePosition?: number | null;
 }
 
+/** A value the sessions do not give, the same on every tile (a class with no session here shows the row of them). */
+const EMPTY = '—';
+
 function formatAveragePosition(position: number | null | undefined): string {
-  if (position === null || position === undefined) return '--';
+  if (position === null || position === undefined) return EMPTY;
   return `P${Number.isInteger(position) ? position : position.toFixed(1)}`;
 }
 
@@ -44,6 +47,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
   qualifyingAveragePosition,
   finishAveragePosition,
 }) => {
+  const bestText = yourBest?.timeStr && yourBest.timeStr !== EMPTY ? yourBest.timeStr : bestLapTimeInTrack ? formatTime(bestLapTimeInTrack) : EMPTY;
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       <div className="bg-lmu-card border border-lmu-border p-4 rounded-xl flex items-center justify-between">
@@ -82,8 +86,9 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
             Your Best ({selectedCarModel !== 'All' ? selectedCarModel : selectedCarClass === 'All' ? 'Overall' : selectedCarClass})
           </p>
           <div className="flex items-baseline gap-2 mt-0.5">
-            <p className="text-xl font-semibold text-lmu-personal-best font-mono">
-              {yourBest?.timeStr || (bestLapTimeInTrack ? formatTime(bestLapTimeInTrack) : '--:--.---')}
+            {/* The gold marks a best; the dash stays in text ink. */}
+            <p className={`text-xl font-semibold font-mono ${bestText === EMPTY ? 'text-white' : 'text-lmu-personal-best'}`}>
+              {bestText}
             </p>
           </div>
           {yourBest?.paceCat && (
@@ -111,7 +116,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
               ? `${totalImprovement > 0 ? '-' : '+'}${Math.abs(totalImprovement).toFixed(3)}s`
               : sessionsWithValidLapsCount === 1
               ? '0.000s'
-              : 'N/A'}
+              : EMPTY}
           </p>
           <p className="text-[11px] text-lmu-muted mt-0.5">
             {sessionsWithValidLapsCount > 1 && totalImprovement !== null && totalImprovement > 0
@@ -135,7 +140,7 @@ export const ImprovementStatsBanner: React.FC<ImprovementStatsBannerProps> = ({
               ? `${top3Improvement > 0 ? '-' : '+'}${Math.abs(top3Improvement).toFixed(3)}s`
               : bestTop3
               ? formatTime(bestTop3)
-              : 'N/A'}
+              : EMPTY}
           </p>
           <p className="text-[11px] text-lmu-muted mt-0.5">
             {bestTop3

@@ -404,7 +404,8 @@ describe('TrackDetail component', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTitle('Benchmark Pace: Offline (111.1%)')).toBeInTheDocument();
+      // The stats row's best and the session row: both against the ELMS target.
+      expect(screen.getAllByTitle('Benchmark Pace: Offline (111.1%)')).toHaveLength(2);
     });
   });
 

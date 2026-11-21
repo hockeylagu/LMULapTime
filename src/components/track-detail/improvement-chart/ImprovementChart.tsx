@@ -140,23 +140,22 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
         setSelectedCarClass={setSelectedCarClass}
       />
 
-      {trackData.length > 0 && (
-        <ImprovementStatsBanner
-          trackDataCount={trackData.length}
-          selectedCarModel={selectedCarModel}
-          selectedCarClass={selectedCarClass}
-          yourBest={yourBest}
-          bestLapTimeInTrack={bestLapTimeInTrack}
-          totalImprovement={totalImprovement}
-          firstValidSessionBestLap={firstValidSession?.bestLapTime ?? null}
-          sessionsWithValidLapsCount={sessionsWithValidLaps.length}
-          top3Improvement={top3Improvement}
-          bestTop3={bestTop3}
-          latestTheoreticalGap={latestTheoreticalGap}
-          qualifyingAveragePosition={qualifyingAveragePosition}
-          finishAveragePosition={finishAveragePosition}
-        />
-      )}
+      {/* Always drawn: a class with no session here keeps the row, its values a dash (driver, 2026-11-20). */}
+      <ImprovementStatsBanner
+        trackDataCount={trackData.length}
+        selectedCarModel={selectedCarModel}
+        selectedCarClass={selectedCarClass}
+        yourBest={yourBest}
+        bestLapTimeInTrack={bestLapTimeInTrack}
+        totalImprovement={totalImprovement}
+        firstValidSessionBestLap={firstValidSession?.bestLapTime ?? null}
+        sessionsWithValidLapsCount={sessionsWithValidLaps.length}
+        top3Improvement={top3Improvement}
+        bestTop3={bestTop3}
+        latestTheoreticalGap={latestTheoreticalGap}
+        qualifyingAveragePosition={qualifyingAveragePosition}
+        finishAveragePosition={finishAveragePosition}
+      />
 
       <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">
         <ImprovementChartControls
