@@ -335,7 +335,10 @@ describe('SessionDatabase replay cache', () => {
     expect(primary?.trackName).toBe('Bahrain (wec)');
     expect(primary?.driversCount).toBe(2);
     expect(primary?.trajectoriesCached).toBe(2);
-    expect(primary?.compressedSizeBytes).toBeGreaterThan(0);
+    // The stored byte counts add up to the blobs' own lengths.
+    const blobs = db.getDb().prepare(`SELECT (SELECT length(metadata_br) FROM replay_metadata WHERE filename = @name)
+      + (SELECT sum(length(trajectory_br)) FROM replay_trajectories WHERE filename = @name) bytes`).get({ name: 'Test_Replay_P1.Vcr' }) as { bytes: number };
+    expect(primary?.compressedSizeBytes).toBe(blobs.bytes);
     expect(primary?.replayDateMs).toBe(1000);
     expect(primary?.replayVersion).toBe(REPLAY_CACHE_VERSION);
     expect(primary?.parserVersion).toBe(REPLAY_CACHE_VERSION);

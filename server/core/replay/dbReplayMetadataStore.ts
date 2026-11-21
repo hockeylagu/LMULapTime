@@ -148,7 +148,7 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
   const rows = db.prepare(`
     SELECT rm.filename, rm.file_path, rm.file_size_bytes, rm.file_mtime_ms, rm.parser_version, rm.metadata_br, rm.updated_at,
            COUNT(rt.filename) as trajectories_cached,
-           LENGTH(rm.metadata_br) + COALESCE(SUM(LENGTH(rt.trajectory_br)), 0) as compressed_size
+           LENGTH(rm.metadata_br) + COALESCE(SUM(rt.trajectory_bytes), 0) as compressed_size
     FROM replay_metadata rm
     LEFT JOIN replay_trajectories rt ON rt.filename = rm.filename
     GROUP BY rm.filename

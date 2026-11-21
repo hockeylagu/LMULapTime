@@ -231,8 +231,9 @@ export function upsertReplayTrajectoryCache(
   filePath?: string
 ): void {
   db.prepare(`
-    INSERT INTO replay_trajectories (filename, source_path, driver_slot, lap_key, file_mtime_ms, file_size_bytes, parser_version, points_count, trajectory_br, updated_at)
-    VALUES (@filename, @filePath, @driverSlot, @lapKey, @mtimeMs, @fileSizeBytes, @parserVersion, @pointsCount, @trajectoryBr, @updatedAt)
+    INSERT INTO replay_trajectories
+      (filename, source_path, driver_slot, lap_key, file_mtime_ms, file_size_bytes, parser_version, points_count, trajectory_br, trajectory_bytes, updated_at)
+    VALUES (@filename, @filePath, @driverSlot, @lapKey, @mtimeMs, @fileSizeBytes, @parserVersion, @pointsCount, @trajectoryBr, length(@trajectoryBr), @updatedAt)
     ON CONFLICT(filename, driver_slot, lap_key) DO UPDATE SET
       source_path = excluded.source_path,
       file_mtime_ms = excluded.file_mtime_ms,
@@ -240,6 +241,7 @@ export function upsertReplayTrajectoryCache(
       parser_version = excluded.parser_version,
       points_count = excluded.points_count,
       trajectory_br = excluded.trajectory_br,
+      trajectory_bytes = excluded.trajectory_bytes,
       updated_at = excluded.updated_at
   `).run({
     filename,

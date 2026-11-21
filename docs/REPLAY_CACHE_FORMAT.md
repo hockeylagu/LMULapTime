@@ -9,7 +9,8 @@ No historical migration, benchmark or private recording was rerun for this revie
 `server/core/replay/lapColumnsCodec.ts` defines `encodeLapColumns` and `decodeLapColumns`.
 `replayTrajectoryCodec.ts` converts trajectories to/from the columnar lap object;
 `server/traffic/lapSamples.ts` requests selected columns. The stored blob is
-`replay_trajectories.trajectory_br`. SQLite row ownership and worker ingestion are described in
+`replay_trajectories.trajectory_br`; `trajectory_bytes` holds its length, set by every insert, for the
+replay cache list's sizes. SQLite row ownership and worker ingestion are described in
 [CODE_MAP](CODE_MAP.md).
 
 Encoding version **2** is inside each blob. The row's `parser_version` identifies decoder semantics,

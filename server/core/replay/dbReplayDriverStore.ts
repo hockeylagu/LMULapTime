@@ -83,14 +83,14 @@ export function replaceReplayDriverLaps(
   }
   const insert = db.prepare(`
     INSERT INTO replay_trajectories
-      (filename, source_path, driver_slot, lap_key, file_mtime_ms, file_size_bytes, parser_version, points_count, trajectory_br, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (filename, source_path, driver_slot, lap_key, file_mtime_ms, file_size_bytes, parser_version, points_count, trajectory_br, trajectory_bytes, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   db.transaction(() => {
     if (checkSource) validateReplaySource(db, save);
     deleteReplayDriverLaps(db, filename, driverSlotKey);
     for (const row of rows) {
-      insert.run(filename, filePath || null, driverSlotKey, row.lapKey, mtimeMs, fileSizeBytes, REPLAY_CACHE_VERSION, row.pointsCount, row.blob, Date.now());
+      insert.run(filename, filePath || null, driverSlotKey, row.lapKey, mtimeMs, fileSizeBytes, REPLAY_CACHE_VERSION, row.pointsCount, row.blob, row.blob.length, Date.now());
     }
     if (storedDefault) setTrajectoryDefaults(db, filename, driverSlotKey, trajectory.currentLap!);
     if (storeDecodedReplayFacts(db, filename, driverSlotKey, trajectory, REPLAY_CACHE_VERSION)) {

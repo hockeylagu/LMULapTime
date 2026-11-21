@@ -216,9 +216,14 @@ export function initDbSchema(db: DatabaseType): void {
       parser_version TEXT NOT NULL,
       points_count INTEGER NOT NULL,
       trajectory_br BLOB NOT NULL,
+      -- length(trajectory_br), set by every insert: the replay cache list sums it from idx_replay_trajectory_bytes.
+      trajectory_bytes INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (filename, driver_slot, lap_key)
     );
+    -- Covers the cache list's count and size: a column after the blob, or length() of it, made SQLite walk every
+    -- lap's overflow pages (71k laps: 180 of the list's 190 ms with length(), 2026-11-20).
+    CREATE INDEX IF NOT EXISTS idx_replay_trajectory_bytes ON replay_trajectories(filename, trajectory_bytes);
 
     CREATE TABLE IF NOT EXISTS replay_driver_roster (
       filename TEXT NOT NULL,
