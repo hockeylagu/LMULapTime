@@ -174,16 +174,18 @@ function turnHabits(context: TurnContext): CornerHabit[] {
       }];
     }
     const repeatability = losses.filter(loss => loss >= HALF_LOSS_SEC).length / own.length;
-    const where = half === 'in' ? 'into the slowest point' : half === 'out' ? 'out of the slowest point' : 'through the turn';
+    // The time lost is drawn beside the line, so the line names only where (driver, 2026-11-20).
+    const where = half === 'in' ? 'into' : half === 'out' ? 'out of' : 'through';
     return [{
       ...base, rule: null, gap: null, repeatability, priority: lossSec * repeatability * context.confidence,
-      line: `${context.turnLabel}: ${lossSec.toFixed(2)} s ${where} that no measured point explains`,
+      line: `Losing time ${where} ${context.turnLabel}: no clear cause`,
       detail: 'Open the laps side by side',
     }];
   });
 }
 
-const MISTAKE_LINES: Record<Exclude<MistakeCause, null>, string> = {
+/** Why a lap lost time, in words: the end of a mistake's line, and the debrief's cause column. */
+export const MISTAKE_LINES: Record<Exclude<MistakeCause, null>, string> = {
   traffic: 'a car close ahead', brakeEarly: 'braked early', lockup: 'a lockup (ABS)', slowMiddle: 'slow in the middle',
   lift: 'a lift', slowExit: 'a slow exit',
 };

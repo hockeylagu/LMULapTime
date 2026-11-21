@@ -197,7 +197,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
       <CornerTrendsSection
         layoutKey={data.summary?.layoutKey && data.summary.layoutKey !== 'unknown' ? data.summary.layoutKey : null}
-        carClass={selectedClass !== 'All' ? selectedClass : data.latestSession?.carClass ?? null}
+        carClass={selectedClass !== 'All' ? selectedClass : null}
         carModel={selectedCarModel}
       />
 

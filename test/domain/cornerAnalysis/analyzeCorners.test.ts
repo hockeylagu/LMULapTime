@@ -122,7 +122,7 @@ describe('analyzeCorners', () => {
     const analysis = analyzeCorners(input(own, [driver('Bob', 4)]));
     expect(analysis.habits).toEqual([]);
     expect(analysis.unexplained.map(habit => habit.line)).toEqual([
-      'T1: 0.10 s into the slowest point that no measured point explains', 'T2: 0.10 s into the slowest point that no measured point explains']);
+      'Losing time into T1: no clear cause', 'Losing time into T2: no clear cause']);
     // Two turns of six corners each braking early: only the top MAX_HABITS.
     const many: CornerAnalysisInput = {
       ...input(driver('Ann', 4, () => ({ brakeM: null })), []),

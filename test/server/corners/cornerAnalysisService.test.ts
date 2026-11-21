@@ -90,9 +90,12 @@ describe('readSessionCornerAnalysis', () => {
     add('s2', 1, 'Bob', false, 100, [2000, 2000, 2000]);
     add('s3', 0, 'Ann', true, 100, [2000, 2000, 2000, 2000]);
     add('s3', 1, 'Bob', false, 100, [2000, 2000, 2000]);
+    const improving = readSessionCornerAnalysis(reader(db), 's2', loadTrack)?.sinceLast?.progress;
+    const resolved = readSessionCornerAnalysis(reader(db), 's3', loadTrack)?.sinceLast?.progress;
+    expect(improving).toMatchObject([{ turnId: TURN, rule: 'brakeEarly', status: 'improving', cue: 'brake 2 m later' }]);
+    expect(resolved).toMatchObject([{ turnId: TURN, rule: 'brakeEarly', status: 'resolved', cue: 'brake 8 m later' }]);
     const trend = readCornerHabitTrends(reader(db), 'square', 'GT3', '', loadTrack).get(TURN);
     expect(trend).toMatchObject({ session: { sessionId: 's3' }, habit: null, seen: 0, of: 3, since: { sessionId: 's2' }, change: null });
-    expect(trend?.gainSec).toBeCloseTo(0.08);
     expect(trend?.fixed).toMatch(/^Brake 8 m later/);
     // Up to s2: the habit showed in both sessions read, and the brake point moved 2 m later since s1.
     db.prepare("DELETE FROM session_drivers WHERE session_id = 's3'").run();

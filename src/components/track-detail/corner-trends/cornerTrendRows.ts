@@ -46,9 +46,9 @@ export function cornerTrendRow(corner: CornerTrend): CornerTrendRow {
 }
 
 /** The shared graph height in seconds: never under this, so noise stays small... */
-export const MIN_GRAPH_SPAN_SEC = 0.3;
+const MIN_GRAPH_SPAN_SEC = 0.3;
 /** ...and never over this, so one wild corner cannot flatten the others; slower points sit on the bottom edge. */
-export const MAX_GRAPH_SPAN_SEC = 1.5;
+const MAX_GRAPH_SPAN_SEC = 1.5;
 
 /** The top of a corner's graph: the class's fastest usual, or the driver's quickest usual when that is quicker or there is none. */
 export function graphTopSec(corner: CornerTrend): number | null {
@@ -78,7 +78,7 @@ export function formatCornerDelta(value: number): string {
 }
 
 /** A recent change smaller than this is level: a few hundredths is noise between sessions. */
-export const LEVEL_SEC = 0.05;
+const LEVEL_SEC = 0.05;
 
 /**
  * The colour of a row's recent stretch and its "last 5" change: quicker in the gain colour, slower in the loss
@@ -99,9 +99,9 @@ export function sessionMark(sessionType: string, sessionName: string): SessionMa
 }
 
 /** How many corners the "vs class" column flags as the ones to work on. */
-export const FOCUS_CORNERS = 2;
+const FOCUS_CORNERS = 2;
 /** A gap to the class below this is no focus, however it ranks: the corner is already near the class. */
-export const MIN_FOCUS_GAP_SEC = 0.1;
+const MIN_FOCUS_GAP_SEC = 0.1;
 
 /** The corners losing most to the class (at most FOCUS_CORNERS, each at least MIN_FOCUS_GAP_SEC behind), by id. */
 export function focusCornerIds(rows: readonly CornerTrendRow[]): Set<number> {

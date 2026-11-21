@@ -19,7 +19,7 @@ const MARK_SHAPES: Record<SessionMark, string> = {
 };
 
 /** A session's mark in the current colour: race filled, qualifying a diamond, practice hollow; the latest one larger. */
-export const SessionMarkGlyph: React.FC<{ mark: SessionMark; large?: boolean }> = ({ mark, large = false }) => (
+const SessionMarkGlyph: React.FC<{ mark: SessionMark; large?: boolean }> = ({ mark, large = false }) => (
   <span className={`block ${large ? 'w-2 h-2' : 'w-1.5 h-1.5'} ${MARK_SHAPES[mark]}`} data-mark={mark} />
 );
 

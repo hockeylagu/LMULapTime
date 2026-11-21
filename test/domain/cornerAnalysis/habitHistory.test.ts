@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cornerHabitTrend, habitCue, type AnalysedSession } from '../../../shared/domain/cornerAnalysis/habitHistory.js';
+import { cornerHabitTrend, habitCue, sessionHabitProgress, type AnalysedSession } from '../../../shared/domain/cornerAnalysis/habitHistory.js';
 import type { TurnUsual } from '../../../shared/domain/cornerAnalysis/turnUsual.js';
 import type { CornerAnalysis, CornerHabit, HabitRule } from '../../../shared/types/corners/cornerAnalysis.js';
 
@@ -21,7 +21,7 @@ function session(id: number, usualSec: number | null, habits: CornerHabit[], tur
     corners: [{ id: 7, label: 'SQ1', name: 'T1', turnIds: [1], usualSec, usualLapOrdinal: 1, lossSec: 0.1, reference: null }],
     habits: habits.filter(item => item.rule !== null), unexplained: habits.filter(item => item.rule === null),
   };
-  return { sessionId: `s${id}`, timestamp: id, sessionType: 'Race', analysis, turns: new Map([[1, usual(turn)]]) };
+  return { sessionId: `s${id}`, timestamp: id, sessionType: 'Race', driverOrdinal: 0, analysis, turns: new Map([[1, usual(turn)]]) };
 }
 
 describe('habitCue', () => {
@@ -43,28 +43,92 @@ describe('habitCue', () => {
   });
 });
 
+/** The session with a reference at corner 7: its habits there were measured. */
+const measured = (now: AnalysedSession): AnalysedSession => {
+  now.analysis.corners[0].reference = {
+    sessionId: 'r', driverOrdinal: 1, name: 'Reference', car: null, sameSession: true, laps: 4,
+    usualSec: 4, usualLapOrdinal: 1,
+  };
+  return now;
+};
+
+describe('sessionHabitProgress', () => {
+  const brake = habit('brakeEarly', 'Brake later into T1');
+
+  it('reports a cue that improves while a habit persists, and resolves it only when it clears', () => {
+    const previous = session(1, 4.2, [brake]);
+    const improving = measured(session(2, 4.1, [brake], { brakeM: 706 }));
+    expect(sessionHabitProgress(improving, previous, 5000)).toMatchObject([{ status: 'improving', cue: 'brake 6 m later' }]);
+    const resolved = measured(session(2, 4.1, [], { brakeM: 706 }));
+    expect(sessionHabitProgress(resolved, previous, 5000)).toMatchObject([{ status: 'resolved', cue: 'brake 6 m later' }]);
+    expect(sessionHabitProgress(resolved, previous, 5000)[0].gainSec).toBeCloseTo(0.1);
+    expect(sessionHabitProgress(measured(session(2, 4.3, [], { brakeM: 706 })), previous, 5000)).toEqual([]);
+    expect(sessionHabitProgress(measured(session(2, 4.1, [])), previous, 5000)).toEqual([]);
+    expect(sessionHabitProgress(session(2, 4.1, [], { brakeM: 706 }), previous, 5000)).toEqual([]);
+  });
+
+  it('uses less mid-corner speed for fast-in/slow-out and rejects gear movement away from the target', () => {
+    const fastIn = habit('inFastOutSlow', 'Give up speed in the middle of T1');
+    const previous = session(1, 4.2, [fastIn]);
+    expect(sessionHabitProgress(measured(session(2, 4.1, [], { minKmh: 88 })), previous, 5000)).toMatchObject([
+      { status: 'resolved', cue: '2 km/h less in the middle' },
+    ]);
+    expect(sessionHabitProgress(measured(session(2, 4.1, [], { minKmh: 92 })), previous, 5000)).toEqual([]);
+    const gear = habit('gear', 'Try gear 2 through T1');
+    expect(sessionHabitProgress(measured(session(2, 4.1, [], { gear: 4 })), session(1, 4.2, [gear]), 5000)).toEqual([]);
+  });
+});
+
 describe('cornerHabitTrend', () => {
-  const brake = habit('brakeEarly', 'Brake 10 m later into T1');
+  const brake = { ...habit('brakeEarly', 'Brake 10 m later into T1'), detail: 'You brake 10 m before Ref Driver' };
 
   it('counts the sessions the main habit showed in, and measures the corner against the session before', () => {
     const sessions = [session(4, 4.0, [brake], { brakeM: 704 }), session(3, 4.1, [brake]), session(2, 4.2, []), session(1, 4.3, [brake])];
     expect(cornerHabitTrend(7, sessions, 5000)).toMatchObject({
-      session: { sessionId: 's4', timestamp: 4, sessionType: 'Race' }, habit: { line: 'Brake 10 m later into T1', rule: 'brakeEarly' },
+      session: { sessionId: 's4', timestamp: 4, sessionType: 'Race' }, habit: { line: 'Brake 10 m later into T1', rule: 'brakeEarly', detail: brake.detail },
       seen: 3, of: 4, since: { sessionId: 's3' }, change: { isNew: false, cue: 'brake 4 m later' }, fixed: null,
     });
-    expect(cornerHabitTrend(7, sessions, 5000)?.gainSec).toBeCloseTo(0.1);
     // Only the last five are read.
     expect(cornerHabitTrend(7, [...sessions, ...sessions], 5000)).toMatchObject({ seen: 4, of: 5 });
     // A session too short to measure the corner neither shows the habit nor counts against it.
     expect(cornerHabitTrend(7, [sessions[0], session(3, null, []), sessions[1]], 5000)).toMatchObject({ seen: 2, of: 2 });
   });
 
-  it('calls a habit new, says which one went, and falls back on a loss no rule explains', () => {
-    const lift = habit(null, 'T1 loses 0.10 s in: no clear cause');
-    expect(cornerHabitTrend(7, [session(2, 4.0, [lift]), session(1, 4.1, [brake])], 5000)).toMatchObject({
+  it("points the lap view at the latest session's usual lap against the reference's", () => {
+    const now = session(2, 4.0, [brake]);
+    expect(cornerHabitTrend(7, [now], 5000)?.view).toBeNull();
+    now.analysis.corners[0].reference = {
+      sessionId: 'r', driverOrdinal: 3, name: 'Ref', car: null, sameSession: false, laps: 5, usualSec: 3.9, usualLapOrdinal: 4,
+    };
+    expect(cornerHabitTrend(7, [now], 5000)?.view).toEqual({
+      lap: { sessionId: 's2', driverOrdinal: 0, lapOrdinal: 1 }, reference: { sessionId: 'r', driverOrdinal: 3, lapOrdinal: 4, name: 'Ref' },
+    });
+  });
+
+  it('calls a habit new, says which one was fixed, and falls back on a loss no rule explains', () => {
+    const lift = habit(null, 'Losing time into T1: no clear cause');
+    // Braking 8 m later than then, the corner 0.1 s quicker: fixed.
+    expect(cornerHabitTrend(7, [measured(session(2, 4.0, [lift], { brakeM: 708 })), session(1, 4.1, [brake])], 5000)).toMatchObject({
       habit: { line: lift.line, rule: null }, seen: 1, change: { isNew: true, cue: null }, fixed: 'Brake 10 m later into T1',
     });
-    expect(cornerHabitTrend(7, [session(1, 4.0, [])], 5000)).toMatchObject({ habit: null, seen: 0, of: 1, since: null, gainSec: null, change: null });
+    // Without a reference now nothing was measured at the corner: the habit gone from the list is not fixed.
+    expect(cornerHabitTrend(7, [session(2, 4.0, [lift], { brakeM: 708 }), session(1, 4.1, [brake])], 5000)?.fixed).toBeNull();
+    const fixed = (now: AnalysedSession, then: AnalysedSession) => cornerHabitTrend(7, [measured(now), then], 5000)?.fixed;
+    // Gone from the list but the same brake point, or a brake point under what the cue says: under its threshold, not fixed.
+    expect(fixed(session(2, 4.0, [lift]), session(1, 4.1, [brake]))).toBeNull();
+    expect(fixed(session(2, 4.0, [lift], { brakeM: 700.4 }), session(1, 4.1, [brake]))).toBeNull();
+    // Braking later but the corner slower: not fixed.
+    expect(fixed(session(2, 4.2, [lift], { brakeM: 708 }), session(1, 4.1, [brake]))).toBeNull();
+    // A loss no rule explains has nothing to fix; a habit still there is not fixed either.
+    expect(fixed(session(2, 4.0, []), session(1, 4.1, [lift]))).toBeNull();
+    expect(fixed(session(2, 4.0, [brake], { brakeM: 708 }), session(1, 4.1, [brake]))).toBeNull();
+    // A fix is said the way its cue goes: less coasting, another gear.
+    const coast = habit('coast', "Don't coast into T1");
+    expect(fixed(session(2, 4.0, [], { coastSec: 0.2 }), session(1, 4.1, [coast], { coastSec: 0.5 }))).toBe(coast.line);
+    expect(fixed(session(2, 4.0, [], { coastSec: 0.6 }), session(1, 4.1, [coast], { coastSec: 0.5 }))).toBeNull();
+    const gear = habit('gear', 'Use gear 2 through T1');
+    expect([fixed(session(2, 4.0, [], { gear: 2 }), session(1, 4.1, [gear])), fixed(session(2, 4.0, []), session(1, 4.1, [gear]))]).toEqual([gear.line, null]);
+    expect(cornerHabitTrend(7, [session(1, 4.0, [])], 5000)).toMatchObject({ habit: null, seen: 0, of: 1, since: null, change: null });
   });
 
   it('has nothing for a corner the latest session has no usual through', () => {

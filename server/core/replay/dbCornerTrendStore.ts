@@ -31,7 +31,6 @@ export interface CornerTrendSessionRow {
 /** A counted pass: a dry racing lap after the first, its session's flags (the corner card's `lapCounts`). */
 export interface CornerTrendPassRow {
   sessionId: string;
-  timestamp: number;
   driverOrdinal: number;
   isPlayer: boolean;
   segment: number;
@@ -78,7 +77,7 @@ export function listCornerTrendPasses(db: DatabaseType, scope: CornerTrendScope)
   const { passes, builds } = TABLES[scope.kind];
   const rows = db.prepare(`
     WITH car AS MATERIALIZED (
-      SELECT s.id session_id, s.timestamp, d.driver_ordinal, d.is_player, v.car_type, rec.recording_name filename, r.driver_slot slot
+      SELECT s.id session_id, d.driver_ordinal, d.is_player, v.car_type, rec.recording_name filename, r.driver_slot slot
       FROM sessions s
       JOIN session_drivers d ON d.session_id = s.id AND d.driver_class = $carClass
       LEFT JOIN vehicles v ON v.vehicle_id = d.vehicle_id
@@ -91,7 +90,7 @@ export function listCornerTrendPasses(db: DatabaseType, scope: CornerTrendScope)
     ),
     -- The counted laps first, once per lap: read per pass, the lap flags took 3.5 times as long (Le Mans, 2026-11-19).
     lap AS MATERIALIZED (
-      SELECT c.session_id, c.timestamp, c.driver_ordinal, c.is_player, c.car_type, c.filename, c.slot, sl.lap_number, sl.lap_time
+      SELECT c.session_id, c.driver_ordinal, c.is_player, c.car_type, c.filename, c.slot, sl.lap_number, sl.lap_time
       FROM car c
       JOIN session_laps sl ON sl.session_id = c.session_id AND sl.driver_ordinal = c.driver_ordinal AND sl.lap_number > 1
       WHERE COALESCE(sl.is_valid, 1) = 1 AND COALESCE(sl.is_pit_stop, 0) = 0 AND COALESCE(sl.is_out_lap, 0) = 0
@@ -114,7 +113,7 @@ export function listCornerTrendPasses(db: DatabaseType, scope: CornerTrendScope)
       ) WHERE overall <= $overall OR in_car <= $perCar
       UNION ALL SELECT session_id, driver_ordinal FROM car WHERE is_player = 1
     )
-    SELECT l.session_id sessionId, l.timestamp, l.driver_ordinal driverOrdinal, l.is_player isPlayer, p.segment, p.duration_ms durationMs
+    SELECT l.session_id sessionId, l.driver_ordinal driverOrdinal, l.is_player isPlayer, p.segment, p.duration_ms durationMs
     FROM ${SHORTLIST_LAPS}
     JOIN ${passes} p ON p.filename = l.filename AND p.driver_slot = l.slot AND p.lap_number = l.lap_number
   `).all({ ...params(scope), minLaps: scope.minLaps, overall: REFERENCE_OVERALL, perCar: REFERENCE_PER_CAR }) as Array<Omit<CornerTrendPassRow, 'isPlayer'> & { isPlayer: number }>;

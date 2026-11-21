@@ -1,4 +1,3 @@
-import type { CornerSegmentKind } from './cornerPasses.js';
 import type { CornerHabitTrend } from './cornerAnalysis.js';
 
 /** The driver through one corner in one session: the counted dry passes' usual (median) and best. */
@@ -22,17 +21,12 @@ export interface CornerTrend {
   title: string;
   points: CornerTrendPoint[];
   /** The class's fastest usual through the corner by another driver, any session at the layout; null without one. */
-  reference: { usualSec: number; sessionId: string; timestamp: number } | null;
+  reference: { usualSec: number } | null;
   /** The corner's habit over the latest analysed sessions (shared/domain/cornerAnalysis/habitHistory.ts); null without one. */
   habit: CornerHabitTrend | null;
 }
 
 export interface CornerTrendsResponse {
-  layoutKey: string;
-  carClass: string;
-  kind: CornerSegmentKind;
-  /** The counted passes a session needs for a point: 3, or 2 on a long layout (10 km and more); 1 in qualifying. */
-  minPasses: number;
   corners: CornerTrend[];
   /** The player's sessions of the class at the layout, and why those without a point have none. */
   sessions: {

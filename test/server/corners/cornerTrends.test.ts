@@ -109,7 +109,7 @@ describe('readCornerTrends', () => {
       .car('s6', 'r6.Vcr', 1, 'Bob', {}, laps(5));
 
     const trends = readCornerTrends(fixture.reader(), 'square', 'GT3', 'car a ', loadTrack);
-    expect(trends).toMatchObject({ kind: 'turns', minPasses: 3, sessions: { total: 5, noReplay: 1, waiting: 1, tooFewPasses: 1 } });
+    expect(trends).toMatchObject({ sessions: { total: 5, noReplay: 1, waiting: 1, tooFewPasses: 1 } });
     const turn = trends?.corners.find(corner => corner.id === TURN);
     expect(turn?.points).toEqual([{
       sessionId: 's1', timestamp: 1000, sessionType: 'Practice1', sessionName: 'Practice1 s1', carType: 'Car A', passCount: 4,
@@ -119,7 +119,7 @@ describe('readCornerTrends', () => {
       usualSec: 9.9, bestSec: 9.9,
     }]);
     // Bob's usual in s4 (8.65 s, four passes) is the class's fastest; any model of the class counts.
-    expect(turn?.reference).toEqual({ usualSec: 8.65, sessionId: 's4', timestamp: 4000 });
+    expect(turn?.reference).toEqual({ usualSec: 8.65 });
     // Every model of the class: s5's car joins.
     expect(readCornerTrends(fixture.reader(), 'square', 'GT3', '', loadTrack)?.corners.find(corner => corner.id === TURN)?.points
       .map(point => point.sessionId)).toEqual(['s1', 's5', 's6']);
@@ -134,7 +134,7 @@ describe('readCornerTrends', () => {
       .session('s2', 2000, 'Race', { file: 'r2.Vcr', key: `${PREFIX}|sig|GT3:${map.mapKey}x` })
       .car('s2', 'r2.Vcr', 0, 'Ann', { player: true }, laps(9, 9, 9));
     const trends = readCornerTrends(fixture.reader(map), 'square', 'GT3', '', loadTrack);
-    expect(trends).toMatchObject({ kind: 'sequences', sessions: { total: 2, noReplay: 0, waiting: 1, tooFewPasses: 0 } });
+    expect(trends).toMatchObject({ sessions: { total: 2, noReplay: 0, waiting: 1, tooFewPasses: 0 } });
     expect(trends?.corners).toHaveLength(1);
     expect(trends?.corners[0]).toMatchObject({ id: TURN, label: 'SQ1', reference: null });
     expect(trends?.corners[0].points.map(point => [point.sessionId, point.usualSec])).toEqual([['s1', 11]]);
@@ -152,7 +152,6 @@ describe('readCornerTrends', () => {
       .car('s1', 'r1.Vcr', 0, 'Ann', { player: true }, laps(10, 12))
       .car('s1', 'r1.Vcr', 1, 'Bob', {}, laps(9, 9.4));
     const trends = readCornerTrends(fixture.reader(), 'square', 'GT3', '', longTrack);
-    expect(trends?.minPasses).toBe(2);
     const turn = trends?.corners.find(corner => corner.id === longLayout.turns[0].id);
     expect(turn?.points.map(point => [point.passCount, point.usualSec])).toEqual([[2, 11]]);
     expect(turn?.reference?.usualSec).toBe(9.2);

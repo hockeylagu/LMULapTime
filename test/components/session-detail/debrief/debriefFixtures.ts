@@ -55,6 +55,7 @@ export const analysis: SessionCornerAnalysis = {
   // The practice before: T1's brake point moved 6 m later since; T2's habit is new.
   sinceLast: {
     session: { sessionId: 'P1', timestamp: Date.UTC(2026, 9, 21, 12), sessionType: 'Practice' },
+    progress: [{ turnId: 4, turnLabel: 'T4', half: 'in', rule: 'brakeEarly', status: 'resolved', cue: 'brake 6 m later', gainSec: 0.08 }],
     habits: [
       { turnId: 1, half: 'in', rule: 'brakeEarly', isNew: false, cue: 'brake 6 m later' },
       { turnId: 2, half: 'in', rule: 'overSlowing', isNew: true, cue: '2 km/h more in the middle' },

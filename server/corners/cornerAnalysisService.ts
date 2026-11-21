@@ -1,7 +1,7 @@
 import { describeTurn } from '../../shared/domain/circuitTurns/turnLabel.js';
 import { resolveVehicle } from '../../shared/domain/vehicleMapping.js';
 import { analyzeCorners } from '../../shared/domain/cornerAnalysis/analyzeCorners.js';
-import { cornerHabitTrend, habitChange, HISTORY_SESSIONS, type AnalysedSession } from '../../shared/domain/cornerAnalysis/habitHistory.js';
+import { cornerHabitTrend, habitChange, HISTORY_SESSIONS, sessionHabitProgress, type AnalysedSession } from '../../shared/domain/cornerAnalysis/habitHistory.js';
 import { turnUsual } from '../../shared/domain/cornerAnalysis/turnUsual.js';
 import type { AnalysisDriver, CornerHabitTrend, SessionCornerAnalysis } from '../../shared/types/corners/cornerAnalysis.js';
 import type { AnalysisPassRow, AnalysisPassScope, AnalysisSessionRow } from '../core/replay/dbCornerAnalysisStore.js';
@@ -80,7 +80,7 @@ function layoutAnalyser(reader: CornerAnalysisReader, layoutKey: string, carClas
         const usual = turnUsual(own.laps.flatMap(lap => lap.passes.filter(pass => pass.segment === turn.id)), layout.lengthM);
         return usual ? [[turn.id, usual] as const] : [];
       }));
-      return [{ sessionId: session.sessionId, timestamp: session.timestamp, sessionType: session.sessionType, analysis, turns: ownTurns }];
+      return [{ sessionId: session.sessionId, timestamp: session.timestamp, sessionType: session.sessionType, driverOrdinal: session.driverOrdinal, analysis, turns: ownTurns }];
     });
   };
   return { layout, corners: analysisCorners, hasPasses: (session: AnalysisSessionRow) => ownOf(session) !== undefined, analyse };
@@ -96,19 +96,20 @@ export function readSessionCornerAnalysis(reader: CornerAnalysisReader, sessionI
   const car = carModel(session.carType);
   // Newest first, before this one: the session the habits are measured against.
   const earlier = reader.listAnalysisSessions(session.layoutKey, session.carClass)
-    .filter(other => other.sessionId !== sessionId && carModel(other.carType) === car
+    .filter(other => car !== null && other.sessionId !== sessionId && carModel(other.carType) === car
       && (other.timestamp < session.timestamp || (other.timestamp === session.timestamp && other.sessionId < sessionId)))
     .reverse();
   const analyser = layoutAnalyser(reader, session.layoutKey, session.carClass, [session, ...earlier], loadTrack);
   if (!analyser?.hasPasses(session)) return null;
   const before = earlier.find(analyser.hasPasses);
   const [now, then = null] = analyser.analyse(before ? [session, before] : [session]);
-  const { sessionId: _sessionId, timestamp: _timestamp, sessionType: _sessionType, analysis } = now;
+  const { analysis } = now;
   return {
     sessionId, layoutKey: session.layoutKey, carClass: session.carClass, driverOrdinal: session.driverOrdinal, ...analysis,
     sinceLast: then && {
       session: { sessionId: then.sessionId, timestamp: then.timestamp, sessionType: then.sessionType },
       habits: [...analysis.habits, ...analysis.unexplained].map(habit => habitChange(habit, now, then, analyser.layout.lengthM)),
+      progress: sessionHabitProgress(now, then, analyser.layout.lengthM),
     },
   };
 }

@@ -53,7 +53,7 @@ export interface AnalysisPassScope {
 /** The reference shortlist: the quickest drivers by usual lap time, overall, in each car and in each analysed session. */
 export const REFERENCE_OVERALL = 10;
 export const REFERENCE_PER_CAR = 3;
-export const REFERENCE_PER_SESSION = 3;
+const REFERENCE_PER_SESSION = 3;
 
 /**
  * Counted laps follow the corner card's `lapCounts` (dry racing laps after the first); a car is its session driver

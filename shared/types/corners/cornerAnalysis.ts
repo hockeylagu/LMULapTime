@@ -158,6 +158,19 @@ export interface HabitChange {
   cue: string | null;
 }
 
+/** Verified progress on a previously identified habit, against the driver's own previous session. */
+export interface SessionHabitProgress {
+  turnId: number;
+  turnLabel: string;
+  half: TurnHalf;
+  rule: HabitRule;
+  status: 'improving' | 'resolved';
+  /** Measured change in the habit's driving cue. */
+  cue: string;
+  /** Time gained through the mapped corner against the driver's previous usual. */
+  gainSec: number;
+}
+
 /** The analysis of a session's player (`GET /api/session/:id/corner-analysis`), with what it was read for. */
 export interface SessionCornerAnalysis extends CornerAnalysis {
   sessionId: string;
@@ -165,7 +178,7 @@ export interface SessionCornerAnalysis extends CornerAnalysis {
   carClass: string;
   driverOrdinal: number;
   /** The habits and unexplained losses against the previous analysed session in the same car; null without one. */
-  sinceLast: { session: AnalysisSessionRef; habits: HabitChange[] } | null;
+  sinceLast: { session: AnalysisSessionRef; habits: HabitChange[]; progress: SessionHabitProgress[] } | null;
 }
 
 /** A corner's habit over the driver's latest analysed sessions at the layout, in one car (the corner trends row). */
@@ -173,15 +186,18 @@ export interface CornerHabitTrend {
   /** The latest analysed session. */
   session: AnalysisSessionRef;
   /** Its main habit at the corner (the highest priority, else a loss no rule explains); null when it loses nothing worth telling. */
-  habit: { line: string; lossSec: number; rule: HabitRule | null } | null;
+  habit: Pick<CornerHabit, 'line' | 'detail' | 'lossSec' | 'rule'> | null;
   /** The sessions, of the last few analysed, where the same habit showed (the same rule at the same turn), and how many were read. */
   seen: number;
   of: number;
   /** The analysed session before it, null without one. */
   since: AnalysisSessionRef | null;
-  /** The usual time through the corner then minus now (s): positive is quicker now. */
-  gainSec: number | null;
   change: HabitChange | null;
-  /** That session's main habit at the corner when it no longer shows. */
+  /** That session's main habit at the corner when it no longer shows, its cue moved the fixing way and the corner is no slower. */
   fixed: string | null;
+  /**
+   * The laps that show the habit: the latest session's lap closest to the driver's usual through the corner, against
+   * the reference's lap closest to theirs (the lap view opens one against the other); null without a reference.
+   */
+  view: { lap: { sessionId: string; driverOrdinal: number; lapOrdinal: number }; reference: { sessionId: string; driverOrdinal: number; lapOrdinal: number; name: string } } | null;
 }
