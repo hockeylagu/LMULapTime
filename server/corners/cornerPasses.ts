@@ -307,7 +307,7 @@ const BRAKE_OFF = 0.05;
 function coastSec(track: LapTrack, entry: number, exit: number, run: [number, number] | null, throttleOn: number | null): number {
   return timeWhere(track, run ? run[1] + 1 : entry, throttleOn ?? exit, i => (track.brake[i] ?? 0) < BRAKE_OFF && (track.throttle[i] ?? 0) < THROTTLE_OFF);
 }
-/** How the car drove a pass beyond its points: gear, braking, part throttle out of the slowest point, TC and ABS. */
+/** How the car drove a pass beyond its points: gear, braking, part throttle out of the slowest point and ABS. */
 function driveCues(track: LapTrack, entry: number, exit: number, slowest: number, brakeStart: number | null) {
   const from = brakeStart ?? entry;
   let peakBrake: number | null = null;
@@ -323,12 +323,11 @@ function driveCues(track: LapTrack, entry: number, exit: number, slowest: number
       const throttle = track.throttle[i] ?? 0;
       return throttle >= THROTTLE_OFF && throttle < THROTTLE_FULL && !track.tc[i];
     }),
-    tcSec: timeWhere(track, from, exit, i => track.tc[i]),
     absSec: timeWhere(track, from, exit, i => track.abs[i]),
   };
 }
 
-const NO_DRIVE_CUES = { minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0 };
+const NO_DRIVE_CUES = { minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0 };
 
 /** The first sample after `from` up to `to` that does not follow the one before it, or -1. */
 function breakIn(track: LapTrack, from: number, to: number): number {
@@ -435,7 +434,7 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
       minSpeedM: onLap(minSpeedM), brakeM: onLap(brakeM), turnInM: onLap(turnInM), throttleM: onLap(throttleM),
       ...(slowest >= 0 ? driveCues(track, entry.index, exit.index, slowest, brakeStart) : NO_DRIVE_CUES),
       coastSec: slowest >= 0 ? coastSec(track, entry.index, exit.index, run, throttleOn) : 0,
-      aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null,
+      aheadSlot: null, aheadGapSec: null,
     });
   }
   return segments.flatMap(({ id }) => last.get(id) ?? []);
@@ -507,16 +506,10 @@ function addTraffic(passes: CornerPass[], traces: CarTrace[], lengthM: number): 
       const pass = list[p];
       if (!pass || pass.entrySec > time) continue;
       const ahead = present[(k + 1) % present.length];
-      const behind = present[(k - 1 + present.length) % present.length];
       const aheadGapSec = ((ahead.station - own.station + lengthM) % lengthM) / own.speedMps;
-      const behindGapSec = ((own.station - behind.station + lengthM) % lengthM) / own.speedMps;
       if (aheadGapSec <= TRAFFIC_RANGE_SEC && (pass.aheadGapSec === null || aheadGapSec < pass.aheadGapSec)) {
         pass.aheadGapSec = aheadGapSec;
         pass.aheadSlot = ahead.slot;
-      }
-      if (behindGapSec <= TRAFFIC_RANGE_SEC && (pass.behindGapSec === null || behindGapSec < pass.behindGapSec)) {
-        pass.behindGapSec = behindGapSec;
-        pass.behindSlot = behind.slot;
       }
     }
   }

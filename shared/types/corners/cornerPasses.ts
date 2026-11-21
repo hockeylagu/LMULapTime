@@ -31,16 +31,13 @@ export interface CornerPass {
    * or a slow way back to full throttle; null without a slowest point.
    */
   partThrottleSec: number | null;
-  /** Time with traction control, and with ABS, active from the brake point (else the segment's start) to its end (s). */
-  tcSec: number;
+  /** Time with ABS active from the brake point (else the segment's start) to its end (s). */
   absSec: number;
   /** Off both pedals (brake under 5 %, throttle under 10 %) from the end of braking (else the segment's start) to the throttle pick-up (else the segment's end) (s). */
   coastSec: number;
-  /** The closest car ahead and behind during the pass, within 2 s at this car's speed. */
+  /** The closest car ahead during the pass, within 2 s at this car's speed. */
   aheadSlot: number | null;
   aheadGapSec: number | null;
-  behindSlot: number | null;
-  behindGapSec: number | null;
 }
 
 /** An official turn as the passes cut it: its label and its segment, from the start line (metres). */

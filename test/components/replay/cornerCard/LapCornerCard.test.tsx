@@ -13,7 +13,7 @@ vi.mock('../../../../src/api/replayApi.js', () => ({ fetchSessionSequencePasses:
 const pass = (lapNumber: number, timeSec: number): CornerPass => ({
   slot: 1, lapNumber, segment: 1, entrySec: lapNumber * 100, minSpeedSec: lapNumber * 100 + 2, exitSec: lapNumber * 100 + timeSec,
   entrySpeedKmh: 250, minSpeedKmh: 100, exitSpeedKmh: 180, minSpeedM: 200, brakeM: 150, turnInM: 170, throttleM: 220,
-  aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0,
+  aheadSlot: null, aheadGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0,
   coastSec: 0,
 });
 const PASSES: SessionCornerPasses = {

@@ -49,7 +49,7 @@ function fixture(): { db: DatabaseType; add: (session: string, ordinal: number, 
           VALUES (?, ?, ?, ?, ?, 1, 0, 0, 'dry')`).run(session, ordinal, index, index + 2, lapTime ?? 100);
         db.prepare(`INSERT INTO replay_corner_passes (filename, driver_slot, lap_number, segment, entry_ms, min_speed_after_ms, duration_ms,
           entry_speed_dkmh, min_speed_dkmh, exit_speed_dkmh, min_speed_dm, brake_dm, min_speed_gear, peak_brake_pm, brake_ms,
-          part_throttle_ms, tc_ms, abs_ms) VALUES (?, ?, ?, ?, 0, ?, ?, 1500, 800, 1200, 1000, ?, 3, 900, 1000, 500, 0, 0)`)
+          part_throttle_ms, abs_ms) VALUES (?, ?, ?, ?, 0, ?, ?, 1500, 800, 1200, 1000, ?, 3, 900, 1000, 500, 0)`)
           .run(file, ordinal + 10, index + 2, TURN, ms, ms + 2000, brakeM * 10);
       });
     },

@@ -18,9 +18,9 @@ function pass(segment: number, lapNumber: number, drive: Drive = {}): CornerPass
     minSpeedM: drive.minM ?? 800 + segment * 1000, brakeM: drive.brakeM === undefined ? 700 + segment * 1000 : drive.brakeM,
     turnInM: null, throttleM: null, minSpeedGear: drive.gear === undefined ? 3 : drive.gear,
     peakBrake: drive.peakBrake === undefined ? 0.9 : drive.peakBrake,
-    brakeSec: drive.brakeSec ?? 1, partThrottleSec: drive.partThrottle === undefined ? 0.5 : drive.partThrottle, tcSec: 0, absSec: drive.abs ?? 0,
+    brakeSec: drive.brakeSec ?? 1, partThrottleSec: drive.partThrottle === undefined ? 0.5 : drive.partThrottle, absSec: drive.abs ?? 0,
     coastSec: drive.coast ?? 0,
-    aheadSlot: null, aheadGapSec: drive.aheadGap ?? null, behindSlot: null, behindGapSec: null,
+    aheadSlot: null, aheadGapSec: drive.aheadGap ?? null,
   };
 }
 

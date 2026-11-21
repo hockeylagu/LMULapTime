@@ -33,7 +33,7 @@ function pass(lapNumber: number, durationSec: number): CornerPass {
   return {
     slot: 3, lapNumber, segment: 1, entrySec: lapNumber * 100, minSpeedSec: lapNumber * 100 + 1, exitSec: lapNumber * 100 + durationSec,
     entrySpeedKmh: 200, minSpeedKmh: 90, exitSpeedKmh: 150, minSpeedM: 500, brakeM: 420, turnInM: 460, throttleM: 520,
-    aheadSlot: null, aheadGapSec: null, behindSlot: null, behindGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, tcSec: 0, absSec: 0,
+    aheadSlot: null, aheadGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0,
   coastSec: 0,
   };
 }

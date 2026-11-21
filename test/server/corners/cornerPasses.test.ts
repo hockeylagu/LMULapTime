@@ -69,12 +69,9 @@ describe('buildCornerPasses', () => {
     // 30 m of part throttle at about 30 m/s; the 10 m under traction control is not the driver's.
     expect(corner.partThrottleSec).toBeGreaterThan(0.8);
     expect(corner.partThrottleSec).toBeLessThan(1.3);
-    // About 10 m at 30 m/s and 20 m at 42 m/s, in whole 0.1 s samples.
-    expect(corner.tcSec).toBeGreaterThan(0.25);
-    expect(corner.tcSec).toBeLessThan(0.45);
     expect(corner.absSec).toBeGreaterThan(0.4);
     expect(corner.absSec).toBeLessThan(0.6);
-    expect(straight).toMatchObject({ minSpeedGear: 5, peakBrake: 0, brakeSec: 0, partThrottleSec: 0, tcSec: 0, absSec: 0 });
+    expect(straight).toMatchObject({ minSpeedGear: 5, peakBrake: 0, brakeSec: 0, partThrottleSec: 0, absSec: 0 });
   });
 
   it('measures the coasting between the braking and the throttle pick-up', () => {
@@ -280,14 +277,12 @@ describe('buildCornerPasses', () => {
     expect(buildCornerPasses([{ slot: 1, laps: [samples] }], segments, LENGTH).map(p => p.segment)).toEqual([0, 1]);
   });
 
-  it('records the closest car ahead and behind, by slot, as a gap in seconds', () => {
+  it('records the closest car ahead, by slot, as a gap in seconds', () => {
     // Car 2 runs the same lap 1 s later; car 3 runs it 3 s after car 2, too far back to count.
     const cars = [{ slot: 1, laps: [lap(1)] }, { slot: 2, laps: [lap(1, 1)] }, { slot: 3, laps: [lap(1, 4)] }];
     const passes = buildCornerPasses(cars, SEGMENTS, LENGTH);
     const leader = passes.find(p => p.slot === 1 && p.segment === 1)!;
     const follower = passes.find(p => p.slot === 2 && p.segment === 1)!;
-    expect(leader.behindSlot).toBe(2);
-    expect(leader.behindGapSec).toBeCloseTo(1, 1);
     expect(follower.aheadSlot).toBe(1);
     expect(follower.aheadGapSec).toBeCloseTo(1, 1);
     expect(leader.aheadSlot).toBeNull();
@@ -304,7 +299,7 @@ describe('buildCornerPasses', () => {
       parked.throttle.push(0); parked.brake.push(0); parked.steer.push(0); parked.usable.push(true);
     }
     const passes = buildCornerPasses([{ slot: 1, laps: [lap(1)] }, { slot: 9, laps: [parked] }], SEGMENTS, LENGTH);
-    expect(passes.filter(p => p.slot === 1).map(p => [p.aheadSlot, p.behindSlot])).toEqual([[null, null], [null, null]]);
+    expect(passes.filter(p => p.slot === 1).map(p => p.aheadSlot)).toEqual([null, null]);
   });
 
   it('times each car\'s own segments, one running far across the line into the next lap, and counts every car as traffic', () => {
@@ -320,6 +315,5 @@ describe('buildCornerPasses', () => {
     // 300 m at 50 m/s to the line, then the first 450 m of lap 2 (its corner 200-400 m slower).
     expect(across.exitSec).toBeGreaterThan(second.times[0] + 9);
     expect(across.brakeM).toBeCloseTo(LENGTH + 200, -1);
-    expect(passes[0].behindSlot).toBe(2);
   });
 });

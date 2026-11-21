@@ -91,11 +91,11 @@ CREATE TABLE IF NOT EXISTS ai_reports (
 
 /**
  * A pass's drive cues (`CornerPass`): gear at the slowest point, peak brake (per mille), and the
- * time braking, on part throttle out of the slowest point, with TC and with ABS (ms), and coasting (ms). Passes are rebuilt offline, so a database
+ * time braking, on part throttle out of the slowest point, with ABS, and coasting (ms). Passes are rebuilt offline, so a database
  * from before them gets the columns from the offline rebuild script, never here.
  */
 export const DRIVE_CUE_COLUMNS = `min_speed_gear INTEGER, peak_brake_pm INTEGER, brake_ms INTEGER,
-      part_throttle_ms INTEGER, tc_ms INTEGER, abs_ms INTEGER, coast_ms INTEGER,`;
+      part_throttle_ms INTEGER, abs_ms INTEGER, coast_ms INTEGER,`;
 
 export function initDbSchema(db: DatabaseType): void {
   db.exec(`
@@ -314,7 +314,7 @@ export function initDbSchema(db: DatabaseType): void {
     -- Corner passes (server/corners/cornerPasses.ts): every car's time and cues through each turn
     -- segment of each lap, built from the stored laps, disposable. Integers keep the row lean:
     -- times in ms on the replay clock (the slowest point and the exit from the entry), distances from the
-    -- start line in decimetres, speeds in 0.1 km/h, traffic as the closest car's slot and gap in ms at this car's speed.
+    -- start line in decimetres, speeds in 0.1 km/h, traffic as the closest car ahead's slot and gap in ms at this car's speed.
     CREATE TABLE IF NOT EXISTS replay_corner_passes (
       filename TEXT NOT NULL,
       driver_slot INTEGER NOT NULL,
@@ -332,8 +332,6 @@ export function initDbSchema(db: DatabaseType): void {
       throttle_dm INTEGER,
       ahead_slot INTEGER,
       ahead_gap_ms INTEGER,
-      behind_slot INTEGER,
-      behind_gap_ms INTEGER,
       ${DRIVE_CUE_COLUMNS}
       PRIMARY KEY (filename, driver_slot, lap_number, segment)
     ) WITHOUT ROWID;
@@ -366,8 +364,6 @@ export function initDbSchema(db: DatabaseType): void {
       throttle_dm INTEGER,
       ahead_slot INTEGER,
       ahead_gap_ms INTEGER,
-      behind_slot INTEGER,
-      behind_gap_ms INTEGER,
       ${DRIVE_CUE_COLUMNS}
       PRIMARY KEY (filename, driver_slot, lap_number, segment)
     ) WITHOUT ROWID;
