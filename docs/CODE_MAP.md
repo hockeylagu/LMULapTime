@@ -103,7 +103,7 @@ because active recordings can be exclusively locked on Windows.
 | `server/live/learning/readiness.ts`, `readinessReader.ts`, `server/routes/liveRoutes.ts` | Manual Settings evidence check |
 | `tools/analysis/evaluateLiveLearning.ts`, `listLearningErrors.ts`, `.claude/skills/race-review/` | Post-race review: calibration report, per-lap forecast errors, findings in `docs/evidence/RACE_REVIEW_LOG.md` |
 | `server/core/live/dbLiveLearningStore.ts`, `dbLearningModelStore.ts` | Compact learning facts and correction models |
-| `shared/domain/live/livePitLane.ts`, `server/core/live/dbPitLaneStore.ts`, `tools/analysis/backfillPitLaneLoss.ts` | Pit lane loss per race stop (in-lap + out-lap - 2 x pace - time stopped), stored per layout and class (`live_pit_lane_losses`), backfill from closed captures |
+| `shared/domain/live/livePitLane.ts`, `server/core/live/dbPitLaneStore.ts` | Pit lane loss per race stop (in-lap + out-lap - 2 x pace - time stopped), stored per layout and class (`live_pit_lane_losses`) |
 
 ---
 
