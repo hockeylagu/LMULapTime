@@ -2,7 +2,7 @@ import { expandSceneryCatalog, parseSceneryCatalog, type RenderingProfiles, type
 import type { SceneryCloudsFile } from '../../shared/types/scenes/clouds.js';
 import type { SceneryLayoutOf } from '../../shared/types/scenes/scenery.js';
 
-/** Validated scenery of a package: layouts by layout key, as the viewer receives them (cloud maps still files). */
+/** The scenery of a package: layouts by layout key, as the viewer receives them (cloud maps still files). */
 export interface SceneryStore { layouts: Map<string, SceneryLayoutOf<SceneryCloudsFile>> }
 
 /**

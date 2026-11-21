@@ -90,8 +90,9 @@ The manifest is exactly these three keys; the catalogs sit at fixed paths (`trac
 format: any other `schemaVersion` (including 8 and 10) invalidates the package, with no fallback. The file shapes, path rules and
 parsers are the pipeline's contract module (its `shared/contract/`), copied here verbatim as `shared/packageContract/` by the
 pipeline's `npm run package -- sync-contract` (never edited here; `sync-contract --check` there verifies the copy). The app's
-loader adds only what needs this machine: contained, size-checked file reads and the hash checks below. The pipeline validates the whole package before it publishes;
-at startup the app parses the catalogs and checks each layout file's identity, and does not re-check the layouts' contents.
+loader adds only what needs this machine: contained, size-checked file reads. The pipeline validates the whole package before it publishes;
+at startup the app parses the manifest and catalogs and matches each track catalog row to the circuit definitions. A track file is read when
+its layout is first asked for; one that cannot be read or names another layout leaves that layout without geometry (logged), not the package invalid.
 
 Track catalogs use the existing canonical layout identities. Geometry files sit beside
 the catalog as `<layoutKey>.json` (keys in the contract's order, map `surfaces` and `brakeMarkers` included). Geometry and projection
@@ -188,7 +189,7 @@ terms, no storm term) and does not apply `airMass` or `sceneLuminanceScale` yet.
 
 `sky.clouds` (the pipeline's docs/SCENE_PACKAGE.md "Clouds") is the cloud field. Its maps are not inline: each map entry (`maps`, `lightMaps`) is
 `{ width, height, channels?, sha256, byteLength, mipByteLengths }` naming the file `rendering/<sha256>.bin`, the 8-bit mip levels concatenated,
-largest first, row-major, channels interleaved. The server hash-checks every such file at startup; `GET /api/data-plugin/scenery/:layoutKey`
+largest first, row-major, channels interleaved. The pipeline checks each file's hash and size before it publishes; `GET /api/data-plugin/scenery/:layoutKey`
 returns the entries as is, `/api/data-plugin/rendering/files/<sha256>.bin` serves the bytes (`application/octet-stream`), and the client
 (`fetchSceneryLayout` in `src/api/sceneryApi.ts`, `shared/domain/scenery/cloudMaps.ts`) fetches each distinct file once and slices it by
 `mipByteLengths` into the mip arrays the viewer reads. The field: two `layers` (`lower`, `upper`) whose `instances`

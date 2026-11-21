@@ -1,6 +1,6 @@
 import { normalizeVehicleId, type VehicleBody } from '../../shared/packageContract/index.js';
 
-/** Validated 3D vehicle bodies of a package: by upper-case VEH id and by folder. */
+/** The 3D vehicle bodies of a package: by upper-case VEH id and by folder. */
 export interface BodyStore { rows: Map<string, VehicleBody>; folders: Map<string, VehicleBody> }
 
 /**
