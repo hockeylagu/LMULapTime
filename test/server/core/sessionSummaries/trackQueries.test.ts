@@ -29,7 +29,7 @@ describe('track detail summary queries', () => {
     upsertSession(db, placed('race-a', 1, 19, 4), 'race-a.xml', 1, 10);
     upsertSession(db, placed('race-b', 3, 22, 6), 'race-b.xml', 3, 10);
     upsertSession(db, placed('quali', 2, 37, 13), 'quali.xml', 2, 10);
-    expect(queryTrackPositionAverages(db, 'Monza', 'LMP3', undefined, 'GP'))
+    expect(queryTrackPositionAverages(db, 'Monza', 'LMP3'))
       .toEqual({ qualifyingAveragePosition: 13, finishAveragePosition: 5 });
     db.close();
   });
@@ -75,13 +75,13 @@ describe('track detail summary queries', () => {
   it('keeps unknown layouts isolated by venue and course', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
-    const first = { ...makeSession('mod-a', 1, 'Oreca 07', 'LMP2_ELMS', 99), trackVenue: 'Mod Circuit Alpha', trackCourse: 'Short' };
-    const second = { ...makeSession('mod-b', 2, 'Oreca 07', 'LMP2_ELMS', 98), trackVenue: 'Mod Circuit Beta', trackCourse: 'Short' };
+    const first = { ...makeSession('mod-a', 1, 'Oreca 07', 'LMP2_ELMS', 99), trackVenue: 'Mod Circuit Alpha', trackCourse: '' };
+    const second = { ...makeSession('mod-b', 2, 'Oreca 07', 'LMP2_ELMS', 98), trackVenue: 'Mod Circuit Beta', trackCourse: '' };
     upsertSession(db, first, 'mod-a.xml', 1, 10);
     upsertSession(db, second, 'mod-b.xml', 2, 10);
 
-    expect(queryTrackDetailSummary(db, 'Mod Circuit Alpha', 'LMP2_ELMS', undefined, 'Short'))
-      .toMatchObject({ trackVenue: 'Mod Circuit Alpha (Short)', sessionsCount: 1, bestLapTime: 99 });
+    expect(queryTrackDetailSummary(db, 'Mod Circuit Alpha', 'LMP2_ELMS'))
+      .toMatchObject({ trackVenue: 'Mod Circuit Alpha', sessionsCount: 1, bestLapTime: 99 });
     db.close();
   });
 });
