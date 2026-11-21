@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router';
 import { ArrowLeftRight, Activity, Crosshair, FileText, SquareCheck, SquarePlus } from 'lucide-react';
 import type { ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
 import { CarLogo } from '../../vehicle/CarLogo.js';
 import type { LeaderboardRow as Row } from './leaderboardRows.js';

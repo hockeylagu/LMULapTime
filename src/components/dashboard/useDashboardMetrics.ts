@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { driverLapsCount, isSessionEmpty, getDisplayTrackName, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
+import { driverLapsCount, isSessionEmpty } from '../../../shared/domain/sessions/sessionLaps.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
+import { compareSessionsBySortOption } from '../../../shared/domain/sessions/sessionOrder.js';
 import { averageQualifiedBenchmarkPace, matchesTrack, getPaceCategoryFromPercentage, type BenchmarkPaceGroup } from '../../../shared/domain/paceCategory.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { classResult } from '../../../shared/domain/classResult.js';

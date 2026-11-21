@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { SessionStrategy } from '../../../../shared/types/index.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { treadTone } from '../../../../shared/domain/live/liveInsights.js';
 import { apiErrorMessage } from '../../../api/apiClient.js';
 import type { SessionStrategyResult } from '../../../api/sessionStrategyApi.js';

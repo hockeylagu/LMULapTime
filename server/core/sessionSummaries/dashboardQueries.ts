@@ -2,7 +2,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import type { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DashboardData, DashboardMetrics, DashboardTrends } from '../../../shared/types/dashboard.js';
-import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
 import { averageQualifiedBenchmarkPace, calculateBenchmarkPace, createBenchmarkLookup, getPaceCategoryFromPercentage, type BenchmarkPaceGroup } from '../../../shared/domain/paceCategory.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { findLayoutBenchmark } from '../../../shared/domain/leaderboard.js';

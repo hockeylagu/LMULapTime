@@ -1,5 +1,5 @@
-import type { DriverData } from '../types/index.js';
-import { areComparableCarClasses, resolveDriverCarClass } from './vehicleMapping.js';
+import type { DriverData } from '../../types/index.js';
+import { areComparableCarClasses, resolveDriverCarClass } from '../vehicleMapping.js';
 
 export type RivalSectorKey = 's1' | 's2' | 's3' | 'lap';
 

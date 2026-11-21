@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
-import { driverLapsCount, getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
+import { driverLapsCount, isSessionEmpty } from '../../../shared/domain/sessions/sessionLaps.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
+import { getBestLapNumber } from '../../../shared/domain/timing/lapTimes.js';
 import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
 import { classResult } from '../../../shared/domain/classResult.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';

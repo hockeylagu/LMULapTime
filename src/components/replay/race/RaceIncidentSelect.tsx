@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { RaceReplayCar, RaceReplayEvent } from '../../../../shared/types/index.js';
-import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
+import { formatElapsedSeconds } from '../../../../shared/domain/timing/timeFormat.js';
 import { Select } from '../../common/dropdown/Select.js';
 import { incidentsOf, incidentText } from './raceEventText.js';
 

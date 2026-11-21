@@ -1,7 +1,7 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
 import { Pause, Play, SkipForward } from 'lucide-react';
 import type { RaceReplayCar, RaceReplayEvent, RaceReplayLap } from '../../../../shared/types/index.js';
-import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
+import { formatElapsedSeconds } from '../../../../shared/domain/timing/timeFormat.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { RACE_SPEEDS, type RaceClock } from './raceClock.js';
 import { RaceIncidentSelect } from './RaceIncidentSelect.js';

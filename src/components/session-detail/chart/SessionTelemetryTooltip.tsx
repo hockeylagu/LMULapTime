@@ -2,7 +2,7 @@ import React from 'react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { LapStatusBadge } from '../../common/LapStatusBadge.js';
 import { LMU_COLORS, SECTOR_COLORS, TELEMETRY_COLORS, WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 
 /** The series' line color as a short stroke before its value; the text stays white so it reads on the dark card. */
 const Swatch: React.FC<{ color: string; dashed?: boolean }> = ({ color, dashed }) => (

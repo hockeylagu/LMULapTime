@@ -2,7 +2,7 @@ import React from 'react';
 import { Replace, Target, Trash2 } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
-import { formatTime, formatPitStopDuration } from '../../../shared/domain/formatters.js';
+import { formatTime, formatPitStopDuration } from '../../../shared/domain/timing/timeFormat.js';
 import { getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { LapStatusBadge } from '../common/LapStatusBadge.js';

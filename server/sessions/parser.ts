@@ -11,13 +11,9 @@ import {
   TireWear,
 } from '../../shared/types/index.js';
 import { parseReplayMetadata, detectPlayerName } from '../replay/decode/replayParser.js';
-import {
-  parseTimeStringToSeconds,
-  computeTheoreticalBest,
-  parseDateStringToTimestamp,
-  getSessionTypeWeight,
-  minValidTime,
-} from '../../shared/domain/formatters.js';
+import { parseTimeStringToSeconds } from '../../shared/domain/timing/timeFormat.js';
+import { computeTheoreticalBest, fasterLapTime } from '../../shared/domain/timing/lapTimes.js';
+import { parseDateStringToTimestamp, getSessionTypeWeight } from '../../shared/domain/sessions/sessionOrder.js';
 import { normalizeCarClass, resolveVehicle } from '../../shared/domain/vehicleMapping.js';
 import {
   RawLapXmlNode,
@@ -41,7 +37,7 @@ const xmlParser = new XMLParser({
   trimValues: true,
 });
 
-const updateMinTime = minValidTime;
+const updateMinTime = fasterLapTime;
 
 export class LmuParser {
   private replayLookup: ((target: ReplayMatchTarget) => ReplayFileEntry[]) | null = null;

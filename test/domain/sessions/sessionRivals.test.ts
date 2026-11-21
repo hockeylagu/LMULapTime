@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { compareWithSameCarRivals } from '../../shared/domain/sessionRivals.js';
-import type { DriverData } from '../../shared/types/index.js';
+import { compareWithSameCarRivals } from '../../../shared/domain/sessions/sessionRivals.js';
+import type { DriverData } from '../../../shared/types/index.js';
 
 function driver(name: string, carType: string, carClass: string, s1: number, s2: number, s3: number, lap: number): DriverData {
   return {

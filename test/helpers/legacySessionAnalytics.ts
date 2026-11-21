@@ -1,6 +1,8 @@
 /** Test-only parity oracle for the paged progression and comparable-lap queries. */
 import type { DetailedSession, ComparableLap, DriverData, LapData, SessionProgressionPoint } from '../../shared/types/index.js';
-import { compareSessions, computeTheoreticalGap, getDisplayTrackName } from '../../shared/domain/formatters.js';
+import { compareSessions } from '../../shared/domain/sessions/sessionOrder.js';
+import { computeTheoreticalGap } from '../../shared/domain/timing/lapTimes.js';
+import { getDisplayTrackName } from '../../shared/domain/sessions/trackDisplayName.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
 import { isOnlineSession } from '../../shared/domain/leaderboard.js';

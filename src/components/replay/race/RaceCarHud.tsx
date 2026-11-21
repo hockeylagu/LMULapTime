@@ -1,7 +1,7 @@
 import React, { useSyncExternalStore } from 'react';
 import type { RaceReplayCar, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { RACE_AID, RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../shared/domain/raceReplay/poseWindow.js';
-import { getSteerAngleDeg } from '../../../../shared/domain/formatters.js';
+import { getSteerAngleDeg } from '../../../../shared/domain/vehicles/steering.js';
 import { GpsMapTelemetryHud } from '../map/display/GpsMapTelemetryHud.js';
 import type { RaceClock } from './raceClock.js';
 import type { RacePoseCache } from './racePoseCache.js';

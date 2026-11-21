@@ -1,7 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
-import { driverLapsCount, isSessionEmpty, getDisplayTrackName, formatTime } from '../../../shared/domain/formatters.js';
+import { driverLapsCount, isSessionEmpty } from '../../../shared/domain/sessions/sessionLaps.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { ReplayIndicator } from '../common/replay/ReplayIndicator.js';
 import { CarIdentity } from '../vehicle/CarIdentity.js';

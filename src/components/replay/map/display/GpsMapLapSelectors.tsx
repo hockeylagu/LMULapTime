@@ -1,6 +1,6 @@
 import { useContext, useRef, type ReactNode } from 'react';
 import { ChevronDown, LoaderCircle, Plus, X } from 'lucide-react';
-import { formatTime } from '../../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../../shared/domain/timing/timeFormat.js';
 import { ReplayFullscreenControlsContext } from '../../inspector/replayFullscreenControls.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../../common/buttonStyles.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';

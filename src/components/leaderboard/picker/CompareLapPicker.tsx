@@ -12,7 +12,7 @@ import {
   pickerQuickPicks,
   type LapPickerFilters,
 } from './lapPickerModel.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { recordedCondition, type SessionKind } from '../../../../shared/domain/compareLapScope.js';
 
 export interface CompareLapPickerProps {

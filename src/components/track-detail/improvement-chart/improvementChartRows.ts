@@ -1,4 +1,4 @@
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
 import type { SessionProgressionPoint } from '../../../../shared/types/index.js';
 import type { ImprovementMetric } from './ImprovementChartControls.js';

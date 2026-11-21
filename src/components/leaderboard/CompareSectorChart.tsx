@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { Clock } from 'lucide-react';
 import { ComparableLap } from '../../../shared/types/index.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 import { LMU_COLORS, CHART_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
 import { plainTag } from './CompareLapCard.js';
 import { EMPTY_ARRAY } from '../../utils/emptyDefaults.js';

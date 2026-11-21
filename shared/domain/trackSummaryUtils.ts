@@ -1,11 +1,8 @@
 import { TrackSummary } from '../types/index.js';
 import type { DriverData, SessionMetadata } from '../types/session.js';
-import {
-  getDisplayTrackName,
-  computeTheoreticalBest,
-  parseDateStringToTimestamp,
-  minValidTime,
-} from './formatters.js';
+import { getDisplayTrackName } from './sessions/trackDisplayName.js';
+import { computeTheoreticalBest, fasterLapTime } from './timing/lapTimes.js';
+import { parseDateStringToTimestamp } from './sessions/sessionOrder.js';
 import { matchesSessionCarClass } from './vehicleMapping.js';
 import { getCircuitSpecification } from './circuitSpecs.js';
 
@@ -94,9 +91,9 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
         summary.bestLapClass = p.carClass;
         summary.bestLapWet = 'bestLapWet' in p && p.bestLapWet ? true : undefined;
       }
-      summary.bestS1 = minValidTime(summary.bestS1, p.bestS1);
-      summary.bestS2 = minValidTime(summary.bestS2, p.bestS2);
-      summary.bestS3 = minValidTime(summary.bestS3, p.bestS3);
+      summary.bestS1 = fasterLapTime(summary.bestS1, p.bestS1);
+      summary.bestS2 = fasterLapTime(summary.bestS2, p.bestS2);
+      summary.bestS3 = fasterLapTime(summary.bestS3, p.bestS3);
     }
 
     summary.theoreticalBest = computeTheoreticalBest(summary.bestS1, summary.bestS2, summary.bestS3);

@@ -1,5 +1,5 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 import type { RaceClock } from './raceClock.js';
 import { raceClassTone } from './raceClassTone.js';

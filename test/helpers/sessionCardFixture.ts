@@ -1,7 +1,7 @@
 import type { SessionCard } from '../../shared/types/sessionSummaries.js';
 import type { DetailedSession, DriverData } from '../../shared/types/session.js';
 import type { LapData } from '../../shared/types/session.js';
-import { parseDateStringToTimestamp } from '../../shared/domain/formatters.js';
+import { parseDateStringToTimestamp } from '../../shared/domain/sessions/sessionOrder.js';
 
 type SessionCardOverrides = Omit<Partial<SessionCard>, 'playerDriver' | 'matchingReplayFile' | 'sessionType'> & {
   sessionType?: string;

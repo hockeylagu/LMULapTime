@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
 

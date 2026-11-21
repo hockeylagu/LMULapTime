@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { ArrowLeftRight, Trophy, Sparkles, Award, Trash2, Crosshair, Activity } from 'lucide-react';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 import { ComparableLap } from '../../../shared/types/index.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';

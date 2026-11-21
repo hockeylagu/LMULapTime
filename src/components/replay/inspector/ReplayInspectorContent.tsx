@@ -7,7 +7,7 @@ import { MapColorMode } from '../map/replayMapUtils.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { useLapSegments } from './useLapSegments.js';
 import { computeLapConsistencyStats } from '../../../utils/lapConsistency.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 import { RaceModeContext } from '../race/raceModeContext.js';
 import { useConsistencyLapSelection } from './useConsistencyLapSelection.js';

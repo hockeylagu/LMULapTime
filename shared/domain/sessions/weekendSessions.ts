@@ -1,7 +1,7 @@
-import { parseDateStringToTimestamp } from './formatters.js';
-import { isOnlineSession } from './leaderboard.js';
-import { CIRCUIT_SPECIFICATIONS } from './circuitDefinitions.js';
-import { getCircuitSpecification } from './circuitSpecs.js';
+import { parseDateStringToTimestamp } from './sessionOrder.js';
+import { isOnlineSession } from '../leaderboard.js';
+import { CIRCUIT_SPECIFICATIONS } from '../circuitDefinitions.js';
+import { getCircuitSpecification } from '../circuitSpecs.js';
 export interface CandidateRelatedSession {
   id?: string;
   sessionId?: string;

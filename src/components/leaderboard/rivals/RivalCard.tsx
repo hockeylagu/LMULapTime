@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Activity, ArrowLeftRight, Ghost, Target } from 'lucide-react';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { boardLapTelemetryRef } from '../board/leaderboardLaps.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import type { RivalState } from './useRival.js';

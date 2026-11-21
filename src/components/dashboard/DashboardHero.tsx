@@ -16,7 +16,7 @@ import type { DetailedSession } from '../../../shared/types/session.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
 import type { DashboardTrends } from '../../../shared/types/dashboard.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 
 export interface DashboardHeroProps {
   sessions: (SessionCard | DetailedSession)[];

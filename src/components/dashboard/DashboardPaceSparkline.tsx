@@ -1,6 +1,6 @@
 import React from 'react';
 import type { DashboardRecentPacePoint } from '../../../shared/types/dashboard.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 
 export interface DashboardPaceSparklineProps {
   points: DashboardRecentPacePoint[];

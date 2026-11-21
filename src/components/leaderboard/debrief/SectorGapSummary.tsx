@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { formatGap } from '../board/leaderboardFormat.js';
 
 export interface SectorTimes {

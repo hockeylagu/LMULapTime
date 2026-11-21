@@ -1,6 +1,6 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
 import type { RaceReplayCar, RaceReplayLap } from '../../../../shared/types/index.js';
-import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
+import { formatElapsedSeconds } from '../../../../shared/domain/timing/timeFormat.js';
 import { GpsMapLapTimingPanel } from '../map/display/GpsMapLapTimingPanel.js';
 import type { RaceClock } from './raceClock.js';
 import { raceLapTimingAt } from './raceLaps.js';

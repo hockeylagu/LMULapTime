@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Timer } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
-import { computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
+import { computeTheoreticalGap } from '../../../../shared/domain/timing/lapTimes.js';
 import { CarIdentity } from '../../vehicle/CarIdentity.js';
 import { DriverRaceStandingsRow } from '../standings/DriverRaceStandingsRow.js';
 import { DriverTimingMetricsRow } from './DriverTimingMetricsRow.js';

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { RivalStatus } from '../../../../shared/types/leaderboard.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 
 export interface RivalInsightsProps {
   status: RivalStatus;

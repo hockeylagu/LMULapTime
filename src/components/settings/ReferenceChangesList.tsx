@@ -4,7 +4,7 @@ import { ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 import { BenchmarkImpactBadge } from './BenchmarkImpactBadge.js';
 import { formatDateTime, formatNumber } from './settingsFormat.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 
 export interface ChangeCountsProps {
   addedCount: number;

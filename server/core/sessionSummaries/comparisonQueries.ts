@@ -2,7 +2,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import type { ComparableLap, WeatherCondition } from '../../../shared/types/index.js';
 import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
-import { computeTheoreticalBest } from '../../../shared/domain/formatters.js';
+import { computeTheoreticalBest } from '../../../shared/domain/timing/lapTimes.js';
 import { SESSION_TYPE_BY_KIND, type CompareLapSort, type SessionKind } from '../../../shared/domain/compareLapScope.js';
 import type { ComparableLapsResult } from '../../sessions/sessionAnalytics.js';
 import { comparisonLapKey, readComparisonLapRows } from './comparisonLapRows.js';

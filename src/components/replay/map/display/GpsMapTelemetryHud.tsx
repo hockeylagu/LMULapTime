@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
-import { getSteerPercent } from '../../../../../shared/domain/formatters.js';
+import { getSteerPercent } from '../../../../../shared/domain/vehicles/steering.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { formatGear, formatReading, getStatusLabel, getStatusSubtext, hasReading, totalAcceleration } from './telemetryReadouts.js';
 

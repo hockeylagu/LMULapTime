@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Layers, Sparkles } from 'lucide-react';
 import { READOUT_LABEL } from './labelStyles.js';
 import { BenchmarkItemImpact } from '../../../shared/types/index.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 
 export interface BenchmarkImpactBadgeProps {
   impact?: BenchmarkItemImpact;

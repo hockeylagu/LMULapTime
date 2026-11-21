@@ -3,7 +3,7 @@ import { Compass } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../../../utils/cornerAnalysis/types.js';
-import { getSteerPercent } from '../../../../../../shared/domain/formatters.js';
+import { getSteerPercent } from '../../../../../../shared/domain/vehicles/steering.js';
 import {
   detectHandlingBalanceEvents,
   computeVisibleHandlingBands,

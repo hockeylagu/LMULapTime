@@ -1,7 +1,7 @@
 import React from 'react';
 import { DriverData } from '../../../../shared/types/index.js';
 import type { ConsistencyRating } from '../../../../shared/domain/lapComparison.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { SummaryStat } from './SummaryStat.js';
 
 export interface DriverTimingMetricsRowProps {

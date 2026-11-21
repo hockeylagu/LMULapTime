@@ -1,5 +1,5 @@
 import { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
-import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
 
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 

@@ -1,6 +1,7 @@
 import type { Database } from 'better-sqlite3';
 import type { TrackSummary } from '../../../shared/types/index.js';
-import { computeTheoreticalBest, getDisplayTrackName, minValidTime } from '../../../shared/domain/formatters.js';
+import { computeTheoreticalBest, fasterLapTime } from '../../../shared/domain/timing/lapTimes.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
 import { sessionWhere, carClassMatch, type SessionQuery, type SqlFragment } from './pageQueries.js';
 import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
@@ -113,9 +114,9 @@ function queryAggregatedTrackSummaries(db: Database, carClass?: string, carType?
     summary.sessionsCount += row.sessions_count;
     summary.totalLaps += row.total_laps;
     summary.lastSessionTimestamp = Math.max(summary.lastSessionTimestamp ?? 0, row.last_timestamp ?? 0);
-    summary.bestS1 = minValidTime(summary.bestS1, row.sector_s1);
-    summary.bestS2 = minValidTime(summary.bestS2, row.best_s2);
-    summary.bestS3 = minValidTime(summary.bestS3, row.best_s3);
+    summary.bestS1 = fasterLapTime(summary.bestS1, row.sector_s1);
+    summary.bestS2 = fasterLapTime(summary.bestS2, row.best_s2);
+    summary.bestS3 = fasterLapTime(summary.bestS3, row.best_s3);
     summary.theoreticalBest = computeTheoreticalBest(summary.bestS1, summary.bestS2, summary.bestS3);
     const time = row.best_lap_time;
     if (time !== null) {

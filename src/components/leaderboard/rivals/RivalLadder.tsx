@@ -3,7 +3,7 @@ import { Check, ChevronDown } from 'lucide-react';
 import { DROPDOWN_CHEVRON, DROPDOWN_LIST_INSET, DROPDOWN_PANEL, DROPDOWN_TRIGGER_COMPACT } from '../../common/dropdown/dropdownStyles.js';
 import { useOutsidePress } from '../../common/dropdown/useAnchoredPanel.js';
 import type { LeaderboardEntry, RivalTarget } from '../../../../shared/types/leaderboard.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { formatDrivenAgo } from '../board/leaderboardFormat.js';
 
 export interface RivalLadderProps {

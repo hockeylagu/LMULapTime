@@ -1,6 +1,6 @@
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
-import { getSteerAngleDeg } from '../../../../../shared/domain/formatters.js';
+import { getSteerAngleDeg } from '../../../../../shared/domain/vehicles/steering.js';
 
 const at = (name: typeof RACE_POSE_CHANNELS[number]) => RACE_POSE_CHANNELS.indexOf(name);
 const STEER = at('steerYaw'), BRAKE = at('brake'), LAMPS = at('lamps'), DEFLECTION = at('deflFL'), SPIN = at('spinFL');

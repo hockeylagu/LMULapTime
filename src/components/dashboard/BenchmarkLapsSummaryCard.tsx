@@ -3,7 +3,7 @@ import { Zap } from 'lucide-react';
 import { SummaryCard, RankedList } from './DashboardSummaryParts.js';
 import { getPaceCategoryStyle } from '../../utils/paceCategoryStyles.js';
 import { PaceCategory } from '../../../shared/types/index.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 
 export interface BestRefLapInfo {
   sessionId?: string;

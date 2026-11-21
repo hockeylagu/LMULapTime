@@ -1,7 +1,7 @@
 import { playerEntry } from '../../../../shared/domain/leaderboard.js';
 import React from 'react';
 import type { Leaderboard, LeaderboardEntry, LeaderboardScope } from '../../../../shared/types/leaderboard.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { getPaceCategoryFromPercentage } from '../../../../shared/domain/paceCategory.js';
 import { formatGap } from './leaderboardFormat.js';
 

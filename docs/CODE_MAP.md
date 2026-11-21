@@ -128,6 +128,7 @@ because active recordings can be exclusively locked on Windows.
   - `targeted.ts`: granular updates for replay links, names, telemetry, and conditions.
   - Round-trip expectations (`canonicalSession`) and the bare `sessions` row fixture live with the tests in `test/server/core/sessionRows/`.
 - **Dictionaries**: `drivers` (keyed by exact name; player/human flags belong to session driver row), `vehicles` (raw XML car type and class), `teams` (name). Emptied with session cache; never pruned.
+- **Shared session and lap helpers** (used by the server and the client): lap time text (`formatTime`, `formatElapsedSeconds`, `parseTimeStringToSeconds`, `formatPitStopDuration` in `shared/domain/timing/timeFormat.ts`), the theoretical best and the best lap (`shared/domain/timing/lapTimes.ts`), session order and the list sort options (`compareSessions`, `compareSessionsBySortOption` in `shared/domain/sessions/sessionOrder.ts`), empty sessions (`shared/domain/sessions/sessionLaps.ts`), the same weekend's other sessions (`findWeekendSessions`, `shared/domain/sessions/weekendSessions.ts`), the track name shown (`getDisplayTrackName`, `shared/domain/sessions/trackDisplayName.ts`) and the steering wheel angle and percent (`shared/domain/vehicles/steering.ts`).
 - **Derived columns**: stored on `session_drivers` (`is_human`, `driver_class`, `clean_laps_count`, `driving_time_seconds`, `max_top_speed`, `best_lap_ordinal`, `top3_average`, `consistency_score`, etc.) and `session_laps` (`condition_group`, clean/representative/human/leaderboard flags). Raw columns retain original XML values (`lap_number`, `is_pit_stop`).
 
 ### Benchmark Rating & Comparison Queries
@@ -265,7 +266,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 | Dashboard | `/api/dashboard` (`sessionSummaries/dashboardQueries.ts`) | `trackSummaryUtils.ts`, `paceCategory.ts` | `components/dashboard/` (`useDashboardData.ts`, `Dashboard.tsx`) |
 | Session list | `/api/dashboard` (its `sessions` page: `sessionSummaries/pageQueries.ts`, `cards.ts`) | | `components/session-list/` (`SessionList.tsx`, `SessionGridCard.tsx`) |
 | Tracks | `/api/tracks`, `/api/track/:trackName` (`sessionSummaries/trackQueries.ts`) | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/`, `components/track-detail/` |
-| Leaderboard & rivals | `leaderboardRoutes.ts`, `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`rivals/useRival.ts` with `includeRival=true`) |
+| Leaderboard & rivals | `leaderboardRoutes.ts`, `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessions/sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`rivals/useRival.ts` with `includeRival=true`) |
 | Lap comparison | `/api/compare/laps` (`comparisonQueries.ts`, `comparisonLapRows.ts`) | `lapComparison.ts`, `compareLapScope.ts` | `components/leaderboard/`, `src/utils/telemetryCompareLink.ts` |
 | Benchmarks | `referenceRoutes.ts`, `server/benchmarks/` (`referenceLaptimes.ts`, `benchmarkImpact.ts`), `dbReferenceLaptimeStore.ts` | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx`, `settings/ReferenceChangesList.tsx` |
 | AI engineer | `aiRoutes.ts`, `server/ai/aiReport.ts`, `dbAiReportStore.ts` | `shared/types/aiReport.ts` | `src/utils/aiReportPayload.ts`, `replay/analysis/AIReportTab.tsx` |
@@ -486,7 +487,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 ### File Size Limits Watchlist
 Counted 2026-11-15.
 - **Source files near 1,000 lines**: `tools/telemetryRecorder.ts` (968), `server/telemetry/duckdbReader.ts` (871), `shared/domain/circuitDefinitions.ts` (774), `server/live/capture/recordingStore.ts` (759); tests `test/server/core/serverContext.test.ts` (907), `db.test.ts` (819), `test/server/live/liveService.test.ts` (800).
-- **Directories over 20 files** (the rule is not linted): `shared/domain/` (21), `test/utils/` (21). **At 20**: `test/domain/`, `src/components/settings/`, `src/components/replay/view3d/scenery/materials/`, `shared/types/`, `shared/domain/live/`. **At 19**: `server/core/`, `src/utils/`, `src/components/replay/race/`, `replay/map/scene/`, `replay/map/display/`, `replay/inspector/`.
+- **Directories over 20 files** (the rule is not linted): `test/utils/` (21). **At 20**: `src/components/settings/`, `src/components/replay/view3d/scenery/materials/`, `shared/types/`, `shared/domain/live/`. **At 19**: `server/core/`, `src/utils/`, `src/components/replay/race/`, `replay/map/scene/`, `replay/map/display/`, `replay/inspector/`.
 - **Components near 300 lines**: `ReplayInspectorModalBody.tsx` (299), `ReplayInspectorContent.tsx` (289), `ReplayInspectorSidebar.tsx` (283), `TelemetryPresetModal.tsx` (273), `GpsSceneMarkers.tsx` (272), `DrivingHabitsCard.tsx` (272, counted 2026-11-21).
 
 ### 3D replay (code review 2026-11-15)

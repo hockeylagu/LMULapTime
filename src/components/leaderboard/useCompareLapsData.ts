@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory, DetailedSession, ComparableLap } from '../../../shared/types/index.js';
-import { computeTheoreticalBest, getDisplayTrackName } from '../../../shared/domain/formatters.js';
+import { computeTheoreticalBest } from '../../../shared/domain/timing/lapTimes.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
 import {
   getPaceCategoryFromPercentage,
 } from '../../../shared/domain/paceCategory.js';

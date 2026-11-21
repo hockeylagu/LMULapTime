@@ -1,7 +1,7 @@
 import type { DriverData, LapData, PitService } from '../../../../shared/types/index.js';
 import { lapEvents } from '../../../../shared/domain/lapComparison.js';
 import { pitLossPerLap } from '../../../../shared/domain/pitStops.js';
-import { formatPitStopDuration } from '../../../../shared/domain/formatters.js';
+import { formatPitStopDuration } from '../../../../shared/domain/timing/timeFormat.js';
 
 /** Damage the driver reported on the laps since their previous stop, up to this in-lap. */
 export interface EarlierDamage {

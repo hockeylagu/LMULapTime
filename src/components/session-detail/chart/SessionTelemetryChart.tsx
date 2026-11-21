@@ -12,7 +12,7 @@ import {
   type LegendPayload,
 } from 'recharts';
 import { DetailedSession, DriverData, FuelStrategyData } from '../../../../shared/types/index.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { LMU_COLORS } from '../../../utils/themeColors.js';
 import { SessionFuelStrategyCard } from '../standings/SessionFuelStrategyCard.js';
 import { useSessionChartData } from './useSessionChartData.js';

@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Ban, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { DriverData } from '../../../../shared/types/index.js';
-import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
+import { formatElapsedSeconds } from '../../../../shared/domain/timing/timeFormat.js';
 import { getTrackLimitStandingsPillClasses, getWorstTrackLimitSeverity } from '../../../utils/trackLimits.js';
 
 const BADGE = 'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-mono font-medium whitespace-nowrap';

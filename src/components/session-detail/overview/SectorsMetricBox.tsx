@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { DriverData } from '../../../../shared/types/index.js';
-import { compareWithSameCarRivals, RivalSectorKey } from '../../../../shared/domain/sessionRivals.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { compareWithSameCarRivals, RivalSectorKey } from '../../../../shared/domain/sessions/sessionRivals.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 
 export interface SectorsMetricBoxProps {
   className?: string;

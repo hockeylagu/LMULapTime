@@ -6,7 +6,7 @@ import { getCircuitSpecification } from '../circuitSpecs.js';
 import { lapConditionGroup } from '../lapConditions.js';
 import { computeConsistencyRating, computeTopNLapAverage, selectCleanLapCandidates } from '../lapComparison.js';
 import { isOnlineSession } from '../leaderboard.js';
-import { isSessionEmpty } from '../formatters.js';
+import { isSessionEmpty } from '../sessions/sessionLaps.js';
 import { buildSessionAggregate } from './buildSessionAggregate.js';
 
 function projectDriver(session: DetailedSession, driver: DriverData, driverOrdinal: number, playerOrdinal: number): { driver: SessionDriverProjection; laps: SessionLapProjection[]; conditions: SessionConditionProjection[] } {

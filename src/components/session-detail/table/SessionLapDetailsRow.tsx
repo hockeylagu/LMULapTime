@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowDownRight, ArrowUpRight, Ban, Car, CloudRain, Flag, Shield, ShieldAlert, Swords, Wrench, type LucideIcon } from 'lucide-react';
 import type { LapData } from '../../../../shared/types/index.js';
 import type { LapEvents } from '../../../../shared/domain/lapComparison.js';
-import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
+import { formatElapsedSeconds } from '../../../../shared/domain/timing/timeFormat.js';
 import { getTrackLimitSeverity } from '../../../utils/trackLimits.js';
 import type { LapDetailSection } from './lapDetailSections.js';
 

@@ -3,7 +3,7 @@ import type { FocusProgress, HabitFocusPin, PaceGoal } from '../../../../shared/
 import type { PaceCategory } from '../../../../shared/types/reference.js';
 import type { LayoutCorners } from '../../../../shared/types/corners/cornerPasses.js';
 import { MISTAKE_LINES } from '../../../../shared/domain/cornerAnalysis/analyzeCorners.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { HISTORY_SESSIONS } from '../../../../shared/domain/cornerAnalysis/habitFocus.js';
 import { CAUSE_EXPLANATIONS, habitGapLabel, habitGapText, habitTriedTitle, habitTryLine, habitTryTitle, MISTAKE_EXPLANATIONS } from './habitText.js';
 import { sessionRefLabel } from '../../track-detail/corner-trends/cornerHabitText.js';

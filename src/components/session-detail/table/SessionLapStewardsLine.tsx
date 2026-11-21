@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Ban, ShieldAlert } from 'lucide-react';
 import { DriverData } from '../../../../shared/types/index.js';
-import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
+import { formatElapsedSeconds } from '../../../../shared/domain/timing/timeFormat.js';
 import { getWorstTrackLimitSeverity, type TrackLimitSeverity } from '../../../utils/trackLimits.js';
 
 interface StewardsEvent {

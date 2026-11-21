@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { compareSessions } from '../../../../shared/domain/formatters.js';
+import { compareSessions } from '../../../../shared/domain/sessions/sessionOrder.js';
 import { matchesTrack } from '../../../../shared/domain/paceCategory.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
 import { ImprovementHeader } from './ImprovementHeader.js';

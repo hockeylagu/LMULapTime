@@ -9,7 +9,7 @@ import {
   Legend,
   type LegendPayload,
 } from 'recharts';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { LMU_COLORS, PACE_CHART_COLORS } from '../../../utils/themeColors.js';
 import { ImprovementMetric } from './ImprovementChartControls.js';
 import { ImprovementPaceTooltip } from './ImprovementPaceTooltip.js';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 
 export interface SectorSplitsRowProps {
   s1?: number | null;

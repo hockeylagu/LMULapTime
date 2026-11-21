@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { LapData, NonRepresentativeReason } from '../../../../shared/types/index.js';
 import type { LapEvents } from '../../../../shared/domain/lapComparison.js';
-import { formatPitStopDuration } from '../../../../shared/domain/formatters.js';
+import { formatPitStopDuration } from '../../../../shared/domain/timing/timeFormat.js';
 import { resolveLapStatus } from '../../common/lapStatus.js';
 import { getWorstTrackLimitSeverity, getTrackLimitBadgeClasses } from '../../../utils/trackLimits.js';
 import { NON_REPRESENTATIVE_LABELS, describeNonRepresentative } from '../../../utils/lapTrafficText.js';

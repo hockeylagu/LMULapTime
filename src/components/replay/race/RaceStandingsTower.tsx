@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useSyncExternalStore } from 'react';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import type { RaceClock } from './raceClock.js';
 import { raceStandingsAt, type RaceGap, type RaceStandingsIndex } from './raceStandings.js';

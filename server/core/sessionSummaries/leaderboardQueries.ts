@@ -2,7 +2,8 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import type { Leaderboard, LeaderboardEntry, LeaderboardLap, LeaderboardLayout, LeaderboardLayoutClass } from '../../../shared/types/leaderboard.js';
 import type { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
-import { computeTheoreticalBest, getDisplayTrackName } from '../../../shared/domain/formatters.js';
+import { computeTheoreticalBest } from '../../../shared/domain/timing/lapTimes.js';
+import { getDisplayTrackName } from '../../../shared/domain/sessions/trackDisplayName.js';
 import { findLayoutBenchmark, type LeaderboardQuery } from '../../../shared/domain/leaderboard.js';
 import { availableReplayLapSql } from '../replay/replayLapAvailability.js';
 

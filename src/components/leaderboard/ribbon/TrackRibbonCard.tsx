@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router';
 import { MapPin } from 'lucide-react';
 import type { LeaderboardLayout } from '../../../../shared/types/leaderboard.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { carClassLabel, formatDrivenAgo } from '../board/leaderboardFormat.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';

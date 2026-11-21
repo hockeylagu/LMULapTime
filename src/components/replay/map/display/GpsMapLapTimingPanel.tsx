@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { ReplayLapSummary } from '../../../../../shared/types/index.js';
-import { formatTime } from '../../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../../shared/domain/timing/timeFormat.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { useStoredToggle } from '../useStoredToggle.js';
 import { GpsMapLapSelectors, lapTimingColumns } from './GpsMapLapSelectors.js';

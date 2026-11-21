@@ -1,4 +1,4 @@
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 import type { LiveLapRecord } from '../../../shared/types/live.js';
 
 export const UNKNOWN = '—';

@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
-import { formatTime } from '../../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../../shared/domain/timing/timeFormat.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { ReplayFullscreenControlsContext } from '../../inspector/replayFullscreenControls.js';
 import { Select } from '../../../common/dropdown/Select.js';

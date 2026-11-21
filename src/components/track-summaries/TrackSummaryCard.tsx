@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { SectorSplitsRow } from '../common/SectorSplitsRow.js';
 import { CarIdentity } from '../vehicle/CarIdentity.js';

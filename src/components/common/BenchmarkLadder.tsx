@@ -1,6 +1,6 @@
 import React from 'react';
 import { PaceCategory, ReferenceLaptimeEntry } from '../../../shared/types/index.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime } from '../../../shared/domain/timing/timeFormat.js';
 import { getPaceCategoryStyle } from '../../utils/paceCategoryStyles.js';
 
 type Targets = ReferenceLaptimeEntry['targets'];

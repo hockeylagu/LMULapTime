@@ -1,5 +1,5 @@
 import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../../shared/types/index.js';
-import { parseTimeStringToSeconds } from '../../shared/domain/formatters.js';
+import { parseTimeStringToSeconds } from '../../shared/domain/timing/timeFormat.js';
 import {
   calculateBenchmarkPace,
   createBenchmarkLookup,

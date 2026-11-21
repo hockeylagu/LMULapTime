@@ -3,7 +3,7 @@ import { Check, CloudRain } from 'lucide-react';
 import { ComparableLap } from '../../../../../shared/types/index.js';
 import { CarIdentity } from '../../../vehicle/CarIdentity.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
-import { formatTime } from '../../../../../shared/domain/formatters.js';
+import { formatTime } from '../../../../../shared/domain/timing/timeFormat.js';
 import { SessionTypeChip } from '../../../session-list/SessionRowParts.js';
 
 export const REPLAY_COMPARE_COLUMNS = 'grid grid-cols-[88px_144px_minmax(150px,1fr)_minmax(240px,1.4fr)_40px_88px_88px] items-center gap-x-3';

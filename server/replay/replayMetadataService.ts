@@ -3,7 +3,7 @@ import {
   ReplayLapSummary,
   ReplayMetadata,
 } from '../../shared/types/index.js';
-import { getDisplayTrackName } from '../../shared/domain/formatters.js';
+import { getDisplayTrackName } from '../../shared/domain/sessions/trackDisplayName.js';
 import { resolveRosterVehicles } from '../../shared/domain/vehicleMapping.js';
 import type { ReplaySessionContext } from './replayServiceTypes.js';
 

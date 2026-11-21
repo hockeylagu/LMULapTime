@@ -1,6 +1,6 @@
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { computeVehicleDynamics } from './computedTelemetry.js';
-import { getSteerAngleDeg } from '../../shared/domain/formatters.js';
+import { getSteerAngleDeg } from '../../shared/domain/vehicles/steering.js';
 import { resolveVehicleHandling } from '../../shared/domain/vehicles/handling.js';
 import type { VehicleHandlingCalibration } from '../../shared/types/dataPlugin.js';
 

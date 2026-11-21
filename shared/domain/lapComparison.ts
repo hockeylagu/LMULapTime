@@ -1,5 +1,5 @@
 import { PaceCategory, ComparableLap, NonRepresentativeReason, LapConditions, DriverData, LapIncident, LapPenalty, LapTrackLimit } from '../types/index.js';
-import { computeTheoreticalBest } from './formatters.js';
+import { computeTheoreticalBest } from './timing/lapTimes.js';
 import { LapConditionGroup, lapConditionGroup } from './lapConditions.js';
 import type { ReplayLapSummary } from '../types/index.js';
 
