@@ -279,6 +279,12 @@ describe('useSessionDetailData', () => {
     let revision = 0;
     let sessionRequests = 0;
     const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/corner-analysis')) {
+        return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ error: 'No corner analysis for this session' }) });
+      }
+      if (url.endsWith('/strategy')) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ strategy: null }) });
+      }
       const failed = url === '/api/session/retry' && ++sessionRequests > 1;
       return Promise.resolve({
         ok: !failed,

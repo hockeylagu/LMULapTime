@@ -19,7 +19,7 @@ const loadTrack = () => ({ centerline: SQUARE, projectionRevision: 'rev1', timin
 const PASS: CornerPass = { slot: 3, lapNumber: 2, segment: 1, entrySec: 61.2345, minSpeedSec: 62.8, exitSec: 64.5,
   entrySpeedKmh: 201.04, minSpeedKmh: 88.26, exitSpeedKmh: null, minSpeedM: 140.04, brakeM: -12.3, turnInM: 60.2,
   throttleM: null, aheadSlot: 7, aheadGapSec: 0.8124, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0,
-  coastSec: 0 };
+  coastSec: 0, arcRadiusM: null, apexLateralM: null };
 const METADATA = { sceneDesc: 'SEBRINGWEC', drivers: [{ name: 'A', slot: 3, carClass: 'GT3' }, { name: 'B', slot: 4, carClass: 'LMP2' }] };
 
 const databases: SessionDatabase[] = [];
@@ -129,6 +129,13 @@ describe('corner pass rows', () => {
     expect(db.listCornerPasses('a.Vcr', 'sequences')).toEqual([]);
     expect(db.getCornerPassBuild('a.Vcr', 'sequences')).toBeNull();
     expect(db.listLayoutPassReplays('sebring_full')).toEqual(['a.Vcr']);
+  });
+
+  it('store the line through the corner: the arc to a tenth of a metre, the road positions to a centimetre', () => {
+    const db = database();
+    db.replaceCornerPasses('a.Vcr', { versionKey: 'k', layoutKey: 'sebring_full' },
+      [{ ...PASS, arcRadiusM: -84.26, apexLateralM: -4.216 }]);
+    expect(db.listCornerPasses('a.Vcr')[0]).toMatchObject({ arcRadiusM: -84.3, apexLateralM: -4.22 });
   });
 
   it('store a sequence map and read it back', () => {

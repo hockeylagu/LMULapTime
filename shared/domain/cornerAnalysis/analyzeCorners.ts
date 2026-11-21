@@ -1,10 +1,11 @@
 import { median } from '../pitStops.js';
 import type { CornerPass } from '../../types/corners/cornerPasses.js';
 import type {
-  AnalysisCorner, AnalysisDriver, CornerAnalysis, CornerAnalysisInput, CornerHabit, CornerMistake, CornerReference, MistakeCause, TurnHalf,
+  AnalysisCorner, AnalysisDriver, CornerAnalysis, CornerAnalysisInput, CornerHabit, CornerMistake, CornerReference, LapTurnComparison, LapTurnDifference, MistakeCause,
+  TurnHalf, TurnMeasures,
 } from '../../types/corners/cornerAnalysis.js';
-import { HABIT_RULES } from './habitRules.js';
-import { fromApexSec, lapGapM, passSec, toApexSec, turnUsual, type TurnUsual } from './turnUsual.js';
+import { habitActions, habitCauses, habitDetail, HABIT_RULES, lossKind, lossKindText, turnArc, turnMeasures } from './habitRules.js';
+import { fromApexSec, isRepresentativeCornerPass, lapGapM, passSec, toApexSec, turnUsual, type TurnUsual } from './turnUsual.js';
 
 /** The habits shown (the first of the ranked list): a few things to work on, never everything (driver, 2026-11-19). */
 export const MAX_HABITS = 3;
@@ -26,25 +27,29 @@ export const MISTAKE_SPREADS = 3;
 export const TRAFFIC_SEC = 1;
 /** A lap this much longer (s) on part throttle out of the slowest point than the driver's usual lifted. */
 export const LIFT_MISTAKE_SEC = 0.5;
-/** A reference from another session counts this much less: grip and patches move whole corners. */
-export const OTHER_SESSION_CONFIDENCE = 0.8;
-/** The session's reference has a usual through at least this share of the driver's corners. */
+/** A lap with ABS working this much longer (s) than the driver's usual locked up. */
+export const LOCKUP_ABS_SEC = 0.3;
+/** A lap braking this much earlier (m) than the driver's usual braked early. */
+export const EARLY_BRAKE_MISTAKE_M = 10;
+/** A lap this much slower (km/h) at the slowest point, or out of the turn, than the driver's usual. */
+export const SLOW_MISTAKE_KMH = 5;
+/** The target has a usual through at least this share of the corners the candidates measured. */
 export const REFERENCE_COVERAGE = 0.8;
 /** The same-car check needs a driver gaining at least this share of what the reference gains on the driver per lap. */
 export const SAME_CAR_SHARE = 2 / 3;
 
 const passesOf = (driver: AnalysisDriver, turnId: number): CornerPass[] =>
-  driver.laps.flatMap(lap => lap.passes.filter(pass => pass.segment === turnId));
+  driver.laps.flatMap(lap => lap.passes.filter(pass => pass.segment === turnId && isRepresentativeCornerPass(pass)));
 
 interface CornerUsual { sec: number; lapOrdinal: number }
 
 /**
- * A driver's usual time through a corner: the median over laps with a pass through every one of its turns, and the lap
- * closest to it (the earliest on a tie).
+ * A driver's usual time through a corner: the median over laps with a representative pass through every one of its
+ * turns, and the lap closest to it (the earliest on a tie).
  */
 function cornerUsual(driver: AnalysisDriver, corner: AnalysisCorner, minLaps: number): CornerUsual | null {
   const sums = driver.laps.flatMap(lap => {
-    const passes = corner.turnIds.map(id => lap.passes.find(pass => pass.segment === id));
+    const passes = corner.turnIds.map(id => lap.passes.find(pass => pass.segment === id && isRepresentativeCornerPass(pass)));
     return passes.every(pass => pass !== undefined) ? [{ lapOrdinal: lap.lapOrdinal, sec: passes.reduce((sum, pass) => sum + passSec(pass), 0) }] : [];
   });
   const sec = sums.length >= minLaps ? median(sums.map(sum => sum.sec)) : null;
@@ -60,49 +65,44 @@ interface ChosenReference { driver: AnalysisDriver; usual: CornerReference }
 const referenceOf = (driver: AnalysisDriver, usual: CornerUsual): ChosenReference => ({
   driver,
   usual: {
-    sessionId: driver.sessionId, driverOrdinal: driver.driverOrdinal, name: driver.name, car: driver.car, sameSession: driver.sameSession,
+    sessionId: driver.sessionId, driverOrdinal: driver.driverOrdinal, name: driver.name, car: driver.car,
     laps: driver.laps.length, usualSec: usual.sec, usualLapOrdinal: usual.lapOrdinal,
   },
 });
 
 /**
- * One reference for the whole session, so the lines compare one way of driving the lap (validation, 2026-11-19): the
- * analysed session's quickest over the driver's corners when quicker than the driver, else the layout's quickest.
+ * The target: one driver for every session at the layout, so the lines compare one way of driving the lap (validation,
+ * 2026-11-19) and a corner's cost compares from session to session (driver, 2026-11-20). The best true pace among the
+ * candidates with a usual through most of the corners any candidate measured; the lower session id on a tie. Nothing
+ * of the driver's own session enters the choice.
  */
-function sessionReference(input: CornerAnalysisInput, ownSecs: Map<number, number | null>, candidates = input.others): AnalysisDriver | null {
-  const corners = input.corners.filter(corner => ownSecs.get(corner.id) != null);
-  const ranked = candidates.flatMap(driver => {
-    // The time gained on the driver over the corners both have: a candidate missing one corner still compares fairly.
-    let shared = 0, gainSec = 0;
-    for (const corner of corners) {
-      const sec = cornerUsualSec(driver, corner, input.minReferenceLaps);
-      if (sec === null) continue;
-      shared++;
-      gainSec += (ownSecs.get(corner.id) ?? 0) - sec;
-    }
-    return corners.length && shared / corners.length >= REFERENCE_COVERAGE ? [{ driver, gainSec }] : [];
-  }).sort((a, b) => b.gainSec - a.gainSec);
-  const sameSession = ranked.find(({ driver, gainSec }) => driver.sameSession && gainSec > 0);
-  return (sameSession ?? ranked[0])?.driver ?? null;
+function targetOf(input: CornerAnalysisInput, candidates = input.others): AnalysisDriver | null {
+  const hasUsual = (driver: AnalysisDriver, corner: AnalysisCorner) => cornerUsualSec(driver, corner, input.minReferenceLaps) !== null;
+  const measured = input.corners.filter(corner => input.others.some(driver => hasUsual(driver, corner)));
+  const covers = (driver: AnalysisDriver) => measured.filter(corner => hasUsual(driver, corner)).length >= REFERENCE_COVERAGE * measured.length;
+  return candidates
+    .flatMap(driver => (driver.paceSec === null ? [] : [{ driver, paceSec: driver.paceSec }]))
+    .sort((a, b) => a.paceSec - b.paceSec || (a.driver.sessionId < b.driver.sessionId ? -1 : a.driver.sessionId > b.driver.sessionId ? 1 : a.driver.driverOrdinal - b.driver.driverOrdinal))
+    .find(({ driver }) => measured.length > 0 && covers(driver))?.driver ?? null;
 }
 
 /**
- * The check for a reference in another car: the quickest driver in the driver's own car, when quicker than the driver
- * over the lap (same session first). A loss they do not share is the car, not the driving (driver, 2026-11-20).
+ * The check for a target in another car: the best true pace in the driver's own car, when quicker than the driver
+ * over the lap. A loss they do not share is the car, not the driving (driver, 2026-11-20).
  */
-function sameCarReference(input: CornerAnalysisInput, ownSecs: Map<number, number | null>, session: AnalysisDriver | null): AnalysisDriver | null {
+function sameCarReference(input: CornerAnalysisInput, ownSecs: Map<number, number | null>, target: AnalysisDriver | null): AnalysisDriver | null {
   const { car } = input.driver;
-  if (car === null || !session || session.car === car) return null;
-  const sameCar = sessionReference(input, ownSecs, input.others.filter(driver => driver.car === car));
+  if (car === null || !target || target.car === car) return null;
+  const sameCar = targetOf(input, input.others.filter(driver => driver.car === car));
   if (!sameCar) return null;
   const gainOf = (other: AnalysisDriver) => input.corners.reduce((sum, corner) => {
     const own = ownSecs.get(corner.id), theirs = cornerUsualSec(other, corner, input.minReferenceLaps);
     return own == null || theirs === null ? sum : sum + own - theirs;
   }, 0);
-  // Only a driver who shows what the car can do: most of the way from the driver to the reference over the lap.
+  // Only a driver who shows what the car can do: most of the way from the driver to the target over the lap.
   // A weaker one is often slower than the driver at the very turn, which says nothing about the car (validation, 2026-11-20).
   const gainSec = gainOf(sameCar);
-  return gainSec > 0 && gainSec >= SAME_CAR_SHARE * gainOf(session) ? sameCar : null;
+  return gainSec > 0 && gainSec >= SAME_CAR_SHARE * gainOf(target) ? sameCar : null;
 }
 
 /** The usual time a half of the driver's turn loses to another driver's usual (s), null when it cannot be measured. */
@@ -112,13 +112,12 @@ const medianHalfLoss = (own: readonly CornerPass[], other: TurnUsual, half: Turn
     return loss === null ? [] : [loss];
   }));
 
-/** A corner the session's reference lacks: the class's fastest usual there, the analysed session's when quicker. */
-function cornerReference(input: CornerAnalysisInput, corner: AnalysisCorner, ownSec: number | null): ChosenReference | null {
-  const ranked = input.others.flatMap(driver => {
+/** A corner the target lacks: the candidates' fastest usual there. */
+function cornerReference(input: CornerAnalysisInput, corner: AnalysisCorner): ChosenReference | null {
+  const [chosen] = input.others.flatMap(driver => {
     const usual = cornerUsual(driver, corner, input.minReferenceLaps);
     return usual === null ? [] : [{ driver, usual }];
   }).sort((a, b) => a.usual.sec - b.usual.sec);
-  const chosen = ranked.find(({ driver, usual }) => driver.sameSession && (ownSec === null || usual.sec < ownSec)) ?? ranked[0];
   return chosen ? referenceOf(chosen.driver, chosen.usual) : null;
 }
 
@@ -142,8 +141,7 @@ interface TurnContext {
   own: CornerPass[];
   ownUsual: TurnUsual;
   reference: TurnUsual;
-  referenceName: string;
-  /** The reference drives the driver's car: only then do gear numbers compare. */
+  /** The target drives the driver's car: only then do gear numbers compare. */
   sameCar: boolean;
   confidence: number;
   lengthM: number;
@@ -153,6 +151,11 @@ interface TurnContext {
 function turnHabits(context: TurnContext): CornerHabit[] {
   const { own, ownUsual, reference, lengthM } = context;
   const halves: TurnHalf[] = splits(ownUsual, reference, lengthM) ? ['in', 'out'] : ['whole'];
+  // Each pass as a usual of one, so a rule measures a lap the way it measures the usual.
+  const each = own.flatMap(pass => turnUsual([pass], lengthM) ?? []);
+  const kind = lossKind(ownUsual, reference);
+  const arc = turnArc(ownUsual, reference);
+  const speeds = { minKmh: ownUsual.minKmh, targetMinKmh: reference.minKmh, exitKmh: ownUsual.exitKmh, targetExitKmh: reference.exitKmh };
   return halves.flatMap((half): CornerHabit[] => {
     const losses = own.flatMap(pass => {
       const loss = halfLossOf(pass, reference, half);
@@ -160,17 +163,28 @@ function turnHabits(context: TurnContext): CornerHabit[] {
     });
     const lossSec = median(losses);
     if (lossSec === null || lossSec < HALF_LOSS_SEC) return [];
-    const base = { cornerId: context.corner.id, turnId: context.turnId, turnLabel: context.turnLabel, half, lossSec, sameCarLossSec: null, confidence: context.confidence };
-    for (const spec of HABIT_RULES.filter(rule => (half === 'whole' || rule.half === half) && (rule.rule !== 'gear' || context.sameCar))) {
-      const checks = own.map(pass => spec.check(pass, reference, lengthM));
-      const held = checks.filter(check => check.holds);
+    const base = {
+      cornerId: context.corner.id, turnId: context.turnId, turnLabel: context.turnLabel, half, lossSec, sameCarLossSec: null,
+      confidence: context.confidence, speeds, kind, arc,
+    };
+    for (const spec of HABIT_RULES.filter(rule => half === 'whole' || rule.half === half)) {
+      // The number said is the usual against the usual, the one the detail line and the series over sessions show.
+      // A rule that holds on half the laps while the usual lap is level with the target (short sessions) names
+      // nothing: a habit is what the driver usually does (driver, 2026-11-21).
+      const gap = spec.gap(ownUsual, reference, lengthM);
+      if (gap === null || !spec.holds(gap, ownUsual, reference)) continue;
+      const held = each.filter(usual => {
+        const passGap = spec.gap(usual, reference, lengthM);
+        return passGap !== null && (spec.holdsPass ? spec.holdsPass(passGap, usual, reference) : spec.holds(passGap, usual, reference));
+      });
       const repeatability = held.length / own.length;
       if (repeatability < MIN_REPEATABILITY) continue;
-      const gap = median(held.flatMap(check => (check.gap === null ? [] : [check.gap])));
+      const [action = null, ...otherActions] = habitActions(spec.rule, kind, gap, ownUsual, reference, lengthM);
       return [{
         ...base, rule: spec.rule, gap, repeatability, priority: lossSec * repeatability * context.confidence,
-        line: spec.line(gap ?? 0, context.turnLabel, reference),
-        detail: spec.detail(gap ?? 0, ownUsual, reference, context.referenceName),
+        line: spec.line(gap, context.turnLabel),
+        detail: habitDetail(spec.rule, ownUsual, reference, kind, arc),
+        action, otherActions, causes: habitCauses(half, action, ownUsual, reference, lengthM, context.sameCar),
       }];
     }
     const repeatability = losses.filter(loss => loss >= HALF_LOSS_SEC).length / own.length;
@@ -179,9 +193,45 @@ function turnHabits(context: TurnContext): CornerHabit[] {
     return [{
       ...base, rule: null, gap: null, repeatability, priority: lossSec * repeatability * context.confidence,
       line: `Losing time ${where} ${context.turnLabel}: no clear cause`,
-      detail: 'Open the laps side by side',
+      detail: 'Open the laps side by side', action: null, otherActions: [], causes: [],
     }];
   });
+}
+
+/**
+ * One lap against another through a turn (the lap view's two laps): each half where `lap` loses time to `other`, with
+ * the first headline measure that differs the losing way, the kind of loss and what else differs. The same measures
+ * and limits as the habits, read on one pass each as a usual of one. Two single laps are noisier than two usuals, so
+ * only a half losing UNEXPLAINED_SEC or more is told, and nothing here is a habit or advice: no action is offered.
+ * Null when either pass cannot be measured (a stop).
+ */
+export function compareLapTurn(lap: CornerPass, other: CornerPass, lengthM: number, sameCar: boolean): LapTurnComparison | null {
+  const own = isRepresentativeCornerPass(lap) ? turnUsual([lap], lengthM) : null;
+  const reference = isRepresentativeCornerPass(other) ? turnUsual([other], lengthM) : null;
+  if (!own || !reference) return null;
+  const halves: TurnHalf[] = splits(own, reference, lengthM) ? ['in', 'out'] : ['whole'];
+  const kind = lossKind(own, reference);
+  const differences = halves.flatMap((half): LapTurnDifference[] => {
+      const lossSec = halfLossOf(lap, reference, half);
+      if (lossSec === null || lossSec < UNEXPLAINED_SEC) return [];
+      const [found = null] = HABIT_RULES.flatMap((spec) => {
+        const gap = half === 'whole' || spec.half === half ? spec.gap(own, reference, lengthM) : null;
+        return gap !== null && (spec.holdsPass ? spec.holdsPass(gap, own, reference) : spec.holds(gap, own, reference)) ? [{ rule: spec.rule, gap }] : [];
+      });
+      return [{
+        half, lossSec, rule: found?.rule ?? null, gap: found?.gap ?? null,
+        kindLine: kind && kind !== 'exitOnly' && half !== 'out' ? lossKindText(kind, turnArc(own, reference)) : null,
+        // The brake point is not said twice under its own headline.
+        causes: habitCauses(half, null, own, reference, lengthM, sameCar).filter(cause => !(found?.rule === 'brakeEarly' && cause.type === 'brakePoint')),
+      }];
+  });
+  const absMoreSec = lap.absSec - other.absSec;
+  return {
+    differences,
+    // Only where the lap loses time: a quicker lap's traffic or longer ABS explains nothing.
+    traffic: differences.length > 0 && lap.aheadGapSec !== null && lap.aheadGapSec <= TRAFFIC_SEC,
+    absMoreSec: differences.some(difference => difference.half !== 'out') && absMoreSec >= LOCKUP_ABS_SEC ? absMoreSec : null,
+  };
 }
 
 /** Why a lap lost time, in words: the end of a mistake's line, and the debrief's cause column. */
@@ -193,11 +243,11 @@ export const MISTAKE_LINES: Record<Exclude<MistakeCause, null>, string> = {
 /** Why a lap lost time in a turn against the driver's own usual there; null when nothing measured stands out. */
 function mistakeCause(pass: CornerPass, usual: TurnUsual, lengthM: number): MistakeCause {
   if (pass.aheadGapSec !== null && pass.aheadGapSec <= TRAFFIC_SEC) return 'traffic';
-  if (pass.absSec - usual.absSec >= 0.3) return 'lockup';
-  if (pass.brakeM !== null && usual.brakeM !== null && lapGapM(pass.brakeM, usual.brakeM, lengthM) >= 10) return 'brakeEarly';
+  if (pass.absSec - usual.absSec >= LOCKUP_ABS_SEC) return 'lockup';
+  if (pass.brakeM !== null && usual.brakeM !== null && lapGapM(pass.brakeM, usual.brakeM, lengthM) >= EARLY_BRAKE_MISTAKE_M) return 'brakeEarly';
   if (pass.partThrottleSec !== null && usual.partThrottleSec !== null && pass.partThrottleSec - usual.partThrottleSec >= LIFT_MISTAKE_SEC) return 'lift';
-  if (pass.minSpeedKmh !== null && usual.minKmh !== null && usual.minKmh - pass.minSpeedKmh >= 5) return 'slowMiddle';
-  if (pass.exitSpeedKmh !== null && usual.exitKmh !== null && usual.exitKmh - pass.exitSpeedKmh >= 5) return 'slowExit';
+  if (pass.minSpeedKmh !== null && usual.minKmh !== null && usual.minKmh - pass.minSpeedKmh >= SLOW_MISTAKE_KMH) return 'slowMiddle';
+  if (pass.exitSpeedKmh !== null && usual.exitKmh !== null && usual.exitKmh - pass.exitSpeedKmh >= SLOW_MISTAKE_KMH) return 'slowExit';
   return null;
 }
 
@@ -205,7 +255,7 @@ function turnMistakes(driver: AnalysisDriver, corner: AnalysisCorner, turnId: nu
   const limit = Math.max(MISTAKE_MIN_SEC, MISTAKE_SPREADS * usual.spreadSec);
   return driver.laps.flatMap(lap => {
     const pass = lap.passes.find(item => item.segment === turnId);
-    if (!pass) return [];
+    if (!pass || !isRepresentativeCornerPass(pass)) return [];
     const lossSec = passSec(pass) - usual.sec;
     if (lossSec <= limit) return [];
     const cause = mistakeCause(pass, usual, lengthM);
@@ -215,9 +265,16 @@ function turnMistakes(driver: AnalysisDriver, corner: AnalysisCorner, turnId: nu
 }
 
 /**
- * The driver's corners at a layout in one session: habits against the class's fastest usual through each corner
- * (the analysed session's quickest when someone was quicker there), and mistakes against the driver's own usual.
+ * The driver's corners at a layout in one session: habits against the layout's target (the best true pace in the
+ * class, the same driver for every session), and mistakes against the driver's own usual.
  * Deterministic: fixed rules on the measured passes (habitRules.ts, mistakeCause).
+ *
+ * The validation below predates the fixed target and the reworked rules (2026-11-21): it compared against each
+ * session's own quickest driver, with the pedal timings as headlines. The rules now stand on the outcome check
+ * (habitRules.ts). A blind round on them (2026-11-21, 8 other sessions): 9 of the hand's 24 top-3 habits in the
+ * engine's top 3 by turn and reason, 14 by turn, the engine's top line at a turn of the hand's top 3 in 7 sessions
+ * of 8. The round found the passes holding a touch of the brake in place of the main stop, or no brake point after
+ * a long roll: fixed in the pass builder (pass version 21), after which "brake later" passes the outcome check too.
  *
  * Validated against blind hand analyses (subagents, the engine run apart, compared by turn and reason): tuned on 16
  * sessions, then a frozen held-out set of 8 in classes the tuning never saw (10 of the hand's 24 top-3 habits in the
@@ -234,14 +291,15 @@ export function analyzeCorners(input: CornerAnalysisInput): CornerAnalysis {
   const labels = new Map(input.turns.map(turn => [turn.id, turn.label]));
   const habits: CornerHabit[] = [];
   const mistakes: CornerMistake[] = [];
+  const measures: TurnMeasures[] = [];
   const ownUsuals = new Map(input.corners.map(corner => [corner.id, cornerUsual(driver, corner, 1)]));
   const ownSecs = new Map(input.corners.map(corner => [corner.id, ownUsuals.get(corner.id)?.sec ?? null]));
-  const session = sessionReference(input, ownSecs);
-  const sameCar = sameCarReference(input, ownSecs, session);
+  const target = targetOf(input);
+  const sameCar = sameCarReference(input, ownSecs, target);
   const corners = input.corners.map(corner => {
     const usualSec = ownSecs.get(corner.id) ?? null;
-    const sessionUsual = session && cornerUsual(session, corner, input.minReferenceLaps);
-    const chosen = session && sessionUsual ? referenceOf(session, sessionUsual) : cornerReference(input, corner, usualSec);
+    const targetUsual = target && cornerUsual(target, corner, input.minReferenceLaps);
+    const chosen = target && targetUsual ? referenceOf(target, targetUsual) : cornerReference(input, corner);
     for (const turnId of corner.turnIds) {
       const turnLabel = labels.get(turnId) || `turn ${turnId + 1}`;
       const own = passesOf(driver, turnId);
@@ -250,9 +308,10 @@ export function analyzeCorners(input: CornerAnalysisInput): CornerAnalysis {
       mistakes.push(...turnMistakes(driver, corner, turnId, turnLabel, ownUsual, lengthM));
       const reference = chosen && turnUsual(passesOf(chosen.driver, turnId), lengthM);
       if (!chosen || !reference) continue;
-      const confidence = Math.min(1, own.length / 5) * Math.min(1, reference.laps / 3) * (chosen.driver.sameSession ? 1 : OTHER_SESSION_CONFIDENCE);
+      measures.push(turnMeasures(turnId, ownUsual, reference, lengthM));
+      const confidence = Math.min(1, own.length / 5) * Math.min(1, reference.laps / 3);
       const sameCarUsual = sameCar && chosen.driver !== sameCar ? turnUsual(passesOf(sameCar, turnId), lengthM) : null;
-      habits.push(...turnHabits({ corner, turnId, turnLabel, own, ownUsual, reference, referenceName: chosen.driver.name,
+      habits.push(...turnHabits({ corner, turnId, turnLabel, own, ownUsual, reference,
         sameCar: driver.car !== null && driver.car === chosen.driver.car, confidence, lengthM })
         .map(habit => ({ ...habit, sameCarLossSec: sameCarUsual && medianHalfLoss(own, sameCarUsual, habit.half) })));
     }
@@ -269,12 +328,16 @@ export function analyzeCorners(input: CornerAnalysisInput): CornerAnalysis {
   return {
     laps: driver.laps.length,
     corners,
+    target: target && target.paceSec !== null
+      ? { sessionId: target.sessionId, driverOrdinal: target.driverOrdinal, name: target.name, car: target.car, laps: target.laps.length, paceSec: target.paceSec }
+      : null,
     sameCarReference: sameCar && {
-      sessionId: sameCar.sessionId, driverOrdinal: sameCar.driverOrdinal, name: sameCar.name, car: sameCar.car, sameSession: sameCar.sameSession, laps: sameCar.laps.length,
+      sessionId: sameCar.sessionId, driverOrdinal: sameCar.driverOrdinal, name: sameCar.name, car: sameCar.car, laps: sameCar.laps.length,
     },
     habits: driving.filter(habit => habit.rule !== null).sort(byPriority),
     unexplained: driving.filter(habit => habit.rule === null && habit.lossSec >= UNEXPLAINED_SEC).sort(byPriority),
     carDifferences: habits.filter(habit => isCar(habit) && habit.lossSec >= UNEXPLAINED_SEC).sort(byPriority),
     mistakes: mistakes.sort((a, b) => a.lapOrdinal - b.lapOrdinal || a.turnId - b.turnId),
+    measures: measures.sort((a, b) => a.turnId - b.turnId),
   };
 }

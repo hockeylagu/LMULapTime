@@ -9,6 +9,12 @@ export function lapGapM(from: number, to: number, lengthM: number): number {
   return gap;
 }
 
+/** At or below this minimum speed (km/h), treat the pass as a stop for corner analysis. */
+const STOPPED_CORNER_SPEED_KMH = 1;
+
+/** Missing speed alone is not evidence of a stop. */
+export const isRepresentativeCornerPass = (pass: CornerPass): boolean => pass.minSpeedKmh === null || pass.minSpeedKmh > STOPPED_CORNER_SPEED_KMH;
+
 export const passSec = (pass: CornerPass): number => pass.exitSec - pass.entrySec;
 export const toApexSec = (pass: CornerPass): number | null => (pass.minSpeedSec === null ? null : pass.minSpeedSec - pass.entrySec);
 export const fromApexSec = (pass: CornerPass): number | null => (pass.minSpeedSec === null ? null : pass.exitSec - pass.minSpeedSec);
@@ -55,15 +61,46 @@ export interface TurnUsual {
   absSec: number;
   gear: number | null;
   coastSec: number;
+  turnInM: number | null;
+  throttleM: number | null;
+  /**
+   * The usual arc at the slowest point: its radius (m), the side it turns to (1 left, -1 right) and the sideways g
+   * there (speed² / radius). Null when the passes have no arc.
+   */
+  arcRadiusM: number | null;
+  arcSide: 1 | -1 | null;
+  latG: number | null;
+  /** Metres towards the inside of the arc from the centre line at the apex. */
+  apexInsideM: number | null;
   /** The lap-to-lap spread of the turn time (s): the median absolute deviation scaled to a standard deviation. */
   spreadSec: number;
 }
+
+const G_MPS2 = 9.81;
+
+/** The sideways g of a pass at its slowest point: speed² / arc radius. */
+const passLatG = (pass: CornerPass): number | null =>
+  pass.arcRadiusM === null || pass.minSpeedKmh === null ? null : (pass.minSpeedKmh / 3.6) ** 2 / Math.abs(pass.arcRadiusM) / G_MPS2;
 
 export function turnUsual(passes: readonly CornerPass[], lengthM: number): TurnUsual | null {
   if (!passes.length) return null;
   const secs = passes.map(passSec);
   const sec = median(secs) ?? 0;
+  // The side most passes turn to: a pass on the other side (a slide, a kink taken the other way) is left out of the line.
+  const left = passes.filter(pass => (pass.arcRadiusM ?? 0) > 0).length, right = passes.filter(pass => (pass.arcRadiusM ?? 0) < 0).length;
+  const arcSide = left + right === 0 ? null : left >= right ? 1 : -1;
+  const onArc = passes.filter(pass => pass.arcRadiusM !== null && Math.sign(pass.arcRadiusM) === arcSide);
+  const inside = (lateral: (pass: CornerPass) => number | null) => medianOf(onArc.map(pass => {
+    const value = lateral(pass);
+    return value === null || arcSide === null ? null : value * arcSide;
+  }));
   return {
+    turnInM: medianPointM(passes.map(pass => pass.turnInM), lengthM),
+    throttleM: medianPointM(passes.map(pass => pass.throttleM), lengthM),
+    arcRadiusM: medianOf(onArc.map(pass => Math.abs(pass.arcRadiusM ?? 0))),
+    arcSide,
+    latG: medianOf(onArc.map(passLatG)),
+    apexInsideM: inside(pass => pass.apexLateralM),
     laps: passes.length,
     sec,
     toApexSec: medianOf(passes.map(toApexSec)),

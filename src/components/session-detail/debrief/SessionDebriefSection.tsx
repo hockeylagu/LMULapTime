@@ -1,44 +1,46 @@
-import { useState } from 'react';
-import { ChevronDown, ClipboardList } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import type { DetailedSession, DriverData } from '../../../../shared/types/index.js';
-import { resolveVehicle } from '../../../../shared/domain/vehicleMapping.js';
-import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { fetchSessionStrategy } from '../../../api/sessionStrategyApi.js';
+import { useRequest } from '../../../api/useRequest.js';
 import { SessionStrategyCard } from './SessionStrategyCard.js';
-import { WatchNextSessionCard } from './WatchNextSessionCard.js';
+import { OneOffLoss, WatchNextSessionCard } from './WatchNextSessionCard.js';
+import { useWatchNextSession } from './useWatchNextSession.js';
 
-/**
- * The player's debrief in one collapsed section, read when opened: what to watch next session (the corner analysis of
- * the replay's passes) and, for a race, the strategy (from their telemetry recording).
- */
-export function SessionDebriefSection({ session, selectedDriver }: { session: DetailedSession; selectedDriver: DriverData }) {
-  const [open, setOpen] = useState(false);
-  const player = selectedDriver.driverOrdinal === session.playerDriver?.driverOrdinal;
-  const strategy = player && session.sessionType === 'Race';
-  const watch = player && Boolean(session.matchingReplayFile);
-  if (!strategy && !watch) return null;
-  const parts = [watch && 'watch next session', strategy && 'strategy'].filter(Boolean).join(' · ');
-  const ownCar = resolveVehicle(selectedDriver.carType)?.model ?? selectedDriver.carType;
+function PlayerDebrief({ session, driverName }: { session: DetailedSession; driverName: string }) {
+  const race = session.sessionType === 'Race';
+  const hasReplay = Boolean(session.matchingReplayFile);
+  const { state, retry, unpin } = useWatchNextSession(session, driverName, hasReplay);
+  // A race's strategy needs its telemetry recording: without one (online races) the side pane leaves it out.
+  const strategy = useRequest(race ? session.id : null, fetchSessionStrategy);
+  const hasStrategy = strategy.data !== null || strategy.error !== null;
+  const mistake = state.status === 'ready' ? state.watch.mistake : null;
+  const hasSidePane = hasStrategy || mistake !== null;
+
   return (
-    <div className="bg-lmu-card rounded-2xl border border-lmu-border" data-testid="session-debrief-section">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen(value => !value)}
-        className={`w-full flex items-center justify-between gap-2 p-5 rounded-2xl text-left ${FOCUS_RING}`}
-      >
-        <span className="flex items-center gap-2">
-          <ClipboardList className="w-4 h-4 text-lmu-warn" />
-          <span className="text-sm font-bold text-white uppercase tracking-wider">Debrief</span>
-          <span className="text-xs text-lmu-muted">{parts}</span>
-        </span>
-        <ChevronDown className={`w-4 h-4 text-lmu-muted transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div className="px-5 pb-5 space-y-4">
-          {watch && <div className="border-t border-lmu-border/60 pt-4"><WatchNextSessionCard session={session} driverName={selectedDriver.name} ownCar={ownCar} /></div>}
-          {strategy && <div className="border-t border-lmu-border/60 pt-4"><SessionStrategyCard sessionId={session.id} /></div>}
-        </div>
-      )}
-    </div>
+    <section
+      aria-labelledby="session-debrief-title"
+      className="bg-lmu-card rounded-2xl border border-lmu-border"
+      data-testid="session-debrief-section"
+    >
+      <header className="flex items-center gap-2 border-b border-lmu-border/60 px-5 pt-5 pb-3">
+        <ClipboardList aria-hidden="true" className="size-4 text-lmu-accent-text" />
+        <h2 id="session-debrief-title" className="text-sm font-bold text-white uppercase tracking-wider">Session Debrief</h2>
+      </header>
+      <div className={hasSidePane ? 'grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]' : undefined}>
+        <WatchNextSessionCard state={state} retry={retry} onUnpin={unpin} />
+        {hasSidePane && (
+          <aside aria-label="Race and lap details" className="min-w-0 rounded-b-2xl border-t border-lmu-border bg-lmu-bg/45 px-5 pt-4 pb-5 lg:rounded-bl-none lg:border-t-0 lg:border-l">
+            {hasStrategy && <SessionStrategyCard state={strategy} />}
+            {mistake && <div className={hasStrategy ? 'mt-4 border-t border-lmu-border/60 pt-4' : undefined}><OneOffLoss mistake={mistake} /></div>}
+          </aside>
+        )}
+      </div>
+    </section>
   );
+}
+
+export function SessionDebriefSection({ session, selectedDriver }: { session: DetailedSession; selectedDriver: DriverData }) {
+  if (selectedDriver.driverOrdinal !== session.playerDriver?.driverOrdinal) return null;
+  if (!session.matchingReplayFile && session.sessionType !== 'Race') return null;
+  return <PlayerDebrief key={session.id} session={session} driverName={selectedDriver.name} />;
 }

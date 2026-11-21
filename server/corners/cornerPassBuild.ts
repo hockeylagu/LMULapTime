@@ -80,7 +80,9 @@ export function readPassLap(
   const stored = decodeLapColumns<StoredLap>(blob, PASS_KEYS);
   const [time, x, z, speed, throttle, brake, steer, inPit, inGarage, teleport, gear, tc, abs] = PASS_KEYS.map(key => channel(stored, key));
   const lengthM = index.totalLengthM;
-  const lap: Required<PassLapSamples> = { lapNumber, times: [], stations: [], speedKmh: [], throttle: [], brake: [], steer: [], gear: [], tcActive: [], absActive: [], usable: [] };
+  const lap: Required<PassLapSamples> = {
+    lapNumber, times: [], stations: [], speedKmh: [], throttle: [], brake: [], steer: [], gear: [], tcActive: [], absActive: [], x: [], z: [], lateral: [], usable: [],
+  };
   const points: ReplayTrajectoryPoint[] = [];
   const driving: number[] = [];
   for (let i = 0; i < stored.pointsLength; i++) {
@@ -101,6 +103,9 @@ export function readPassLap(
     lap.gear.push(numberOrNull(gear[i]));
     lap.tcActive.push(tc[i] === true);
     lap.absActive.push(abs[i] === true);
+    lap.x.push(px);
+    lap.z.push(pz);
+    lap.lateral.push(null);
     lap.usable.push(usable);
     if (usable) {
       points.push({ x: px, y: 0, z: pz });
@@ -108,9 +113,10 @@ export function readPassLap(
     }
   }
   if (points.length > 0) {
-    const { stations } = projectTrajectoryToCenterline(points, index, { clampSeam: false });
+    const { stations, lateralOffsets } = projectTrajectoryToCenterline(points, index, { clampSeam: false });
     driving.forEach((sampleIndex, k) => {
       lap.stations[sampleIndex] = ((stations[k] - startStationM) % lengthM + lengthM) % lengthM;
+      lap.lateral[sampleIndex] = lateralOffsets[k];
     });
   }
   return lap;

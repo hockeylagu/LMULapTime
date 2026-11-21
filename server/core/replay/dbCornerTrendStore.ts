@@ -1,6 +1,10 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import type { PassKind } from './dbCornerPassStore.js';
-import { REFERENCE_OVERALL, REFERENCE_PER_CAR, SHORTLIST_LAPS } from './dbCornerAnalysisStore.js';
+import { SHORTLIST_LAPS } from './dbCornerAnalysisStore.js';
+
+/** The class reference shortlist: the quickest drivers by usual lap time, overall and in each car. */
+export const REFERENCE_OVERALL = 10;
+export const REFERENCE_PER_CAR = 3;
 
 /** Which stored passes a layout's corner trends read: the pass tables and the build they must come from. */
 export interface CornerTrendScope {
@@ -68,7 +72,7 @@ export function listCornerTrendSessions(db: DatabaseType, scope: CornerTrendScop
 /**
  * The counted passes of the class at the layout, from current builds only: the player's (of the model, when one is
  * picked) and the class reference candidates': other human drivers (any model), shortlisted by usual (median) lap time
- * over at least `minLaps` counted laps as the corner analysis shortlists them (REFERENCE_OVERALL quickest, REFERENCE_PER_CAR
+ * over at least `minLaps` counted laps (REFERENCE_OVERALL quickest, REFERENCE_PER_CAR
  * per car; driver, 2026-11-20: lap time is good enough. Against every driver, 440 of 465 corner references stayed,
  * the rest slower by a median 0.02 s, at most 0.08 s). A car is its session driver
  * matched by name in the replay's roster, as the sequence maps match them.

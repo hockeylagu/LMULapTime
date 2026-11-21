@@ -6,7 +6,7 @@ import type { CornerPass, SessionCornerPasses } from '../../../shared/types/corn
 const pass = (slot: number, lapNumber: number, segment: number, entrySec: number, exitSec: number, extra: Partial<CornerPass> = {}): CornerPass => ({
   slot, lapNumber, segment, entrySec, minSpeedSec: null, exitSec, entrySpeedKmh: null, minSpeedKmh: null, exitSpeedKmh: null,
   minSpeedM: null, brakeM: null, turnInM: null, throttleM: null, aheadSlot: null, aheadGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0,
-  coastSec: 0, ...extra,
+  coastSec: 0, arcRadiusM: null, apexLateralM: null, ...extra,
 });
 const data = (passes: CornerPass[]): SessionCornerPasses & { available: true } => ({
   available: true, layoutKey: 'test', startStationM: 100, trackLengthM: 1000,

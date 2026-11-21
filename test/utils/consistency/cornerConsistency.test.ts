@@ -13,7 +13,7 @@ function pass(lapNumber: number, segment: number, sec: number, extra: Partial<Co
     slot: 0, lapNumber, segment, entrySec, minSpeedSec: entrySec + 1, exitSec: entrySec + sec,
     entrySpeedKmh: 250, minSpeedKmh: 100, exitSpeedKmh: 180, minSpeedM: 500, brakeM: 380, turnInM: 440, throttleM: 530,
     aheadSlot: null, aheadGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0,
-  coastSec: 0, ...extra,
+  coastSec: 0, arcRadiusM: null, apexLateralM: null, ...extra,
   };
 }
 

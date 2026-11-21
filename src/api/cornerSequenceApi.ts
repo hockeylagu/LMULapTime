@@ -2,6 +2,7 @@ import type { LayoutCorners } from '../../shared/types/corners/cornerPasses.js';
 import type { SequenceMapsResponse } from '../../shared/types/corners/sequenceMaps.js';
 import type { CornerTrendsResponse } from '../../shared/types/corners/cornerTrends.js';
 import type { SessionCornerAnalysis } from '../../shared/types/corners/cornerAnalysis.js';
+import type { HabitFocusPin } from '../../shared/types/corners/habitFocus.js';
 import { fetchJson, postJson } from './apiClient.js';
 
 export function fetchSequenceMaps(signal?: AbortSignal): Promise<SequenceMapsResponse> {
@@ -70,4 +71,14 @@ export function sequenceMapsChanged(): void {
 /** Rebuilds a map from the class's fastest laps now, then its layout's sequence passes (in the background). */
 export function regenerateSequenceMap(layoutKey: string, carClass: string): Promise<{ regenerating: string }> {
   return postJson('/api/corner-sequences/maps/regenerate', { layoutKey, carClass });
+}
+
+/** Makes the corner holding the turn a focus until unpinned; refused ("Unpin one first") when 2 are pinned. */
+export function pinHabitFocus(pin: HabitFocusPin): Promise<{ pinned: boolean }> {
+  return postJson('/api/habit-focus/pin', pin);
+}
+
+/** Hands the corner's focus slot back to the rules. */
+export function unpinHabitFocus(pin: HabitFocusPin): Promise<{ pinned: boolean }> {
+  return postJson('/api/habit-focus/unpin', pin);
 }

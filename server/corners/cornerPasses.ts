@@ -8,7 +8,7 @@
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 
 /** Bumped when the pass rule or the stored pass row changes: every replay's passes are rebuilt offline. */
-export const CORNER_PASS_VERSION = 19;
+export const CORNER_PASS_VERSION = 21;
 
 /** Samples further apart than this are a gap in the recording: no crossing is read across it. */
 const MAX_SAMPLE_GAP_SEC = 1.5;
@@ -25,8 +25,8 @@ const LINE_BORROW_M = 200;
 const BRAKE_ON = 0.1;
 /** Brake releases shorter than this stay one braking (a driver's trail-brake stab). */
 const BRAKE_MERGE_SEC = 0.25;
-/** A braking that ended more than this before the slowest point belongs to an earlier corner. */
-const BRAKE_TO_SLOWEST_MAX_SEC = 2;
+/** A braking after which the car gained more than this (km/h) before the slowest point was for an earlier corner. */
+const BRAKE_REGAIN_MAX_KMH = 10;
 /** Steering from which the car is turning in (share of full lock, one side: about 8-10Â° at the wheel). */
 const TURN_IN_STEER = 0.04;
 /** Throttle under this is a lift; back over it the car is accelerating again (0-1). */
@@ -45,6 +45,10 @@ export const TRAFFIC_RANGE_SEC = 2;
 const TRAFFIC_MIN_SPEED_MPS = 5;
 /** How often the cars' order on the track is read for traffic. */
 const TRAFFIC_HZ = 4;
+/** The arc at the slowest point is the circle through the car's positions this long (s) before, at and after it. */
+const ARC_HALF_SEC = 0.5;
+/** A wider arc than this (m) is a straight: no arc, no inside. */
+const MAX_ARC_RADIUS_M = 1500;
 
 /** One stored lap of one car at full rate, its samples already placed on the centre line. */
 export interface PassLapSamples {
@@ -61,6 +65,10 @@ export interface PassLapSamples {
   gear?: Array<number | null>;
   tcActive?: boolean[];
   absActive?: boolean[];
+  /** The car's position (m) and its offset from the centre line (m, positive left); absent when not read (no arc, no road position). */
+  x?: Array<number | null>;
+  z?: Array<number | null>;
+  lateral?: Array<number | null>;
   /** False for samples that are not driving the track (pit lane, garage, teleport, far off it, unreadable). */
   usable: boolean[];
 }
@@ -91,16 +99,22 @@ interface LapTrack {
   gear: Array<number | null>;
   tc: boolean[];
   abs: boolean[];
+  x: Array<number | null>;
+  z: Array<number | null>;
+  lateral: Array<number | null>;
   /** Whether sample i follows sample i - 1 without a gap. */
   joined: boolean[];
 }
+
+const emptyTrack = (lapNumber: number): LapTrack =>
+  ({ lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], gear: [], tc: [], abs: [], x: [], z: [], lateral: [], joined: [] });
 
 /** Whether a sample follows the one before it without a gap in the recording or a teleport. */
 const follows = (previousT: number, previousD: number, t: number, d: number) =>
   t > previousT && t - previousT <= MAX_SAMPLE_GAP_SEC && Math.abs(d - previousD) <= MAX_SAMPLE_JUMP_M;
 
 function lapTrack(lap: PassLapSamples, lengthM: number): LapTrack {
-  const track: LapTrack = { lapNumber: lap.lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], gear: [], tc: [], abs: [], joined: [] };
+  const track = emptyTrack(lap.lapNumber);
   for (let i = 0; i < lap.times.length; i++) {
     const time = lap.times[i];
     const station = lap.stations[i];
@@ -123,6 +137,9 @@ function lapTrack(lap: PassLapSamples, lengthM: number): LapTrack {
     track.gear.push(lap.gear?.[i] ?? null);
     track.tc.push(lap.tcActive?.[i] === true);
     track.abs.push(lap.absActive?.[i] === true);
+    track.x.push(lap.x?.[i] ?? null);
+    track.z.push(lap.z?.[i] ?? null);
+    track.lateral.push(lap.lateral?.[i] ?? null);
     track.joined.push(joined);
   }
   placeOnLap(track, lengthM);
@@ -161,7 +178,7 @@ function placeOnLap(track: LapTrack, lengthM: number): void {
 function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: LapTrack | undefined, lengthM: number, borrowM: number): LapTrack {
   const n = track.t.length;
   if (n === 0) return track;
-  const out: LapTrack = { lapNumber: track.lapNumber, t: [], d: [], speed: [], throttle: [], brake: [], steer: [], gear: [], tc: [], abs: [], joined: [] };
+  const out = emptyTrack(track.lapNumber);
   const push = (from: LapTrack, i: number, shift: number, joined: boolean) => {
     out.t.push(from.t[i]);
     out.d.push(from.d[i] + shift);
@@ -172,6 +189,9 @@ function withNeighbours(track: LapTrack, previous: LapTrack | undefined, next: L
     out.gear.push(from.gear[i]);
     out.tc.push(from.tc[i]);
     out.abs.push(from.abs[i]);
+    out.x.push(from.x[i]);
+    out.z.push(from.z[i]);
+    out.lateral.push(from.lateral[i]);
     out.joined.push(joined);
   };
   // Only the unbroken run that leads into the lap's first sample, and the one that carries on from its last: other
@@ -300,6 +320,17 @@ function timeWhere(track: LapTrack, from: number, to: number, holds: (i: number)
 const BRAKE_OFF = 0.05;
 
 /**
+ * The speed a braking sheds up to the slowest point (km/h); null when the car gained speed again after it (the
+ * braking was for an earlier corner).
+ */
+function brakingShed(track: LapTrack, [first, last]: [number, number], slowest: number): number | null {
+  const end = Math.min(last, slowest);
+  const endSpeed = track.speed[end] ?? 0;
+  for (let i = end + 1; i <= slowest; i++) if ((track.speed[i] ?? 0) > endSpeed + BRAKE_REGAIN_MAX_KMH) return null;
+  return (track.speed[first] ?? 0) - endSpeed;
+}
+
+/**
  * Coasting: off both pedals from the end of the braking (else the segment's start) to the throttle pick-up (else the
  * segment's end) (s). The corner-map branch's coasting; its other technique cues did not survive the blind validation
  * of 2026-11-20 (shared/domain/cornerAnalysis/analyzeCorners.ts).
@@ -328,6 +359,59 @@ function driveCues(track: LapTrack, entry: number, exit: number, slowest: number
 }
 
 const NO_DRIVE_CUES = { minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0 };
+
+/** The car's position at `time`, between the samples around it, reached from sample `from` without crossing a gap. */
+function positionAt(track: LapTrack, time: number, from: number): [number, number] | null {
+  let i = from;
+  while (i > 0 && track.t[i] > time) {
+    if (!track.joined[i]) return null;
+    i--;
+  }
+  while (i + 1 < track.t.length && track.t[i + 1] <= time) {
+    if (!track.joined[i + 1]) return null;
+    i++;
+  }
+  const x = track.x[i], z = track.z[i];
+  if (track.t[i] > time || x === null || z === null) return null;
+  if (track.t[i] === time) return [x, z];
+  const nextX = track.x[i + 1] ?? null, nextZ = track.z[i + 1] ?? null;
+  if (i + 1 >= track.t.length || !track.joined[i + 1] || nextX === null || nextZ === null) return null;
+  const f = (time - track.t[i]) / (track.t[i + 1] - track.t[i]);
+  return [x + (nextX - x) * f, z + (nextZ - z) * f];
+}
+
+/**
+ * The radius of the circle through the car's positions ARC_HALF_SEC before, at and after sample `i` (m), positive
+ * turning left (the centre line's left is (-tz, tx) of its direction); null on a straight or without positions.
+ */
+function arcRadius(track: LapTrack, i: number): number | null {
+  const a = positionAt(track, track.t[i] - ARC_HALF_SEC, i), b = positionAt(track, track.t[i], i), c = positionAt(track, track.t[i] + ARC_HALF_SEC, i);
+  if (!a || !b || !c) return null;
+  const cross = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+  if (Math.abs(cross) < 1e-6) return null;
+  const radius = (Math.hypot(b[0] - a[0], b[1] - a[1]) * Math.hypot(c[0] - b[0], c[1] - b[1]) * Math.hypot(a[0] - c[0], a[1] - c[1])) / (2 * Math.abs(cross));
+  return radius > MAX_ARC_RADIUS_M ? null : Math.sign(cross) * radius;
+}
+
+const NO_LINE = { arcRadiusM: null, apexLateralM: null };
+
+/**
+ * The line of a pass: its arc at the slowest point, and where the car is on the road at the apex (the most inside
+ * point of the pass, the inside being the side the arc turns to). The road positions at the turn-in and at the exit
+ * are not kept: no kind of loss followed them on the driver's history. speed² = sideways g × arc radius at the slowest
+ * point, so a lower minimum speed is a tighter arc or less grip used.
+ */
+function passLine(track: LapTrack, entry: number, exit: number, slowest: number) {
+  const arcRadiusM = arcRadius(track, slowest);
+  if (arcRadiusM === null) return NO_LINE;
+  const side = Math.sign(arcRadiusM);
+  let apex: number | null = null;
+  for (let i = entry; i < exit; i++) {
+    const lateral = track.lateral[i];
+    if (lateral !== null && (apex === null || lateral * side > apex)) apex = lateral * side;
+  }
+  return { arcRadiusM, apexLateralM: apex === null ? null : apex * side };
+}
 
 /** The first sample after `from` up to `to` that does not follow the one before it, or -1. */
 function breakIn(track: LapTrack, from: number, to: number): number {
@@ -384,11 +468,14 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
     let minSpeedKmh = slowest >= 0 ? track.speed[slowest] : null;
     let minSpeedM = slowest >= 0 ? track.d[slowest] : null;
     let minSpeedSec = slowest >= 0 ? track.t[slowest] : null;
+    // Slowest at an end, the segment holds no apex: no line is read.
+    let apexInside = slowest >= 0;
     for (const [end, m] of [[entry, segment.startM], [exit, segment.endM]] as const) {
       if (end.speedKmh !== null && (minSpeedKmh === null || end.speedKmh < minSpeedKmh)) {
         minSpeedKmh = end.speedKmh;
         minSpeedM = m;
         minSpeedSec = end.sec;
+        apexInside = false;
       }
     }
 
@@ -398,13 +485,21 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
     let brakeStart: number | null = null;
     let run: [number, number] | null = null;
     let throttleOn: number | null = null;
+    let turnIn: number | null = null;
     if (slowest >= 0) {
-      // The braking for this corner: the last one that starts after the previous corner's slowest point,
-      // starts by this one's slowest point and is still on shortly before it.
+      // The braking for this corner: of those that start after the previous corner's slowest point and by this
+      // one's, the one that sheds the most speed. The main stop, not a touch of the brake after it; however long the
+      // car rolls from it to the slowest point (the last braking within 2 s of that point, until pass version 21,
+      // took the touch and dropped the stop of a long roll: blind round of 2026-11-21).
       while (nextRun < runs.length && runs[nextRun][0] <= previousSlowest) nextRun++;
       let chosen = -1;
+      let most = -Infinity;
       for (let r = nextRun; r < runs.length && runs[r][0] <= slowest; r++) {
-        if (track.t[slowest] - track.t[runs[r][1]] <= BRAKE_TO_SLOWEST_MAX_SEC) chosen = r;
+        const shed = brakingShed(track, runs[r], slowest);
+        if (shed !== null && shed > most) {
+          chosen = r;
+          most = shed;
+        }
       }
       if (chosen >= 0) {
         run = runs[chosen];
@@ -413,7 +508,7 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
         nextRun = chosen + 1;
       }
       // Never back into the previous corner: its slowest point, and the throttle point it already took.
-      const turnIn = turnInIndex(track, slowest, previousSlowest + 1);
+      turnIn = turnInIndex(track, slowest, previousSlowest + 1);
       if (turnIn !== null) turnInM = track.d[turnIn];
       throttleOn = throttleOnIndex(track, slowest, Math.max(previousSlowest, previousThrottleOn) + 1, exit.index);
       if (throttleOn !== null) {
@@ -434,6 +529,7 @@ function lapPasses(slot: number, track: LapTrack, segments: PassSegment[], lengt
       minSpeedM: onLap(minSpeedM), brakeM: onLap(brakeM), turnInM: onLap(turnInM), throttleM: onLap(throttleM),
       ...(slowest >= 0 ? driveCues(track, entry.index, exit.index, slowest, brakeStart) : NO_DRIVE_CUES),
       coastSec: slowest >= 0 ? coastSec(track, entry.index, exit.index, run, throttleOn) : 0,
+      ...(apexInside ? passLine(track, entry.index, exit.index, slowest) : NO_LINE),
       aheadSlot: null, aheadGapSec: null,
     });
   }

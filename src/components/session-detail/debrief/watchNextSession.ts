@@ -1,66 +1,109 @@
-import type {
-  CornerAnalysisCorner, CornerHabit, CornerReference, SessionCornerAnalysis,
-} from '../../../../shared/types/corners/cornerAnalysis.js';
+import type { CornerHabit, HabitRule, SessionCornerAnalysis } from '../../../../shared/types/corners/cornerAnalysis.js';
+import type { FocusProgress, HabitFocusPin, PaceGoal } from '../../../../shared/types/corners/habitFocus.js';
+import type { PaceCategory } from '../../../../shared/types/reference.js';
 import type { LayoutCorners } from '../../../../shared/types/corners/cornerPasses.js';
+import { MISTAKE_LINES } from '../../../../shared/domain/cornerAnalysis/analyzeCorners.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
+import { HISTORY_SESSIONS } from '../../../../shared/domain/cornerAnalysis/habitFocus.js';
+import { CAUSE_EXPLANATIONS, habitGapLabel, habitGapText, habitTriedTitle, habitTryLine, habitTryTitle, MISTAKE_EXPLANATIONS } from './habitText.js';
 import { sessionRefLabel } from '../../track-detail/corner-trends/cornerHabitText.js';
+import { buildTelemetryComparePath, type TelemetryLapRef } from '../../../utils/telemetryCompareLink.js';
 
-/** Lines shown: a few things to work on, never everything (driver, 2026-11-19). */
-export const WATCH_HABITS = 3;
-export const WATCH_MISTAKES = 3;
-
-export interface WatchHabit {
-  key: string;
+/** Where the session stands against the next pace level, one line above the focus. */
+export interface WatchGoal {
+  /** At the top level: nothing above to find. */
+  reached: boolean;
+  /** Current pace level and percentage for the PaceBadge. */
+  level: PaceCategory;
+  percent: number;
+  /** Next pace level and seconds to find; null at the top level. */
+  next: { level: PaceCategory; toFindSec: number } | null;
+  /** "0.76 s to find for Competitive pace · Good now", or "Alien pace: the top level". */
   line: string;
-  /** The usual time the half loses to the reference per lap (s). */
-  lossSec: number;
-  /** The share of counted laps it happens on; null for a loss no rule explains. */
+  /** The numbers behind the line: the true pace's percent of the benchmark target, and where the next level starts. */
+  title: string;
+}
+
+/** A focus corner: what to do there next session. */
+export interface WatchFocus {
+  cornerId: number;
+  /** The corner's name ("Sunset Bend (T17)"). */
+  name: string;
+  /** The turn a pin of the corner is stored on. */
+  pinTurnId: number;
+  pinned: boolean;
+  slipping: boolean;
+  /** Null for a pinned corner without a named habit this session. */
+  rule: HabitRule | null;
+  /** The habit's advice ("Carry 7 km/h more through T5"); the corner's name without a habit. */
+  line: string;
+  /** Compact speed target shown on the summary line ("Apex 96 → 100 km/h"); null without a habit or speed. */
+  speedLine: string | null;
+  /** Diagnostic detail hidden under Details (line/grip/kind text); null when none. */
+  diagnosis: string | null;
+  /** The speeds to hit and the kind of loss; says so when no habit is named. */
+  detail: string;
+  /** The one thing to try ("Turn in 5 m earlier"); null when the headline is the action or none is measured. */
+  tryLine: string | null;
+  /** The metres behind a try said in words, for its tooltip. */
+  tryTitle: string | undefined;
+  /** What else was measured there: "braking 0.4 s longer", with a hover explanation. */
+  causes: Array<{ line: string; explanation: string }>;
+  /** The usual time lost to the target through the whole corner (s a lap); null when not measured. */
+  costSec: number | null;
+  /** The share of laps the habit showed on; null without a habit. */
   share: number | null;
-  /** Telemetry: the driver's usual lap at the corner against the reference's usual lap there. */
   link: string | null;
-  /** Against the driver's previous session here in the same car: "vs Oct 21 Race: brake 6 m later", "New since ...". */
-  since: string | null;
 }
 
 export interface WatchMistake {
-  key: string;
   lapNumber: number | null;
-  line: string;
+  turnLabel: string;
+  /** Why the lap lost time, and what that measured; null when nothing measured stands out. */
+  cause: { label: string; explanation: string } | null;
   lossSec: number;
-  /** Telemetry: that lap at the corner against the driver's own usual lap there. */
+  link: string | null;
+}
+
+/** A focus corner, or one that left the focus lately, then against now. */
+export interface WatchProgress {
+  cornerId: number;
+  name: string;
+  state: FocusProgress['state'];
+  slipping: boolean;
+  /** The session "then" is: "Oct 21 Race". */
+  sinceLabel: string;
+  costThenSec: number;
+  costNowSec: number;
+  /** Corner cost (s/lap) over the last measuring sessions, oldest first, for the inline sparkline. */
+  costs: number[];
+  /** "Minimum speed at T5: 7 km/h under → 3 km/h under"; null without a named habit. */
+  gap: string | null;
+  /** What the driver did of the last advice and whether the corner's cost followed: the result of a try, not progress by itself. */
+  tried: { line: string; worked: boolean; title: string | undefined } | null;
   link: string | null;
 }
 
 export interface WatchNextSession {
-  /** The session's reference driver: the one most corners are compared with. */
-  reference: Omit<CornerReference, 'usualSec' | 'usualLapOrdinal'> | null;
-  laps: number;
-  habits: WatchHabit[];
-  /** The biggest losses, at most WATCH_MISTAKES, and how many more there were. */
-  mistakes: WatchMistake[];
-  moreMistakes: number;
-  /** Turns (and halves) whose loss is the car: the quickest driver in the same car loses there too. */
-  carTurns: string[];
+  /** The driver's analysed sessions here in the car the progress reads: this one and the few before it. */
+  sessions: number;
+  /** The driver's earlier sessions here in the car: none, this is their first. */
+  earlierSessions: number;
+  goal: WatchGoal | null;
+  progress: WatchProgress[];
+  focus: WatchFocus[];
+  hasReference: boolean;
+  /** What a pin or an unpin names beside the turn. */
+  pinScope: Omit<HabitFocusPin, 'turnId'>;
+  /** The biggest one-off loss the driver caused (traffic is not theirs to fix). */
+  mistake: WatchMistake | null;
 }
 
-interface LapRef { sessionId: string; driverOrdinal: number; lapOrdinal: number; name: string }
+/** The 2D lap view at a corner (its number in the lap view, by start position), with a comparison lap. */
+const watchLink = (lap: TelemetryLapRef, baseline: TelemetryLapRef, cornerNumber: number | null): string =>
+  buildTelemetryComparePath(new URLSearchParams({ view: '2d' }), lap, baseline, cornerNumber ?? undefined);
 
-/** The lap view at a corner (its number in the lap view, by start position), with a comparison lap. */
-export function watchLink(lap: LapRef, baseline: LapRef, cornerNumber: number | null): string {
-  const params = new URLSearchParams({
-    sessionId: lap.sessionId,
-    driverOrdinal: String(lap.driverOrdinal),
-    lapOrdinal: String(lap.lapOrdinal),
-    baselineSessionId: baseline.sessionId,
-    baselineDriverOrdinal: String(baseline.driverOrdinal),
-    baselineLapOrdinal: String(baseline.lapOrdinal),
-    compareDriver: baseline.name,
-    ...(cornerNumber === null ? {} : { corner: String(cornerNumber) }),
-    view: '2d',
-  });
-  return `/telemetry?${params.toString()}`;
-}
-
-/** The lap view numbers the layout's corners in their order on the track; null when it shows another corner set. */
+/** The lap view numbers the layout's corners in their order on the track. */
 export function cornerNumbering(layout: LayoutCorners | null): (cornerId: number) => number | null {
   const order = layout ? layout.corners.toSorted((a, b) => a.startM - b.startM).map(corner => corner.id) : [];
   return (cornerId) => {
@@ -69,28 +112,48 @@ export function cornerNumbering(layout: LayoutCorners | null): (cornerId: number
   };
 }
 
-/** The reference most corners are compared with (one per session; a corner it lacks takes another). */
-function sessionReference(corners: readonly CornerAnalysisCorner[]): WatchNextSession['reference'] {
-  const counts = new Map<string, { reference: CornerReference; count: number }>();
-  for (const { reference } of corners) {
-    if (!reference) continue;
-    const key = `${reference.sessionId}|${reference.driverOrdinal}`;
-    const entry = counts.get(key) ?? { reference, count: 0 };
-    entry.count++;
-    counts.set(key, entry);
-  }
-  const top = [...counts.values()].sort((a, b) => b.count - a.count)[0]?.reference;
-  if (!top) return null;
-  const { usualSec: _usualSec, usualLapOrdinal: _usualLapOrdinal, ...reference } = top;
-  return reference;
+function watchGoal({ benchmarkSec, percent, level, next }: PaceGoal): WatchGoal {
+  const now = `Your true pace (the average of your 3 fastest clean dry laps) is ${percent.toFixed(1)}% of the benchmark target of this layout and class, ${formatTime(benchmarkSec)}: ${level}`;
+  return next
+    ? {
+      reached: false, level, percent, next: { level: next.level, toFindSec: next.toFindSec },
+      line: `${next.toFindSec.toFixed(2)} s to find for ${next.level} pace · ${level} now`,
+      title: `${now}. ${next.level} starts at ${next.maxPercent.toFixed(1)}%, ${formatTime((benchmarkSec * next.maxPercent) / 100)}`,
+    }
+    : { reached: true, level, percent, next: null, line: `${level} pace: the top level`, title: now };
 }
 
-const halfLabel = (habit: CornerHabit) => (habit.half === 'whole' ? habit.turnLabel : `${habit.turnLabel} ${habit.half}`);
+/** Compact speed cue for the collapsed focus row ("Apex 96 → 100 km/h"); null without measured speeds. */
+function focusSpeedLine(habit: CornerHabit): string | null {
+  const { minKmh, targetMinKmh, exitKmh, targetExitKmh } = habit.speeds;
+  const pair = (label: string, own: number | null, target: number | null) =>
+    (own !== null && target !== null ? `${label} ${Math.round(own)} → ${Math.round(target)} km/h` : null);
+  const apex = pair('Apex', minKmh, targetMinKmh);
+  if (habit.rule === 'exitSpeed') {
+    const exit = pair('Exit', exitKmh, targetExitKmh);
+    return [exit, apex].filter(Boolean).join(' · ') || null;
+  }
+  return apex;
+}
 
-/**
- * What to watch next session, from the session's corner analysis: the top habits (the turns losing time no rule
- * explains fill the rest), the biggest mistakes, and the turns whose loss is the car.
- */
+/** Diagnostic part of `habit.detail` (line/grip/brake pressure) tucked under Details; null when none. */
+export function focusDiagnosis(habit: CornerHabit): string | null {
+  const parts = habit.detail.split(' · ');
+  const kept = parts.filter(part => !/^(apex|exit)\s/i.test(part));
+  return kept.length ? kept.join(' · ') : null;
+}
+
+/** Advice text for a focus row: omits the turn label when the row already prefixes a single-turn corner's name. */
+function focusLine(habit: CornerHabit, singleTurn: boolean): string {
+  if (!singleTurn || habit.rule === null || habit.gap === null) return habit.line;
+  switch (habit.rule) {
+    case 'brakesWhereLift': return "Lift, don't brake";
+    case 'overSlowing': return `Carry ${Math.round(habit.gap)} km/h more`;
+    case 'brakeEarly': return `Brake ${Math.round(habit.gap)} m later`;
+    case 'exitSpeed': return `Exit ${Math.round(habit.gap)} km/h faster`;
+  }
+}
+
 export function watchNextSession(
   analysis: SessionCornerAnalysis,
   driverName: string,
@@ -98,53 +161,72 @@ export function watchNextSession(
   lapNumberOf: (lapOrdinal: number) => number | null,
 ): WatchNextSession {
   const corners = new Map(analysis.corners.map(corner => [corner.id, corner]));
-  const own = (corner: CornerAnalysisCorner | undefined, lapOrdinal: number | null): LapRef | null =>
-    (corner && lapOrdinal !== null ? { sessionId: analysis.sessionId, driverOrdinal: analysis.driverOrdinal, lapOrdinal, name: driverName } : null);
-
-  const { sinceLast } = analysis;
-  const sinceText = (habit: CornerHabit): string | null => {
-    const change = sinceLast?.habits.find(item => item.turnId === habit.turnId && item.half === habit.half && item.rule === habit.rule);
-    if (!sinceLast || !change) return null;
-    const label = sessionRefLabel(sinceLast.session);
-    return change.isNew ? `New since ${label}` : change.cue && `vs ${label}: ${change.cue}`;
-  };
-
-  const habits = [...analysis.habits, ...analysis.unexplained].slice(0, WATCH_HABITS).map((habit, index): WatchHabit => {
-    const corner = corners.get(habit.cornerId);
-    const lap = own(corner, corner?.usualLapOrdinal ?? null);
-    const reference = corner?.reference;
+  const own = (lapOrdinal: number): TelemetryLapRef => ({
+    sessionId: analysis.sessionId, driverOrdinal: analysis.driverOrdinal, lapOrdinal, driverName,
+  });
+  const focus = analysis.focus.corners.map((item): WatchFocus => {
+    const corner = corners.get(item.cornerId);
+    const usual = corner?.usualLapOrdinal;
+    const cornerReference = corner?.reference;
+    const { habit } = item;
+    const singleTurn = (corner?.turnIds.length ?? 0) === 1;
     return {
-      key: `${habit.turnId}|${habit.half}|${index}`,
-      line: habit.line,
-      lossSec: habit.lossSec,
-      share: habit.rule === null ? null : habit.repeatability,
-      since: sinceText(habit),
-      link: lap && reference
-        ? watchLink(lap, { sessionId: reference.sessionId, driverOrdinal: reference.driverOrdinal, lapOrdinal: reference.usualLapOrdinal, name: reference.name }, cornerNumberOf(habit.cornerId))
-        : null,
+      cornerId: item.cornerId, name: item.name, pinTurnId: item.pinTurnId, pinned: item.pinned, slipping: item.slipping,
+      rule: habit?.rule ?? null,
+      line: habit ? focusLine(habit, singleTurn) : item.name,
+      speedLine: habit ? focusSpeedLine(habit) : null,
+      diagnosis: habit ? focusDiagnosis(habit) : null,
+      detail: habit?.detail ?? 'No habit named here this session.',
+      tryLine: habit ? habitTryLine(habit) : null,
+      tryTitle: habit ? habitTryTitle(habit.action) : undefined,
+      causes: habit?.causes.map(cause => ({ line: cause.line, explanation: CAUSE_EXPLANATIONS[cause.type] })) ?? [],
+      costSec: item.costSec,
+      share: habit?.repeatability ?? null,
+      link: usual != null && cornerReference ? watchLink(own(usual), {
+        sessionId: cornerReference.sessionId, driverOrdinal: cornerReference.driverOrdinal,
+        lapOrdinal: cornerReference.usualLapOrdinal, driverName: cornerReference.name,
+      }, cornerNumberOf(item.cornerId)) : null,
     };
   });
 
-  const biggest = analysis.mistakes.toSorted((a, b) => b.lossSec - a.lossSec);
-  const mistakes = biggest.slice(0, WATCH_MISTAKES).map((mistake): WatchMistake => {
-    const corner = corners.get(mistake.cornerId);
-    const lap = own(corner, mistake.lapOrdinal);
-    const usual = own(corner, corner?.usualLapOrdinal ?? null);
+  const progress = analysis.focus.progress.map((item): WatchProgress => {
+    const { gap, tried } = item;
     return {
-      key: `${mistake.lapOrdinal}|${mistake.turnId}`,
-      lapNumber: lapNumberOf(mistake.lapOrdinal),
-      line: mistake.line,
-      lossSec: mistake.lossSec,
-      link: lap && usual && usual.lapOrdinal !== lap.lapOrdinal ? watchLink(lap, usual, cornerNumberOf(mistake.cornerId)) : null,
+      cornerId: item.cornerId, name: item.name, state: item.state, slipping: item.slipping,
+      sinceLabel: sessionRefLabel(item.since),
+      costThenSec: item.costThenSec, costNowSec: item.costNowSec,
+      costs: item.costs,
+      gap: gap && `${habitGapLabel(gap.rule, gap.turnLabel)}: ${habitGapText(gap.rule, gap.unit, gap.before)} → ${habitGapText(gap.rule, gap.unit, gap.now)}`,
+      tried: tried && {
+        worked: tried.worked,
+        title: habitTriedTitle(tried.action, tried.moved),
+        line: `Last try: you ${tried.did} at ${tried.turnLabel} · ${tried.worked
+          ? `the corner is ${Math.abs(tried.costChangeSec).toFixed(2)} s quicker` : 'no gain in the corner yet'}`,
+      },
+      link: item.view ? watchLink(own(item.view.lapOrdinal), {
+        sessionId: item.since.sessionId, driverOrdinal: item.since.driverOrdinal, lapOrdinal: item.view.thenLapOrdinal, driverName,
+      }, cornerNumberOf(item.cornerId)) : null,
     };
   });
 
+  const biggest = analysis.mistakes.filter(item => item.cause !== 'traffic').reduce<(typeof analysis.mistakes)[number] | null>((best, item) =>
+    best === null || item.lossSec > best.lossSec ? item : best, null);
+  const baseline = biggest ? corners.get(biggest.cornerId)?.usualLapOrdinal : null;
   return {
-    reference: sessionReference(analysis.corners),
-    laps: analysis.laps,
-    habits,
-    mistakes,
-    moreMistakes: biggest.length - mistakes.length,
-    carTurns: [...new Set(analysis.carDifferences.map(halfLabel))],
+    sessions: Math.min(HISTORY_SESSIONS, analysis.focus.sessions),
+    earlierSessions: analysis.focus.sessions - 1,
+    goal: analysis.goal && watchGoal(analysis.goal),
+    progress,
+    focus,
+    hasReference: analysis.corners.some(corner => corner.reference !== null),
+    pinScope: { layoutKey: analysis.layoutKey, carClass: analysis.carClass },
+    mistake: biggest && {
+      lapNumber: lapNumberOf(biggest.lapOrdinal),
+      turnLabel: biggest.turnLabel,
+      cause: biggest.cause && { label: MISTAKE_LINES[biggest.cause], explanation: MISTAKE_EXPLANATIONS[biggest.cause] },
+      lossSec: biggest.lossSec,
+      link: baseline != null && baseline !== biggest.lapOrdinal
+        ? watchLink(own(biggest.lapOrdinal), own(baseline), cornerNumberOf(biggest.cornerId)) : null,
+    },
   };
 }

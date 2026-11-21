@@ -12,11 +12,10 @@ const tyresChanged = (corners: readonly string[]) => (corners.length === 0 ? 'no
 export function StrategyPlanVsActual({ plan, strategy }: { plan: LiveRaceStrategies; strategy: SessionStrategy }) {
   const { chosen, unit } = plan;
   const ve = strategy.kind === 've';
-  const first = strategy.stops[0];
   const last = strategy.stops.at(-1);
   const rows: Array<[string, string, string]> = [
     ['Stops', `${chosen.stops}${chosen.pitLap !== null ? ` · lap ${chosen.pitLap}` : ''}`,
-      `${strategy.stops.length}${first ? ` · lap ${first.lap}` : ''}`],
+      `${strategy.stops.length}${strategy.stops.length ? ` · ${strategy.stops.length === 1 ? 'lap' : 'laps'} ${strategy.stops.map(stop => stop.lap).join(', ')}` : ''}`],
     [`${plan.kind === 've' ? 'VE' : 'Fuel'} at the start`, level(chosen.loadStart, unit), level(ve ? strategy.start.ve : strategy.start.fuel, unit)],
     ...(chosen.loadToFinish !== null || last ? [['Leaving the last stop', level(chosen.loadToFinish, unit), level(last?.levelAfter ?? null, unit)] as [string, string, string]] : []),
     ...(chosen.tyresStop !== null || last ? [['Tyres at the stop', chosen.tyresStop?.toLowerCase() ?? '—',
@@ -26,21 +25,21 @@ export function StrategyPlanVsActual({ plan, strategy }: { plan: LiveRaceStrateg
   ];
   return (
     <div data-testid="strategy-plan-vs-actual">
-      <p className="text-[10px] uppercase tracking-wider font-semibold text-lmu-muted mb-1">Plan vs actual · {chosen.name.toLowerCase()}</p>
+      <h3 className="mb-2 text-sm font-semibold text-white">Plan vs. actual <span className="text-xs font-normal text-lmu-muted">· {chosen.name.toLowerCase()}</span></h3>
       <table className="w-full text-xs">
         <thead>
-          <tr className="text-lmu-muted text-left">
-            <th className="font-normal py-0.5" />
-            <th className="font-normal py-0.5">Planned</th>
-            <th className="font-normal py-0.5">Actual</th>
+          <tr className="text-left text-[11px] font-semibold uppercase tracking-wider text-lmu-muted">
+            <th className="pb-1" />
+            <th className="pb-1 font-semibold">Planned</th>
+            <th className="pb-1 font-semibold">Actual</th>
           </tr>
         </thead>
         <tbody>
           {rows.map(([label, planned, actual]) => (
             <tr key={label} className="border-t border-lmu-border/40">
               <td className="py-1 text-lmu-muted">{label}</td>
-              <td className="py-1 font-mono text-white">{planned}</td>
-              <td className="py-1 font-mono text-white">{actual}</td>
+              <td className="py-1 font-mono tabular-nums text-white">{planned}</td>
+              <td className="py-1 font-mono tabular-nums text-white">{actual}</td>
             </tr>
           ))}
         </tbody>

@@ -11,6 +11,8 @@ export interface AnalysisPassRow {
   carType: string | null;
   isPlayer: boolean;
   lapOrdinal: number;
+  /** The driver's true pace in the session (s), for a target candidate; null for the player's rows. */
+  paceSec: number | null;
   pass: CornerPass;
 }
 
@@ -24,12 +26,16 @@ export interface AnalysisSessionRow {
   carClass: string;
   /** The player's car name, null when unknown. */
   carType: string | null;
+  /** The player's fastest clean dry laps of the session, up to 3: how many, and their times added up (s); 0 without any. */
+  fastestCount: number;
+  fastestSumSec: number;
 }
 
 const SESSION_COLUMNS = `s.id sessionId, s.timestamp, s.session_type sessionType, s.layout_key layoutKey, d.driver_ordinal driverOrdinal,
-  d.driver_class carClass, v.car_type carType
+  d.driver_class carClass, v.car_type carType, COALESCE(t.fastest_three_count, 0) fastestCount, COALESCE(t.fastest_three_time_sum, 0) fastestSumSec
   FROM sessions s JOIN session_drivers d ON d.session_id = s.id AND d.is_player = 1
-  LEFT JOIN vehicles v ON v.vehicle_id = d.vehicle_id`;
+  LEFT JOIN vehicles v ON v.vehicle_id = d.vehicle_id
+  LEFT JOIN session_driver_condition_summaries t ON t.session_id = s.id AND t.driver_ordinal = d.driver_ordinal AND t.condition_group = 'dry'`;
 
 export function getAnalysisSession(db: DatabaseType, sessionId: string): AnalysisSessionRow | null {
   return (db.prepare(`SELECT ${SESSION_COLUMNS} WHERE s.id = ?`).get(sessionId) as AnalysisSessionRow | undefined) ?? null;
@@ -50,10 +56,11 @@ export interface AnalysisPassScope {
   sessionIds: readonly string[];
 }
 
-/** The reference shortlist: the quickest drivers by usual lap time, overall, in each car and in each analysed session. */
-export const REFERENCE_OVERALL = 10;
-export const REFERENCE_PER_CAR = 3;
-const REFERENCE_PER_SESSION = 3;
+/**
+ * The best true paces read as target candidates: the first with a usual through enough corners is the target, so a
+ * quick driver with a broken replay does not leave the layout without one.
+ */
+export const TARGET_CANDIDATES = 3;
 
 /**
  * Counted laps follow the corner card's `lapCounts` (dry racing laps after the first); a car is its session driver
@@ -80,9 +87,9 @@ const passQuery = (driverWhere: string, select: string) => `
     )
     ${select}`;
 
-/** The passes of the laps in `from` (`lap l`, or the laps joined to a shortlist). */
-const passes = (from: string) => `SELECT l.session_id sessionId, l.driver_ordinal driverOrdinal, l.driver_name driverName, l.car_type carType,
-      l.is_player isPlayer, l.lap_ordinal lapOrdinal, p.*
+/** The passes of the laps in `from` (`lap l`, or the laps joined to a shortlist), with the driver's true pace from `pace`. */
+const passes = (from: string, pace = 'NULL') => `SELECT l.session_id sessionId, l.driver_ordinal driverOrdinal, l.driver_name driverName, l.car_type carType,
+      l.is_player isPlayer, l.lap_ordinal lapOrdinal, ${pace} paceSec, p.*
     FROM ${from}
     JOIN replay_corner_passes p ON p.filename = l.filename AND p.driver_slot = l.slot AND p.lap_number = l.lap_number`;
 
@@ -93,51 +100,47 @@ const passes = (from: string) => `SELECT l.session_id sessionId, l.driver_ordina
 export const SHORTLIST_LAPS = 'pick k CROSS JOIN lap l ON l.session_id = k.session_id AND l.driver_ordinal = k.driver_ordinal';
 
 const IN_SESSIONS = 's.id IN (SELECT value FROM json_each($sessionIds))';
+const OTHER_HUMANS = 'd.is_player = 0 AND d.is_human = 1';
 
-function passRows(db: DatabaseType, sql: string, scope: AnalysisPassScope, extra: Record<string, unknown> = {}): AnalysisPassRow[] {
-  const { layoutKey, carClass, buildPrefix, sessionIds } = scope;
-  const rows = db.prepare(sql).all({ sessionIds: JSON.stringify(sessionIds), layoutKey, carClass, buildPrefix, ...extra }) as Array<Record<string, unknown>>;
+/** The target candidates of the cars in `lap`: each with at least `$minLaps` counted laps and a true pace over 3 laps. */
+const PACED = `paced AS (
+      SELECT l.session_id, l.driver_ordinal, l.car_type, t.fastest_three_time_sum / 3.0 pace
+      FROM lap l
+      JOIN session_driver_condition_summaries t ON t.session_id = l.session_id AND t.driver_ordinal = l.driver_ordinal
+        AND t.condition_group = 'dry' AND t.fastest_three_count = 3
+      GROUP BY l.session_id, l.driver_ordinal HAVING COUNT(DISTINCT l.lap_number) >= $minLaps
+    )`;
+
+function passRows(db: DatabaseType, sql: string, params: Record<string, unknown>): AnalysisPassRow[] {
+  const rows = db.prepare(sql).all(params) as Array<Record<string, unknown>>;
   return rows.map(row => ({
     sessionId: row.sessionId as string, driverOrdinal: row.driverOrdinal as number, driverName: row.driverName as string, carType: (row.carType as string | null) ?? null,
-    isPlayer: row.isPlayer === 1, lapOrdinal: row.lapOrdinal as number, pass: passFromRow(row as CornerPassRow),
+    isPlayer: row.isPlayer === 1, lapOrdinal: row.lapOrdinal as number, paceSec: (row.paceSec as number | null) ?? null, pass: passFromRow(row as CornerPassRow),
   }));
 }
 
 /** The player's counted turn passes in the analysed sessions. */
 export function listPlayerAnalysisPasses(db: DatabaseType, scope: AnalysisPassScope): AnalysisPassRow[] {
-  return passRows(db, passQuery(`d.is_player = 1 AND ${IN_SESSIONS}`, passes('lap l')), scope);
+  const { layoutKey, carClass, buildPrefix, sessionIds } = scope;
+  return passRows(db, passQuery(`d.is_player = 1 AND ${IN_SESSIONS}`, passes('lap l')), { layoutKey, carClass, buildPrefix, sessionIds: JSON.stringify(sessionIds) });
 }
 
 /**
- * The reference candidates' counted turn passes: other human drivers of the class at the layout, shortlisted by
- * overall lap time, not corner by corner (driver, 2026-11-20): the REFERENCE_OVERALL quickest by usual (median) lap
- * over at least `minLaps` counted laps, the REFERENCE_PER_CAR quickest in each car, and in each analysed session
- * the REFERENCE_PER_SESSION quickest and each car's quickest (the engine prefers a reference, and a same-car check,
- * from the session). Reading every driver took most of the corner trends' time; a big online race's whole grid, most
- * of the rest (Daytona, 2026-11-20). Against every driver, 18 of 2,830 corner references and 3 of 366 same-car
- * checks changed: a quicker driver by lap time now stands in for one quicker only through the driver's corners.
+ * The counted turn passes of the layout's target candidates, the same for every session (driver, 2026-11-20: one
+ * fixed target per layout and class, so sessions compare). Other human drivers of the class with at least `minLaps`
+ * counted laps, by true pace (the leaderboard's: the average of the 3 fastest clean dry laps of the session): the
+ * TARGET_CANDIDATES best overall, and the best in each car for the same-car check. Each row carries that pace.
  */
-export function listReferenceAnalysisPasses(db: DatabaseType, scope: AnalysisPassScope, minLaps: number): AnalysisPassRow[] {
-  return passRows(db, passQuery('d.is_player = 0 AND d.is_human = 1', `,
-    ranked AS (
-      SELECT session_id, driver_ordinal, car_type, lap_time,
-        ROW_NUMBER() OVER (PARTITION BY session_id, driver_ordinal ORDER BY lap_time) rn, COUNT(*) OVER (PARTITION BY session_id, driver_ordinal) n
-      FROM lap WHERE lap_time > 0
-    ),
-    usual AS (
-      SELECT session_id, driver_ordinal, car_type, AVG(lap_time) usual_time FROM ranked
-      WHERE n >= $minLaps AND rn IN ((n + 1) / 2, (n + 2) / 2) GROUP BY session_id, driver_ordinal
-    ),
+export function listReferenceAnalysisPasses(db: DatabaseType, scope: Omit<AnalysisPassScope, 'sessionIds'>, minLaps: number): AnalysisPassRow[] {
+  const { layoutKey, carClass, buildPrefix } = scope;
+  return passRows(db, passQuery(OTHER_HUMANS, `, ${PACED},
     pick AS (
-      SELECT session_id, driver_ordinal FROM (
-        SELECT session_id, driver_ordinal, ROW_NUMBER() OVER (ORDER BY usual_time, session_id, driver_ordinal) overall,
-          ROW_NUMBER() OVER (PARTITION BY car_type ORDER BY usual_time, session_id, driver_ordinal) in_car,
-          ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY usual_time, session_id, driver_ordinal) in_session,
-          ROW_NUMBER() OVER (PARTITION BY session_id, car_type ORDER BY usual_time, session_id, driver_ordinal) in_session_car
-        FROM usual
-      ) WHERE overall <= $overall OR in_car <= $perCar
-        OR ((in_session <= $perSession OR in_session_car = 1) AND session_id IN (SELECT value FROM json_each($sessionIds)))
+      SELECT session_id, driver_ordinal, pace FROM (
+        SELECT session_id, driver_ordinal, pace, ROW_NUMBER() OVER (ORDER BY pace, session_id, driver_ordinal) overall,
+          ROW_NUMBER() OVER (PARTITION BY car_type ORDER BY pace, session_id, driver_ordinal) in_car
+        FROM paced
+      ) WHERE overall <= $targets OR in_car = 1
     )
-    ${passes(SHORTLIST_LAPS)}`),
-  scope, { minLaps, overall: REFERENCE_OVERALL, perCar: REFERENCE_PER_CAR, perSession: REFERENCE_PER_SESSION });
+    ${passes(SHORTLIST_LAPS, 'k.pace')}`), { layoutKey, carClass, buildPrefix, minLaps, targets: TARGET_CANDIDATES });
 }
+

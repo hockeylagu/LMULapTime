@@ -3,12 +3,25 @@ import { queueCornerWork, refreshLayoutSequencePasses, refreshSequenceMaps } fro
 import type { ServerContext } from '../core/serverContext.js';
 import { layoutCorners } from '../corners/sessionCornerPasses.js';
 import { readCornerTrends } from '../corners/cornerTrends.js';
-import { readCornerHabitTrends, readSessionCornerAnalysis } from '../corners/cornerAnalysisService.js';
+import { benchmarkTargetSec } from '../benchmarks/referenceLaptimes.js';
+import { pinnedCornerTurns, readCornerHabitTrends, readSessionCornerAnalysis } from '../corners/cornerAnalysisService.js';
+import { FOCUS_SLOTS } from '../../shared/domain/cornerAnalysis/habitFocus.js';
+import type { HabitFocusPin } from '../../shared/types/corners/habitFocus.js';
 import { queryString } from './queryParams.js';
 import { requireSessionSummaries } from './summaryReadiness.js';
 import type { SequenceMapsResponse } from '../../shared/types/corners/sequenceMaps.js';
 
-/** The turn sequence maps (server/corners/sequenceMapService.ts): the list Settings shows, regenerating one, the corner trends and a session's corner analysis. */
+/** A pin as a request names it: the layout, class and a turn of the corner; null when one is missing. */
+function pinOf(body: unknown): HabitFocusPin | null {
+  const { layoutKey, carClass, turnId } = (body ?? {}) as Record<string, unknown>;
+  return typeof layoutKey === 'string' && typeof carClass === 'string' && Number.isInteger(turnId)
+    ? { layoutKey, carClass, turnId: turnId as number } : null;
+}
+
+/**
+ * The turn sequence maps (server/corners/sequenceMapService.ts): the list Settings shows, regenerating one, the corner
+ * trends and a session's corner analysis, with the habit focus's pins.
+ */
 export function createCornerSequenceRouter(context: ServerContext): Router {
   const router = Router();
   // One map regenerates at a time: it re-reads the class's fastest laps, then rebuilds the layout's sequence passes.
@@ -43,9 +56,31 @@ export function createCornerSequenceRouter(context: ServerContext): Router {
   // The session player's corner habits and mistakes (server/corners/cornerAnalysisService.ts); references come from
   // the layout's other sessions too, so it waits for the summaries like the trends.
   router.get('/session/:sessionId/corner-analysis', requireSessionSummaries(context), (req: Request<{ sessionId: string }>, res) => {
-    const analysis = readSessionCornerAnalysis(context.sessionDb, req.params.sessionId);
+    const analysis = readSessionCornerAnalysis(context.sessionDb, req.params.sessionId, benchmarkTargetSec);
     if (!analysis) return res.status(404).json({ error: 'No corner analysis for this session' });
     res.json(analysis);
+  });
+
+  // The driver makes a corner a focus: it holds one of the 2 slots until unpinned.
+  router.post('/habit-focus/pin', (req, res) => {
+    const pin = pinOf(req.body);
+    if (!pin) return res.status(400).json({ error: 'layoutKey, carClass and turnId are required' });
+    const corner = pinnedCornerTurns(context.sessionDb, pin, pin.turnId);
+    if (!corner) return res.status(404).json({ error: 'No corner holds this turn' });
+    if (corner.pinnedHere.length === 0) {
+      if (corner.pinnedCorners >= FOCUS_SLOTS) return res.status(409).json({ error: 'Unpin one first' });
+      context.sessionDb.addHabitFocusPin({ ...pin, turnId: corner.cornerTurnIds[0] }, Date.now());
+    }
+    res.json({ pinned: true });
+  });
+
+  router.post('/habit-focus/unpin', (req, res) => {
+    const pin = pinOf(req.body);
+    if (!pin) return res.status(400).json({ error: 'layoutKey, carClass and turnId are required' });
+    const corner = pinnedCornerTurns(context.sessionDb, pin, pin.turnId);
+    if (!corner) return res.status(404).json({ error: 'No corner holds this turn' });
+    context.sessionDb.removeHabitFocusPins(pin, corner.pinnedHere);
+    res.json({ pinned: false });
   });
 
   router.post('/corner-sequences/maps/regenerate', (req, res) => {

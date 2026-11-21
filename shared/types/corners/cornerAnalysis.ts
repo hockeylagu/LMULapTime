@@ -1,4 +1,5 @@
 import type { CornerPass } from './cornerPasses.js';
+import type { GapUnit, HabitFocus, PaceGoal } from './habitFocus.js';
 
 /** One counted lap of a driver: its place in the driver's stored laps and its passes through the official turns. */
 export interface AnalysisLap {
@@ -13,8 +14,8 @@ export interface AnalysisDriver {
   name: string;
   /** The car's model, null when unknown: gears compare only within one car. */
   car: string | null;
-  /** Driven in the analysed session: a reference from it is preferred (same grip, rubber and patch). */
-  sameSession: boolean;
+  /** The driver's true pace in the session (the average of the 3 fastest clean dry laps, s); null when unknown: never a target. */
+  paceSec: number | null;
   laps: AnalysisLap[];
 }
 
@@ -37,7 +38,7 @@ export interface CornerAnalysisInput {
   corners: AnalysisCorner[];
   turns: AnalysisTurn[];
   driver: AnalysisDriver;
-  /** Other human drivers of the class: the analysed session's and the layout's other sessions'. */
+  /** The layout's target candidates: other human drivers of the class with a true pace, and each car's best. */
   others: AnalysisDriver[];
   /** Counted laps a reference needs: its usual is a median, never one lap. */
   minReferenceLaps: number;
@@ -46,19 +47,66 @@ export interface CornerAnalysisInput {
 /** Into the turn's slowest point, out of it, or the whole turn when the split is unknown. */
 export type TurnHalf = 'in' | 'out' | 'whole';
 
-/** The patterns the engine can name (shared/domain/cornerAnalysis/habitRules.ts). */
-export type HabitRule =
-  | 'brakesWhereLift'
-  | 'dragBrake'
-  | 'coast'
-  | 'overSlowing'
-  | 'brakeEarly'
-  | 'apexEarly'
-  | 'inFastOutSlow'
-  | 'partThrottle'
-  | 'gear';
+/**
+ * The headlines the engine can name (shared/domain/cornerAnalysis/habitRules.ts): the measures whose gap, once closed,
+ * made the turn quicker on the driver's history.
+ */
+export type HabitRule = 'brakesWhereLift' | 'overSlowing' | 'brakeEarly' | 'exitSpeed';
 
-/** A loss to the class that repeats, and what explains it. */
+/**
+ * How a turn loses its speed. At the slowest point speed² = sideways g × arc radius, so a lower minimum speed is a
+ * tighter arc, the same arc with less grip used, or both; a turn slower at the exit with the same minimum is its own kind.
+ */
+export type LossKind = 'tighterArc' | 'lessGrip' | 'arcAndGrip' | 'exitOnly';
+
+/** What the driver can try: something done with a pedal or the wheel, or a place on the road. */
+export type HabitActionType = 'lift' | 'brakeLater' | 'brakeShorter' | 'turnInEarlier' | 'reachInside';
+
+export interface HabitAction {
+  type: HabitActionType;
+  /** The driver's usual against the target's, in the action's unit (m, s). */
+  gap: number;
+  /** "Brake 11 m later". */
+  line: string;
+}
+
+/** A measured difference that goes with a headline: said under it, never a focus alone. */
+export type HabitCauseType = 'entrySpeed' | 'brakePoint' | 'brakeLonger' | 'brakeSofter' | 'coast' | 'throttlePoint' | 'partThrottle' | 'gear';
+
+export interface HabitCause {
+  type: HabitCauseType;
+  gap: number;
+  /** "braking 0.4 s longer". */
+  line: string;
+}
+
+/** The driver's and the target's usual speeds at a turn (km/h): the minimum is on every row, the speed to hit. */
+export interface TurnSpeeds {
+  minKmh: number | null;
+  targetMinKmh: number | null;
+  exitKmh: number | null;
+  targetExitKmh: number | null;
+}
+
+/** The usual arc at the slowest point (m) and the sideways g there, the driver's and the target's. */
+export interface TurnArc {
+  radiusM: number;
+  targetRadiusM: number;
+  latG: number;
+  targetLatG: number;
+}
+
+/**
+ * A measured turn's gaps to the target, the driver's usual against the target's, whether or not a rule holds there:
+ * a series over sessions then has no holes. Each in its rule's or action's unit, positive the habit's way.
+ */
+export interface TurnMeasures {
+  turnId: number;
+  rules: Record<HabitRule, number | null>;
+  actions: Record<HabitActionType, number | null>;
+}
+
+/** A loss to the target that repeats, and what explains it. */
 export interface CornerHabit {
   cornerId: number;
   turnId: number;
@@ -70,8 +118,17 @@ export interface CornerHabit {
   sameCarLossSec: number | null;
   /** Null when no rule explains the loss: the line then says so. */
   rule: HabitRule | null;
-  /** The rule's usual gap: metres, km/h, seconds or a gear difference, as the rule measures it. */
+  /** The rule's usual gap: metres, km/h or brake points, as the rule measures it. */
   gap: number | null;
+  speeds: TurnSpeeds;
+  /** How the turn loses its speed; null when the speeds are level or the arc is not measured. */
+  kind: LossKind | null;
+  arc: TurnArc | null;
+  /** The one thing to try, the largest gap among the actions of the kind; null when none stands out. */
+  action: HabitAction | null;
+  /** What else can be tried there, the largest gap first: the next one is offered when a try of `action` gave no gain. */
+  otherActions: HabitAction[];
+  causes: HabitCause[];
   /** The share of counted laps where the rule held (or, without a rule, where the half lost time). */
   repeatability: number;
   confidence: number;
@@ -79,6 +136,34 @@ export interface CornerHabit {
   priority: number;
   line: string;
   detail: string;
+}
+
+/** What differs in a half of a turn between two laps, where the one lap loses time to the other. */
+export interface LapTurnDifference {
+  half: TurnHalf;
+  /** The time the lap loses to the other lap in the half (s). */
+  lossSec: number;
+  /** The first headline measure that differs the losing way; null when none does. */
+  rule: HabitRule | null;
+  /** The rule's gap between the two laps: metres, km/h or brake points, as the rule measures it. */
+  gap: number | null;
+  /** How the lap's lower minimum speed came about ("tighter arc: 34 m radius against 42 m"); null when the speeds are level or no arc is measured. */
+  kindLine: string | null;
+  /** What else differs in the half, without what the headline already says. */
+  causes: HabitCause[];
+}
+
+/** One lap against another through a turn: a description of two laps, never a habit and never advice. */
+export interface LapTurnComparison {
+  /** The halves where the lap loses time worth telling, in lap order. */
+  differences: LapTurnDifference[];
+  /** The lap loses time with a car close ahead through the turn: the loss is not the driving. */
+  traffic: boolean;
+  /**
+   * The lap loses time into the turn with ABS working this much longer than on the other lap (s); null otherwise.
+   * A lockup against the driver's own lap; against another driver it may be how they brake, so it is said as measured.
+   */
+  absMoreSec: number | null;
 }
 
 /** Why one lap lost time in one turn against the driver's own usual there. */
@@ -96,8 +181,8 @@ export interface CornerMistake {
 }
 
 /**
- * The reference a corner is compared with: one driver for the whole session, the quickest of the analysed session when
- * quicker than the driver, else the layout's quickest; a corner that driver lacks takes its own quickest there.
+ * The driver a corner is compared with: the layout's target (the best true pace in the class, the same for every
+ * session); a corner the target lacks takes the candidates' fastest usual there.
  */
 export interface CornerReference {
   sessionId: string;
@@ -105,7 +190,6 @@ export interface CornerReference {
   name: string;
   /** The car's model, null when unknown. */
   car: string | null;
-  sameSession: boolean;
   laps: number;
   /** The usual time through the corner's turns (s). */
   usualSec: number;
@@ -129,7 +213,9 @@ export interface CornerAnalysisCorner {
 export interface CornerAnalysis {
   laps: number;
   corners: CornerAnalysisCorner[];
-  /** The quickest driver in the driver's own car, checking a reference in another car; null when there is none. */
+  /** The layout's target: the best true pace in the class, the same driver for every session; null without one. */
+  target: (Omit<CornerReference, 'usualSec' | 'usualLapOrdinal'> & { paceSec: number }) | null;
+  /** The quickest driver in the driver's own car, checking a target in another car; null when there is none. */
   sameCarReference: Omit<CornerReference, 'usualSec' | 'usualLapOrdinal'> | null;
   /** Ranked by priority (a view shows the first MAX_HABITS); the turns losing time that no rule explains follow separately. */
   habits: CornerHabit[];
@@ -138,6 +224,8 @@ export interface CornerAnalysis {
   carDifferences: CornerHabit[];
   /** In lap order. */
   mistakes: CornerMistake[];
+  /** The turns measured against the target, in turn order. */
+  measures: TurnMeasures[];
 }
 
 /** A session of the driver's habit history. */
@@ -147,57 +235,40 @@ export interface AnalysisSessionRef {
   sessionType: string;
 }
 
-/** A habit against the driver's previous session at the layout in the same car: the driver against themself. */
-export interface HabitChange {
-  turnId: number;
-  half: TurnHalf;
-  rule: HabitRule | null;
-  /** Not among that session's habits at the turn (the same rule at the same turn). */
-  isNew: boolean;
-  /** The cue the rule names, now against then ("brake 6 m later"); null without a rule or a measure. */
-  cue: string | null;
-}
-
-/** Verified progress on a previously identified habit, against the driver's own previous session. */
-export interface SessionHabitProgress {
-  turnId: number;
-  turnLabel: string;
-  half: TurnHalf;
-  rule: HabitRule;
-  status: 'improving' | 'resolved';
-  /** Measured change in the habit's driving cue. */
-  cue: string;
-  /** Time gained through the mapped corner against the driver's previous usual. */
-  gainSec: number;
-}
-
 /** The analysis of a session's player (`GET /api/session/:id/corner-analysis`), with what it was read for. */
 export interface SessionCornerAnalysis extends CornerAnalysis {
   sessionId: string;
   layoutKey: string;
   carClass: string;
+  /** The car's model; null when unknown. */
+  car: string | null;
   driverOrdinal: number;
-  /** The habits and unexplained losses against the previous analysed session in the same car; null without one. */
-  sinceLast: { session: AnalysisSessionRef; habits: HabitChange[]; progress: SessionHabitProgress[] } | null;
+  /** The 2 corners to work on next and the progress on them, over the driver's analysed sessions here in the class. */
+  focus: HabitFocus;
+  /** The session's true pace against the target's and the goal; null without a target. */
+  goal: PaceGoal | null;
 }
 
-/** A corner's habit over the driver's latest analysed sessions at the layout, in one car (the corner trends row). */
+/** A corner's habit over the driver's latest analysed sessions at the layout, in the class (the corner trends row). */
 export interface CornerHabitTrend {
   /** The latest analysed session. */
   session: AnalysisSessionRef;
-  /** Its main habit at the corner (the highest priority, else a loss no rule explains); null when it loses nothing worth telling. */
-  habit: Pick<CornerHabit, 'line' | 'detail' | 'lossSec' | 'rule'> | null;
-  /** The sessions, of the last few analysed, where the same habit showed (the same rule at the same turn), and how many were read. */
-  seen: number;
-  of: number;
-  /** The analysed session before it, null without one. */
-  since: AnalysisSessionRef | null;
-  change: HabitChange | null;
-  /** That session's main habit at the corner when it no longer shows, its cue moved the fixing way and the corner is no slower. */
-  fixed: string | null;
+  /** Its habit at the corner (the named one a focus would carry, else a loss no rule explains); null when it loses nothing worth telling. */
+  habit: CornerHabit | null;
+  /** The usual time lost to the target through the whole corner that session (s a lap); null without a target there. */
+  costSec: number | null;
+  /** One of the 2 focus corners: by the rules, or pinned by the driver. */
+  focus: 'focus' | 'pinned' | null;
+  /** The corner's first turn: what a pin is stored on. */
+  pinTurnId: number;
+  slipping: boolean;
+  /** What the series' gap measures: the habit's rule at its turn; null without a named habit. */
+  gap: { rule: HabitRule; turnLabel: string; unit: GapUnit } | null;
+  /** The last few sessions that measured the corner, oldest first: its cost and the habit's gap (null where not measured). */
+  series: Array<{ session: AnalysisSessionRef; costSec: number; gap: number | null }>;
   /**
    * The laps that show the habit: the latest session's lap closest to the driver's usual through the corner, against
-   * the reference's lap closest to theirs (the lap view opens one against the other); null without a reference.
+   * the target's lap closest to theirs (the lap view opens one against the other); null without a target.
    */
   view: { lap: { sessionId: string; driverOrdinal: number; lapOrdinal: number }; reference: { sessionId: string; driverOrdinal: number; lapOrdinal: number; name: string } } | null;
 }

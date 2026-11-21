@@ -102,6 +102,8 @@ import {
   getBeatenRivals,
   pinRival,
 } from './dbRivalStore.js';
+import { addHabitFocusPin, listHabitFocusPins, removeHabitFocusPins, type HabitFocusScope } from './dbHabitFocusStore.js';
+import type { HabitFocusPin } from '../../shared/types/corners/habitFocus.js';
 import type { RivalTarget } from '../../shared/types/leaderboard.js';
 import type { NewRivalTarget, RivalResolution } from '../../shared/domain/rivals.js';
 import {
@@ -402,8 +404,22 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
     return listPlayerAnalysisPasses(this.db, scope);
   }
 
-  public listReferenceAnalysisPasses(scope: AnalysisPassScope, minLaps: number): AnalysisPassRow[] {
+  public listReferenceAnalysisPasses(scope: Omit<AnalysisPassScope, 'sessionIds'>, minLaps: number): AnalysisPassRow[] {
     return listReferenceAnalysisPasses(this.db, scope, minLaps);
+  }
+
+  // --- Habit focus pins (user state, kept when the cache is cleared) ---
+
+  public listHabitFocusPins(scope: HabitFocusScope): number[] {
+    return listHabitFocusPins(this.db, scope);
+  }
+
+  public addHabitFocusPin(pin: HabitFocusPin, setAt: number): void {
+    addHabitFocusPin(this.db, pin, setAt);
+  }
+
+  public removeHabitFocusPins(scope: HabitFocusScope, turnIds: readonly number[]): void {
+    removeHabitFocusPins(this.db, scope, turnIds);
   }
 
   public listCornerTrendPasses(scope: CornerTrendScope): CornerTrendPassRow[] {

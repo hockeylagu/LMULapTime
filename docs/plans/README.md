@@ -5,7 +5,7 @@ Current implementation belongs in [CODE_MAP](../CODE_MAP.md), not in completed d
 
 ## Corner analysis and trends
 
-Delivered 2026-11-20: the corner analysis engine (`shared/domain/cornerAnalysis/`: habits against the class best,
+Delivered 2026-11-20: the corner analysis engine (`shared/domain/cornerAnalysis/`: habits against the layout's target,
 mistakes against the driver's own usual), the debrief's "Watch next session", and the track page's corner trends
 with each corner's habit history. Rules, thresholds and their validation sit in the module comments; ownership in
 [CODE_MAP](../CODE_MAP.md). The old `corner-map` branch's technique cues were scored and only coasting kept; the
@@ -13,11 +13,19 @@ branch is deleted. Open:
 
 - **Ways in to corner trends:** "History here" on the corner card and on the Consistency panel's sequence rows,
   opening the track page on that corner.
-- **Focus from last time:** at the top of the debrief, last session's first habit and what became of it ("T3, 0.14 s
-  better, still your first"); a habit leaving the top three is a corrected one.
-- **Rule ideas (driver, 2026-11-20), each needing a fresh blind held-out set:** habits against the quickest driver in
-  the driver's own car with the class best as the target gap; a gearing check (speed per gear) before gear advice.
-- **Road use** (where the car sits between the white lines): left out until clean road-edge data covers the layouts.
+- **[Habit focus](proposed/HABIT_FOCUS.md):** a stable focus of 2 corners per layout and car, measured against the
+  layout's fastest, with the gap and cost over the last 5 sessions, a goal (the next pace level of the Reference
+  Benchmarks above the session's true pace), pins, and the same focus on corner trends. The engine is reworked first:
+  only measures that pass an outcome check on the driver's history can headline a focus. Built through step 8 on
+  2026-11-21, not committed; the plan's "Implementation status" lists what stands and the driver's answers to the
+  open points. Nothing more is built until the driver has driven with it.
+- **Rule idea (driver, 2026-11-20), needing a fresh blind held-out set:** a gearing check (speed per gear) before gear
+  advice. Habits against the quickest driver in the driver's own car were decided against the same day (the class
+  fastest stays the target; see Habit focus).
+- **Road use** (where the car sits between the white lines): measured on 2026-11-20 (see Habit focus). Road position
+  alone does not carry the time, so it is drawn on the map and is no advice line; the arc radius and the sideways g at
+  the slowest point pass the check and become the cause under "minimum speed lower". 13 of 34 layouts have 1 or 2 turns
+  with an odd road edge.
 
 ## Live dashboard and learning
 

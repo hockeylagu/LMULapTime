@@ -14,7 +14,7 @@ const loadTrack = () => ({ centerline: SQUARE, projectionRevision: 'rev1', timin
 const pass = (slot: number): CornerPass => ({ slot, lapNumber: 2, segment: 1, entrySec: 61, minSpeedSec: 62, exitSec: 64,
   entrySpeedKmh: 200, minSpeedKmh: 90, exitSpeedKmh: 150, minSpeedM: 140, brakeM: 100, turnInM: 120, throttleM: 160,
   aheadSlot: null, aheadGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0,
-  coastSec: 0 });
+  coastSec: 0, arcRadiusM: null, apexLateralM: null });
 const CARS = [{ slot: 0, name: 'A', sessionDriverOrdinal: 0 }, { slot: 4, name: 'B', sessionDriverOrdinal: 1 }];
 
 function reader(versionKey: string | null): CornerPassReader {

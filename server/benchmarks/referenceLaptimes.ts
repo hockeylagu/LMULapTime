@@ -3,6 +3,7 @@ import { parseTimeStringToSeconds } from '../../shared/domain/formatters.js';
 import {
   calculateBenchmarkPace,
   createBenchmarkLookup,
+  findReferenceEntry,
 } from '../../shared/domain/paceCategory.js';
 import { normalizeCarClass } from '../../shared/domain/vehicleMapping.js';
 import { isMainThread } from 'node:worker_threads';
@@ -241,6 +242,11 @@ export type PaceCalculator = (
   lapTimeSec: number | null, venue: string, course: string, carClass: string, carType: string,
   trackLengthMeters?: number | null,
 ) => PaceCategoryInfo | null;
+
+/** The 100% target of a layout and class (s), by the layout's key (every key names its own layout); null without one. */
+export function benchmarkTargetSec(layoutKey: string, carClass: string, entries = loadReferenceLaptimesFromCache()?.entries ?? {}): number | null {
+  return findReferenceEntry(entries, layoutKey, '', carClass)?.targets.alienSec ?? null;
+}
 
 /** Reuse target matching within a read; a new calculator sees refreshed benchmarks. */
 export function createPaceCalculator(entries = loadReferenceLaptimesFromCache()?.entries ?? {}): PaceCalculator {

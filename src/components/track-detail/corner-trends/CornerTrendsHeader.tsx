@@ -26,7 +26,8 @@ const SortButton: React.FC<{
 export const CornerTrendsHeader: React.FC<{ columns: string; sort: CornerSort; onSort: (sort: CornerSort) => void }> = ({ columns, sort, onSort }) => (
   <div className={`${columns} py-2 bg-lmu-bg/80 border-b border-lmu-border text-[11px] font-bold uppercase tracking-wider text-lmu-muted`}>
     <SortButton sortKey="corner" label="Corner" sort={sort} onSort={onSort}
-      title="The corner as the class's map groups the turns (SQ), or the official turn. Sorts in lap order." />
+      title={'The corner as the class\'s map groups the turns (SQ), or the official turn. Sorts in lap order.\n'
+        + 'A target marks your 2 focus corners, a pin the ones you picked.'} />
     <span className={`block ${SPARKLINE_BOX}`} title={'Your usual (median) time through the corner, one mark per session, oldest to newest.\n'
       + 'The dashed line is the class\'s fastest usual: the further below it, the bigger your gap. Every row shares one scale.\n'
       + 'Circle: race · diamond: qualifying · hollow: practice. The last mark is green (quicker), red (slower) or grey (level) over your last '
@@ -37,7 +38,7 @@ export const CornerTrendsHeader: React.FC<{ columns: string; sort: CornerSort; o
       title={`Estimated change in your median corner time across the last ${RECENT_SESSIONS} eligible sessions. `
         + `Uses fewer if needed, with a minimum of ${MIN_TREND_SESSIONS}. Negative means quicker.`} />
     <SortButton sortKey="vsClass" label="Ref. gap (s)" sort={sort} onSort={onSort} right
-      title={'Your latest usual against the class\'s fastest usual here by another driver (s). '
-        + 'The two biggest gaps of 0.1 s or more are in red: the corners to work on.'} />
+      title={'Your latest usual against the class\'s fastest usual here by another driver (s): the best anyone did through the corner. '
+        + 'A corner\'s cost, in its opened row, is against the target instead.'} />
   </div>
 );

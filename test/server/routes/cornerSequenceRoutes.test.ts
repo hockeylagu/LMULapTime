@@ -10,14 +10,18 @@ const corners = vi.hoisted(() => ({ layoutCorners: vi.fn() }));
 vi.mock('../../../server/corners/sessionCornerPasses.js', () => corners);
 const trends = vi.hoisted(() => ({ readCornerTrends: vi.fn() }));
 vi.mock('../../../server/corners/cornerTrends.js', () => trends);
-const analysis = vi.hoisted(() => ({ readSessionCornerAnalysis: vi.fn(), readCornerHabitTrends: vi.fn() }));
+const analysis = vi.hoisted(() => ({ readSessionCornerAnalysis: vi.fn(), readCornerHabitTrends: vi.fn(), pinnedCornerTurns: vi.fn() }));
 vi.mock('../../../server/corners/cornerAnalysisService.js', () => analysis);
 
+import { benchmarkTargetSec } from '../../../server/benchmarks/referenceLaptimes.js';
 import { createCornerSequenceRouter } from '../../../server/routes/cornerSequenceRoutes.js';
 import type { ServerContext } from '../../../server/core/serverContext.js';
 
+const pins = { addHabitFocusPin: vi.fn(), removeHabitFocusPins: vi.fn() };
+
 function app(scanRunning = false, summariesReady = true) {
   const sessionDb = {
+    ...pins,
     isSessionSummaryReady: () => summariesReady,
     getSessionCatalogStats: () => ({ sessions: 3 }),
     listSequenceMaps: vi.fn(() => [{ layoutKey: 'spa_gp', carClass: 'GT3' }]),
@@ -72,12 +76,12 @@ describe('corner sequence routes', () => {
   });
 
   it("serves a layout's corner trends, behind the summary readiness gate", async () => {
-    const body = { layoutKey: 'spa_gp', carClass: 'GT3', kind: 'turns', corners: [{ id: 1, habit: null }, { id: 2, habit: null }], sessions: { total: 0, noReplay: 0, waiting: 0, tooFewPasses: 0 } };
+    const body = { corners: [{ id: 1, habit: null }, { id: 2, habit: null }], sessions: { total: 0, noReplay: 0, waiting: 0, tooFewPasses: 0 } };
     trends.readCornerTrends.mockImplementation((_db: unknown, layoutKey: string) => (layoutKey === 'spa_gp' ? body : null));
-    // Each corner's habit over the latest sessions, from the corner analysis.
-    analysis.readCornerHabitTrends.mockReturnValue(new Map([[2, { seen: 3 }]]));
+    // Each corner's habit and focus over the latest sessions, from the corner analysis.
+    analysis.readCornerHabitTrends.mockReturnValue(new Map([[2, { focus: 'pinned' }]]));
     expect((await request(app()).get('/api/corner-trends?layoutKey=spa_gp&carClass=GT3&carType=Car%20A')).body)
-      .toEqual({ ...body, corners: [{ id: 1, habit: null }, { id: 2, habit: { seen: 3 } }] });
+      .toEqual({ ...body, corners: [{ id: 1, habit: null }, { id: 2, habit: { focus: 'pinned' } }] });
     expect(analysis.readCornerHabitTrends).toHaveBeenCalledWith(expect.anything(), 'spa_gp', 'GT3', 'car a');
     expect(trends.readCornerTrends).toHaveBeenCalledWith(expect.anything(), 'spa_gp', 'GT3', 'Car A');
     expect((await request(app()).get('/api/corner-trends?layoutKey=nowhere&carClass=GT3')).status).toBe(404);
@@ -89,8 +93,40 @@ describe('corner sequence routes', () => {
     const body = { sessionId: 's1', layoutKey: 'spa_gp', carClass: 'GT3', driverOrdinal: 0, laps: 8, corners: [], habits: [], mistakes: [] };
     analysis.readSessionCornerAnalysis.mockImplementation((_db: unknown, sessionId: string) => (sessionId === 's1' ? body : null));
     expect((await request(app()).get('/api/session/s1/corner-analysis')).body).toEqual(body);
+    // The goal is measured against the app's Reference Benchmarks.
+    expect(analysis.readSessionCornerAnalysis).toHaveBeenCalledWith(expect.anything(), 's1', benchmarkTargetSec);
     expect((await request(app()).get('/api/session/s2/corner-analysis')).status).toBe(404);
     expect((await request(app(false, false)).get('/api/session/s1/corner-analysis')).status).toBe(503);
+  });
+
+  it("pins a corner by its first turn, refuses a third pin and unpins whatever turn it was pinned by", async () => {
+    const pin = { layoutKey: 'spa_gp', carClass: 'GT3', turnId: 6 };
+    // Turn 6 sits in a corner of turns 5 and 6, with one other corner pinned.
+    analysis.pinnedCornerTurns.mockReturnValue({ cornerTurnIds: [5, 6], pinnedHere: [], pinnedCorners: 1 });
+    expect((await request(app()).post('/api/habit-focus/pin').send(pin)).body).toEqual({ pinned: true });
+    expect(analysis.pinnedCornerTurns).toHaveBeenCalledWith(expect.anything(), pin, 6);
+    expect(pins.addHabitFocusPin).toHaveBeenCalledWith({ ...pin, turnId: 5 }, expect.any(Number));
+
+    pins.addHabitFocusPin.mockClear();
+    analysis.pinnedCornerTurns.mockReturnValue({ cornerTurnIds: [5, 6], pinnedHere: [], pinnedCorners: 2 });
+    const third = await request(app()).post('/api/habit-focus/pin').send(pin);
+    expect(third.status).toBe(409);
+    expect(third.body).toEqual({ error: 'Unpin one first' });
+    // Already pinned: nothing to store, and never refused.
+    analysis.pinnedCornerTurns.mockReturnValue({ cornerTurnIds: [5, 6], pinnedHere: [5], pinnedCorners: 2 });
+    expect((await request(app()).post('/api/habit-focus/pin').send(pin)).body).toEqual({ pinned: true });
+    expect(pins.addHabitFocusPin).not.toHaveBeenCalled();
+
+    expect((await request(app()).post('/api/habit-focus/unpin').send(pin)).body).toEqual({ pinned: false });
+    expect(pins.removeHabitFocusPins).toHaveBeenCalledWith(pin, [5]);
+
+    analysis.pinnedCornerTurns.mockReturnValue(null);
+    for (const route of ['pin', 'unpin']) {
+      expect((await request(app()).post(`/api/habit-focus/${route}`).send(pin)).status).toBe(404);
+      for (const bad of [{ ...pin, turnId: 1.5 }, { ...pin, layoutKey: undefined }, { ...pin, carClass: 3 }]) {
+        expect((await request(app()).post(`/api/habit-focus/${route}`).send(bad)).status).toBe(400);
+      }
+    }
   });
 
   it('refuses a missing map, a bad request and a regenerate during a replay scan', async () => {

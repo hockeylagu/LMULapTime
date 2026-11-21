@@ -92,7 +92,8 @@ CREATE TABLE IF NOT EXISTS ai_reports (
  * from before them gets the columns from the offline rebuild script, never here.
  */
 export const DRIVE_CUE_COLUMNS = `min_speed_gear INTEGER, peak_brake_pm INTEGER, brake_ms INTEGER,
-      part_throttle_ms INTEGER, abs_ms INTEGER, coast_ms INTEGER,`;
+      part_throttle_ms INTEGER, abs_ms INTEGER, coast_ms INTEGER,
+      arc_radius_dm INTEGER, apex_lateral_cm INTEGER,`;
 
 export function initDbSchema(db: DatabaseType): void {
   db.exec(`
@@ -192,6 +193,17 @@ export function initDbSchema(db: DatabaseType): void {
       beaten_session_id TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_rival_targets_scope ON rival_targets(layout_key, car_class, car_type, status);
+
+    -- The driver's pinned focus corners (user state, never cleared): a turn of the corner, so a pin follows the
+    -- sequence that holds it when a class map is regenerated.
+    CREATE TABLE IF NOT EXISTS habit_focus_pins (
+      layout_key TEXT NOT NULL,
+      car_class TEXT NOT NULL,
+      car_model TEXT NOT NULL,
+      turn_id INTEGER NOT NULL,
+      set_at INTEGER NOT NULL,
+      PRIMARY KEY (layout_key, car_class, car_model, turn_id)
+    ) WITHOUT ROWID;
 
     CREATE TABLE IF NOT EXISTS replay_metadata (
       filename TEXT PRIMARY KEY,

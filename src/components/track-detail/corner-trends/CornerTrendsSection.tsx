@@ -1,14 +1,16 @@
 import React, { useId, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ChevronRight, Route } from 'lucide-react';
+import { apiErrorMessage } from '../../../api/apiClient.js';
+import { pinHabitFocus, unpinHabitFocus } from '../../../api/cornerSequenceApi.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
-import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { CornerHabitLine } from './CornerHabitLine.js';
-import { cornerHabitText } from './cornerHabitText.js';
+import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
+import { FocusTag, SlippingTag } from '../../common/CostSparkline.js';
+import { CornerHabitLine, type CornerPinControl } from './CornerHabitLine.js';
 import { CornerTrendsHeader } from './CornerTrendsHeader.js';
 import { CornerTrendSparkline, SPARKLINE_BOX } from './CornerTrendSparkline.js';
 import {
-  LAP_ORDER, MIN_TREND_SESSIONS, RECENT_SESSIONS, cornerTrendRow, cornerTrendTone, focusCornerIds, formatCornerDelta, formatCornerSec, missingSessionsText,
+  LAP_ORDER, MIN_TREND_SESSIONS, RECENT_SESSIONS, cornerTrendRow, cornerTrendTone, formatCornerDelta, formatCornerSec, missingSessionsText,
   sharedGraphSpanSec, sortCornerRows, type CornerSort, type CornerTrendRow,
 } from './cornerTrendRows.js';
 import { useCornerTrends } from './useCornerTrends.js';
@@ -39,16 +41,21 @@ interface RowProps {
   link: string | null;
   /** The graph height in seconds, shared by every row. */
   spanSec: number;
-  focus: boolean;
+  pin: CornerPinControl | null;
 }
 
 /** One corner cell, with the disclosure before both the code and name. */
 const CornerCell: React.FC<{ row: CornerTrendRow; open: boolean | null; adviceId: string }> = ({ row, open, adviceId }) => {
   const { label, name, title } = row.corner;
+  const focus = row.corner.habit?.focus;
+  const slipping = row.corner.habit?.slipping === true;
   const content = (
     <>
       <span className="shrink-0 font-mono text-xs text-lmu-muted">{label}</span>
       <span className="truncate text-xs font-semibold">{name}</span>
+      {focus && <FocusTag focus={focus} label={focus === 'pinned' ? 'Pinned' : 'Focus'}
+        title={focus === 'pinned' ? 'Your pick: a focus corner until you unpin it' : 'Focus corner: one of the 2 to work on next'} />}
+      {slipping && !focus && <SlippingTag />}
     </>
   );
   if (open === null) return <div className="flex min-w-0 items-center gap-1.5 pl-5" title={title}>{content}</div>;
@@ -61,17 +68,16 @@ const CornerCell: React.FC<{ row: CornerTrendRow; open: boolean | null; adviceId
   );
 };
 
-const Row: React.FC<RowProps> = ({ row, link, spanSec, focus }) => {
+const Row: React.FC<RowProps> = ({ row, link, spanSec, pin }) => {
   const tone = cornerTrendTone(row.recentChangeSec);
   const hasPoints = row.corner.points.length > 0;
   const trendCount = row.recentFrom === null ? 0 : row.corner.points.length - row.recentFrom;
   const [open, setOpen] = useState(false);
   const adviceId = useId();
   const habit = row.corner.habit;
-  const text = habit ? cornerHabitText(habit) : null;
-  const hasAdvice = Boolean(text && (text.habit || text.since));
+  const hasAdvice = habit !== null;
   return (
-    <li className={`${COLUMNS} py-2 border-b border-lmu-border/50 ${hasAdvice ? 'group cursor-pointer hover:bg-lmu-raised/30' : ''}`}
+    <li className={`${COLUMNS} py-2 border-b border-lmu-border/50 ${hasAdvice ? 'group cursor-pointer' : ''} ${hasAdvice && !open ? 'hover:bg-lmu-raised/35' : ''}`}
       // A drag that selects the advice to copy it leaves the row as it is.
       onClick={hasAdvice ? () => { if (!window.getSelection()?.toString()) setOpen(previous => !previous); } : undefined} data-testid="corner-trend-row">
         <CornerCell row={row} open={hasAdvice ? open : null} adviceId={adviceId} />
@@ -89,14 +95,13 @@ const Row: React.FC<RowProps> = ({ row, link, spanSec, focus }) => {
             ? <span className="text-[11px] text-lmu-muted">{hasPoints ? `Need ${MIN_TREND_SESSIONS} sessions` : '—'}</span>
             : <Delta value={row.recentChangeSec} label="Recent trend" toneClass={tone === 'text-lmu-muted' ? 'text-lmu-text-soft' : tone} />}
         </div>
-        {focus
-          ? <span className="text-right" title="One of your biggest gaps to the class here: the corner to work on">
-            <Delta value={row.vsClassSec} label="Biggest gap to the class's fastest usual" toneClass="text-lmu-loss font-bold" />
-          </span>
-          : row.corner.reference === null
-            ? <span className="text-right text-[11px] text-lmu-muted">No reference</span>
-            : <Delta value={row.vsClassSec} label="Against the class's fastest usual" />}
-        {habit && open && <CornerHabitLine trend={habit} id={adviceId} to={link} className="col-span-full mt-2 bg-lmu-raised/50 px-3 py-2" />}
+        {row.corner.reference === null
+          ? <span className="text-right text-[11px] text-lmu-muted">No reference</span>
+          : <Delta value={row.vsClassSec} label="Against the class's fastest usual" />}
+        {habit && open && (
+          <CornerHabitLine trend={habit} id={adviceId} to={link} pin={pin}
+            className="col-span-full -mx-1.5 -mb-2 mt-2 cursor-auto border-t border-lmu-border/50 bg-lmu-bg/60 py-3 pr-3 pl-[1.625rem]" />
+        )}
     </li>
   );
 };
@@ -104,7 +109,8 @@ const Row: React.FC<RowProps> = ({ row, link, spanSec, focus }) => {
 /**
  * Corner trends on the track page: the driver's usual time through each corner of the class's map (else the official
  * turns), one mark per session, with the direction of the last sessions (`cornerTrendRow`), the gap to the class's
- * fastest, and the corner's habit over the latest sessions (`CornerHabitLine`), closed until the row is opened.
+ * fastest, and the corner's habit over the latest sessions (`CornerHabitLine`), closed until the row is opened. The 2
+ * focus corners carry a mark (the same walk as the debrief), and an opened row makes its corner a focus or unpins it.
  */
 export const CornerTrendsSection: React.FC<CornerTrendsSectionProps> = ({ layoutKey, carClass, carModel }) => {
   const { trends, loading, error, retry } = useCornerTrends(layoutKey, carClass, carModel === 'All' ? '' : carModel);
@@ -113,8 +119,21 @@ export const CornerTrendsSection: React.FC<CornerTrendsSectionProps> = ({ layout
   const rows = trends?.corners.map(cornerTrendRow) ?? [];
   const missing = trends ? missingSessionsText(trends) : null;
   const anyPoint = rows.some(row => row.corner.points.length > 0);
-  const focus = focusCornerIds(rows);
   const spanSec = sharedGraphSpanSec(trends?.corners ?? []);
+  const [pinError, setPinError] = useState<{ cornerId: number; message: string } | null>(null);
+  /** A pin names the layout, the class and the corner's first turn; the rows are read again once it is stored. */
+  const pinOf = (row: CornerTrendRow): CornerPinControl | null => {
+    const turnId = row.corner.habit?.pinTurnId;
+    if (!layoutKey || !carClass || turnId === undefined) return null;
+    return {
+      error: pinError?.cornerId === row.corner.id ? pinError.message : null,
+      onChange: (pinned) => {
+        setPinError(null);
+        void (pinned ? pinHabitFocus : unpinHabitFocus)({ layoutKey, carClass, turnId })
+          .then(retry, (error: unknown) => setPinError({ cornerId: row.corner.id, message: apiErrorMessage(error, 'The focus could not be changed') }));
+      },
+    };
+  };
   const [searchParams] = useSearchParams();
   // The lap view numbers the corners in lap order, the order the trends come in.
   const linkOf = (row: CornerTrendRow): string | null => {
@@ -135,8 +154,8 @@ export const CornerTrendsSection: React.FC<CornerTrendsSectionProps> = ({ layout
       )}
       {error && !trends && (
         <div role="alert" className="flex items-center justify-between gap-3 text-xs">
-          <p className="text-lmu-warn-soft">Corner trends could not be loaded: {error}</p>
-          <button type="button" onClick={retry} className={`font-bold text-lmu-info hover:text-lmu-info-soft ${FOCUS_RING}`}>Try again</button>
+          <p className="text-lmu-loss">Corner trends could not be loaded: {error}</p>
+          <button type="button" onClick={retry} className={SECONDARY_BUTTON}>Try again</button>
         </div>
       )}
       {loading && !trends && <p role="status" className="text-xs text-lmu-muted py-4">Loading corner trends…</p>}
@@ -153,7 +172,7 @@ export const CornerTrendsSection: React.FC<CornerTrendsSectionProps> = ({ layout
         <div>
           <CornerTrendsHeader columns={COLUMNS} sort={sort} onSort={setSort} />
           <ul aria-label="Corners">{sortCornerRows(rows, sort).map(row => (
-            <Row key={row.corner.id} row={row} link={linkOf(row)} spanSec={spanSec} focus={focus.has(row.corner.id)} />
+            <Row key={row.corner.id} row={row} link={linkOf(row)} spanSec={spanSec} pin={pinOf(row)} />
           ))}</ul>
         </div>
       )}

@@ -98,20 +98,6 @@ export function sessionMark(sessionType: string, sessionName: string): SessionMa
   return 'practice';
 }
 
-/** How many corners the "vs class" column flags as the ones to work on. */
-const FOCUS_CORNERS = 2;
-/** A gap to the class below this is no focus, however it ranks: the corner is already near the class. */
-const MIN_FOCUS_GAP_SEC = 0.1;
-
-/** The corners losing most to the class (at most FOCUS_CORNERS, each at least MIN_FOCUS_GAP_SEC behind), by id. */
-export function focusCornerIds(rows: readonly CornerTrendRow[]): Set<number> {
-  return new Set(rows
-    .filter((row): row is CornerTrendRow & { vsClassSec: number } => row.vsClassSec !== null && row.vsClassSec >= MIN_FOCUS_GAP_SEC)
-    .sort((a, b) => b.vsClassSec - a.vsClassSec)
-    .slice(0, FOCUS_CORNERS)
-    .map(row => row.corner.id));
-}
-
 /** The columns the corner rows sort by: lap order, or one of the numbers. */
 export type CornerSortKey = 'corner' | 'latest' | 'recent' | 'vsClass';
 export interface CornerSort { key: CornerSortKey; descending: boolean }

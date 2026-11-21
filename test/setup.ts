@@ -96,7 +96,8 @@ vi.mock('recharts', () => {
       return null;
     },
     CartesianGrid: () => null,
-    ReferenceLine: () => null,
+    ReferenceLine: ({ y, label }: { y?: number; label?: { value?: string } }) =>
+      React.createElement('line', { 'data-testid': 'recharts-reference-line', 'data-y': y, 'aria-label': label?.value }),
     Legend: ({
       formatter,
       content,

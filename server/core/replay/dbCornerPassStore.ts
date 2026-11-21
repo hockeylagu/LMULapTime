@@ -34,9 +34,11 @@ export function replaceCornerPasses(
     INSERT INTO ${table} (filename, driver_slot, lap_number, segment, entry_ms, min_speed_after_ms, duration_ms,
       entry_speed_dkmh, min_speed_dkmh, exit_speed_dkmh, min_speed_dm, brake_dm, turn_in_dm, throttle_dm,
       ahead_slot, ahead_gap_ms,
-      min_speed_gear, peak_brake_pm, brake_ms, part_throttle_ms, abs_ms, coast_ms)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      min_speed_gear, peak_brake_pm, brake_ms, part_throttle_ms, abs_ms, coast_ms,
+      arc_radius_dm, apex_lateral_cm)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+  const hundredths = (value: number | null): number | null => value === null ? null : Math.round(value * 100);
   const perMille = (value: number | null): number | null => value === null ? null : Math.round(value * 1000);
   db.transaction(() => {
     db.prepare(`DELETE FROM ${table} WHERE filename = ?`).run(filename);
@@ -48,7 +50,8 @@ export function replaceCornerPasses(
         tenths(pass.minSpeedM), tenths(pass.brakeM), tenths(pass.turnInM), tenths(pass.throttleM),
         pass.aheadSlot, ms(pass.aheadGapSec),
         pass.minSpeedGear, perMille(pass.peakBrake), ms(pass.brakeSec), ms(pass.partThrottleSec),
-        ms(pass.absSec), ms(pass.coastSec));
+        ms(pass.absSec), ms(pass.coastSec),
+        tenths(pass.arcRadiusM), hundredths(pass.apexLateralM));
     }
     db.prepare(`
       INSERT INTO ${builds} (filename, version_key, layout_key, pass_count, built_at) VALUES (?, ?, ?, ?, ?)
@@ -66,6 +69,7 @@ export function passFromRow(row: CornerPassRow): CornerPass {
   const fromTenths = (value: number | null): number | null => value === null ? null : value / 10;
   const sec = (value: number | null): number | null => value === null ? null : value / 1000;
   const fromPerMille = (value: number | null): number | null => value === null ? null : value / 1000;
+  const fromHundredths = (value: number | null): number | null => value === null ? null : value / 100;
   const entryMs = row.entry_ms as number;
   return {
     slot: row.driver_slot as number, lapNumber: row.lap_number as number, segment: row.segment as number,
@@ -77,6 +81,8 @@ export function passFromRow(row: CornerPassRow): CornerPass {
     throttleM: fromTenths(row.throttle_dm),
     minSpeedGear: row.min_speed_gear, peakBrake: fromPerMille(row.peak_brake_pm),
     brakeSec: sec(row.brake_ms) ?? 0, partThrottleSec: sec(row.part_throttle_ms), absSec: sec(row.abs_ms) ?? 0, coastSec: sec(row.coast_ms) ?? 0,
+    arcRadiusM: fromTenths(row.arc_radius_dm ?? null),
+    apexLateralM: fromHundredths(row.apex_lateral_cm ?? null),
     aheadSlot: row.ahead_slot, aheadGapSec: sec(row.ahead_gap_ms),
   };
 }

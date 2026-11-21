@@ -2,14 +2,16 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import type { CornerTrend, CornerTrendPoint, CornerTrendsResponse } from '../../../../shared/types/corners/cornerTrends.js';
-import type { CornerHabitTrend } from '../../../../shared/types/corners/cornerAnalysis.js';
+import type { CornerHabit, CornerHabitTrend } from '../../../../shared/types/corners/cornerAnalysis.js';
 
-const api = vi.hoisted(() => ({ fetchCornerTrends: vi.fn(), onSequenceMapsChanged: vi.fn(() => () => {}) }));
+const api = vi.hoisted(() => ({
+  fetchCornerTrends: vi.fn(), onSequenceMapsChanged: vi.fn(() => () => {}), pinHabitFocus: vi.fn(), unpinHabitFocus: vi.fn(),
+}));
 vi.mock('../../../../src/api/cornerSequenceApi.js', () => api);
 
 import { CornerTrendsSection } from '../../../../src/components/track-detail/corner-trends/CornerTrendsSection.js';
 import { cornerHabitText } from '../../../../src/components/track-detail/corner-trends/cornerHabitText.js';
-import { cornerTrendRow, cornerTrendTone, focusCornerIds, graphTopSec, missingSessionsText, sessionMark, sharedGraphSpanSec, sortCornerRows, type CornerSort } from '../../../../src/components/track-detail/corner-trends/cornerTrendRows.js';
+import { cornerTrendRow, cornerTrendTone, graphTopSec, missingSessionsText, sessionMark, sharedGraphSpanSec, sortCornerRows, type CornerSort } from '../../../../src/components/track-detail/corner-trends/cornerTrendRows.js';
 
 /** The section reads the page's query (its telemetry links keep it). */
 const renderInRouter = (element: ReactElement) => {
@@ -45,15 +47,6 @@ describe('cornerTrendRow', () => {
     expect(change([10.4, 10.3, 11.5, 10.1, 10.0])).toBeCloseTo(-0.4);
     // Two sessions are no direction.
     expect(cornerTrendRow(corner(1, [point('s1', 10.5), point('s2', 10.1)], 10))).toMatchObject({ recentFrom: null, recentChangeSec: null });
-  });
-
-  it('flags the two corners losing most to the class, never one within 0.1 s', () => {
-    // Latest 10.0 s everywhere; the class at 9.5, 9.8, 9.2, 9.4 and none: gaps 0.5, 0.2, 0.8, 0.6.
-    const references: Array<number | null> = [9.5, 9.8, 9.2, 9.4, null];
-    const rows = references.map((reference, i) => cornerTrendRow(corner(i + 1, [point('s1', 10.0)], reference)));
-    expect([...focusCornerIds(rows)]).toEqual([3, 4]);
-    const close = [cornerTrendRow(corner(1, [point('s1', 10.0)], 9.95)), cornerTrendRow(corner(2, [point('s1', 10.0)], 9.8))];
-    expect([...focusCornerIds(close)]).toEqual([2]);
   });
 
   it('tops each graph at the class line and gives every graph the same height in seconds', () => {
@@ -94,7 +87,7 @@ describe('cornerTrendRow', () => {
 });
 
 describe('CornerTrendsSection', () => {
-  beforeEach(() => api.fetchCornerTrends.mockReset());
+  beforeEach(() => { api.fetchCornerTrends.mockReset(); api.pinHabitFocus.mockReset(); api.unpinHabitFocus.mockReset(); });
 
   it('draws a row per corner with a dot per session and the class line', async () => {
     api.fetchCornerTrends.mockResolvedValue(response([
@@ -117,8 +110,8 @@ describe('CornerTrendsSection', () => {
     // A corner without any session says so once, in the graph's place; "Need 3 sessions" is for one with too few.
     expect(within(rows[1]).queryByText('Need 3 sessions')).toBeNull();
     expect(within(rows[1]).getByText('No reference')).toBeInTheDocument();
-    // The one corner behind the class by 0.1 s or more is the one to work on.
-    expect(within(rows[0]).getByLabelText('Biggest gap to the class\'s fastest usual +0.200 s')).toHaveClass('text-lmu-loss');
+    // The gap to the class is plain: the focus comes from the habits, not from this column.
+    expect(within(rows[0]).getByLabelText('Against the class\'s fastest usual +0.200 s')).not.toHaveClass('text-lmu-loss');
     expect(rows[1]).toHaveTextContent('No session with enough clean laps');
     expect(screen.getByText('2 of 4 sessions have no corner times: 2 without a replay.')).toBeInTheDocument();
   });
@@ -164,21 +157,31 @@ describe('CornerTrendsSection', () => {
     expect(await labels()).toEqual(['SQ1', 'SQ2', 'SQ3']);
   });
 
-  it("opens the corner's habit under its row: how often it showed, the corner against the session before, a habit fixed", async () => {
-    const habit: CornerHabitTrend = {
-      session: { sessionId: 's3', timestamp: Date.UTC(2026, 10, 3, 12), sessionType: 'Race' },
-      habit: { line: 'Get to full throttle sooner out of T5', detail: '0.6 s on part throttle out of the slowest point, Ref Driver 0.3 s (+0.3 s)', lossSec: 0.12, rule: 'partThrottle' }, seen: 4, of: 5,
-      since: { sessionId: 's2', timestamp: Date.UTC(2026, 9, 21, 12), sessionType: 'Qualifying' },
-      change: { turnId: 5, half: 'out', rule: 'partThrottle', isNew: false, cue: '0.2 s less part throttle' }, fixed: 'Carry 3 km/h more through T6',
-      view: { lap: { sessionId: 's3', driverOrdinal: 2, lapOrdinal: 7 }, reference: { sessionId: 'r1', driverOrdinal: 4, lapOrdinal: 5, name: 'Ref Driver' } },
-    };
+  const sessionOf = (id: string, day: number) => ({ sessionId: id, timestamp: Date.UTC(2026, 10, day, 12), sessionType: 'Race' });
+  const habitOf = (extra: Partial<CornerHabit> = {}): CornerHabit => ({
+    cornerId: 2, turnId: 5, turnLabel: 'T5', half: 'in', lossSec: 0.12, sameCarLossSec: null, rule: 'overSlowing', gap: 4,
+    speeds: { minKmh: 96, targetMinKmh: 100, exitKmh: 150, targetExitKmh: 150 }, kind: 'tighterArc', arc: null,
+    action: { type: 'reachInside', gap: 1.2, line: 'Get closer to the inside at the apex' }, otherActions: [], causes: [],
+    repeatability: 1, confidence: 1, priority: 0.12, line: 'Carry 4 km/h more through T5',
+    detail: 'Apex 96 km/h, Ref Driver 100 km/h · tighter arc: 80 m radius against 87 m', ...extra,
+  });
+  /** T5's over-slowing over 3 sessions, the second without the gap measured. */
+  const trendOf = (extra: Partial<CornerHabitTrend> = {}): CornerHabitTrend => ({
+    session: sessionOf('s3', 3), habit: habitOf(), costSec: 0.22, focus: null, pinTurnId: 5, slipping: false,
+    gap: { rule: 'overSlowing', turnLabel: 'T5', unit: 'km/h' },
+    series: [{ session: sessionOf('s1', 1), costSec: 0.31, gap: 7 }, { session: sessionOf('s2', 2), costSec: 0.28, gap: null }, { session: sessionOf('s3', 3), costSec: 0.22, gap: 4.4 }],
+    view: { lap: { sessionId: 's3', driverOrdinal: 2, lapOrdinal: 7 }, reference: { sessionId: 'r1', driverOrdinal: 4, lapOrdinal: 5, name: 'Ref Driver' } },
+    ...extra,
+  });
+
+  it("opens the corner's habit under its row: its cost to the target, the thing to try, and the cost and gap over the last sessions", async () => {
     api.fetchCornerTrends.mockResolvedValue(response([
-      corner(1, [point('s1', 10.6)], 10.0, { ...habit, habit: null, seen: 0, of: 1, since: null, change: null }),
-      corner(2, [point('s1', 10.2)], 10.0, habit),
+      corner(1, [point('s1', 10.6)], 10.0),
+      corner(2, [point('s1', 10.2)], 10.0, trendOf()),
     ]));
     renderInRouter(<CornerTrendsSection layoutKey="spa_gp" carClass="GT3" carModel="All" />);
     const rows = (await screen.findAllByTestId('corner-trend-row')).toReversed();
-    // Closed at first; a corner with nothing to tell has no toggle.
+    // Closed at first; a corner without an analysis has no toggle.
     expect(within(rows[0]).queryByTestId('corner-habit')).toBeNull();
     expect(within(rows[1]).queryByRole('button')).toBeNull();
     const toggle = within(rows[0]).getByRole('button', { name: 'SQ2 Turn 2' });
@@ -197,15 +200,16 @@ describe('CornerTrendsSection', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     selection.mockRestore();
     const lines = within(rows[0]).getByTestId('corner-habit');
-    // The habit leads; what it costs and how often it shows sit beside it.
-    const advice = within(lines).getByText('Get to full throttle sooner out of T5');
-    expect(advice).toHaveAttribute('title', '0.6 s on part throttle out of the slowest point, Ref Driver 0.3 s (+0.3 s)');
-    expect(within(lines).getByText('+0.12 s a lap')).toHaveClass('font-mono');
-    expect(within(lines).getByText('seen in 4 of 5 sessions')).toBeInTheDocument();
-    // One line on the session before: the habit's cue and the habit fixed, not the corner's time the graph shows.
-    expect(lines).toHaveTextContent(/Since Oct 21 Qualifying:\s*0\.2 s less part throttle\s*·\s*fixed: Carry 3 km\/h more through T6/);
-    expect(lines).not.toHaveTextContent('quicker');
-    expect(within(rows[1]).queryByTestId('corner-habit')).toBeNull();
+    // The habit leads, the speeds and the kind of loss on its hover; the corner's cost against the target sits beside it.
+    const advice = within(lines).getByText('Carry 4 km/h more through T5');
+    expect(advice).toHaveAttribute('title', 'Apex 96 km/h, Ref Driver 100 km/h · tighter arc: 80 m radius against 87 m');
+    expect(within(lines).getByText('+0.22 s a lap vs target')).toHaveClass('font-mono');
+    expect(within(lines).getByTitle('The target is 1.2 m closer to the inside at the apex than you')).toHaveTextContent('Try: Get closer to the inside at the apex');
+    // The cost sparkline (start → latest) and the habit's own gap over the last sessions: a gap that closes while the cost stays shows here.
+    expect(within(lines).getByTestId('corner-habit-sparkline')).toHaveAttribute('aria-label', 'Cost trend: 0.31 → 0.28 → 0.22 s/lap');
+    expect(lines).toHaveTextContent('0.31 → 0.22 s');
+    expect(lines).toHaveTextContent('Minimum speed at T5, gap to the target: 7 → – → 4 km/h');
+    expect(lines).not.toHaveTextContent(/fixed|Slipping|Focus corner|Your pick/);
     // The lap view at the corner (the second in lap order): the session's lap against the reference's, the page's query kept.
     const link = new URL(within(lines).getByRole('link', { name: /Compare in telemetry/ }).getAttribute('href')!, 'http://x');
     expect(link.pathname).toBe('/telemetry');
@@ -218,16 +222,52 @@ describe('CornerTrendsSection', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('leaves out of the advice what the row already says: a new habit, the corner against the session before', () => {
-    const trend: CornerHabitTrend = {
-      session: { sessionId: 's3', timestamp: Date.UTC(2026, 10, 3, 12), sessionType: 'Race' },
-      habit: { line: 'Losing time into T5: no clear cause', detail: 'Open the laps side by side', lossSec: 0.08, rule: null }, seen: 1, of: 3,
-      since: { sessionId: 's2', timestamp: Date.UTC(2026, 9, 21, 12), sessionType: 'Race' },
-      change: { turnId: 5, half: 'in', rule: null, isNew: true, cue: null }, fixed: null, view: null,
-    };
-    expect(cornerHabitText(trend)).toEqual({
-      habit: { line: 'Losing time into T5: no clear cause', loss: '+0.08 s a lap', seen: 'seen in 1 of 3 sessions', explained: false }, since: null,
+  it('marks the focus corners and lets the driver make a corner a focus or unpin it', async () => {
+    const rowsOf = (focus: Array<CornerHabitTrend['focus']>) => response([
+      corner(1, [point('s1', 10.6)], 10.0, trendOf({ focus: focus[0], habit: null, gap: null, costSec: 0.6, slipping: true, series: [{ session: sessionOf('s3', 3), costSec: 0.6, gap: null }], view: null, pinTurnId: 3 })),
+      corner(2, [point('s1', 10.2)], 10.0, trendOf({ focus: focus[1] })),
+    ]);
+    api.fetchCornerTrends.mockResolvedValueOnce(rowsOf(['focus', null])).mockResolvedValue(rowsOf(['focus', 'pinned']));
+    api.pinHabitFocus.mockResolvedValue({ pinned: true });
+    api.unpinHabitFocus.mockRejectedValue(new Error('Unpin one first'));
+    renderInRouter(<CornerTrendsSection layoutKey="spa_gp" carClass="GT3" carModel="All" />);
+    const [first, second] = await screen.findAllByTestId('corner-trend-row');
+    // The mark sits beside the corner's name; the other corner has none.
+    expect(within(first).getByTitle('Focus corner: one of the 2 to work on next')).toBeInTheDocument();
+    expect(within(second).queryByTitle(/Focus corner|Your pick/)).toBeNull();
+    // A focus corner without a named habit still opens: its cost, the slip, and the way to keep it.
+    fireEvent.click(first);
+    const focusLines = within(first).getByTestId('corner-habit');
+    expect(focusLines).toHaveTextContent('No habit named here in Nov 3 Race');
+    expect(focusLines).toHaveTextContent('+0.60 s a lap vs target');
+    expect(within(focusLines).getByText('Slipping')).toHaveAttribute('title', 'Its cost is at least 0.10 s a lap above its recent level in the last 2 sessions');
+    expect(focusLines).not.toHaveTextContent(/Cost:|Try:/);
+    expect(within(focusLines).getByRole('button', { name: 'Keep as focus' })).toBeInTheDocument();
+    // Making the other corner a focus stores the pin on its turn and reads the rows again; the row stays open.
+    fireEvent.click(second);
+    fireEvent.click(within(second).getByRole('button', { name: 'Make focus' }));
+    expect(api.pinHabitFocus).toHaveBeenCalledWith({ layoutKey: 'spa_gp', carClass: 'GT3', turnId: 5 });
+    const unpin = await within(second).findByRole('button', { name: 'Unpin' });
+    expect(within(second).getByTitle('Your pick: a focus corner until you unpin it')).toBeInTheDocument();
+    // The tag beside the name says it once; the opened row does not repeat it.
+    expect(within(second).getByTestId('corner-habit')).not.toHaveTextContent(/Your pick|Focus corner/);
+    // A refusal is said on the row.
+    fireEvent.click(unpin);
+    expect(await within(second).findByRole('alert')).toHaveTextContent('Unpin one first');
+    expect(api.unpinHabitFocus).toHaveBeenCalledWith({ layoutKey: 'spa_gp', carClass: 'GT3', turnId: 5 });
+  });
+
+  it('words a loss no rule explains as an observation, with no series from a single session', () => {
+    const trend = trendOf({
+      habit: habitOf({ line: 'Losing time into T5: no clear cause', detail: 'Open the laps side by side', rule: null, action: null }),
+      costSec: -0.08, gap: null, series: [{ session: sessionOf('s3', 3), costSec: -0.08, gap: null }],
     });
+    expect(cornerHabitText(trend)).toEqual({
+      habit: { line: 'Losing time into T5: no clear cause', explained: false }, tryLine: null, cost: '−0.08 s a lap vs target', costSeries: null, gapSeries: null,
+    });
+    // A brake point is its own advice; without a target there is no cost.
+    expect(cornerHabitText(trendOf({ habit: habitOf({ rule: 'brakeEarly', action: { type: 'brakeLater', gap: 10, line: 'Brake 10 m later' } }), costSec: null })))
+      .toMatchObject({ tryLine: null, cost: null });
   });
 
   it('says when the class has no session at the track, apart from sessions without corner times', async () => {

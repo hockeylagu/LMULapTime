@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   parseReferenceCsv,
+  benchmarkTargetSec,
   createPaceCalculator,
   loadReferenceLaptimesFromCache,
   isReferenceLaptimesCacheFresh,
@@ -64,6 +65,15 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
       expect(createPaceCalculator(updated)(120, 'Spa', 'GP', 'Hyper', 'Ferrari')?.percentage).toBe(120);
       expect(rate(120, 'Spa', 'GP', 'Hyper', 'Ferrari')?.percentage).toBe(100);
       expect(createPaceCalculator({})(120, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
+    });
+    it("gives a layout's 100% target by its key, from the stored benchmarks unless given others", () => {
+      const cache = parseReferenceCsv(sampleCsv);
+      getSessionDatabase().saveReferenceLaptimes(cache);
+      resetCachedReferenceLaptimes();
+      expect(benchmarkTargetSec('spa_gp', 'Hyper')).toBe(120);
+      expect(benchmarkTargetSec('spa_gp', 'GT3')).toBeNull();
+      expect(benchmarkTargetSec('nowhere', 'Hyper')).toBeNull();
+      expect(benchmarkTargetSec('spa_gp', 'Hyper', {})).toBeNull();
     });
     it('returns null for null, 0, or negative lap times', () => {
       const rate = createPaceCalculator();

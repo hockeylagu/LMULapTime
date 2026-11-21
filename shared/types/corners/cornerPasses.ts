@@ -35,6 +35,17 @@ export interface CornerPass {
   absSec: number;
   /** Off both pedals (brake under 5 %, throttle under 10 %) from the end of braking (else the segment's start) to the throttle pick-up (else the segment's end) (s). */
   coastSec: number;
+  /**
+   * The arc at the slowest point: the radius of the circle through the car's positions half a second before, at and
+   * after it (m), positive turning left and negative turning right. Null without a slowest point inside the segment,
+   * on a straight or without positions.
+   */
+  arcRadiusM: number | null;
+  /**
+   * Where the car is on the road at the apex, from the centre line (m, positive left): the most inside point of the
+   * pass, the inside being the side the arc turns to. Null without an arc.
+   */
+  apexLateralM: number | null;
   /** The closest car ahead during the pass, within 2 s at this car's speed. */
   aheadSlot: number | null;
   aheadGapSec: number | null;

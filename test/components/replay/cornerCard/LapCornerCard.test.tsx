@@ -14,7 +14,7 @@ const pass = (lapNumber: number, timeSec: number): CornerPass => ({
   slot: 1, lapNumber, segment: 1, entrySec: lapNumber * 100, minSpeedSec: lapNumber * 100 + 2, exitSec: lapNumber * 100 + timeSec,
   entrySpeedKmh: 250, minSpeedKmh: 100, exitSpeedKmh: 180, minSpeedM: 200, brakeM: 150, turnInM: 170, throttleM: 220,
   aheadSlot: null, aheadGapSec: null, minSpeedGear: null, peakBrake: null, brakeSec: 0, partThrottleSec: null, absSec: 0,
-  coastSec: 0,
+  coastSec: 0, arcRadiusM: null, apexLateralM: null,
 });
 const PASSES: SessionCornerPasses = {
   available: true, layoutKey: 'test', startStationM: 0, trackLengthM: 1000,

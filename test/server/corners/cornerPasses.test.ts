@@ -54,6 +54,36 @@ describe('buildCornerPasses', () => {
     expect(first.aheadSlot).toBeNull();
   });
 
+  it('takes the main stop as the braking, not a touch of the brake after it, however long the car rolls on', () => {
+    const braking = (brakeAt: (m: number) => number) => {
+      const samples = lap(1);
+      samples.brake = samples.stations.map(brakeAt);
+      return buildCornerPasses([{ slot: 1, laps: [samples] }], SEGMENTS, LENGTH)[0];
+    };
+    // The stop from 200 m to 260 m, then a light touch from 290 m to the slowest point at 300 m.
+    const touched = braking(m => (m >= 200 && m < 260 ? 0.8 : m >= 290 && m < 300 ? 0.15 : 0));
+    expect(touched.brakeM).toBeCloseTo(200, -1);
+    expect(touched.peakBrake).toBe(0.8);
+    expect(touched.brakeSec).toBeGreaterThan(1.5);
+    // A short stop from 200 m to 220 m, then over 2 s rolling to the slowest point.
+    const rolled = braking(m => (m >= 200 && m < 220 ? 0.8 : 0));
+    expect(rolled.minSpeedSec as number - rolled.entrySec).toBeGreaterThan(4 + 20 / 45 + 2);
+    expect(rolled.brakeM).toBeCloseTo(200, -1);
+    expect(rolled.coastSec).toBeGreaterThan(2);
+  });
+
+  it('leaves out a braking the car gained speed again after: it was for an earlier corner', () => {
+    const samples = lap(1);
+    const local = samples.stations;
+    // A stop from 50 m to 100 m down to 40 m/s, back to 50 m/s by 150 m; then the corner on a lift alone.
+    samples.speedKmh = samples.speedKmh.map((speed, i) => (local[i] >= 50 && local[i] < 100 ? (50 - (local[i] - 50) / 5) * 3.6
+      : local[i] >= 100 && local[i] < 150 ? (40 + (local[i] - 100) / 5) * 3.6 : speed));
+    samples.brake = local.map(m => (m >= 50 && m < 100 ? 0.5 : 0));
+    const [corner] = buildCornerPasses([{ slot: 1, laps: [samples] }], SEGMENTS, LENGTH);
+    expect(corner.minSpeedM).toBeCloseTo(300, -1);
+    expect(corner.brakeM).toBeNull();
+  });
+
   it('measures the gear, the braking, the part throttle out of the slowest point and the TC and ABS time', () => {
     const samples = lap(1);
     const local = samples.stations;
@@ -88,6 +118,47 @@ describe('buildCornerPasses', () => {
     samples.throttle = lap(1).throttle;
     samples.brake = samples.brake.map((brake, i) => (local[i] >= 300 && local[i] < 320 ? 0.1 : brake));
     expect(buildCornerPasses([{ slot: 1, laps: [samples] }], SEGMENTS, LENGTH)[0].coastSec).toBe(0);
+  });
+
+  it('measures the line: the arc at the slowest point and the place on the road at the turn-in, the apex and the exit', () => {
+    // The lap's path: straight, a 60 m arc from 250 m to 350 m turning `side` (1 left, -1 right), straight again.
+    // On the road: 3 m to the outside until the turn-in, 3 m to the inside at 300 m, 2.5 m to the outside from 400 m.
+    const withLine = (side: 1 | -1): PassLapSamples => {
+      const samples = lap(1);
+      const local = samples.stations;
+      let x = 0, z = 0;
+      samples.x = [];
+      samples.z = [];
+      local.forEach((m, i) => {
+        const step = i === 0 ? 0 : m - local[i - 1];
+        const heading = side * (Math.min(Math.max(local[Math.max(i - 1, 0)], 250), 350) - 250) / 60;
+        x += step * Math.cos(heading);
+        z += step * Math.sin(heading);
+        samples.x?.push(x);
+        samples.z?.push(z);
+      });
+      samples.lateral = local.map(m => side * (m < 230 ? -3 : m < 300 ? -3 + 6 * (m - 230) / 70 : m < 400 ? 3 - 5.5 * (m - 300) / 100 : -2.5));
+      return samples;
+    };
+    const [corner, straight] = buildCornerPasses([{ slot: 1, laps: [withLine(1)] }], SEGMENTS, LENGTH);
+    // Positive turning left; the road positions are metres left of the centre line.
+    expect(corner.arcRadiusM).toBeCloseTo(60, 0);
+    expect(corner.apexLateralM).toBeCloseTo(3, 0);
+    // No slowest point to turn around on a straight: no line.
+    expect(straight).toMatchObject({ arcRadiusM: null, apexLateralM: null });
+    // Turning right, everything mirrors.
+    const [right] = buildCornerPasses([{ slot: 1, laps: [withLine(-1)] }], SEGMENTS, LENGTH);
+    expect(right.arcRadiusM).toBeCloseTo(-60, 0);
+    expect(right.apexLateralM).toBeCloseTo(-3, 0);
+    // Without positions (a lap read before they were kept), or with one missing beside the slowest point: no line.
+    expect(buildCornerPasses([{ slot: 1, laps: [lap(1)] }], SEGMENTS, LENGTH)[0]).toMatchObject({ arcRadiusM: null, apexLateralM: null });
+    const holed = withLine(1);
+    const slowest = holed.speedKmh.indexOf(Math.min(...holed.speedKmh.map(speed => speed ?? Infinity)));
+    for (let i = slowest - 6; i <= slowest + 6; i++) if (i !== slowest && holed.x) holed.x[i] = null;
+    expect(buildCornerPasses([{ slot: 1, laps: [holed] }], SEGMENTS, LENGTH)[0].arcRadiusM).toBeNull();
+    // A segment whose slowest point is its end holds no apex: no line either.
+    const early = [{ id: 0, startM: 0, endM: 280 }, { id: 1, startM: 280, endM: LENGTH }];
+    expect(buildCornerPasses([{ slot: 1, laps: [withLine(1)] }], early, LENGTH)[0]).toMatchObject({ arcRadiusM: null, apexLateralM: null });
   });
 
   it('reads a sample just short of the line at the lap start as before it', () => {

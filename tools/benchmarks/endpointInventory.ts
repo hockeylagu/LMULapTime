@@ -16,6 +16,8 @@ const exclusions: Record<string, string> = {
   '/api/reference-laptimes/refresh': 'Calls Google Sheets and changes benchmark targets.',
   '/api/corner-sequences/maps/regenerate': 'Rebuilds a sequence map and the sequence passes of its layout.',
   '/api/rivals/pin': 'Changes the selected rival.',
+  '/api/habit-focus/pin': "Changes the driver's focus corners.",
+  '/api/habit-focus/unpin': "Changes the driver's focus corners.",
   '/api/live/settings': 'Changes the live dashboard settings.',
   '/api/desktop/browser': 'Changes the desktop-local browser monitor preference.',
   '/api/peripherals/:id/settings': 'Changes peripheral settings.',
