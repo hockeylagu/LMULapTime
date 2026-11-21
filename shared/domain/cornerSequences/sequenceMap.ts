@@ -96,6 +96,31 @@ export function buildSequenceMap(turns: readonly SequenceTurn[], laps: readonly 
   const recovered = laps.length ? shares.map(median) : [];
   const empty: SequenceMap = { version: SEQUENCE_MAP_VERSION, lengthM, lapCount: laps.length, sequences: [], joinVotes, recovered };
   if (turns.length === 0 || laps.length === 0) return empty;
+  // A sequence starting before the previous one's slowest point is the same corner: half the laps drove the pair as one
+  // (Silverstone National's Maggotts, 5 votes of 10, an 11 m sequence of 0.165 s). The pair joins, until none overlaps.
+  let sequences = sequencesOf(turns, laps, lengthM, joined);
+  for (let overlap = overlappingTurn(sequences, turns, lengthM); overlap >= 0; overlap = overlappingTurn(sequences, turns, lengthM)) {
+    joined[overlap] = true;
+    sequences = sequencesOf(turns, laps, lengthM, joined);
+  }
+  return { ...empty, sequences };
+}
+
+/** The turn (by position) a sequence starting before the previous one's slowest point should join on from; -1 when none does. */
+function overlappingTurn(sequences: readonly MapSequence[], turns: readonly SequenceTurn[], lengthM: number): number {
+  const ordered = sequences.toSorted((a, b) => a.startM - b.startM);
+  if (ordered.length < 2) return -1;
+  const overlapping = ordered.findIndex((sequence, i) => {
+    const next = ordered[(i + 1) % ordered.length];
+    return ahead(sequence.startM, next.startM, lengthM) < ahead(sequence.startM, sequence.minM, lengthM);
+  });
+  if (overlapping < 0) return -1;
+  const nextFirst = turns.findIndex(turn => turn.id === ordered[(overlapping + 1) % ordered.length].turnIds[0]);
+  return (nextFirst - 1 + turns.length) % turns.length;
+}
+
+/** The sequences of the runs of joined turns (`joined[i]`: turn i and the next are one corner). */
+function sequencesOf(turns: readonly SequenceTurn[], laps: readonly SequenceLap[], lengthM: number, joined: readonly boolean[]): MapSequence[] {
   // Runs of joined turns, starting after a split (the first turn may join the last one across the line).
   const firstSplit = joined.findIndex(join => !join);
   const runs: number[][] = [];
@@ -163,7 +188,7 @@ export function buildSequenceMap(turns: readonly SequenceTurn[], laps: readonly 
     holder?.turnIds.push(...ids);
     holder?.exitTurnIds.push(...ids);
   }
-  return { ...empty, sequences: sequences.filter((sequence): sequence is MapSequence => sequence !== null) };
+  return sequences.filter((sequence): sequence is MapSequence => sequence !== null);
 }
 
 export interface SequenceCheck {

@@ -99,6 +99,13 @@ describe('refreshSequenceMaps', () => {
     // The driver's own laps (slot 0) check it.
     expect(map.checkLaps.map(lap => lap.slot)).toEqual([0, 0, 0]);
     expect(map.sequences.every(sequence => sequence.check?.same)).toBe(true);
+    // The key names the corners as well as the laps: a regeneration from the same laps that a rule fix groups otherwise
+    // gets a new key, so the passes are built again (a key of the laps alone left them on the old corners).
+    const lapsKey = map.mapKey.split(':').slice(0, 2).join(':');
+    store.maps.set('square|GT3', { ...map, mapKey: lapsKey });
+    await refreshSequenceMaps(store, 'square', ['GT3'], { readLaps, loadTrack, remap: true });
+    expect(store.maps.get('square|GT3')!.mapKey).toBe(map.mapKey);
+    expect(map.mapKey.startsWith(`${lapsKey}:`)).toBe(true);
 
     // Full: two new fast laps change nothing and check nothing.
     const built = map.mapKey;

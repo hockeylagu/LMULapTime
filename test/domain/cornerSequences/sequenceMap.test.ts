@@ -35,6 +35,18 @@ describe('buildSequenceMap', () => {
     expect(split.sequences.map(sequence => sequence.turnIds)).toEqual([[2], [3], [1]]);
   });
 
+  it('joins two turns whose split leaves the second starting before the first one\'s slowest point', () => {
+    // Silverstone National's Maggotts: one lap takes turns 1 and 2 as one corner (slowest at 140), the other gets half
+    // its speed back between them. The tied vote splits them, and turn 2 would start at 110, before turn 1's slowest
+    // point (120, the median): an 11 m corner. It is the same corner.
+    const turns = [{ id: 1, apexM: 100 }, { id: 2, apexM: 120 }, { id: 3, apexM: 600 }];
+    const oneCorner = lap([['max', 20, 250], ['min', 140, 110], ['max', 400, 240], ['min', 600, 90]]);
+    const twoDips = lap([['max', 20, 250], ['min', 100, 150], ['max', 110, 200], ['min', 125, 120], ['max', 400, 240], ['min', 600, 90]]);
+    const map = buildSequenceMap(turns, [oneCorner, twoDips], LENGTH);
+    expect(map.joinVotes[0]).toBe(1);
+    expect(map.sequences.map(sequence => [sequence.turnIds, sequence.startM])).toEqual([[[3], 400], [[1, 2], 20]]);
+  });
+
   it('joins a chicane across the start line, reading the dip at the end of the lap', () => {
     // Into turn 2 (apex 980) from 250 km/h to 100; 110 just past the line is 7% back before turn 1 (apex 20).
     const turns = [{ id: 1, apexM: 20 }, { id: 2, apexM: 980 }, { id: 3, apexM: 500 }].sort((a, b) => a.apexM - b.apexM);

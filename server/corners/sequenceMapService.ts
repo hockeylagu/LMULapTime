@@ -114,8 +114,8 @@ export async function refreshSequenceMaps(
       await recheckSequenceMap(store, stored, laps, { readLaps, layout, sequenceTurns });
       continue;
     }
-    const mapKey = `${ruleHash}:${shortHash(laps.map(lapId).join(','))}`;
-    if (!options.remap && stored?.mapKey === mapKey) continue;
+    const lapsKey = `${ruleHash}:${shortHash(laps.map(lapId).join(','))}`;
+    if (!options.remap && stored?.mapKey.startsWith(lapsKey)) continue;
     const own = laps.every(lap => lap.own);
     const checkLaps = own ? [] : pool.filter(lap => lap.own).sort((a, b) => a.lapTimeSec - b.lapTimeSec).slice(0, SEQUENCE_CHECK_LAPS);
     // oxlint-disable-next-line eslint/no-await-in-loop -- One class's laps decoded at a time: each read holds its laps in memory.
@@ -125,6 +125,9 @@ export async function refreshSequenceMaps(
     if (map.sequences.length === 0) continue;
     const checks = checkLaps.length >= SEQUENCE_MIN_LAPS
       ? checkSequenceMap(map, buildSequenceMap(sequenceTurns, read.slice(laps.length), layout.lengthM)) : null;
+    // The corners are in the key, so a regeneration that changes them from the same laps gives the passes a new map
+    // to be built on (a fix to the rule, 2026-11-21: the same laps, the same key, and the passes kept the old corners).
+    const mapKey = `${lapsKey}:${shortHash(map.sequences.map(sequence => `${sequence.turnIds.join('.')}@${sequence.startM.toFixed(1)}`).join(','))}`;
     store.replaceSequenceMap({
       layoutKey, carClass, mapKey, lengthM: layout.lengthM,
       sequences: map.sequences.map((sequence, i) => ({
