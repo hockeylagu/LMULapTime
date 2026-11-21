@@ -6,26 +6,44 @@ Current implementation belongs in [CODE_MAP](../CODE_MAP.md), not in completed d
 ## Corner analysis and trends
 
 Delivered 2026-11-20: the corner analysis engine (`shared/domain/cornerAnalysis/`: habits against the layout's target,
-mistakes against the driver's own usual), the debrief's driving habits ("Focus next session"), and the track page's corner trends
-with each corner's habit history. Rules, thresholds and their validation sit in the module comments; ownership in
-[CODE_MAP](../CODE_MAP.md). The old `corner-map` branch's technique cues were scored and only coasting kept; the
-branch is deleted. Open:
+mistakes against the driver's own usual), the debrief's driving habits and the track page's corner trends. Delivered
+2026-11-21 (`031d193a`, plan retired): the habit focus. That is 2 focus corners per layout and car, kept stable from
+session to session, measured against a fixed target. It comes with the goal (the next pace level of the Reference
+Benchmarks), pins, the reworked engine (only measures that pass `tools/analysis/habitOutcomeCheck.ts` headline) and
+the lap view's corner conclusion. Rules, thresholds and their validation sit in the module comments (`habitRules.ts`,
+`habitFocus.ts`, `paceGoal.ts`, `cornerPasses.ts`); ownership in [CODE_MAP](../CODE_MAP.md). Open:
 
+- **Drive with it first (driver, 2026-11-21):** nothing more is built until the driver has driven with the focus. Then,
+  each on the driver's go:
+  - the line on the map for a focus corner: both usual laps between the white lines, coloured by speed, with each
+    slowest point's km/h and arc;
+  - the target's minimum speed as the live corner speed panel's REF at a focus corner;
+  - own potential on the goal line;
+  - an exit grip cause;
+  - new mistake causes.
 - **Ways in to corner trends:** "History here" on the corner card and on the Consistency panel's sequence rows,
   opening the track page on that corner.
-- **[Habit focus](proposed/HABIT_FOCUS.md):** a stable focus of 2 corners per layout and car, measured against the
-  layout's fastest, with the gap and cost over the last 5 sessions, a goal (the next pace level of the Reference
-  Benchmarks above the session's true pace), pins, and the same focus on corner trends. The engine is reworked first:
-  only measures that pass an outcome check on the driver's history can headline a focus. Built through step 8 on
-  2026-11-21, not committed; the plan's "Implementation status" lists what stands and the driver's answers to the
-  open points. Nothing more is built until the driver has driven with it.
+- **Engine details still open:**
+  - A lap braking more than 60 m before the target (`BRAKE_GAP_MAX_M`) does not count toward "half the laps", so a usual
+    54 m early can stay unnamed (Le Mans LMP3, second Mulsanne chicane).
+  - "Lift, don't brake" is too rare to check (4 pairs), kept on the driver's answer.
+  - "Closer to the inside" is weak on the outcome check (63% / 41%).
+  - Exit-only habits are shown but never picked.
+  - The arc is not measured on 21% of focus rows.
+  - `focusSpeedLine` (`drivingHabits.ts`) and `cornerSpeedCue` (`cornerHabitText.ts`) are the same function twice.
+- **Accepted for now, to look at again if they bite:**
+  - The target counts only sessions with 3 clean laps, so a fast one-lap qualifying is left out.
+  - A target with 2 or 3 counted laps gives a noisier usual.
+  - Two pins on corners that stopped costing time hide the automatic pick.
+  - "Less grip used" is said against a target in another car.
+  - "Entry speed lower" points at the turn before.
 - **Rule idea (driver, 2026-11-20), needing a fresh blind held-out set:** a gearing check (speed per gear) before gear
-  advice. Habits against the quickest driver in the driver's own car were decided against the same day (the class
-  fastest stays the target; see Habit focus).
-- **Road use** (where the car sits between the white lines): measured on 2026-11-20 (see Habit focus). Road position
-  alone does not carry the time, so it is drawn on the map and is no advice line; the arc radius and the sideways g at
-  the slowest point pass the check and become the cause under "minimum speed lower". 13 of 34 layouts have 1 or 2 turns
-  with an odd road edge.
+  advice. Habits against the quickest driver in the driver's own car were decided against the same day: the class
+  fastest stays the target.
+- **Road use** (where the car sits between the white lines): road position alone does not carry the time (measured
+  2026-11-20), so it is drawn on the map and is no advice line. The arc radius and the sideways g at the slowest point
+  pass the check and become the cause under "minimum speed lower". 13 of 34 layouts have 1 or 2 turns with an odd road
+  edge, fixed in the track pipeline when a turn matters.
 
 ## Live dashboard and learning
 
