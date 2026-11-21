@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BoxGeometry, Group, Matrix4, Mesh, MeshStandardMaterial } from 'three';
 import { buildCarParts, setCameraDistance, setCockpitView } from '../../../../../src/components/replay/view3d/cars/carParts.js';
-import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 
 const box = new BoxGeometry(1, 1, 1), material = new MeshStandardMaterial();

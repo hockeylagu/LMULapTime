@@ -8,7 +8,7 @@ import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp 
 import { flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
-import { makeCar } from './sceneObjects.js';
+import { makeCar } from './carObject.js';
 import type { CarTemplates } from './carTemplates.js';
 
 /**

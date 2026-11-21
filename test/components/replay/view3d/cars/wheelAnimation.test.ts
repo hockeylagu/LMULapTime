@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { Group, Quaternion, Vector3 } from 'three';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
-import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 import { createWheelAnimation } from '../../../../../src/components/replay/view3d/cars/wheelAnimation.js';
 import { sampleRenderPose } from '../../../../../src/components/replay/view3d/scene/replayPose.js';
 import { attachWheelRigs } from '../../../../../src/components/replay/view3d/cars/wheelGeometry.js';

@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
-import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/scene/disposeObjects.js';
 import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 

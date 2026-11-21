@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Quaternion } from 'three';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { createCarMotion } from '../../../../../src/components/replay/view3d/cars/carMotion.js';
-import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 
 /** A short straight: two samples 1 m apart. */

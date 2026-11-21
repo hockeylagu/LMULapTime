@@ -6,7 +6,7 @@ import { disposeObjects } from '../scene/disposeObjects.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import { createCarModels, type CarTextures } from './carModels.js';
 import type { CarTemplates } from './carTemplates.js';
-import { makeCar } from './sceneObjects.js';
+import { makeCar } from './carObject.js';
 import { buildCarParts, setCockpitView, type CarParts } from './carParts.js';
 import { batchCars, UNSEEN_LAYER } from './carBatching.js';
 import { createSlicer } from '../batching/batchedParts.js';

@@ -13,7 +13,7 @@ import type { SceneContent, SceneShell } from '../scene/sceneShell.js';
 import type { CarParts } from '../cars/carParts.js';
 import type { CarMotion } from '../cars/carMotion.js';
 import { createCarSets, type Cabin, type CarSets, type DrivenCar } from '../cars/drawnCar.js';
-import { windowPoints } from './raceTrack.js';
+import { windowPoints } from './racePosePoints.js';
 import { createRaceField, type RaceField } from './raceField.js';
 import { createStandInCars, type StandInCars } from './standInCars.js';
 import { carSpans, carsUnder, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';

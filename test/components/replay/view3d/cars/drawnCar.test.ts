@@ -5,7 +5,7 @@ import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
 import type { CarTextures } from '../../../../../src/components/replay/view3d/cars/carModels.js';
 import type { CarTemplates } from '../../../../../src/components/replay/view3d/cars/carTemplates.js';
 import { createCarSets, createDrawnCars } from '../../../../../src/components/replay/view3d/cars/drawnCar.js';
-import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 import { setCockpitView } from '../../../../../src/components/replay/view3d/cars/carParts.js';
 import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 
@@ -13,7 +13,7 @@ import { rigModel } from '../../../../helpers/scenes/rigModel.js';
 const loaders = vi.hoisted(() => [] as boolean[]);
 vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async () => {
   const three = await import('three'), {rigModel: rig} = await import('../../../../helpers/scenes/rigModel.js');
-  const {makeCar: make} = await import('../../../../../src/components/replay/view3d/cars/sceneObjects.js');
+  const {makeCar: make} = await import('../../../../../src/components/replay/view3d/cars/carObject.js');
   const withParts = () => {
     const model = rig(), cabin = new three.Mesh(new three.BoxGeometry(1, 1, 1), new three.MeshStandardMaterial());
     cabin.name = 'cabin'; cabin.userData.interior = true;

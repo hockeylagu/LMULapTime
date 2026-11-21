@@ -283,7 +283,7 @@ A body is split by where it is seen from and has texture start files:
   `chassis` node (`laps/lapLayer.ts`); a body with an interior and no `chassis` node fails to load.
 - A mesh node in either GLB may carry `extras.lod` {`inM`, `outM`}: it is drawn while `inM` <= camera distance < `outM` (`outM`
   null = no limit). The followed car is always at distance 0, the comparison car at its distance from the camera
-  (`sceneObjects.ts`, `setCameraDistance`). Every LOD distance, scenery `lmuLod` included, is divided by the view's LOD multiplier
+  (`cars/carParts.ts`, `setCameraDistance`). Every LOD distance, scenery `lmuLod` included, is divided by the view's LOD multiplier
   (`CameraRig.lodMultiplier`): a car-mounted game camera's `lodMultiplier`, `cameras.chase.lodMultiplier` in the follow and chase
   views. The trackside views draw every resident scenery instance (their scale follows the zoom), as do the free views.
 - A surface map may carry `uvAnimation` {`mode` scroll | step, `rate`, `step`}: its UV moves by rate · t, or step · floor(rate · t),

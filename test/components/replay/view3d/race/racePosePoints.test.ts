@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RACE_LAMP, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
-import { windowPoints } from '../../../../../src/components/replay/view3d/race/raceTrack.js';
+import { windowPoints } from '../../../../../src/components/replay/view3d/race/racePosePoints.js';
 
 const channel = (name: typeof RACE_POSE_CHANNELS[number]) => RACE_POSE_CHANNELS.indexOf(name);
 

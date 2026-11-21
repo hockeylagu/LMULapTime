@@ -8,14 +8,14 @@ import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
 import type { RenderPose } from '../scene/replayPose.js';
 import type { SceneShell } from '../scene/sceneShell.js';
-import { makeCar } from '../cars/sceneObjects.js';
+import { makeCar } from '../cars/carObject.js';
 import { buildCarParts, setCameraDistance, setCockpitView, type CarParts } from '../cars/carParts.js';
 import { batchCars, type CarBatchSet } from '../cars/carBatching.js';
 import type { CarSets, DrawnCar, DrawnCars } from '../cars/drawnCar.js';
 import { createFarCarLoader } from '../cars/farCars.js';
 import { createFarGlows, FAR_GLOW_MAX, type FarGlowCar } from '../cars/farGlows.js';
 import { attachWheelRigs } from '../cars/wheelGeometry.js';
-import { windowPoints } from './raceTrack.js';
+import { windowPoints } from './racePosePoints.js';
 import { createBlobShadows } from './blobShadows.js';
 import { envelopeBounds } from './carPick.js';
 

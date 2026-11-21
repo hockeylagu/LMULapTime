@@ -3,7 +3,7 @@ import { BatchedMesh, Box3, BoxGeometry, DataTexture, DoubleSide, Group, Matrix4
 import { layoutOf } from '../../../../../src/components/replay/view3d/batching/batchedParts.js';
 import { batchable, batchCars, SHADOW_ONLY_LAYER, UNSEEN_LAYER } from '../../../../../src/components/replay/view3d/cars/carBatching.js';
 import { buildCarParts, type CarParts } from '../../../../../src/components/replay/view3d/cars/carParts.js';
-import { makeCar } from '../../../../../src/components/replay/view3d/cars/sceneObjects.js';
+import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 
 /** What cars of one body share: the geometry and materials of its parts (the loader's shareMaterials). */
 function body() {
