@@ -13,7 +13,6 @@ import {
 } from '../ai/aiReport.js';
 import { SessionDatabase } from '../core/db.js';
 import { AiAnalyzeRequest, AiAnalyzeResponse } from '../../shared/types/index.js';
-import { queryString } from './queryParams.js';
 
 export function createAiRouter(sessionDb: SessionDatabase): Router {
   const router = Router();
@@ -89,11 +88,9 @@ export function createAiRouter(sessionDb: SessionDatabase): Router {
     }
   });
 
-  router.get('/reports', (req, res) => {
+  router.get('/reports', (_req, res) => {
     try {
-      const limitParam = queryString(req.query.limit);
-      const limit = limitParam ? parseInt(limitParam, 10) : undefined;
-      res.json(sessionDb.getAiReportsList(limit));
+      res.json(sessionDb.getAiReportsList());
     } catch (err: unknown) {
       console.error('Failed to list AI report history:', err);
       const message = err instanceof Error ? err.message : 'Failed to list AI report history';

@@ -128,13 +128,10 @@ export function createReplayRouter(context: ServerContext): Router {
     } catch (error: unknown) {
       return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid telemetry locator' });
     }
-    let maxPoints = 1200;
-    try {
-      const value = queryString(req.query.maxPoints);
-      if (value !== undefined) maxPoints = value === '0' || value.toLowerCase() === 'raw'
-        ? 0 : parseBoundedInteger(value, 'maxPoints', 1, 100000) ?? 1200;
-    } catch (error: unknown) {
-      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid maxPoints' });
+    // A lap is served in full unless a point spacing is asked for; maxPoints=0 says so explicitly.
+    const maxPoints = queryString(req.query.maxPoints);
+    if (maxPoints !== undefined && maxPoints !== '0') {
+      return res.status(400).json({ error: 'maxPoints accepts only 0 (the full lap); use pointSpacingM for fewer points' });
     }
     let pointSpacingM: number | undefined;
     const spacing = queryString(req.query.pointSpacingM);
@@ -149,7 +146,7 @@ export function createReplayRouter(context: ServerContext): Router {
         session: trajectorySession,
         driverOrdinal,
         lapOrdinal,
-        maxPoints,
+        maxPoints: 0,
         pointSpacingM,
         allowDuckDb: queryString(req.query.source)?.toLowerCase() !== 'vcr',
       });
