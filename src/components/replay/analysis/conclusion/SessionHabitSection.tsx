@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { MISTAKE_LINES } from '../../../../../shared/domain/cornerAnalysis/analyzeCorners.js';
-import { FocusTag, formatCostSec } from '../../../common/CostSparkline.js';
+import { formatCostSec } from '../../../common/CostSparkline.js';
+import { FocusTag } from '../../../common/HabitTags.js';
 import { Term } from '../../../common/Term.js';
 import { HABIT_EXPLANATIONS, HABIT_LABELS, MISTAKE_EXPLANATIONS } from '../../../session-detail/debrief/habitText.js';
 import { cornerConclusion } from './cornerConclusion.js';

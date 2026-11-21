@@ -3,22 +3,22 @@ import type { DetailedSession } from '../../../../shared/types/index.js';
 import { ApiError, apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
 import { fetchSessionCornerAnalysis, loadLayoutCorners, onSequenceMapsChanged, unpinHabitFocus } from '../../../api/cornerSequenceApi.js';
 import { useSessionDataContext } from '../../../api/sessionDataContext.js';
-import { cornerNumbering, watchNextSession, type WatchNextSession } from './watchNextSession.js';
+import { cornerNumbering, drivingHabits, type DrivingHabits } from './drivingHabits.js';
 
-export type WatchNextSessionState =
+export type DrivingHabitsState =
   | { status: 'loading' }
   | { status: 'unavailable'; message: string }
   | { status: 'error'; message: string }
-  | { status: 'ready'; watch: WatchNextSession };
+  | { status: 'ready'; habits: DrivingHabits };
 
-const LOADING: WatchNextSessionState = { status: 'loading' };
+const LOADING: DrivingHabitsState = { status: 'loading' };
 
 /**
- * The session player's "watch next session" lines, read when shown: fetched again when sessions are stored, a sequence
+ * The session player's driving habits (goal, focus corners, one-off), read when shown: fetched again when sessions are stored, a sequence
  * map changes or the driver retries. A session the analysis cannot read (no replay passes, too few laps) is unavailable.
  */
-export function useWatchNextSession(session: DetailedSession, driverName: string, hasReplay: boolean): {
-  state: WatchNextSessionState;
+export function useDrivingHabits(session: DetailedSession, driverName: string, hasReplay: boolean): {
+  state: DrivingHabitsState;
   retry: () => void;
   /** Unpins the corner holding the turn, then reads the focus again; null while nothing can be unpinned. */
   unpin: ((turnId: number) => void) | null;
@@ -28,7 +28,7 @@ export function useWatchNextSession(session: DetailedSession, driverName: string
   const [mapsChanged, setMapsChanged] = useState(0);
   useEffect(() => onSequenceMapsChanged(() => setMapsChanged(count => count + 1)), []);
   const key = `${session.id}|${driverName}|${revision}|${attempt}|${mapsChanged}`;
-  const [loaded, setLoaded] = useState<{ key: string; state: WatchNextSessionState } | null>(null);
+  const [loaded, setLoaded] = useState<{ key: string; state: DrivingHabitsState } | null>(null);
 
   useEffect(() => {
     if (!hasReplay) return;
@@ -39,8 +39,8 @@ export function useWatchNextSession(session: DetailedSession, driverName: string
         const analysis = await fetchSessionCornerAnalysis(session.id, controller.signal);
         const layout = await loadLayoutCorners(analysis.layoutKey, analysis.carClass);
         if (controller.signal.aborted) return;
-        const watch = watchNextSession(analysis, driverName, cornerNumbering(layout), lapNumberOf(analysis.driverOrdinal));
-        setLoaded({ key, state: { status: 'ready', watch } });
+        const habits = drivingHabits(analysis, driverName, cornerNumbering(layout), lapNumberOf(analysis.driverOrdinal));
+        setLoaded({ key, state: { status: 'ready', habits } });
       } catch (error: unknown) {
         if (isAbortError(error) || controller.signal.aborted) return;
         setLoaded({ key, state: error instanceof ApiError && error.status === 404
@@ -55,7 +55,7 @@ export function useWatchNextSession(session: DetailedSession, driverName: string
     ? loaded?.key === key ? loaded.state : LOADING
     : { status: 'unavailable' as const, message: 'No replay linked to this session.' };
   const retry = () => setAttempt(count => count + 1);
-  const pinScope = state.status === 'ready' ? state.watch.pinScope : null;
+  const pinScope = state.status === 'ready' ? state.habits.pinScope : null;
   // Read again either way: a failed unpin shows the corner still pinned.
   return { state, retry, unpin: pinScope && ((turnId) => { void unpinHabitFocus({ ...pinScope, turnId }).then(retry, retry); }) };
 }

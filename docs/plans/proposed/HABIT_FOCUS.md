@@ -363,7 +363,7 @@ one driver for all 8 Sebring School sessions where the old reference gave 5.
 1. **Debrief layout on today's data.** Rename "Keep an eye on" to "Focus next session" and show 2 rows, each with the
    habit's `detail` line (the driver's value against the reference's) in the row itself. Rename "Improving" to
    "Progress · last 5 sessions" and keep what it measures today (the driver's own cue and corner time). Drop "fixed"
-   and the per-row "since" (`WatchNextSessionCard.tsx`, `watchNextSession.ts`). Gap and cost against the target arrive
+   and the per-row "since" (`DrivingHabitsCard.tsx`, `drivingHabits.ts`). Gap and cost against the target arrive
    with step 4: no comparable cost exists before the target does.
 2. **Target and corner series.** Pick the target in `dbCornerAnalysisStore.ts` and read its passes and each car's best
    (the same-car check keeps working); today's wider shortlist goes. `analyzeCorners` takes the target: the
@@ -639,7 +639,7 @@ Engine:
 - A corner the history holds needs a measured cost in the session shown to be shown as a focus (1% of sessions now
   show one focus corner).
 
-Debrief card (`WatchNextSessionCard.tsx`, `watchNextSession.ts`):
+Debrief card (`DrivingHabitsCard.tsx`, `drivingHabits.ts`):
 
 - **One row per focus corner** in place of a Progress list above a Focus list: the corner's name, then the advice as
   the link to telemetry; on the right the cost last session → this one with a line of the last 5 sessions' costs, its end dot

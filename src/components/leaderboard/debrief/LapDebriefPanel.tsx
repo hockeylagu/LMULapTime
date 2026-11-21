@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 import { apiErrorMessage } from '../../../api/apiClient.js';
 import { useRequest } from '../../../api/useRequest.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
-import { DebriefCornerRow } from '../../session-detail/debrief/DebriefCornerRow.js';
+import { DebriefCornerRow } from './DebriefCornerRow.js';
 import type { LapDebrief } from './loadLapDebrief.js';
 
 type PanelState =

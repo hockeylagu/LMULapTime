@@ -1,7 +1,7 @@
 import type { CornerMistake, HabitRule, MistakeCause, SessionCornerAnalysis } from '../../../../../shared/types/corners/cornerAnalysis.js';
 import { cornerHabit } from '../../../../../shared/domain/cornerAnalysis/habitFocus.js';
 import { habitTryLine, habitTryTitle } from '../../../session-detail/debrief/habitText.js';
-import { focusDiagnosis } from '../../../session-detail/debrief/watchNextSession.js';
+import { focusDiagnosis } from '../../../session-detail/debrief/drivingHabits.js';
 import { cornerSpeedCue } from '../../../track-detail/corner-trends/cornerHabitText.js';
 
 /**

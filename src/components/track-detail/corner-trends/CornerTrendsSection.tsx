@@ -5,7 +5,7 @@ import { apiErrorMessage } from '../../../api/apiClient.js';
 import { pinHabitFocus, unpinHabitFocus } from '../../../api/cornerSequenceApi.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
-import { FocusTag, SlippingTag } from '../../common/CostSparkline.js';
+import { FocusTag, SlippingTag } from '../../common/HabitTags.js';
 import { CornerHabitLine, type CornerPinControl } from './CornerHabitLine.js';
 import { CornerTrendsHeader } from './CornerTrendsHeader.js';
 import { CornerTrendSparkline, SPARKLINE_BOX } from './CornerTrendSparkline.js';

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { SessionCornerAnalysis } from '../../../../../shared/types/corners/cornerAnalysis.js';
 import { ApiError, apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import { fetchSessionCornerAnalysis, loadLayoutCorners, onSequenceMapsChanged } from '../../../../api/cornerSequenceApi.js';
-import { cornerNumbering } from '../../../session-detail/debrief/watchNextSession.js';
+import { cornerNumbering } from '../../../session-detail/debrief/drivingHabits.js';
 
 export type SessionCornerAnalysisState =
   | { status: 'loading' }

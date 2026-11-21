@@ -6,7 +6,7 @@ Current implementation belongs in [CODE_MAP](../CODE_MAP.md), not in completed d
 ## Corner analysis and trends
 
 Delivered 2026-11-20: the corner analysis engine (`shared/domain/cornerAnalysis/`: habits against the layout's target,
-mistakes against the driver's own usual), the debrief's "Watch next session", and the track page's corner trends
+mistakes against the driver's own usual), the debrief's driving habits ("Focus next session"), and the track page's corner trends
 with each corner's habit history. Rules, thresholds and their validation sit in the module comments; ownership in
 [CODE_MAP](../CODE_MAP.md). The old `corner-map` branch's technique cues were scored and only coasting kept; the
 branch is deleted. Open:

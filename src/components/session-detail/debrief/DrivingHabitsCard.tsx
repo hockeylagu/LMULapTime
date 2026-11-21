@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { ArrowRight, ArrowUpRight, ChevronDown, Flag, History, Loader2, Pin, Target, Zap, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
-import { costChangeTone, CostSparkline, formatCostSec, SlippingTag } from '../../common/CostSparkline.js';
+import { costChangeTone, CostSparkline, formatCostSec } from '../../common/CostSparkline.js';
+import { SlippingTag } from '../../common/HabitTags.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
 import { Term } from '../../common/Term.js';
-import type { WatchNextSessionState } from './useWatchNextSession.js';
-import type { WatchFocus, WatchGoal, WatchMistake, WatchNextSession, WatchProgress } from './watchNextSession.js';
+import type { DrivingHabitsState } from './useDrivingHabits.js';
+import type { DebriefFocus, DebriefGoal, DebriefMistake, DrivingHabits, DebriefProgress } from './drivingHabits.js';
 import { HABIT_EXPLANATIONS, HABIT_LABELS } from './habitText.js';
 
 const readout = 'font-mono text-xs font-bold tabular-nums whitespace-nowrap';
@@ -38,7 +39,7 @@ function SectionHeading({ id, icon: Icon, tone, children }: { id: string; icon: 
 }
 
 /** Where the session stands against the next pace level, reusing PaceBadge to repeat the app's pace language. */
-function GoalLine({ goal }: { goal: WatchGoal }) {
+function GoalLine({ goal }: { goal: DebriefGoal }) {
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" data-testid="debrief-goal" title={goal.title}>
       <Flag aria-hidden="true" className={`size-4 shrink-0 ${goal.reached ? 'text-lmu-gain' : 'text-lmu-muted'}`} />
@@ -65,7 +66,7 @@ function GoalLine({ goal }: { goal: WatchGoal }) {
  * A corner's cost last session against this one, with the last sessions' costs as a line: only the end dot wears the
  * colour of that same change, so it agrees with "Last try"; the readout stays white.
  */
-function CostChange({ item }: { item: WatchProgress }) {
+function CostTrend({ item }: { item: DebriefProgress }) {
   const tone = costChangeTone(item.costNowSec - item.costThenSec);
   const line = item.costs.length > 2 ? ` The line shows the last ${item.costs.length} sessions here.` : '';
   return (
@@ -81,7 +82,7 @@ function CostChange({ item }: { item: WatchProgress }) {
 type Unpin = ((turnId: number) => void) | null;
 
 /** One unified focus corner: advice + trend sparkline on top, Try + apex speed below, diagnostics tucked in Details. */
-function FocusRow({ item, progress, onUnpin }: { item: WatchFocus; progress: WatchProgress | null; onUnpin: Unpin }) {
+function FocusRow({ item, progress, onUnpin }: { item: DebriefFocus; progress: DebriefProgress | null; onUnpin: Unpin }) {
   const [expanded, setExpanded] = useState(false);
   const hasDetails = Boolean(item.diagnosis || item.causes.length > 0 || item.rule || progress?.gap);
   const summary = item.speedLine ?? (!item.rule ? item.detail : null);
@@ -94,7 +95,7 @@ function FocusRow({ item, progress, onUnpin }: { item: WatchFocus; progress: Wat
           <RowLink to={item.link} title="Compare in telemetry" label={showCornerPrefix ? `${item.name}: ${item.line}` : undefined}>{item.line}</RowLink>
         </p>
         {progress ? (
-          <CostChange item={progress} />
+          <CostTrend item={progress} />
         ) : (
           <span className={`${readout} text-white`} title="Your usual time lost to the target through the whole corner">
             {item.costSec === null ? '—' : `${item.costSec >= 0 ? '+' : '−'}${Math.abs(item.costSec).toFixed(2)} s/lap`}
@@ -172,17 +173,17 @@ function FocusRow({ item, progress, onUnpin }: { item: WatchFocus; progress: Wat
   );
 }
 
-function HabitGroups({ watch, onUnpin }: { watch: WatchNextSession; onUnpin: Unpin }) {
-  const { focus, progress, earlierSessions } = watch;
+function FocusLists({ habits, onUnpin }: { habits: DrivingHabits; onUnpin: Unpin }) {
+  const { focus, progress, earlierSessions } = habits;
   const progressByCorner = new Map(progress.map(item => [item.cornerId, item]));
   const left = progress.filter(item => item.state === 'left');
   return (
     <>
-      {watch.goal && <GoalLine goal={watch.goal} />}
-      <section aria-labelledby="debrief-next-session" className={`space-y-1 ${watch.goal ? 'border-t border-lmu-border pt-3' : ''}`}>
+      {habits.goal && <GoalLine goal={habits.goal} />}
+      <section aria-labelledby="debrief-next-session" className={`space-y-1 ${habits.goal ? 'border-t border-lmu-border pt-3' : ''}`}>
         <div className="flex flex-wrap items-baseline gap-x-2">
           <SectionHeading id="debrief-next-session" icon={Target} tone="text-lmu-muted">Focus next session</SectionHeading>
-          {earlierSessions > 0 && <p className="text-xs text-lmu-muted">last {watch.sessions} sessions here</p>}
+          {earlierSessions > 0 && <p className="text-xs text-lmu-muted">last {habits.sessions} sessions here</p>}
         </div>
         {focus.length ? (
           <ol className="divide-y divide-lmu-border/60">
@@ -192,7 +193,7 @@ function HabitGroups({ watch, onUnpin }: { watch: WatchNextSession; onUnpin: Unp
           </ol>
         ) : (
           <p className="py-1 text-sm text-lmu-muted" role="status">
-            {watch.hasReference ? 'No recurring driving habit identified.' : 'No comparable reference for these laps.'}
+            {habits.hasReference ? 'No recurring driving habit identified.' : 'No comparable reference for these laps.'}
           </p>
         )}
         {earlierSessions === 0 && focus.length > 0 && (
@@ -211,7 +212,7 @@ function HabitGroups({ watch, onUnpin }: { watch: WatchNextSession; onUnpin: Unp
                     <RowLink to={item.link} title={`Opens it in telemetry against ${item.sinceLabel}.`}>{item.name}</RowLink>
                     {item.slipping && <SlippingTag />}
                   </p>
-                  <CostChange item={item} />
+                  <CostTrend item={item} />
                 </div>
                 {item.gap && <p className="text-xs text-lmu-text-soft">{item.gap}</p>}
                 {item.tried && (
@@ -228,7 +229,7 @@ function HabitGroups({ watch, onUnpin }: { watch: WatchNextSession; onUnpin: Unp
   );
 }
 
-export function OneOffLoss({ mistake }: { mistake: WatchMistake }) {
+export function OneOffMistake({ mistake }: { mistake: DebriefMistake }) {
   return (
     <section aria-labelledby="debrief-one-off" className="space-y-1">
       <SectionHeading id="debrief-one-off" icon={Zap} tone="text-lmu-loss">One-off</SectionHeading>
@@ -240,16 +241,16 @@ export function OneOffLoss({ mistake }: { mistake: WatchMistake }) {
   );
 }
 
-interface WatchNextSessionCardProps {
-  state: WatchNextSessionState;
+interface DrivingHabitsCardProps {
+  state: DrivingHabitsState;
   retry: () => void;
   /** Hands a pinned corner's focus slot back to the rules; null when nothing can be unpinned. */
   onUnpin: ((turnId: number) => void) | null;
 }
 
-export function WatchNextSessionCard({ state, retry, onUnpin }: WatchNextSessionCardProps) {
+export function DrivingHabitsCard({ state, retry, onUnpin }: DrivingHabitsCardProps) {
   return (
-    <section aria-label="Driving habits" className="min-w-0 space-y-3 px-5 py-4" data-testid="watch-next-session">
+    <section aria-label="Driving habits" className="min-w-0 space-y-3 px-5 py-4" data-testid="driving-habits">
       {state.status === 'loading' && (
         <p role="status" className="flex items-center gap-2 text-sm text-lmu-muted"><Loader2 aria-hidden="true" className="size-4 animate-spin" /> Reading corner analysis…</p>
       )}
@@ -260,7 +261,7 @@ export function WatchNextSessionCard({ state, retry, onUnpin }: WatchNextSession
           <button type="button" onClick={retry} className={SECONDARY_BUTTON}>Retry corner analysis</button>
         </div>
       )}
-      {state.status === 'ready' && <HabitGroups watch={state.watch} onUnpin={onUnpin} />}
+      {state.status === 'ready' && <FocusLists habits={state.habits} onUnpin={onUnpin} />}
     </section>
   );
 }

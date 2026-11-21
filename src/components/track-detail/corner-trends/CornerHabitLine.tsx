@@ -3,7 +3,8 @@ import { Link } from 'react-router';
 import { ArrowUpRight } from 'lucide-react';
 import type { CornerHabitTrend } from '../../../../shared/types/corners/cornerAnalysis.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
-import { costChangeTone, CostSparkline, formatCostSec, SlippingTag } from '../../common/CostSparkline.js';
+import { costChangeTone, CostSparkline, formatCostSec } from '../../common/CostSparkline.js';
+import { SlippingTag } from '../../common/HabitTags.js';
 import { cornerHabitText, cornerSpeedCue, sessionRefLabel } from './cornerHabitText.js';
 
 /** Making the corner a focus or handing its slot back; `error` is the server's refusal ("Unpin one first"). */

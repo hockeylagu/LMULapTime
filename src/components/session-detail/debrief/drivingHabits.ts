@@ -10,7 +10,7 @@ import { sessionRefLabel } from '../../track-detail/corner-trends/cornerHabitTex
 import { buildTelemetryComparePath, type TelemetryLapRef } from '../../../utils/telemetryCompareLink.js';
 
 /** Where the session stands against the next pace level, one line above the focus. */
-export interface WatchGoal {
+export interface DebriefGoal {
   /** At the top level: nothing above to find. */
   reached: boolean;
   /** Current pace level and percentage for the PaceBadge. */
@@ -25,7 +25,7 @@ export interface WatchGoal {
 }
 
 /** A focus corner: what to do there next session. */
-export interface WatchFocus {
+export interface DebriefFocus {
   cornerId: number;
   /** The corner's name ("Sunset Bend (T17)"). */
   name: string;
@@ -56,7 +56,7 @@ export interface WatchFocus {
   link: string | null;
 }
 
-export interface WatchMistake {
+export interface DebriefMistake {
   lapNumber: number | null;
   turnLabel: string;
   /** Why the lap lost time, and what that measured; null when nothing measured stands out. */
@@ -66,7 +66,7 @@ export interface WatchMistake {
 }
 
 /** A focus corner, or one that left the focus lately, then against now. */
-export interface WatchProgress {
+export interface DebriefProgress {
   cornerId: number;
   name: string;
   state: FocusProgress['state'];
@@ -84,19 +84,19 @@ export interface WatchProgress {
   link: string | null;
 }
 
-export interface WatchNextSession {
+export interface DrivingHabits {
   /** The driver's analysed sessions here in the car the progress reads: this one and the few before it. */
   sessions: number;
   /** The driver's earlier sessions here in the car: none, this is their first. */
   earlierSessions: number;
-  goal: WatchGoal | null;
-  progress: WatchProgress[];
-  focus: WatchFocus[];
+  goal: DebriefGoal | null;
+  progress: DebriefProgress[];
+  focus: DebriefFocus[];
   hasReference: boolean;
   /** What a pin or an unpin names beside the turn. */
   pinScope: Omit<HabitFocusPin, 'turnId'>;
   /** The biggest one-off loss the driver caused (traffic is not theirs to fix). */
-  mistake: WatchMistake | null;
+  mistake: DebriefMistake | null;
 }
 
 /** The 2D lap view at a corner (its number in the lap view, by start position), with a comparison lap. */
@@ -112,7 +112,7 @@ export function cornerNumbering(layout: LayoutCorners | null): (cornerId: number
   };
 }
 
-function watchGoal({ benchmarkSec, percent, level, next }: PaceGoal): WatchGoal {
+function watchGoal({ benchmarkSec, percent, level, next }: PaceGoal): DebriefGoal {
   const now = `Your true pace (the average of your 3 fastest clean dry laps) is ${percent.toFixed(1)}% of the benchmark target of this layout and class, ${formatTime(benchmarkSec)}: ${level}`;
   return next
     ? {
@@ -154,17 +154,17 @@ function focusLine(habit: CornerHabit, singleTurn: boolean): string {
   }
 }
 
-export function watchNextSession(
+export function drivingHabits(
   analysis: SessionCornerAnalysis,
   driverName: string,
   cornerNumberOf: (cornerId: number) => number | null,
   lapNumberOf: (lapOrdinal: number) => number | null,
-): WatchNextSession {
+): DrivingHabits {
   const corners = new Map(analysis.corners.map(corner => [corner.id, corner]));
   const own = (lapOrdinal: number): TelemetryLapRef => ({
     sessionId: analysis.sessionId, driverOrdinal: analysis.driverOrdinal, lapOrdinal, driverName,
   });
-  const focus = analysis.focus.corners.map((item): WatchFocus => {
+  const focus = analysis.focus.corners.map((item): DebriefFocus => {
     const corner = corners.get(item.cornerId);
     const usual = corner?.usualLapOrdinal;
     const cornerReference = corner?.reference;
@@ -189,7 +189,7 @@ export function watchNextSession(
     };
   });
 
-  const progress = analysis.focus.progress.map((item): WatchProgress => {
+  const progress = analysis.focus.progress.map((item): DebriefProgress => {
     const { gap, tried } = item;
     return {
       cornerId: item.cornerId, name: item.name, state: item.state, slipping: item.slipping,
