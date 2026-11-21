@@ -111,10 +111,7 @@ const liveCapture = new LiveCaptureController({
     const result = indexLiveCaptureCatalog(sessionDb.getDb(), recordings);
     const message = liveCaptureLog.format(result);
     if (message) console.log(message);
-    for (const { manifest } of recordings) {
-      sessionDb.clearIngestError('live-capture', path.join(captureDirectory, manifest.filename));
-    }
-    for (const entry of errors) sessionDb.recordIngestError('live-capture', path.join(captureDirectory, entry.filename), new Error(entry.error));
+    for (const entry of errors) console.warn(`[Live capture] Cannot read ${entry.filename}: ${entry.error}`);
   },
 });
 let captureRefresh: Promise<void> | null = null;
@@ -130,13 +127,13 @@ async function refreshLiveCaptureLinks(discover = false): Promise<void> {
       await refreshLiveLearning(sessionDb.getDb(), captureDirectory, () => liveService.isSessionLoaded());
       // Learning is optional: its failure must never stop capture links below.
       await automaticLearning.refresh(sessionDb.getDb(), () => liveService.isSessionLoaded() || liveCapture.hasOpenRecordingHandle)
-        .catch(error => sessionDb.recordIngestError('live-learning', captureDirectory, error));
+        .catch((error: unknown) => console.error('[Live learning] Refresh failed:', error));
     }
     if (liveService.isSessionLoaded()) return;
     liveCapture.synchronizeLinks(getLiveCaptureIndexRows(sessionDb.getDb())
       .filter(entry => entry.available).map(entry => entry.manifest));
-  })().catch(error => {
-    sessionDb.recordIngestError('live-capture-directory', captureDirectory, error);
+  })().catch((error: unknown) => {
+    console.error('[Live capture] Refresh failed:', error);
   }).finally(() => { captureRefresh = null; });
   return captureRefresh;
 }

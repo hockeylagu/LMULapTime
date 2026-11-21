@@ -6,7 +6,7 @@ import { DuckDbReader } from '../telemetry/duckdbReader.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 export type SessionStrategySource = Pick<SessionDatabase, 'getDb' | 'getSessionById' | 'getTelemetryMetadata'
-  | 'getTelemetryLapCacheFilenames' | 'recordIngestError'>;
+  | 'getTelemetryLapCacheFilenames'>;
 
 /**
  * The strategy a session measured, from the player's native telemetry files linked to it (online races write no
@@ -42,7 +42,6 @@ export async function readSessionLapStates(sessionDb: SessionStrategySource, ses
     } catch (error) {
       if (signal?.aborted) throw error;
       console.warn(`[DuckDB] Failed to read the strategy from ${file.filename}:`, error);
-      sessionDb.recordIngestError('duckdb', file.filePath, error);
     } finally {
       // oxlint-disable-next-line eslint/no-await-in-loop -- Closed before the next file opens.
       await reader.close().catch(() => undefined);

@@ -76,7 +76,7 @@ export class TelemetryCatalog {
       published.add(file.filePath);
       const previous = cachedMap.get(file.filePath);
       if (!previous || previous.mtimeMs !== file.mtimeMs || previous.fileSizeBytes !== file.fileSizeBytes || previous.enrichmentError) {
-        this.sessionDb.upsertTelemetryMetadata?.(file);
+        this.sessionDb.upsertTelemetryMetadata(file);
       }
     };
     let cachedCount = 0;
@@ -98,36 +98,16 @@ export class TelemetryCatalog {
         const sliceUsed = startYieldSlice();
         for (const file of files) {
           const prev = cachedMap.get(file.filePath);
-          if (!prev) {
-            addedCount++;
-            publish(file);
-          } else if (prev.mtimeMs !== file.mtimeMs || prev.fileSizeBytes !== file.fileSizeBytes) {
-            updatedCount++;
-            publish(file);
-          } else {
-            cachedCount++;
-          }
+          if (!prev) addedCount++;
+          else if (prev.mtimeMs !== file.mtimeMs || prev.fileSizeBytes !== file.fileSizeBytes) updatedCount++;
+          else cachedCount++;
           publish(file);
-          if (file.enrichmentError) {
-            if (typeof this.sessionDb?.recordIngestError === 'function') {
-              this.sessionDb.recordIngestError('duckdb', file.filePath, file.enrichmentError);
-            }
-          } else {
-            if (typeof this.sessionDb?.clearIngestError === 'function') {
-              this.sessionDb.clearIngestError('duckdb', file.filePath);
-            }
-          }
           if (!sliceUsed()) continue;
           // oxlint-disable-next-line eslint/no-await-in-loop -- Gives HTTP and SSE a turn once a slice of catalog rows is used up.
           await yieldToEventLoop();
           if (generation !== this.refreshGeneration) return files.length;
         }
-        if (typeof this.sessionDb?.pruneTelemetryLapCache === 'function') {
-          this.sessionDb.pruneTelemetryLapCache(new Set(files.map(file => file.filename)));
-        }
-        if (typeof this.sessionDb?.clearIngestError === 'function') {
-          this.sessionDb.clearIngestError('duckdb-directory', directory);
-        }
+        this.sessionDb.pruneTelemetryLapCache(new Set(files.map(file => file.filename)));
         this.scanStatus.result = {
           added: addedCount,
           updated: updatedCount,
@@ -140,9 +120,6 @@ export class TelemetryCatalog {
         if (generation !== this.refreshGeneration) throw error;
         const errorMsg = error instanceof Error ? error.message : String(error);
         this.scanStatus.error = errorMsg;
-        if (typeof this.sessionDb?.recordIngestError === 'function') {
-          this.sessionDb.recordIngestError('duckdb-directory', directory, error);
-        }
         throw error;
       })
       .finally(() => {

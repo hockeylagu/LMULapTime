@@ -25,7 +25,7 @@ const query = vi.fn();
 const close = vi.fn();
 const source: SessionStrategySource = {
   getDb: () => db, getSessionById: () => session([driver('Player', [xml], { isPlayer: true })]),
-  getTelemetryMetadata: () => [], getTelemetryLapCacheFilenames: () => new Set(), recordIngestError: vi.fn(),
+  getTelemetryMetadata: () => [], getTelemetryLapCacheFilenames: () => new Set(),
 };
 
 beforeEach(() => {

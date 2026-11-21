@@ -340,16 +340,16 @@ describe('ReplayTelemetryService', () => {
     expect(result.trajectory.duckdbAvailable).toBe(false);
   });
 
-  it('logs ingest error and leaves source as vcr when DuckDbReader throws', async () => {
+  it('warns and leaves source as vcr when DuckDbReader throws', async () => {
     const file = onDisk(mockDuckFile);
     db.upsertTelemetryMetadata(file, 'session-456');
     vi.spyOn(DuckDbReader.prototype, 'open').mockRejectedValueOnce(new Error('DuckDB parse error'));
-    const ingestSpy = vi.spyOn(db, 'recordIngestError');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const result = await request();
 
     expect(result.fused).toBe(false);
     expect(result.trajectory.source).toBe('vcr');
-    expect(ingestSpy).toHaveBeenCalledWith('duckdb', file.filePath, expect.any(Error));
+    expect(warn).toHaveBeenCalledWith(`[DuckDB] Failed to read ${file.filename}:`, expect.any(Error));
   });
 });

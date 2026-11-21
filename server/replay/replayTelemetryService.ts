@@ -115,7 +115,6 @@ export class ReplayTelemetryService {
       } catch (error) {
         failed.add(file.filename);
         console.warn(`[DuckDB] Failed to read ${file.filename}:`, error);
-        this.sessionDb.recordIngestError('duckdb', file.filePath, error);
       }
     }
     return null;

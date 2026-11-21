@@ -21,7 +21,6 @@ const source: SessionStrategySource = {
   getSessionById: id => readSession(db, id),
   getTelemetryMetadata: id => getTelemetryMetadata(db, id),
   getTelemetryLapCacheFilenames: id => getTelemetryLapCacheFilenames(db, id),
-  recordIngestError: (_type, filename, error) => console.error(`Unreadable ${filename}:`, error),
 };
 try {
   const sessions = db.prepare(`SELECT s.id, s.layout_key, s.player_car_type, n.name FROM sessions s
