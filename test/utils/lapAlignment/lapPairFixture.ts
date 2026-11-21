@@ -24,8 +24,7 @@ import {
 /**
  * Real lap pairs captured from the replay API at the inspector's default resolution
  * (`/trajectory?pointSpacingM=2`, one point every 2 m), stored as columns
- * with only the channels the comparison pipeline reads. Captured with
- * tools/analysis/captureLapPairFixture.ts; see ./README.md.
+ * with only the channels the comparison pipeline reads; see ./README.md.
  */
 export type LapPairName = 'daytona-r1-10-lap-pair' | 'sarthe-r1-41-lap-pair' | 'bahrain-r1-10-lap-pair' | 'spa-r1-38-lap-pair';
 

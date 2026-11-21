@@ -9,8 +9,9 @@ map ghost / pedal markers / corner flags, corner consistency), run on real laps.
 | `lapAlignmentGolden.test.ts` | Characterization snapshot: **every** change in output shows up as a diff |
 | `lapAlignmentInvariants.test.ts` | Properties that must hold whatever the implementation; known violations are listed with the phase that fixes them |
 
-Private fixtures (`<LMU_PERSONAL_FIXTURES>/replays/*.json`) are captured with
-`tools/analysis/captureLapPairFixture.ts` (usage in its header):
+Private fixtures (`<LMU_PERSONAL_FIXTURES>/replays/*.json`) were captured from the replay API
+(the capture tool was removed with the routes it called; Git history has it as
+`tools/analysis/captureLapPairFixture.ts`):
 
 | Fixture | Class | Primary | Baseline | Why it is here |
 |---|---|---|---|---|
@@ -25,8 +26,8 @@ cache, so every fixture lap starts at station 0 and ends at the track length.
 Laps are reduced to the requested resolution by `server/replay/decode/trajectoryDownsampler.ts`
 (Visvalingam-Whyatt over pedals and speed). Since phase 6 the inspector asks for one point every
 2 m of the lap (`pointSpacingM=2`: 2,863 points at Daytona, 6,813 at Le Mans) instead of a fixed
-2400, and the fixtures are captured the same way. `tools/analysis/measureLapDensity.ts` compares
-each budget with full resolution: at 2 m no pedal point is lost and they match within 5 m (Spa T2
+2400, and the fixtures were captured the same way. Each budget was compared
+with full resolution: at 2 m no pedal point is lost and they match within 5 m (Spa T2
 baseline pick-up; 0-1 m elsewhere), corner deltas within 2 ms, final deltas exactly; at 2400 the Le
 Mans T13 baseline pick-up was lost. Scrubbing and panning cost the same at any density.
 
