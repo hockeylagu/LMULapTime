@@ -33,9 +33,15 @@ export function formatCostSec(sec: number): string {
   return sec < 0 && Number(shown) !== 0 ? `−${shown}` : shown;
 }
 
-/** Colour for a cost change over sessions: green when down, red when up, neutral within noise. */
+/**
+ * A cost up by at least this (s) reads red. Smaller rises stay neutral (driver, 2026-11-21: progress should not read
+ * overly negative; one session's rise is often race against qualifying, and Slipping already flags a lasting one).
+ */
+export const COST_RISE_RED_SEC = 0.15;
+
+/** Colour for a cost change over sessions: green when down from FOLLOWED_SEC, red only for a big rise, neutral otherwise. */
 export function costChangeTone(changeSec: number): string {
-  return changeSec <= -FOLLOWED_SEC ? 'text-lmu-gain' : changeSec >= FOLLOWED_SEC ? 'text-lmu-loss' : 'text-lmu-text-soft';
+  return changeSec <= -FOLLOWED_SEC ? 'text-lmu-gain' : changeSec >= COST_RISE_RED_SEC ? 'text-lmu-loss' : 'text-lmu-text-soft';
 }
 
 interface CostSparklineProps {

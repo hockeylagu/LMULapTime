@@ -130,9 +130,10 @@ describe('habitFocus', () => {
     expect(focus.corners.map(corner => [corner.cornerId, corner.name, corner.pinTurnId, corner.pinned, corner.costSec, corner.habit?.rule])).toEqual([
       [2, 'T3', 2, false, 0.5, 'overSlowing'], [0, 'T1', 0, false, 0.28, 'overSlowing']]);
     // Leaving is not fixing: T2 keeps a row for 3 sessions after leaving, then drops off.
-    expect(focus.progress.map(row => [row.cornerId, row.state, row.since.sessionId, row.costThenSec, row.costNowSec])).toEqual([
-      [2, 'focus', 's1', 0.1, 0.5], [0, 'focus', 's1', 0.3, 0.28], [1, 'left', 's1', 0.2, 0.2]]);
-    expect(focus.progress[1]).toMatchObject({ since: { driverOrdinal: 7, sessionType: 'Race', timestamp: 1000 }, view: { lapOrdinal: 3, thenLapOrdinal: 1 }, slipping: false });
+    // "Then" is the previous session that measured the corner (the span "Last try" reads), not the oldest of the line.
+    expect(focus.progress.map(row => [row.cornerId, row.state, row.since.sessionId, row.costThenSec, row.costNowSec, row.costs])).toEqual([
+      [2, 'focus', 's2', 0.5, 0.5, [0.1, 0.5, 0.5]], [0, 'focus', 's2', 0.3, 0.28, [0.3, 0.3, 0.28]], [1, 'left', 's2', 0.2, 0.2, [0.2, 0.2, 0.2]]]);
+    expect(focus.progress[1]).toMatchObject({ since: { driverOrdinal: 7, sessionType: 'Race', timestamp: 2000 }, view: { lapOrdinal: 3, thenLapOrdinal: 2 }, slipping: false });
     const afterThree = history(
       { 0: at(0.3), 1: at(0.2), 2: at(0.1) },
       { 0: at(0.3), 1: at(0.2), 2: at(0.5) },
@@ -150,7 +151,7 @@ describe('habitFocus', () => {
       { 0: at(0.3), 1: { cost: 0.04, priority: 0, gap: 0.2 }, 2: at(0.5) },
     );
     expect(habitFocus(graduated, CORNERS, []).progress.find(row => row.cornerId === 1)).toMatchObject({
-      state: 'left', gap: { rule: 'overSlowing', turnLabel: 'T2', unit: 'km/h', before: 6, now: 0.2 },
+      state: 'left', gap: { rule: 'overSlowing', turnLabel: 'T2', unit: 'km/h', before: 4, now: 0.2 },
     });
   });
 

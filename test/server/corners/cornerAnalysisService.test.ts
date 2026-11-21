@@ -128,12 +128,13 @@ describe('readSessionCornerAnalysis', () => {
     const second = readSessionCornerAnalysis(reader(db), 's2', noTarget, loadTrack)?.focus;
     expect(second?.progress).toMatchObject([{ cornerId: TURN, state: 'focus', since: { sessionId: 's1' }, gap: { rule: 'brakeEarly', unit: 'm', before: 10, now: 8 }, tried: null }]);
     expect(second?.progress[0].view).not.toBeNull();
-    // Level with Bob in the third: the corner stays the focus while its last sessions named a habit, with what the try did.
+    // Level with Bob in the third: the corner stays the focus while its last sessions named a habit, with what the try did;
+    // "then" is the session before (s2), the span the try reads.
     const third = readSessionCornerAnalysis(reader(db), 's3', noTarget, loadTrack)?.focus;
     expect(third).toMatchObject({ sessions: 3, corners: [{ cornerId: TURN, habit: null }] });
     expect(third?.corners[0].costSec).toBeCloseTo(0);
-    expect(third?.progress).toMatchObject([{ since: { sessionId: 's1' }, gap: null, tried: { action: 'brakeLater', did: 'braked 8 m later', worked: true } }]);
-    expect(third?.progress[0].costThenSec).toBeCloseTo(0.1);
+    expect(third?.progress).toMatchObject([{ since: { sessionId: 's2' }, gap: null, tried: { action: 'brakeLater', did: 'braked 8 m later', worked: true } }]);
+    expect(third?.progress[0].costThenSec).toBeCloseTo(0.08);
     // Another car in the same class continues the same habit history.
     add('s4', 0, 'Ann', true, 90, [2100, 2100, 2100, 2100], undefined, 2);
     expect(readSessionCornerAnalysis(reader(db), 's4', noTarget, loadTrack)).toMatchObject({ car: 'Car B', focus: { sessions: 4 } });

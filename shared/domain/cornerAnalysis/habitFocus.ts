@@ -176,14 +176,18 @@ function cornerAdvice(sessions: readonly AnalysedSession[], cornerId: number, se
   return advice;
 }
 
-/** The corner then against now: the oldest of its last HISTORY_SESSIONS measuring sessions against the latest. */
+/**
+ * The corner then against now: the previous session that measured it against the latest, the span "Last try" reads
+ * (driver, 2026-11-21: the oldest of 5 showed a corner that got worse since last time as improved). The cost line keeps
+ * the last HISTORY_SESSIONS sessions as context.
+ */
 function progressOf(
   sessions: readonly AnalysedSession[], corner: FocusCornerRef, series: readonly CornerPoint[], state: FocusProgress['state'], tried: FocusProgress['tried'],
 ): FocusProgress | null {
   const last = sessions.length - 1;
   const window = windowAt(series, last);
-  const now = window.at(-1), then = window[0];
-  if (!now || now.index !== last || then.index === last) return null;
+  const now = window.at(-1), then = window.at(-2);
+  if (!now || !then || now.index !== last) return null;
   const nowSession = sessions[last], thenSession = sessions[then.index];
   // A graduated corner often has no named habit left now: show the gap of the last habit worked on in the window so the driver sees what improved.
   const habit = cornerHabit(nowSession.analysis, corner.id)

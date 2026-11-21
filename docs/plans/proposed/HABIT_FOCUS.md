@@ -290,7 +290,8 @@ A qualifying session with 2 counted laps counts like any other; the engine's con
 ## Progress and slipping
 
 Progress covers the focus corners and the corners that left focus within the last 5 sessions: the cost and the
-habit's gap, then → now, the oldest of the last 5 sessions that measured the corner against this one. A gap that closed
+habit's gap, then → now, the previous session that measured the corner against this one (it was the oldest of the last
+5 until 2026-11-21: a corner that got worse since last time read as improved). A gap that closed
 while the cost did not move is visible; that is the check that the advice worked. On the card it is not a list of its
 own (it was, until 2026-11-21): a focus row carries its cost then → now with a line of the last 5 sessions' costs, and
 its gap under Details; the corners that left have their own short list.
@@ -509,7 +510,7 @@ Kept as built:
 - "Lift, don't brake" stays, though too rare to check (26 pairs).
 - A new habit needs 2 sessions before it is a focus, so a slot can stay empty for a session (3% of sessions).
 - A focus row's cost is the whole corner's, the number the progress row and the corner trends follow.
-- "Last try" compares the last two sessions; "then → now" spans up to 5.
+- "Last try" and "then → now" both compare the last two sessions that measured the corner; the cost line shows up to 5.
 - Pinning is on the track page only; the debrief can unpin.
 - A corner the rules picked that a pin pushed out gets no progress row.
 - The goal line is in the debrief only, and uses the true pace, so it reads slower than the best lap's badge.
@@ -641,8 +642,9 @@ Engine:
 Debrief card (`WatchNextSessionCard.tsx`, `watchNextSession.ts`):
 
 - **One row per focus corner** in place of a Progress list above a Focus list: the corner's name, then the advice as
-  the link to telemetry; on the right the cost then → now with a line of the last 5 sessions' costs, green when it
-  came down by 0.05 s or more, red when it went up by as much. Without earlier sessions: the cost alone.
+  the link to telemetry; on the right the cost last session → this one with a line of the last 5 sessions' costs, its end dot
+  green when the cost came down by 0.05 s or more since last session, red only when it went up by 0.15 s or more
+  (`COST_RISE_RED_SEC`; driver, 2026-11-21: not overly negative), soft otherwise. Without earlier sessions: the cost alone.
 - **Second line:** "Try: …", the speed as "Apex 96 → 100 km/h" (the driver's, then the target's), Slipping, "Your
   pick" with Unpin, and a Details toggle.
 - **Details** hold what identifies the loss and is not the advice: the kind of loss (arc, grip), the habit's gap then

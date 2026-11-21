@@ -27,7 +27,7 @@ export interface FocusProgress {
   /** In focus now, or out of it within the last few sessions ("no longer in your top 2"): leaving is not fixing. */
   state: 'focus' | 'left';
   slipping: boolean;
-  /** The oldest of the last few sessions that measured the corner: what "then" is. */
+  /** The previous session that measured the corner: what "then" is (the span "Last try" reads). */
   since: AnalysisSessionRef & { driverOrdinal: number };
   costThenSec: number;
   costNowSec: number;

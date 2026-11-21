@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, ArrowUpRight, ChevronDown, Flag, Loader2, Pin, Target, TrendingUp, Zap, type LucideIcon } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, ChevronDown, Flag, History, Loader2, Pin, Target, Zap, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
 import { costChangeTone, CostSparkline, formatCostSec, SlippingTag } from '../../common/CostSparkline.js';
@@ -61,13 +61,17 @@ function GoalLine({ goal }: { goal: WatchGoal }) {
   );
 }
 
-/** A corner's cost then against now with an inline sparkline: only the end dot wears the trend colour; the readout stays white. */
+/**
+ * A corner's cost last session against this one, with the last sessions' costs as a line: only the end dot wears the
+ * colour of that same change, so it agrees with "Last try"; the readout stays white.
+ */
 function CostChange({ item }: { item: WatchProgress }) {
   const tone = costChangeTone(item.costNowSec - item.costThenSec);
+  const line = item.costs.length > 2 ? ` The line shows the last ${item.costs.length} sessions here.` : '';
   return (
     <span className="inline-flex items-center gap-2">
       <CostSparkline costs={item.costs} tone={tone} testId="debrief-sparkline" />
-      <span className={`${readout} text-white`} title={`Time lost to the target through the corner: ${item.sinceLabel} against this session`}>
+      <span className={`${readout} text-white`} title={`Time lost to the target through the corner: ${item.sinceLabel}, then this session.${line}`}>
         {`${formatCostSec(item.costThenSec)} → ${formatCostSec(item.costNowSec)} s/lap`}
       </span>
     </span>
@@ -197,7 +201,8 @@ function HabitGroups({ watch, onUnpin }: { watch: WatchNextSession; onUnpin: Unp
       </section>
       {left.length > 0 && (
         <section aria-labelledby="debrief-left-focus" className="space-y-1 border-t border-lmu-border pt-3">
-          <SectionHeading id="debrief-left-focus" icon={TrendingUp} tone="text-lmu-gain">No longer in your top 2</SectionHeading>
+          {/* Neutral: a corner leaves the top 2 when others cost more, not only when it got quicker; its cost line says which. */}
+          <SectionHeading id="debrief-left-focus" icon={History} tone="text-lmu-muted">No longer in your top 2</SectionHeading>
           <ul className="divide-y divide-lmu-border/60">
             {left.map(item => (
               <li key={item.cornerId} className="space-y-0.5 py-2" data-testid="debrief-left-row">
