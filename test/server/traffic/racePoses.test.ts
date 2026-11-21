@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assembleRacePoseWindow, racePoseWindowIndex, resampleLapPoses, type LapPoses } from '../../../server/traffic/racePoses.js';
+import { assembleRacePoseWindow, resampleLapPoses, type LapPoses } from '../../../server/traffic/racePoses.js';
 import { compressTrajectory } from '../../../server/core/replay/replayTrajectoryCodec.js';
 import { RACE_AID, RACE_POSE_CHANNELS, RACE_POSE_CHANNEL_COUNT } from '../../../shared/domain/raceReplay/poseWindow.js';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
@@ -97,12 +97,5 @@ describe('assembleRacePoseWindow', () => {
     expect(car(50)).toBeCloseTo(0);
     expect(car(100)).toBeCloseTo(250);
     expect(Number.isNaN(car(200))).toBe(true);
-  });
-
-  it('finds the window of a time', () => {
-    expect(racePoseWindowIndex(0)).toBe(0);
-    expect(racePoseWindowIndex(59.9)).toBe(0);
-    expect(racePoseWindowIndex(60)).toBe(1);
-    expect(racePoseWindowIndex(-3)).toBe(0);
   });
 });

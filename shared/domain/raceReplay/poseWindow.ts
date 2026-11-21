@@ -11,7 +11,6 @@
  */
 export const RACE_POSE_CHANNELS = ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'speedKmh', 'inPit', 'steerYaw', 'brake', 'lamps',
   'deflFL', 'deflFR', 'deflRL', 'deflRR', 'spinFL', 'spinFR', 'spinRL', 'spinRR', 'throttle', 'gear', 'accelLatG', 'accelLonG', 'aids'] as const;
-export type RacePoseChannel = typeof RACE_POSE_CHANNELS[number];
 export const RACE_POSE_CHANNEL_COUNT = RACE_POSE_CHANNELS.length;
 /** The `lamps` channel's flags. */
 export const RACE_LAMP = { headlights: 1, pitLimiter: 2, rainLight: 4 } as const;

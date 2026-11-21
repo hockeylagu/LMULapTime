@@ -48,9 +48,6 @@ export interface DebriefCorner {
   lapsInTraffic: number;
 }
 
-/** A corner of the analysed lap driven with another car close is not a clean read of the driver's pace. */
-export const TRAFFIC_CONFIDENCE = 0.5;
-
 export interface RankDebriefOptions {
   /** The analysed lap against the technique reference (the fastest lap), for the evidence. */
   technique?: LapSegmentComparison[];

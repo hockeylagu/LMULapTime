@@ -94,9 +94,6 @@ export function resampleLapPoses(blob: Uint8Array, hz = RACE_POSE_HZ): LapPoses 
   return { firstTick, count, data };
 }
 
-/** The window that holds replay time `timeSec`. */
-export const racePoseWindowIndex = (timeSec: number, windowSec = RACE_POSE_WINDOW_SEC) => Math.max(0, Math.floor(timeSec / windowSec));
-
 /**
  * Window `index` of every car: its laps' samples copied onto one grid. `laps` holds each car's
  * resampled laps that overlap the window; on the sample two laps share, the later lap's wins.
