@@ -328,6 +328,21 @@ describe('LiveStrategyTracker', () => {
     expect(garageLaps({ raining: 0.15, avgPathWetness: 0.4 })).toMatchObject({ lapSeconds: 236.5, laps: 17 });
   });
 
+  it('takes the class pace for a grid leader of the same class without an estimate (Bahrain Paddock 2026-11-21: 18 planned, 17 run)', () => {
+    const garageLaps = (leaderClass: string) => {
+      const tracker = new LiveStrategyTracker();
+      tracker.applyRest({ type: 'schedule', raceMinutes: 20, hasQualifying: true });
+      const garage = at(25, { sessionCode: 10, inRealtime: false, gamePhase: 0,
+        player: vehicleReading({ totalLaps: 0, estimatedLapTime: 79.203, vehicleClass: 'LMP3' }),
+        classLeader: null, leader: vehicleReading({ id: 3, estimatedLapTime: 0, vehicleClass: leaderClass }) });
+      return context(tracker, garage, { carClass: 'LMP3', lapsLeft: null })?.garage?.laps;
+    };
+    // 16 racing laps and the formation lap, as run.
+    expect(garageLaps('LMP3')).toBe(17);
+    // A leader of another class may take the flag a lap later: the latest flag stays.
+    expect(garageLaps('LMP2')).toBe(18);
+  });
+
   it('plans the race from the qualifying garage, with the schedule and the game tyre change time, until the race runs', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 3, selected: { compound: 'Medium', used: false, wear: 1 } });

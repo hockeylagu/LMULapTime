@@ -16,6 +16,7 @@ import { isWetCompound, liveTrackWet, RAIN_WET_MIN } from '../lapConditions.js';
 import { median } from '../pitStops.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
 import { classLeaderLapSeconds, raceClockRunning } from './liveLapsLeft.js';
+import { knownCarClass } from '../vehicleMapping.js';
 import { plannedServiceSeconds, refuelBase, refuelSeconds } from './livePitTime.js';
 import { planRaceStrategies } from '../strategy/raceStrategy.js';
 import { estimateFromHistory } from '../strategy/strategyHistory.js';
@@ -594,8 +595,14 @@ export class LiveStrategyTracker {
     const wetPace = this.wet === true && ownLaps !== null;
     const lapSeconds = (wetPace ? ownLaps : null) ?? classLeaderLapSeconds(reading.player, reading.classLeader) ?? ownLaps ?? estimated;
     const tyres = this.garageTyres(race && !clockRunning && reading.player?.inPits === false);
-    const leaderEstimate = race ? reading.leader?.estimatedLapTime ?? null : null;
-    const leaderLapSeconds = leaderEstimate !== null && wetPace && estimated !== null ? leaderEstimate * ownLaps / estimated : leaderEstimate;
+    const leaderEstimate = race && reading.leader && reading.leader.estimatedLapTime > 0 ? reading.leader.estimatedLapTime : null;
+    // On the grid the leader often has no estimate yet. Leading in the player's class, its pace is the class pace the plan
+    // already uses (Sebring School 2026-11-17 ×3, Bahrain Paddock 2026-11-21: the latest flag asked a lap too many). A
+    // leader of another class keeps the latest flag: a faster class can take the flag a lap later (Barcelona 2026-11-12).
+    const sameClassLeader = race && knownCarClass(reading.leader?.vehicleClass) !== null
+      && knownCarClass(reading.leader?.vehicleClass) === knownCarClass(reading.player?.vehicleClass);
+    const leaderLapSeconds = leaderEstimate !== null && wetPace && estimated !== null ? leaderEstimate * ownLaps / estimated
+      : leaderEstimate ?? (sameClassLeader ? lapSeconds : null);
     const plan = planGarage({
       kind,
       sessionSeconds,
