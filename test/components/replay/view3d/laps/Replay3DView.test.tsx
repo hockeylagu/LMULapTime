@@ -337,6 +337,22 @@ it('uses the interpolated playhead for the collapsed HUD, fullscreen comparison 
   expect(advance).toHaveBeenCalledWith(40);
 });
 
+it('draws a jump at its new index, never back at the last index the page showed', async () => {
+  const cursor = createPlaybackCursor();
+  const view = (currentIndex: number) => <ReplayPlaybackCursorContext value={cursor}>
+    <Replay3DView trajectory={trajectory} baseline={trajectory} currentIndex={currentIndex} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />
+  </ReplayPlaybackCursorContext>;
+  const {rerender} = render(view(1));
+  await waitFor(() => expect(scene.cursor).toHaveBeenCalled());
+  act(() => cursor.publish(trajectory.points, {index: 4, timeSec: 1}));
+  scene.cursor.mockClear();
+  // A jump clears the playing clock before the page shows its index: the clock's pose stays until then.
+  act(() => cursor.clear());
+  expect(scene.cursor).not.toHaveBeenCalled();
+  rerender(view(2));
+  expect(scene.cursor.mock.calls).toEqual([[2, 0]]);
+});
+
 it('repeats a picked corner from its entry, keeping the camera until the corner view is asked for', async () => {
   const cursor = createPlaybackCursor(), onSelectIndex = vi.fn(), onLeaveCorner = vi.fn(), onChangeSpeed = vi.fn();
   const corner = {type: 'corner', cornerNumber: 4, entryDistM: 1, primaryBrakingDistM: null, minDistM: 3, baselineMinDistM: 2.5,

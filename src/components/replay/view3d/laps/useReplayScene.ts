@@ -122,7 +122,9 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
     void update();
     return () => abort.abort();
   }, [key, trajectory, baseline, ready, setState]);
-  useEffect(() => { drawCursor(); return cursor?.subscribe(() => drawCursor()); }, [cursor, currentIndex, trajectory]);
+  // A cleared cursor (a jump: a click on the charts, Backspace to marker A) waits for the page's new index: drawn now, from
+  // the index the page still shows, the cars stepped back to where the clock last left them for a frame.
+  useEffect(() => { drawCursor(); return cursor?.subscribe(() => { if (cursor.getSnapshot()) drawCursor(); }); }, [cursor, currentIndex, trajectory]);
   useEffect(() => { scene.current?.mode(mode); drawCursor(); }, [mode, scene]);
   useEffect(() => { scene.current?.colorLines(colorBy); }, [colorBy, scene]);
   useEffect(() => { scene.current?.syncGhost(syncMode, anchorDistM); drawCursor(); }, [syncMode, anchorDistM, scene]);
