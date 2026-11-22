@@ -10,12 +10,10 @@ import { FolderPathsCard } from './FolderPathsCard.js';
 import { LiveDashboardCard } from './LiveDashboardCard.js';
 import { PeripheralsCard } from './peripherals/PeripheralsCard.js';
 import { LearningReadinessPanel } from './learning/LearningReadinessPanel.js';
-import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
 import { SequenceMapsCard } from './sequences/SequenceMapsCard.js';
 import { SettingsSidebar } from './SettingsSidebar.js';
 import { useReplayCache } from './replays/useReplayCache.js';
-import { useAiSettings } from './hooks/useAiSettings.js';
 import { useDeepLinkAlign } from './hooks/useDeepLinkAlign.js';
 import {
   SETTINGS_SECTIONS,
@@ -54,7 +52,6 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
 
   const actions = useSettingsActions({ status, onUpdatePaths, onReplayScanTriggered, isScanRunning });
   const replay = useReplayCache(replayScanStatus);
-  const ai = useAiSettings();
 
   const missingPaths = getMissingPaths(status);
   const setupNeeded = missingPaths.length > 0;
@@ -94,7 +91,6 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
           <OverviewCard
             status={status}
             replay={replay}
-            ai={ai}
             isClearingSessions={actions.isClearingSessions}
             isScanRunning={isScanRunning}
             onClearSessions={actions.handleClearSessions}
@@ -111,8 +107,6 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         return <PeripheralsCard />;
       case 'learning':
         return <LearningReadinessPanel />;
-      case 'ai-settings':
-        return <AISettingsCard ai={ai} />;
       case 'reference-benchmarks':
         return (
           <ReferenceLaptimesCard
@@ -153,7 +147,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
       <div>
         <h2 className="text-lg font-extrabold tracking-tight text-lmu-text">Application Settings</h2>
         <p className="text-xs text-lmu-muted mt-1">
-          What the app has stored, reference benchmarks, AI lap reports, cached replays and folder paths
+          What the app has stored, reference benchmarks, cached replays and folder paths
         </p>
       </div>
 
@@ -191,7 +185,7 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
               </div>
               <h3 className="text-sm font-bold text-lmu-text">No settings found</h3>
               <p className="text-xs text-lmu-muted max-w-sm mx-auto">
-                No settings match &quot;{searchQuery}&quot;. Try searching for cache, replays, AI, benchmarks, or paths.
+                No settings match &quot;{searchQuery}&quot;. Try searching for cache, replays, benchmarks, or paths.
               </p>
               <button
                 type="button"

@@ -5,7 +5,6 @@ import { OverviewCard } from '../../../src/components/settings/OverviewCard.js';
 import { FeedbackMessage } from '../../../src/components/settings/SettingsPanel.js';
 import type { AppStatus, ScanStatus } from '../../../shared/types/index.js';
 import type { ReplayCacheState } from '../../../src/components/settings/replays/useReplayCache.js';
-import type { AiSettingsState } from '../../../src/components/settings/hooks/useAiSettings.js';
 import { requestBody } from '../../fixtures/requestUrl.js';
 
 const status: AppStatus = {
@@ -34,8 +33,7 @@ function mockServer(onScan: (call: ScanCall) => Promise<unknown>) {
       scans.push(call);
       return onScan(call);
     }
-    if (url.includes('/api/replays/cache') || url.includes('/api/ai/reports') || url.includes('/diffs')) return json([]);
-    if (url.includes('/api/ai/settings')) return json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
+    if (url.includes('/api/replays/cache') || url.includes('/diffs')) return json([]);
     return json({});
   });
   return scans;
@@ -232,14 +230,13 @@ describe('Settings driver name', () => {
 
 describe('Overview card', () => {
   const replay = { counts: { total: 1234, archived: 1 } } as unknown as ReplayCacheState;
-  const ai = { settings: null, loadError: null } as unknown as AiSettingsState;
   const cacheStatus = (telemetryFilesCount?: number, sessions = 3): AppStatus => ({
     ...status,
     sessionsCount: sessions,
     sqliteCache: { sessionsCount: sessions, lastSyncedAt: null, dbSizeBytes: 1024, telemetryFilesCount },
   });
   const renderCard = (appStatus: AppStatus | null, extra: Partial<React.ComponentProps<typeof OverviewCard>> = {}) =>
-    render(<OverviewCard status={appStatus} replay={replay} ai={ai} isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} {...extra} />);
+    render(<OverviewCard status={appStatus} replay={replay} isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} {...extra} />);
   const strip = () => screen.getByRole('group', { name: 'Settings status' });
 
   it('shows the telemetry files total with thousands separators, in the same readout style as the others', () => {
@@ -282,7 +279,7 @@ describe('Overview card', () => {
     const { rerender } = renderCard(cacheStatus(2), { onClearSessions: onClear });
     fireEvent.click(screen.getByRole('button', { name: /clear parsed sessions/i }));
     onClear.mockImplementation(() => {
-      rerender(<OverviewCard status={cacheStatus(2)} replay={replay} ai={ai} isClearingSessions={true} onClearSessions={onClear} sessionsMessage={null} />);
+      rerender(<OverviewCard status={cacheStatus(2)} replay={replay} isClearingSessions={true} onClearSessions={onClear} sessionsMessage={null} />);
     });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onClear).toHaveBeenCalledTimes(1);

@@ -5,7 +5,6 @@ import type { ReplayCacheSummary } from '../../../shared/types/replay.js';
 import type { DetailedSession } from '../../../shared/types/session.js';
 import path from 'path';
 import fs from 'fs';
-import { dataPlugin } from '../../../server/plugins/dataPlugin.js';
 import { app } from '../../../server/index.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 
@@ -43,21 +42,9 @@ describe('Server API wiring', () => {
     ['reference', '/api/reference-laptimes'],
     ['leaderboard', '/api/leaderboard/layouts'],
     ['replay', '/api/replays/cache'],
-    ['ai', '/api/ai/reports'],
   ])('mounts the %s router: GET %s answers 200', async (_router, url) => {
     const res = await request(app).get(url);
     expect(res.status).toBe(200);
-  });
-
-  it.each(['absent','invalid','ready'] as const)('keeps cloud AI settings and reports available when the plugin is %s',async state=>{
-    const previous=dataPlugin.status.state;
-    try {
-      dataPlugin.status.state=state;
-      expect((await request(app).get('/api/ai/settings')).status).toBe(200);
-      expect((await request(app).get('/api/ai/reports')).status).toBe(200);
-      const response=await request(app).post('/api/ai/analyze-lap').send({});
-      expect(response.status).toBe(400);expect(response.body).toHaveProperty('errorCode', 'invalid_request');
-    } finally {dataPlugin.status.state=previous;}
   });
 
   it('answers JSON errors from the routers, not an HTML page', async () => {

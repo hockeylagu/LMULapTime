@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ReplayInspectorSidebar } from '../../../../src/components/replay/inspector/ReplayInspectorSidebar.js';
 import { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/types.js';
@@ -101,11 +101,8 @@ describe('ReplayInspectorSidebar', () => {
 
     // Header toggle buttons
     const cornersToggle = screen.getByRole('button', { name: /Corners \(1\)/i });
-    const aiReportToggle = screen.getByRole('button', { name: /AI Report/i });
     expect(cornersToggle).toBeInTheDocument();
-    expect(aiReportToggle).toBeInTheDocument();
     expect(cornersToggle).toHaveAttribute('aria-pressed', 'true');
-    expect(aiReportToggle).toHaveAttribute('aria-pressed', 'false');
 
     // Close button on the same row as the tabs
     expect(screen.getByRole('button', { name: /Close side panel/i })).toBeInTheDocument();
@@ -166,34 +163,13 @@ describe('ReplayInspectorSidebar', () => {
     expect(screen.queryByText(/vs Baseline/i)).not.toBeInTheDocument();
   });
 
-  it('keeps the same map (and its 3D view) through the Corners and AI report tabs', () => {
+  it('keeps the same map (and its 3D view) through the Corners tab', () => {
     const { rerender } = render(<ReplayInspectorSidebar {...baseProps} activeTab="map" />);
     const map = screen.getByTitle('Zoom In (+)');
     rerender(<ReplayInspectorSidebar {...baseProps} activeTab="corners" />);
     expect(screen.getByTitle('Zoom In (+)')).toBe(map);
-    rerender(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" />);
-    expect(screen.getByTitle('Zoom In (+)')).toBe(map);
     rerender(<ReplayInspectorSidebar {...baseProps} activeTab="map" />);
     expect(screen.getByTitle('Zoom In (+)')).toBe(map);
-  });
-
-  it('renders AI Report alongside the GPS map when activeTab is ai-report and allows closing with X on tabs row', async () => {
-    const setActiveTab = vi.fn();
-    render(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" setActiveTab={setActiveTab} />);
-
-    // Map is still present on the left
-    expect(screen.getByTitle('Zoom In (+)')).toBeInTheDocument();
-
-    // AI Report UI is on the right
-    await waitFor(() => {
-      expect(screen.getByText(/Select a completed lap to generate an AI report/i)).toBeInTheDocument();
-    });
-
-    // Close button on the same row as the tabs
-    const closeBtn = screen.getByRole('button', { name: /Close side panel/i });
-    expect(closeBtn).toBeInTheDocument();
-    fireEvent.click(closeBtn);
-    expect(setActiveTab).toHaveBeenCalledWith('map');
   });
 
   it('switches between Lap analysis and Consistency subviews in corners tab', () => {
@@ -207,16 +183,6 @@ describe('ReplayInspectorSidebar', () => {
     const lapAnalysisBtn = screen.getByRole('button', { name: /Lap analysis/i });
     fireEvent.click(lapAnalysisBtn);
     expect(setCornerSubView).toHaveBeenCalledWith('compare');
-  });
-
-  it('toggles AI Report tab back to map when AI Report button is clicked while active', async () => {
-    const setActiveTab = vi.fn();
-    render(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" setActiveTab={setActiveTab} />);
-
-    const aiBtn = screen.getByRole('button', { name: /AI Report/i });
-    fireEvent.click(aiBtn);
-    expect(setActiveTab).toHaveBeenCalledWith('map');
-    await act(async () => {});
   });
 
   it('gives the corner chart baseline distances in the primary lap frame (matched by track station)', () => {

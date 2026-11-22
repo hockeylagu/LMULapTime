@@ -7,10 +7,8 @@ export interface BenchmarkCase {
   requiredCollection?: 'entries' | 'sessions' | 'laps';
 }
 
-const prefixes: Record<string, string> = { aiRoutes: '/api/ai', dataPluginRoutes: '/api/data-plugin', peripheralRoutes: '/api/peripherals' };
+const prefixes: Record<string, string> = { dataPluginRoutes: '/api/data-plugin', peripheralRoutes: '/api/peripherals' };
 const exclusions: Record<string, string> = {
-  '/api/ai/settings': 'Changes AI configuration.',
-  '/api/ai/analyze-lap': 'Calls a paid external AI service; latency needs a separate controlled benchmark.',
   '/api/sessions/clear': 'Destroys the benchmark dataset.',
   '/api/scan': 'Starts ingestion and changes the dataset.',
   '/api/settings/folders': 'Changes the configured folders and driver name.',

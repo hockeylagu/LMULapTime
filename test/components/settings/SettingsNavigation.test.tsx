@@ -30,10 +30,7 @@ describe('Settings navigation', () => {
       if ((url.includes('/api/settings/folders') || url.includes('/api/scan')) && options?.method === 'POST') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: false }) });
       }
-      if (url.includes('/api/ai/settings')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }) });
-      }
-      if (url.includes('/api/replays/cache') || url.includes('/api/ai/reports')) {
+      if (url.includes('/api/replays/cache')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
@@ -70,7 +67,6 @@ describe('Settings navigation', () => {
       'Live Dashboard',
       'Learning',
       'Peripherals',
-      'AI Lap Reports',
       'Cached Replays',
       'Corner Sequences',
       'Folder Paths & Driver',
@@ -88,11 +84,11 @@ describe('Settings navigation', () => {
 
   it('writes ?section= on TOC click, moves focus to the heading and marks the section current', async () => {
     render(<Settings status={okStatus} onUpdatePaths={vi.fn()} />);
-    fireEvent.click(within(toc()).getByRole('button', { name: 'AI Lap Reports' }));
+    fireEvent.click(within(toc()).getByRole('button', { name: 'Cached Replays' }));
 
-    expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toHaveFocus();
-    expect(within(toc()).getByRole('button', { name: 'AI Lap Reports' })).toHaveAttribute('aria-current', 'location');
-    await waitFor(() => expect(window.location.hash).toContain('section=ai-settings'));
+    expect(screen.getByRole('heading', { name: 'Cached Replays' })).toHaveFocus();
+    expect(within(toc()).getByRole('button', { name: 'Cached Replays' })).toHaveAttribute('aria-current', 'location');
+    await waitFor(() => expect(window.location.hash).toContain('section=replay-cache'));
     await settled();
   });
 

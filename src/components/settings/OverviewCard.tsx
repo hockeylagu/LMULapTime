@@ -4,7 +4,6 @@ import { AppStatus } from '../../../shared/types/index.js';
 import { SECONDARY_BUTTON } from '../common/buttonStyles.js';
 import { InlineConfirm } from './controls/InlineConfirm.js';
 import { useInlineConfirm } from './controls/useInlineConfirm.js';
-import { AiSettingsState } from './hooks/useAiSettings.js';
 import { ReplayCacheState } from './replays/useReplayCache.js';
 import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPanel.js';
 import { formatBytes, formatDateTime, formatNumber, pluralize } from './settingsFormat.js';
@@ -32,7 +31,6 @@ const Readout: React.FC<ReadoutProps> = ({ label, value, hint, tone, text }) => 
 export interface OverviewCardProps {
   status: AppStatus | null;
   replay: ReplayCacheState;
-  ai: AiSettingsState;
   isClearingSessions: boolean;
   /** A file scan is running on the server; clearing waits for it. */
   isScanRunning?: boolean;
@@ -44,7 +42,7 @@ export interface OverviewCardProps {
  * The page's one status card: what the app has found and stored, and the way to clear the session cache.
  * Benchmark figures live in their own card, so each number appears once on the page.
  */
-export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, isClearingSessions, isScanRunning = false, onClearSessions, sessionsMessage }) => {
+export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, isClearingSessions, isScanRunning = false, onClearSessions, sessionsMessage }) => {
   const { isOpen: isConfirmOpen, triggerRef, open: openConfirm, cancel: cancelConfirm, confirm } = useInlineConfirm('overview-heading');
   const missing = getMissingPaths(status);
   const cache = status?.sqliteCache;
@@ -54,10 +52,6 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, 
   const counts = replay.counts;
   const telemetryFiles = cache?.telemetryFilesCount;
   const liveTelemetryFiles = cache?.liveTelemetryFilesCount;
-
-  const aiValue = ai.settings
-    ? (ai.settings.configured ? 'Ready' : 'Optional · not set up')
-    : (ai.loadError ? 'Unavailable' : '—');
 
   return (
     <SettingsPanel sectionId="overview">
@@ -83,7 +77,6 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, 
           value={formatNumber(telemetryFiles)}
           hint={telemetryFiles === 0 ? 'No telemetry cached yet' : undefined}
         />
-        <Readout text label="AI reports" value={aiValue} />
         <Readout label="Total app database" value={cache ? formatBytes(cache.dbSizeBytes) : '—'} hint="Sessions, replays and telemetry" />
         <Readout
           label="Last synced"

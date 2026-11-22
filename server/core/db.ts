@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import {
-  AiReportRecord,
   DetailedSession,
   SessionMetadata,
   ReferenceLaptimeEntry,
@@ -14,7 +13,6 @@ import {
   ReplayMetadata,
   ReplayTrajectoryData,
   ReplayCacheSummary,
-  AiReportHistoryEntry,
   RejectedReplayLink,
   ReplayLinkRejectionReason,
 } from '../../shared/types/index.js';
@@ -90,11 +88,6 @@ import {
   getIngestErrors,
   IngestErrorEntry,
 } from './dbMetadataStore.js';
-import {
-  getAiReport,
-  getAiReportsList,
-  saveAiReport,
-} from './dbAiReportStore.js';
 import {
   RivalScope,
   applyRivalResolution,
@@ -233,20 +226,6 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
 
   public getIngestErrors(): IngestErrorEntry[] {
     return getIngestErrors(this.db);
-  }
-
-  // --- AI Reports ---
-
-  public getAiReport(cacheKey: string): AiReportRecord | null {
-    return getAiReport(this.db, cacheKey);
-  }
-
-  public getAiReportsList(limit = 200): AiReportHistoryEntry[] {
-    return getAiReportsList(this.db, limit);
-  }
-
-  public saveAiReport(record: AiReportRecord): void {
-    saveAiReport(this.db, record);
   }
 
   // --- Rivals (user state, kept when the cache is cleared) ---

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Settings } from '../../../src/components/settings/Settings.js';
 import { ReferenceLaptimesCard } from '../../../src/components/settings/ReferenceLaptimesCard.js';
-import { AiReportsHistorySection } from '../../../src/components/settings/AiReportsHistoryCard.js';
 import { SETTINGS_SECTIONS } from '../../../src/components/settings/settingsSections.js';
 import type { AppStatus, BenchmarkDiffSummary } from '../../../shared/types/index.js';
 import { chooseValue, openSelect } from '../../helpers/selectControl.js';
@@ -33,21 +32,19 @@ describe('Settings overview card', () => {
           { filename: 'B R1 2.Vcr', isOnDisk: false, replayVersion: 'v7', fileSizeBytes: 1, compressedSizeBytes: 1 },
         ]);
       }
-      if (url.includes('/api/ai/settings')) return json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
       return json([]);
     });
   });
 
-  it('reads folders, sessions, replays and AI in one labelled group', async () => {
+  it('reads folders, sessions and replays in one labelled group', async () => {
     render(<Settings status={status} onUpdatePaths={vi.fn()} />);
     const strip = screen.getByRole('group', { name: 'Settings status' });
     await waitFor(() => expect(within(strip).getByText('1 archived')).toBeInTheDocument());
     expect(within(strip).getByText('All found')).toBeInTheDocument();
     expect(within(strip).getByText('35')).toBeInTheDocument();
     expect(within(strip).getByText('2')).toBeInTheDocument();
-    expect(within(strip).getByText('Optional · not set up')).toBeInTheDocument();
     expect(within(strip).queryByText('Benchmarks updated')).not.toBeInTheDocument();
-    for (const label of ['Folders', 'Sessions', 'Replays', 'AI reports', 'Total app database', 'Last synced']) {
+    for (const label of ['Folders', 'Sessions', 'Replays', 'Total app database', 'Last synced']) {
       expect(within(strip).getByText(label)).toBeInTheDocument();
     }
   });
@@ -75,7 +72,6 @@ describe('Settings overview card', () => {
       'Live Dashboard',
       'Learning',
       'Peripherals',
-      'AI Lap Reports',
       'Cached Replays',
       'Corner Sequences',
       'Folder Paths & Driver',
@@ -143,28 +139,5 @@ describe('Error surfacing', () => {
     chooseValue(await screen.findByRole('combobox', { name: 'Show update' }), '9');
     expect(await screen.findByText('Snapshot 9 is missing')).toHaveClass('text-lmu-loss');
     expect(screen.queryByText('Latest Ring')).not.toBeInTheDocument();
-  });
-
-  it('shows the server message when the AI report history cannot load', async () => {
-    global.fetch = vi.fn().mockImplementation(() => fail('Report store offline'));
-    render(<AiReportsHistorySection defaultOpen />);
-    expect(await screen.findByText('Report store offline')).toHaveClass('text-lmu-loss');
-    expect(screen.queryByText(/\d+ Cached/)).not.toBeInTheDocument();
-  });
-
-  it('shows no count while the history loads, then the latest reports with Show all', async () => {
-    const reports = Array.from({ length: 8 }, (_, i) => ({
-      cacheKey: `k${i}`, replayName: `Replay ${i}`, lapNumber: i + 1, model: 'gemini-3.8-flash', generatedAt: 1,
-    }));
-    global.fetch = vi.fn().mockImplementation(() => json(reports));
-    render(<AiReportsHistorySection defaultOpen />);
-    expect(screen.queryByText(/cached$/)).not.toBeInTheDocument();
-    expect(await screen.findByText('8 cached')).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(5);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show all 8' }));
-    expect(screen.getAllByRole('listitem')).toHaveLength(8);
-    fireEvent.click(screen.getByRole('button', { name: 'Show latest only' }));
-    expect(screen.getAllByRole('listitem')).toHaveLength(5);
   });
 });

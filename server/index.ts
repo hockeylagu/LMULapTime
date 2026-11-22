@@ -9,7 +9,6 @@ import { getSessionDatabase } from './core/db.js';
 import { TelemetryCatalog } from './telemetry/telemetryCatalog.js';
 import { ReplayRecordingService } from './replay/replayRecordingService.js';
 import { ServerContext } from './core/serverContext.js';
-import { createAiRouter } from './routes/aiRoutes.js';
 import { createCornerRouter } from './routes/cornerRoutes.js';
 import { createLeaderboardRouter } from './routes/leaderboardRoutes.js';
 import { createLiveRouter } from './routes/liveRoutes.js';
@@ -177,7 +176,6 @@ if (process.env.NODE_ENV === 'test') {
   captureRefreshTimer.unref();
 }
 
-app.use('/api/ai', createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));
 app.use('/api', createReferenceRouter(serverContext));
 app.use('/api', createCornerRouter(serverContext));

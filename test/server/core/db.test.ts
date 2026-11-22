@@ -4,11 +4,10 @@ import path from 'path';
 import fs from 'fs';
 import os from 'os';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { initDbSchema } from '../../../server/core/dbSchema.js';
 import { REPLAY_CACHE_VERSION } from '../../../server/core/dbCache.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { parseReplayMetadata } from '../../../server/replay/decode/replayParser.js';
-import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../../shared/types/index.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 import { writeSessionRows } from '../../../server/core/sessionRows/writer.js';
 
@@ -608,70 +607,6 @@ describe('SessionDatabase replay cache', () => {
     expect(result.skipped).toBe(1);
     expect(result.added).toBe(0);
     expect(db.getReplaysCount()).toBe(0);
-  });
-});
-
-describe('SessionDatabase AI report history', () => {
-  let db: SessionDatabase;
-
-  beforeEach(() => {
-    db = new SessionDatabase(':memory:');
-  });
-
-  afterEach(() => {
-    db.close();
-  });
-
-  const buildReport = (overrides: Partial<AiReportRecord> = {}): AiReportRecord => ({
-    cacheKey: overrides.cacheKey || 'key-1',
-    sessionId: 'test-session', driverOrdinal: 0, lapOrdinal: 2,
-    lapNumber: 3,
-    model: 'gemini-3.8-flash',
-    promptVersion: 1,
-    report: { overallSummary: 'Brake later into T1.', improvements: [] },
-    promptTokens: 100,
-    completionTokens: 50,
-    totalTokens: 150,
-    generatedAt: Date.now(),
-    ...overrides,
-  });
-
-  it('preserves current AI report history when the schema initializes repeatedly', () => {
-    const sql = db.getDb();
-    db.saveAiReport(buildReport());
-    const saved = db.getAiReport('key-1');
-    initDbSchema(sql);
-    initDbSchema(sql);
-    expect(db.getAiReport('key-1')).toEqual(saved);
-    db.saveAiReport(buildReport({ cacheKey: 'key-2' }));
-    expect(db.getAiReportsList()).toHaveLength(2);
-  });
-
-  it('returns an empty list when no reports have been generated', () => {
-    expect(db.getAiReportsList()).toEqual([]);
-  });
-
-  it('lists saved AI reports newest first with token usage and summary', () => {
-    db.saveAiReport(buildReport({ cacheKey: 'key-old', generatedAt: 1000 }));
-    db.saveAiReport(buildReport({ cacheKey: 'key-new', generatedAt: 2000, report: { overallSummary: 'Carry more mid-corner speed.', improvements: [] } }));
-
-    const list = db.getAiReportsList();
-    expect(list).toHaveLength(2);
-    expect(list[0].cacheKey).toBe('key-new');
-    expect(list[0].overallSummary).toBe('Carry more mid-corner speed.');
-    expect(list[0].tokensUsed).toEqual({ prompt: 100, completion: 50, total: 150 });
-    expect(list[1].cacheKey).toBe('key-old');
-  });
-
-  it('respects the limit parameter', () => {
-    db.saveAiReport(buildReport({ cacheKey: 'key-1', generatedAt: 1000 }));
-    db.saveAiReport(buildReport({ cacheKey: 'key-2', generatedAt: 2000 }));
-    db.saveAiReport(buildReport({ cacheKey: 'key-3', generatedAt: 3000 }));
-
-    const limited = db.getAiReportsList(2);
-    expect(limited).toHaveLength(2);
-    expect(limited[0].cacheKey).toBe('key-3');
-    expect(limited[1].cacheKey).toBe('key-2');
   });
 });
 

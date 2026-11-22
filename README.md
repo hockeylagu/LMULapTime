@@ -63,7 +63,6 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 ### 🎯 Coaching
 - **Corner analysis**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) for every turn, with consistency scoring and faster-class comparison fallback when no same-car lap is faster.
 - **Deterministic coaching**: driving deficits ranked by time lost, repeatability and confidence (`priority = timeLoss * repeatability * confidence`).
-- **AI Race Engineer** (optional, Google Gemini): explains the findings and suggests setup changes.
 
 ### 🔌 Plug & Play
 - Finds the LMU Steam install, results, replays and telemetry on its own; handles long multi-stint sessions and multi-file telemetry.
@@ -90,7 +89,6 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 ### Prerequisites
 - [Node.js](https://nodejs.org/) 24.15+ on the 24.x line (also supported by the installed stack: 22.22.2+ on 22.x, or 26+)
 - [Le Mans Ultimate](https://lemansultimate.com/) installed on your PC
-- *(Optional)* Google Gemini API key for AI Race Engineer post-stint debriefs
 
 ### Installation
 
@@ -106,11 +104,7 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
    ```
 
 3. **Configure Environment (Optional)**:
-   Create an ignored `.env.local` file in the project root if you want to enable Gemini AI coaching debriefs; `dev:server` loads this file:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-   Optional detailed track/vehicle data uses `LMU_PLUGIN_ROOT` in the same file; see [local package setup](docs/PLUGINS.md).
+   Optional detailed track/vehicle data uses `LMU_PLUGIN_ROOT` in an ignored `.env.local` file in the project root, which `dev:server` loads; see [local package setup](docs/PLUGINS.md).
 
 4. **Launch the application**:
    ```bash
@@ -172,7 +166,7 @@ To adjust your paths or driver profile:
 ## 🛠️ Tech Stack
 
 - **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite 8](https://vitejs.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [Three.js](https://threejs.org/), [Recharts](https://recharts.org/), [Lucide React](https://lucide.dev/)
-- **Backend**: [Node.js](https://nodejs.org/), [Express 5](https://expressjs.com/), [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) (WAL Mode), [DuckDB](https://duckdb.org/), [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser), [@google/genai](https://github.com/googleapis/genai-js)
+- **Backend**: [Node.js](https://nodejs.org/), [Express 5](https://expressjs.com/), [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) (WAL Mode), [DuckDB](https://duckdb.org/), [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser)
 - **Diagnostics & Tooling**: TypeScript Telemetry Recorder (`tools/telemetryRecorder.ts`), TSX analysis scripts
 - **Test Suite**: [Vitest](https://vitest.dev/), Testing Library, happy-dom
 

@@ -38,7 +38,6 @@
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.6-r.1",
-    "@google/genai": "^2.26.0",
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
     "express": "^5.2.1",

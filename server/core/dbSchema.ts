@@ -65,27 +65,6 @@ export interface ReplaySyncResult {
   interrupted: boolean;
 }
 
-const AI_REPORT_SCHEMA = `
-CREATE TABLE IF NOT EXISTS ai_reports (
-      cache_key TEXT PRIMARY KEY,
-      session_id TEXT,
-      driver_ordinal INTEGER,
-      lap_ordinal INTEGER,
-      lap_number INTEGER NOT NULL,
-      baseline_session_id TEXT,
-      baseline_driver_ordinal INTEGER,
-      baseline_lap_ordinal INTEGER,
-      baseline_lap_number INTEGER,
-      model TEXT NOT NULL,
-      prompt_version INTEGER NOT NULL,
-      report_json TEXT NOT NULL,
-      prompt_tokens INTEGER,
-      completion_tokens INTEGER,
-      total_tokens INTEGER,
-      generated_at INTEGER NOT NULL
-    );
-`;
-
 /**
  * A pass's drive cues (`CornerPass`): gear at the slowest point, peak brake (per mille), and the
  * time braking, on part throttle out of the slowest point, with ABS, and coasting (ms). Passes are rebuilt offline, so a database
@@ -170,8 +149,6 @@ export function initDbSchema(db: DatabaseType): void {
       key TEXT PRIMARY KEY,
       value TEXT
     );
-
-    ${AI_REPORT_SCHEMA}
 
     -- The player's rival on a layout, per class (car_type '' ) or per car: a real driver about
     -- 0.3 s ahead, or a ghost time. A target stays until it is beaten or replaced, so the

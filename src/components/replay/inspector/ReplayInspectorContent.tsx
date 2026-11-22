@@ -124,7 +124,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     if (controlledView === undefined) setUncontrolledView(nextView);
     onViewChange?.(nextView);
   };
-  const [activeTab, setActiveTab] = useState<'map' | 'corners' | 'ai-report'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'corners'>('map');
   const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
   const [colorBy, setColorBy] = useState<MapColorMode>('pedal');
   const { availableConsistencyLaps, excludedConsistencyLaps, toggleConsistencyLap } =
@@ -138,7 +138,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     setColorBy('speed');
   }
 
-  const { segments: lapSegments, kind: lapCornerKind } = useLapSegments(trajectory, isCompareMode ? baselineTrajectory : null);
+  const lapSegments = useLapSegments(trajectory, isCompareMode ? baselineTrajectory : null);
 
   const cornerSegments = useMemo(() => lapSegments.filter(s => s.type === 'corner'), [lapSegments]);
   const cornerCount = cornerSegments.length;
@@ -154,15 +154,14 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     [trajectory]
   );
 
-  // The panel's corners (sequences or turns; the AI report reads the lap's own, so a corner's repeatability is its own
-  // passes), placed on the displayed lap: each apex and the lap's corner holding it.
+  // The panel's corners (sequences or turns), placed on the displayed lap: each apex and the lap's corner holding it.
   const cornerPlacement = useMemo(() => ({ dists: primaryDists, corners: cornerSegments }), [primaryDists, cornerSegments]);
   const panelSegments = useConsistencySegments();
   const {
     cornerStats: cornerConsistencyStats, isLoading: isCornerConsistencyLoading, unavailableReason: cornerConsistencyUnavailableReason,
   } = useCornerConsistency(
-    (activeTab === 'corners' && cornerSubView === 'consistency') || (activeTab === 'ai-report' && isCompareMode),
-    activeSessionId, metadata, selectedDriverSlot, trajectory, excludedConsistencyLaps, cornerPlacement, activeTab === 'ai-report' ? lapCornerKind : panelSegments
+    activeTab === 'corners' && cornerSubView === 'consistency',
+    activeSessionId, metadata, selectedDriverSlot, trajectory, excludedConsistencyLaps, cornerPlacement, panelSegments
   );
 
   const bestSectors = useMemo(() => {

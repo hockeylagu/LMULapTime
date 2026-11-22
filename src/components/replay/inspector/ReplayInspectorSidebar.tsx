@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
-import { Activity, BrainCircuit, Timer } from 'lucide-react';
-import { ReplayDriverEntry, ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
+import { Activity, Timer } from 'lucide-react';
+import { ReplayDriverEntry, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
@@ -9,7 +9,6 @@ import { ReplayInspectorSidebarTabs } from './ReplayInspectorSidebarTabs.js';
 import { PanelResizeHandle, usePanelWidth } from './PanelResizeHandle.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayMapContainer } from '../map/ReplayMapContainer.js';
-import { AIReportTab } from '../analysis/AIReportTab.js';
 import { CornerSpeedTable } from '../analysis/CornerSpeedTable.js';
 import { ConsistencyPanel } from '../analysis/ConsistencyPanel.js';
 import type { LapConsistencyOption } from '../analysis/LapSelectorDropdown.js';
@@ -19,8 +18,8 @@ import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistan
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayInspectorSidebarProps {
-  activeTab: 'map' | 'corners' | 'ai-report';
-  setActiveTab: (tab: 'map' | 'corners' | 'ai-report') => void;
+  activeTab: 'map' | 'corners';
+  setActiveTab: (tab: 'map' | 'corners') => void;
   cornerCount: number;
   colorBy: MapColorMode;
   setColorBy: (mode: MapColorMode) => void;
@@ -37,7 +36,6 @@ export interface ReplayInspectorSidebarProps {
   handleSelectCorner: (cornerNumber: number | null) => void;
   baselineLapNumber: number | null;
   lapSegments: LapSegmentComparison[];
-  currentLapSummary?: ReplayLapSummary | null;
   drivers: ReplayDriverEntry[];
   selectedDriverSlot: number | null;
   isSelfAnalysis: boolean;
@@ -86,7 +84,6 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   handleSelectCorner,
   baselineLapNumber,
   lapSegments,
-  currentLapSummary,
   drivers,
   selectedDriverSlot,
   isSelfAnalysis,
@@ -176,14 +173,14 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
         }}
       />
 
-      {/* One tree for every tab: the map keeps its place, so opening Corners or the AI report never reloads its 3D view. */}
+      {/* One tree for every tab: the map keeps its place, so opening Corners never reloads its 3D view. */}
       <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${isDoublePanel ? 'md:flex-row' : ''}`}>
         {/* LEFT SUB-PANEL: GPS Map (Always Visible) */}
         <div className={`flex-1 min-w-0 flex flex-col min-h-0 p-0 gap-0 overflow-hidden ${isDoublePanel ? 'md:w-1/2 border-b md:border-b-0 md:border-r border-lmu-border' : ''}`}>
           {mapContainer}
         </div>
 
-        {/* RIGHT SUB-PANEL: Corners or AI Report */}
+        {/* RIGHT SUB-PANEL: Corners */}
         {isDoublePanel && (
           <div className="flex-1 md:w-1/2 min-w-0 flex flex-col min-h-0 overflow-hidden">
             {activeTab === 'corners' && (
@@ -211,25 +208,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
               </div>
             )}
 
-            {activeTab === 'ai-report' && (
-              <div className="px-4 py-2.5 bg-lmu-card/50 border-b border-lmu-border/60 flex items-center gap-2 shrink-0 min-h-[41px]">
-                <BrainCircuit className="w-4 h-4 text-lmu-accent-text shrink-0" />
-                <span className="text-xs font-bold text-white">AI Coaching Report</span>
-              </div>
-            )}
-
-            {activeTab === 'ai-report' ? (
-              <AIReportTab
-                trajectory={trajectory}
-                baselineTrajectory={baselineTrajectory}
-                baselineLapNumber={baselineLapNumber}
-                segments={lapSegments}
-                cornerStats={cornerConsistencyStats}
-                currentLapSummary={currentLapSummary}
-                carClass={drivers.find(driver => driver.slot === selectedDriverSlot)?.carClass}
-                carType={drivers.find(driver => driver.slot === selectedDriverSlot)?.carType}
-              />
-            ) : cornerSubView === 'compare' ? (
+            {cornerSubView === 'compare' ? (
               <CornerSpeedTable
                 segments={lapSegments}
                 selfAnalysis={isSelfAnalysis}

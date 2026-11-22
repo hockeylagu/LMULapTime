@@ -1,8 +1,8 @@
 import React from 'react';
-import { BrainCircuit, Timer, X } from 'lucide-react';
+import { Timer, X } from 'lucide-react';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
-export type InspectorSidebarTab = 'map' | 'corners' | 'ai-report';
+export type InspectorSidebarTab = 'map' | 'corners';
 
 export interface ReplayInspectorSidebarTabsProps {
   activeTab: InspectorSidebarTab;
@@ -18,7 +18,7 @@ const tabClass = (isActive: boolean) =>
       : 'text-lmu-muted hover:text-white border-transparent'
   }`;
 
-/** The Corners / AI Report toggles on top of the inspector sidebar, with a close button while a side panel is open. */
+/** The Corners toggle on top of the inspector sidebar, with a close button while a side panel is open. */
 export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProps> = ({
   activeTab,
   setActiveTab,
@@ -35,15 +35,6 @@ export const ReplayInspectorSidebarTabs: React.FC<ReplayInspectorSidebarTabsProp
         title={activeTab === 'corners' ? 'Close Corners Panel' : 'Open Corners Panel'}
       >
         <Timer className="w-3.5 h-3.5" /> Corners ({cornerCount})
-      </button>
-      <button
-        type="button"
-        onClick={() => setActiveTab(activeTab === 'ai-report' ? 'map' : 'ai-report')}
-        aria-pressed={activeTab === 'ai-report'}
-        className={`${tabClass(activeTab === 'ai-report')} ${FOCUS_RING}`}
-        title={activeTab === 'ai-report' ? 'Close AI Report Panel' : 'Open AI Report Panel'}
-      >
-        <BrainCircuit className="w-3.5 h-3.5" /> AI Report
       </button>
     </div>
 

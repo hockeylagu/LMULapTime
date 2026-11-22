@@ -83,8 +83,8 @@ export interface ReplayInspectorModalBodyProps {
   handleSelectCorner: (cornerNumber: number | null) => void;
   selectedCornerMarkers: { cornerNumber: number; label?: string; entryFrame: number; minFrame: number; exitFrame: number } | null;
   primaryDists: number[];
-  activeTab: 'map' | 'corners' | 'ai-report';
-  setActiveTab: (tab: 'map' | 'corners' | 'ai-report') => void;
+  activeTab: 'map' | 'corners';
+  setActiveTab: (tab: 'map' | 'corners') => void;
   cornerSubView: 'compare' | 'consistency';
   setCornerSubView: (view: 'compare' | 'consistency') => void;
   colorBy: MapColorMode;
@@ -272,7 +272,6 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           handleSelectCorner={handleSelectCorner}
           baselineLapNumber={baselineLapNumber}
           lapSegments={lapSegments}
-          currentLapSummary={currentLapSummary}
           drivers={drivers}
           selectedDriverSlot={selectedDriverSlot}
           isSelfAnalysis={isSelfAnalysis}

@@ -44,7 +44,7 @@ Success means the driver leaves a session review knowing a few specific, correct
 - **Layouts never mix.** Benchmarks, records, comparisons and geometry are strictly per layout (32 layouts), and comparisons stay within one car class.
 - **Lap classification is fixed.** True pace and consistency use clean flying laps only. Start, out, in, partial and wet laps are judged apart.
 - **Numbers must be exact.** Lap times, deltas and units are shown precisely. Nothing is rounded or estimated silently, and unknown or inferred values are labeled as such.
-- **Advice must be right or absent.** No advice is better than bad advice, and any coaching shown to the driver needs very high confidence. Metrics and lap detection are deterministic. AI (Google Gemini, optional) may interpret information that is too hard to read directly, when that helps, but it is held to the same confidence bar. The app must work fully without it.
+- **Advice must be right or absent.** No advice is better than bad advice, and any coaching shown to the driver needs very high confidence. Metrics and lap detection are deterministic. The app runs no AI model: coaching wording is fixed text reviewed before it ships.
 - VCR/XML do not establish damage/repair state. Recorded live condition and REST repair estimates add evidence when available; an estimate does not prove a repair occurred. Inferred repairs remain labeled as estimates.
 
 ## Brand Commitments

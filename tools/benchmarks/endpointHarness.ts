@@ -11,7 +11,6 @@ import { LmuParser } from '../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../server/telemetry/telemetryCatalog.js';
 import { ReplayRecordingService } from '../../server/replay/replayRecordingService.js';
 import { ServerContext } from '../../server/core/serverContext.js';
-import { createAiRouter } from '../../server/routes/aiRoutes.js';
 import { createDataPluginRouter } from '../../server/routes/dataPluginRoutes.js';
 import { createSystemRouter } from '../../server/routes/systemRoutes.js';
 import { createReferenceRouter } from '../../server/routes/referenceRoutes.js';
@@ -61,7 +60,6 @@ export async function startBenchmarkServer(snapshot: string) {
   app.use(cors());
   app.use(express.json());
   app.use('/api/data-plugin', createDataPluginRouter());
-  app.use('/api/ai', createAiRouter(store));
   app.use('/api', createSystemRouter(context));
   app.use('/api', createReferenceRouter(context));
   app.use('/api', createCornerRouter(context));

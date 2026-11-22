@@ -10,7 +10,7 @@ Architectural standards, domain rules, and coding conventions for AI agents.
 Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ultimate (LMU)** (rFactor 2 engine lineage). Ingests 100 Hz DuckDB telemetry, binary `.Vcr` replays, XML session logs, and live app capture streams (`*.live.duckdb`).
 
 - **Frontend**: React 19, TypeScript (strict), Vite 8, Tailwind CSS v4, Recharts, Lucide React, Hash routing (`HashRouter`).
-- **Backend**: Node.js + Express 5 (port 3001), Better-SQLite3 (WAL mode), DuckDB Node reader, Fast-XML-Parser, Koffi (rFactor 2 shared memory FFI), worker threads (VCR decoding, live recording, learning), Server-Sent Events (SSE), Google Gen AI SDK (`@google/genai`).
+- **Backend**: Node.js + Express 5 (port 3001), Better-SQLite3 (WAL mode), DuckDB Node reader, Fast-XML-Parser, Koffi (rFactor 2 shared memory FFI), worker threads (VCR decoding, live recording, learning), Server-Sent Events (SSE).
 - **Tools**: TSX telemetry recorder (`tools/telemetryRecorder.ts`), TSX analysis scripts (`tools/analysis/`), benchmark suites (`tools/benchmarks/`), data guard scripts (`tools/release/checkLocalData.mjs`).
 
 ---
@@ -28,8 +28,8 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 | `server/traffic/` | Race replay: every car's poses (worker) and live gaps from the corner passes |
 | `server/corners/` | Corner passes: every car's time and cues through each official turn, built per replay on a worker |
 | `server/tracks/` | Track geometry, centerline projection, timing line cuts, station glitch repair |
-| `server/routes/` | Express domain routers (`ai`, `leaderboard`, `live`, `liveEvidence`, `reference`, `replay`, `session`, `system`, `dataPlugin`), readiness gates |
-| `server/ai/`, `server/benchmarks/` | Gemini race engineer; Google Sheets alien benchmarks scraper and diff |
+| `server/routes/` | Express domain routers (`leaderboard`, `live`, `liveEvidence`, `reference`, `replay`, `session`, `system`, `dataPlugin`), readiness gates |
+| `server/benchmarks/` | Google Sheets alien benchmarks scraper and diff |
 | `server/plugins/` | Local package loaders for detailed track geometry and manufacturer assets |
 | `public/track-outlines/` | Bundled basic SVG illustrations (metric data stays in external local packages) |
 | `shared/domain/` | Deterministic domain engines (circuits, vehicles, laps, conditions, pace, pit stops, traffic, rivals, `learning/`, `live/`, `sessionSummaries/`) |
@@ -55,9 +55,9 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 - **Single Classification Source**: The parser (`server/sessions/parser.ts`) sets flags (`isInferred`, `isOutLap`, `isCompletedPitStop`) once. Views and analytics consume them (`isRacingLap`, `selectCleanLapCandidates`); never re-derive from adjacent laps. Changing rules requires bumping `DB_PARSER_VERSION`.
 - **Lap Conditions**: Dry by default. Wet tyres or replay rain (`RAIN_WET_MIN`) set `conditions` via `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`). Compare pace/consistency against laps in matching conditions; clean lap average covers all clean laps.
 
-### C. Deterministic Logic First (AI Is Secondary)
+### C. Deterministic Logic Only (No Runtime AI)
 - Deltas, telemetry traces, sector rankings, tire wear, pace categories, handling balance, and coaching deficits must be **100% deterministic** (`priority = estimatedTimeLoss * repeatability * confidence`).
-- AI (`server/ai/aiReport.ts`) is strictly for natural language explanation and coaching narrative. Never use AI to compute metrics or scores.
+- The app calls no AI model. Coaching text is fixed, reviewed wording that ships with the app; an LLM may help write rules or wording offline, never at runtime.
 
 ### D. Replay Binary Stream Safety
 - Replay files (`.Vcr`, 300MB–1GB+) must be decoded in worker threads (`replayTrajectoryWorker.ts`) to avoid blocking the event loop.

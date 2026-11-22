@@ -1,4 +1,4 @@
-import { LucideIcon, LayoutDashboard, Film, BrainCircuit, Database, HardDrive, Radio, ChartNoAxesCombined, Gamepad2, Spline } from 'lucide-react';
+import { LucideIcon, LayoutDashboard, Film, Database, HardDrive, Radio, ChartNoAxesCombined, Gamepad2, Spline } from 'lucide-react';
 import { AppStatus } from '../../../shared/types/index.js';
 
 export interface SettingsSectionDef {
@@ -9,13 +9,13 @@ export interface SettingsSectionDef {
   keywords: string[];
 }
 
-/** Page order when healthy: the overview first, then what changes (benchmarks, AI, replays), and the one-time folder setup last. */
+/** Page order when healthy: the overview first, then what changes (benchmarks, replays), and the one-time folder setup last. */
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   {
     id: 'overview',
     title: 'Overview',
     icon: LayoutDashboard,
-    description: 'Folders, sessions, replays and AI at a glance, plus the local SQLite session cache and how to clear it',
+    description: 'Folders, sessions and replays at a glance, plus the local SQLite session cache and how to clear it',
     keywords: ['overview', 'status', 'health', 'cache', 'session cache', 'sqlite', 'database', 'sessions', 'size', 'clear', 'clear cache', 'reset', 'storage', 'sync', 'last synced', 'lmu_cache.db', 'disk'],
   },
   {
@@ -43,13 +43,6 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     id: 'peripherals', title: 'Peripherals', icon: Gamepad2,
     description: 'Simagic wheel profiles, SimPro connection and per-car preset mappings',
     keywords: ['simagic', 'simpro', 'wheel', 'preset', 'led', 'profile', 'peripheral', 'mapping'],
-  },
-  {
-    id: 'ai-settings',
-    title: 'AI Lap Reports',
-    icon: BrainCircuit,
-    description: 'Google Gemini AI configuration, API key, model selection, and cached report history',
-    keywords: ['ai', 'gemini', 'api key', 'race engineer', 'model', 'flash', 'coaching', 'tokens', 'google', 'prompt', 'history', 'reports', 'cached reports', 'debriefs', 'saved', 'logs'],
   },
   {
     id: 'replay-cache',
@@ -112,6 +105,5 @@ export function orderSettingsSections(sections: SettingsSectionDef[], setupNeede
 /** The section id a `?section=` value points at, or null when it names no section. */
 export function resolveSectionId(requested: string | null): string | null {
   if (!requested) return null;
-  if (requested === 'ai-history') return 'ai-settings';
   return SETTINGS_SECTIONS.some((section) => section.id === requested) ? requested : null;
 }

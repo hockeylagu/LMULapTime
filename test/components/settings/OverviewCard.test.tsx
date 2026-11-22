@@ -3,7 +3,6 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { OverviewCard } from '../../../src/components/settings/OverviewCard.js';
 import type { AppStatus } from '../../../shared/types/index.js';
 import type { ReplayCacheState } from '../../../src/components/settings/replays/useReplayCache.js';
-import type { AiSettingsState } from '../../../src/components/settings/hooks/useAiSettings.js';
 
 const status = (sessions: number): AppStatus => ({
   resultsDir: 'C:\\LMU\\Results',
@@ -15,25 +14,24 @@ const status = (sessions: number): AppStatus => ({
 });
 
 const replay = { counts: { total: 4, archived: 1 } } as unknown as ReplayCacheState;
-const ai = { settings: null, loadError: null } as unknown as AiSettingsState;
 
 const renderCard = (sessions: number, onClearSessions = vi.fn()) =>
-  render(<OverviewCard status={status(sessions)} replay={replay} ai={ai} isClearingSessions={false} onClearSessions={onClearSessions} sessionsMessage={null} />);
+  render(<OverviewCard status={status(sessions)} replay={replay} isClearingSessions={false} onClearSessions={onClearSessions} sessionsMessage={null} />);
 
 describe('OverviewCard', () => {
   it('shows supplemental live recording files separately from native telemetry', () => {
     const appStatus = status(3);
     appStatus.sqliteCache!.liveTelemetryFilesCount = 12;
-    const { rerender } = render(<OverviewCard status={appStatus} replay={replay} ai={ai}
+    const { rerender } = render(<OverviewCard status={appStatus} replay={replay}
       isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} />);
     expect(within(screen.getByText('Live telemetry files').parentElement!).getByText('12')).toBeInTheDocument();
     expect(within(screen.getByText('Telemetry files').parentElement!).getByText('3')).toBeInTheDocument();
     appStatus.sqliteCache!.liveTelemetryFilesCount = 0;
-    rerender(<OverviewCard status={appStatus} replay={replay} ai={ai}
+    rerender(<OverviewCard status={appStatus} replay={replay}
       isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} />);
     expect(screen.getByText('No live recordings yet')).toBeInTheDocument();
     delete appStatus.sqliteCache!.liveTelemetryFilesCount;
-    rerender(<OverviewCard status={appStatus} replay={replay} ai={ai}
+    rerender(<OverviewCard status={appStatus} replay={replay}
       isClearingSessions={false} onClearSessions={vi.fn()} sessionsMessage={null} />);
     expect(screen.getByText('Live telemetry files').nextElementSibling).toHaveTextContent('—');
   });

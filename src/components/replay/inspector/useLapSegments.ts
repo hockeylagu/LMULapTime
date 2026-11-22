@@ -26,7 +26,7 @@ export function useLapSegments(trajectory: ReplayTrajectoryData | null | undefin
 
   const corners = loaded && loaded.key === key ? loaded.corners : null;
 
-  const segments = useMemo(() => {
+  return useMemo(() => {
     // Without the layout's corners (no centre line, or the server unreachable) the lap has no segments.
     if (!trajectory || !corners) return [];
     const compared = baselineTrajectory ?? trajectory;
@@ -34,6 +34,4 @@ export function useLapSegments(trajectory: ReplayTrajectoryData | null | undefin
     const spec = trajectory.layoutKey ? getCircuitSpecification(trajectory.layoutKey) : undefined;
     return computeLapSegmentComparisons(trajectory.points, compared.points, corners, trajectory.trackLengthM, spec?.nominalWidthM);
   }, [trajectory, baselineTrajectory, corners]);
-  // What the corners are, so readers of the session's passes read the same ones (the AI report's repeatability).
-  return { segments, kind: corners?.kind ?? 'turns' };
 }

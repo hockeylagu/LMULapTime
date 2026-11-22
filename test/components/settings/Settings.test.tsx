@@ -34,15 +34,6 @@ describe('Settings component', () => {
       if (url.includes('/api/replays/cache')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
-      if (url.includes('/api/ai/settings')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }),
-        });
-      }
-      if (url.includes('/api/ai/reports')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-      }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
     });
   });
@@ -54,7 +45,6 @@ describe('Settings component', () => {
 
     expect(screen.getByText('Application Settings')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Cached Replays' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Report History' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Results')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Replays')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:\\LMU\\Telemetry')).toBeInTheDocument();
@@ -312,13 +302,12 @@ describe('Settings component', () => {
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
 
-    // Search for "gemini" -> should show AI sections and hide SQLite Cache
-    fireEvent.change(searchInput, { target: { value: 'gemini' } });
+    // Search for "vcr" -> should show the replay cache section and hide the others
+    fireEvent.change(searchInput, { target: { value: 'vcr' } });
 
     await waitFor(() => {
-      expect(screen.getByText('1 of 9 sections match')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Report History' })).toBeInTheDocument();
+      expect(screen.getByText('1 of 8 sections match')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Cached Replays' })).toBeInTheDocument();
     });
 
     // Clear search using the one clear button in the input
@@ -337,7 +326,7 @@ describe('Settings component', () => {
     await settled();
     expect(screen.getByRole('heading', { name: 'Learning', level: 3 })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: /search settings/i }), { target: { value: 'evidence' } });
-    expect(screen.getByText('1 of 9 sections match')).toBeInTheDocument();
+    expect(screen.getByText('1 of 8 sections match')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Learning', level: 3 })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Live Dashboard' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check evidence' })).toBeInTheDocument();
@@ -377,8 +366,8 @@ describe('Settings component', () => {
     const tocNav = screen.getByRole('navigation', { name: /settings table of contents/i });
     expect(tocNav).toBeInTheDocument();
 
-    const aiButton = within(tocNav).getByRole('button', { name: /AI Lap Reports/i });
-    fireEvent.click(aiButton);
+    const replaysButton = within(tocNav).getByRole('button', { name: /Cached Replays/i });
+    fireEvent.click(replaysButton);
 
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
   });

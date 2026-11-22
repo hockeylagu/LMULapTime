@@ -54,7 +54,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     id, route, ...(url ? { url } : { skip }), ...(collections[route] ? { requiredCollection: collections[route] } : {}),
   });
   for (const [id, url] of Object.entries({
-    status: '/api/status', peripherals: '/api/peripherals', scan: '/api/scan/status', 'ai-settings': '/api/ai/settings', 'ai-reports': '/api/ai/reports',
+    status: '/api/status', peripherals: '/api/peripherals', scan: '/api/scan/status',
     logos: '/api/data-plugin/vehicles/logos',
     references: '/api/reference-laptimes', 'reference-diffs': '/api/reference-laptimes/diffs',
     dashboard: '/api/dashboard?page=1&pageSize=25&hideEmpty=true', 'dashboard-page-2': '/api/dashboard?page=2&pageSize=25&hideEmpty=true', tracks: '/api/tracks',

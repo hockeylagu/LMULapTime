@@ -399,11 +399,6 @@ copyright notices are acknowledged below:
   Copyright (c) 2013 Troy Goode <troygoode@gmail.com>
   Website: https://github.com/expressjs/cors
 
-* Google Gen AI SDK (@google/genai)
-  License: Apache License 2.0
-  Copyright (c) Google LLC
-  Website: https://github.com/googleapis/genai-js
-
 2. Build Tools, PostCSS & Testing Libraries
 -------------------------------------------
 

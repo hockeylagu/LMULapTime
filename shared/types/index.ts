@@ -4,11 +4,6 @@ export type {
   LapTraffic, TrafficCar, TrafficGap, TrafficSpell, TrafficSpellKind,
 } from './raceTraffic.js';
 
-export type {
-  AiErrorCode, AiEvidenceSegment, AiLapEvidence, AiReportSection, AiLapReport,
-  AiAnalyzeRequest, AiTokenUsage, AiAnalyzeResponse, AiReportRecord, AiReportHistoryEntry,
-} from './aiReport.js';
-
 
 export * from './reference.js';
 export * from './session.js';
