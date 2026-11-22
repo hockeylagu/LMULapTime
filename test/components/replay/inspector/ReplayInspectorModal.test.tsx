@@ -183,6 +183,18 @@ describe('ReplayInspectorContent', () => {
     expect(screen.queryByText(/Whole lap:/i)).not.toBeInTheDocument();
   });
 
+  it('opens a linked corner with the car at its apex, not at the start of the lap', async () => {
+    const traj = { ...mockTraj, layoutKey: 'test_layout', points: mockTraj.points.map((point, i) => ({ ...point, stationM: i * 50 })) };
+    const corners = { kind: 'turns', startStationM: 0, lengthM: 1000, corners: [{ id: 1, label: 'T1', title: 'Turn 1', apexM: 60, startM: 40, endM: 80 }] };
+    global.fetch = vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true,
+      json: () => Promise.resolve(url.endsWith('/replay') ? mockMeta : url.includes('/telemetry?') ? traj : url.includes('/api/corners?') ? corners : { laps: [] }),
+    }));
+    render(<ReplayInspectorContent isOpen onClose={vi.fn()} sessionId="session-1" initialCornerNumber={1} />);
+
+    // The slowest sample in the corner is the one at 50 m, half a second into the lap.
+    expect(await screen.findByText('0:00.500')).toBeInTheDocument();
+  });
+
   it('allows switching drivers from the selector and reloads trajectory', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.endsWith('/replay')) {

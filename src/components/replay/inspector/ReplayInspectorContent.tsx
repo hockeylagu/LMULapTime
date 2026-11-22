@@ -186,11 +186,14 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   useEffect(() => {
     const pending = pendingCornerRef.current;
     if (pending === null || (initialCompareMode && !baselineTrajectory)) return;
-    if (!cornerSegments.some(s => s.cornerNumber === pending)) return;
+    const segment = cornerSegments.find(s => s.cornerNumber === pending);
+    if (!segment || primaryDists.length === 0) return;
     pendingCornerRef.current = null;
     setActiveTab('corners');
     setPickedCorner({ trajectory, baselineTrajectory, number: pending });
-  }, [cornerSegments, trajectory, baselineTrajectory, initialCompareMode]);
+    // The car waits at the corner's apex, as a click on the corner in the table puts it.
+    setCurrentIndex(findIndexAtDistance(primaryDists, segment.minDistM));
+  }, [cornerSegments, primaryDists, trajectory, baselineTrajectory, initialCompareMode, setCurrentIndex]);
 
   const selectedCorner = useMemo(
     () => cornerSegments.find(s => s.cornerNumber === selectedCornerNumber) || null,
