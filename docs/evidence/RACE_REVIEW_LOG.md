@@ -3,6 +3,67 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-11-21 — LMP3, Bahrain Paddock (bahrain_paddock), single class (Ginetta G61-LT-P325 Evo)
+
+**Sessions**: practice `82P1`, qualifying `78Q1` (79.475), race `64R1` (20 min, dry, 20 cars, grid 11 → P7). Fuel only,
+no stop, new Mediums. Model version 19.
+
+**Scorecard**:
+
+| # | Box | Result |
+|---|---|---|
+| 1 | Fuel/VE per lap | OK: median +0.7 % (6 eligible), no run under −2 %; meter 1.89–1.94 L |
+| 2 | Laps | OK: 16 at the green, 16 run, race total held (no `!` line); garage 18 with the formation for 17 (box 14) |
+| 3 | Start load | Miss, mechanism (small): 2.22 L (1.17 laps) at the flag against 0.56 + 0.5; driver set 33 L, the garage's last ask 35 L |
+| 4 | Formation lap | OK: 0.37 L (0.19 lap) |
+| 5 | Stops | n/a: no stop |
+| 6 | Tyre wear | Miss, mechanism (safe side): worst tread 0.935 (RL) against 0.771 planned; the plan took the used set (0.92) and the qualifying rate (~0.009 a lap), the driver fitted the new set, ~0.004 a lap |
+| 7 | Incidents | Lap 6 four-wheel lockup and spin, S3 +11.5 s (+12.5 s), P4 → P9; lap 15 S1 +3.4 s (offPace); both excluded from learning |
+| 8 | Weather | n/a: dry |
+| 9 | Data | OK: forecasts stored, native telemetry linked; garage inputs: no leader estimate on the grid → latest flag (box 14) |
+| 10 | Learning | OK: first event of this car at the layout, insufficient evidence, baseline bias +0.15 % |
+| 11 | Result | P11 → P6 on lap 1 (two DNFs at the start, passes), P4 by lap 5, P9 after the lap 6 spin, P7 at the flag |
+| 12 | Traffic | OK: flagged laps +0.4 to +1.2 s against the clean median 78.60; lap 3 (81.06, 0.5 s behind) was a pass for P5, not flagged |
+| 13 | Driving | Clean median ~1.0 s off the winner; best 78.345 against qualifying 79.475, theoretical 78.14, consistency 99.7; takeaways: lap 6 spin (~3 places at the flag), S1 spread 27.3–28.0 |
+| 14 | App output | Miss, mechanism: the race garage asked 18 laps with the formation while its race strategy planned 16 racing laps (right); session page not opened |
+| 15 | Deployment | n/a: no battery |
+| 16 | Last change | OK: v19 removed the lap 1–2 extra lap; the race total held from the green |
+
+**Mechanism** (boxes 3, 14): on the grid the leader has no estimate, so the garage planned the latest flag, one of the
+player's laps past the clock. Fourth single-class race in a row a lap long (Sebring School ×3, Bahrain). Replayed:
+leader pace 77.3–79.2 s gives 17 with the formation (17 run with the formation), none gives 18.
+
+**Change** (applied, uncommitted; `LIVE_MODEL_VERSION` 20): a grid leader of the player's class without an estimate
+takes the class pace the garage plans with; another class keeps the latest flag (Barcelona multiclass)
+(`liveStrategyTracker.ts` `garagePlan`); test "takes the class pace for a grid leader of the same class without an
+estimate" (`test/domain/live/liveStrategyTracker.test.ts`).
+
+**Watch list** (recheck at every review):
+- Garage leader pace (changed in v20): check the next single-class garage plans the laps run, and a multiclass one
+  still plans the latest flag.
+- Race tyre wear planned from a few qualifying laps and the used set (11-21: 0.77 planned, 0.935 at the flag on new
+  tyres); see "race vs qualifying tyre wear" below.
+- Own pace median takes the start lap and incident laps (11-17 race 2: 13–14 left on laps 3–4 for 15–16).
+- Leader pace in multiclass laps left (11-12): check that the in-race count holds; garage flag without the leader's
+  slow start lap (+8.5 s at Barcelona) and the crossing margin to the flag are candidates if a garage plan is short again.
+- Wet garage with no wet lap in the event (11-10): still the dry estimate; layout wet history would cover it.
+- Fuel use rising as the track dries: the meter lags it (11-10: +2 % on the last stint, below the reserve; 11-11 held).
+- Late pit request toggles (11-10, 11-11, 11-12, 11-17 races 2 and 3, 11-21 after the flag): asked the driver whether deliberate.
+- Start load against plan by choice (Le Mans 11-05: +5–6 L; Barcelona 11-12 +1–2 L; Sebring 11-17 −2 to −4 %; Bahrain
+  11-21 −2 L; since Sebring against a garage a lap long).
+- History by class, not car (not applied): recheck when a car's first race at a layout follows another car's there.
+- Game crash clears the event meters ('offline' reset); with the history above it fell to the other car's history.
+- Game session-start placeholder estimate feeding the game-forecast learning (Daytona race 1 lap 3, +65 %).
+- Tyres picked in the MFD after service starts are not fitted (Daytona race 2 lap 20, game behaviour); a warning could help.
+- Grid forecast read against the session length before the start ("rain in 47 s" Daytona, "none @64" Le Mans 11-05 and Bahrain 11-21).
+- Wets on forecast rain: forecast term needs several races. Grip 0 and 1 unconfirmed.
+- Deployment: driver changes several laps after the advice (Daytona); check the earlier advice at the next hybrid race.
+- Driving: Le Mans pace ~4 s off the class front (S2 on 11-10, S3 on 11-11); incident laps (11-05, 11-11 last-lap wall);
+  front lockups doubled on 11-11; Barcelona S2 +0.45 s; Sebring starts (race 3 lost 10 places) and contact (race 2);
+  Bahrain lap 6 spin.
+- Carried: start load bias (Silverstone); laps left mid-race 30 vs 29 (Silverstone); race vs qualifying tyre wear;
+  "lowest 2 of 5" meter; race plan from the leader's pace; damage pace after impact.
+
 ## 2026-11-17 — GT3, Sebring School (sebring_school), three races (Ford Mustang LMGT3 ×2, BMW M4 LMGT3)
 
 **Sessions**: race 1 `47R1` (Mustang, grid 13 → P6), race 2 `26R1` (Mustang, grid 5 → P7), race 3 `99R1` (BMW, grid 6
