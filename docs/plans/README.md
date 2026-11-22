@@ -191,8 +191,9 @@ items and the open code-review findings.
 
 - Rival duel: two cars' corner passes over the same laps, on the corner passes and sequences already built
   (corner insight delivered 2026-11-19; see [code map](../CODE_MAP.md#3-life-of-a-replay-lap-vcr--telemetry-studio)).
-- [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
-  driver decisions first (Crew Chief overlap, voice, naming).
+- [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules, browser
+  Web Worker TTS + pre-generated fixed clips, and iterations; starts with the Step 1a voice
+  listening test.
 - [Live wetness projection](proposed/LIVE_WETNESS_PROJECTION.md): when the track will reach the next wetness step,
   wetting from rain intensity and drying after it stops, timed from the steps; tyre crossover timing first, then
   pace and fuel. Starts by recording the rain unrounded.
