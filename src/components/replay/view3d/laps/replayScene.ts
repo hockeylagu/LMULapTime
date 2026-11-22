@@ -8,6 +8,7 @@ import { createLapLayerLoader, type LapCars, type LapLayer } from './lapLayer.js
 import type { DrivingMark } from './drivingMarks.js';
 import { createCarSets } from '../cars/drawnCar.js';
 import { setCameraDistance } from '../cars/carParts.js';
+import { ghostFader } from '../cars/ghostFade.js';
 import type { CameraMode } from '../camera/cameraModes.js';
 import { cornerFraming } from '../camera/cornerFraming.js';
 import type { SceneLoadProgress } from '../scene/loadProgress.js';
@@ -77,19 +78,25 @@ export async function createReplayScene(
   carsWarm.catch(() => {}); // A failure here surfaces from the load or the scene's warm-up below.
   const ghostCentre = new Vector3(), primaryCentre = new Vector3();
   /** The shell's content for a lap layer: the cars and lines, with the ghost's parts following the camera's distance. */
-  const contentOf = (lap: LapLayer): SceneContent => ({
-    root: lap.root, reflected: lap.primary,
-    beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
-      lap.syncParts();
-      // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
-      // parts follow the camera's distance.
-      if (lap.ghost.visible) setCameraDistance(lap.ghost, camera.position.distanceTo(lap.ghost.getWorldPosition(ghostCentre)) / shell.rig.lodMultiplier);
-    },
-    // The compared car casts none (`drawnCar`).
-    casters: () => [lap.primary.getWorldPosition(primaryCentre)],
-    refreshHeights: () => lap.refreshHeights(),
-    dispose: () => lap.dispose(),
-  });
+  const contentOf = (lap: LapLayer): SceneContent => {
+    const fadeGhost = ghostFader(lap.ghost);
+    return {
+      root: lap.root, reflected: lap.primary,
+      beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
+        lap.syncParts();
+        // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
+        // parts follow the camera's distance.
+        if (lap.ghost.visible) {
+          setCameraDistance(lap.ghost, camera.position.distanceTo(lap.ghost.getWorldPosition(ghostCentre)) / shell.rig.lodMultiplier);
+          fadeGhost(camera);
+        }
+      },
+      // The compared car casts none (`drawnCar`).
+      casters: () => [lap.primary.getWorldPosition(primaryCentre)],
+      refreshHeights: () => lap.refreshHeights(),
+      dispose: () => lap.dispose(),
+    };
+  };
   let layer: LapLayer;
   if (shell.started) {
     // The shell already shows the circuit (the race view left it): the lap's cars take its place once compiled, the camera
