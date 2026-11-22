@@ -61,9 +61,9 @@ export const RaceStandingsTower: React.FC<Props> = ({ index, clock, followSlot, 
           // Out of the race (its status in the gap column) or in the pits: the faint text tier and the class's faded step.
           const out = row.gap?.kind === 'out';
           const dimmed = out || pitted.has(row.car.slot);
-          // Your row as the leaderboard marks it: an accent tint, a bolder name and the You chip.
+          // The selected car reads loudest (white, bold name); your row keeps the accent tint and the You chip.
           const fill = you ? (followed ? 'bg-lmu-accent/20' : 'bg-lmu-accent/10') : followed ? 'bg-lmu-card' : '';
-          const text = dimmed ? 'text-lmu-faint' : you ? 'text-white' : followed ? 'text-lmu-text' : 'text-lmu-text-soft';
+          const text = dimmed ? 'text-lmu-faint' : followed ? 'text-white' : you ? 'text-lmu-text' : 'text-lmu-text-soft';
           return (
             <li key={row.car.slot}>
               <button type="button" onClick={() => onFollow(row.car.slot)} onDoubleClick={() => onTrack(row.car.slot)} aria-pressed={followed}
@@ -76,7 +76,7 @@ export const RaceStandingsTower: React.FC<Props> = ({ index, clock, followSlot, 
                 </span>
                 <span className="flex min-w-0 items-center gap-1.5">
                   {row.car.carNumber && <span className={`shrink-0 font-mono ${dimmed ? tone.textFaded : tone.text}`}>#{row.car.carNumber}</span>}
-                  <span className={`truncate ${you ? 'font-extrabold' : ''}`}>{row.car.name}</span>
+                  <span className={`truncate ${followed ? 'font-extrabold' : ''}`}>{row.car.name}</span>
                   {you && <span className="shrink-0 rounded bg-lmu-accent/20 px-1.5 text-[11px] font-bold text-lmu-accent-soft">You</span>}
                 </span>
                 <span className="text-right font-mono">{row.lapsDone}</span>
