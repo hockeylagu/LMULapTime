@@ -156,7 +156,7 @@ function turnHabits(context: TurnContext): CornerHabit[] {
   const kind = lossKind(ownUsual, reference);
   const arc = turnArc(ownUsual, reference);
   const speeds = { minKmh: ownUsual.minKmh, targetMinKmh: reference.minKmh, exitKmh: ownUsual.exitKmh, targetExitKmh: reference.exitKmh };
-  return halves.flatMap((half): CornerHabit[] => {
+  const habits = halves.flatMap((half): CornerHabit[] => {
     const losses = own.flatMap(pass => {
       const loss = halfLossOf(pass, reference, half);
       return loss === null ? [] : [loss];
@@ -167,7 +167,9 @@ function turnHabits(context: TurnContext): CornerHabit[] {
       cornerId: context.corner.id, turnId: context.turnId, turnLabel: context.turnLabel, half, lossSec, sameCarLossSec: null,
       confidence: context.confidence, speeds, kind, arc,
     };
-    for (const spec of HABIT_RULES.filter(rule => half === 'whole' || rule.half === half)) {
+    // A slower exit is a result, not something to do: when the apex is slower too, the time lost on the way out
+    // comes from there, so the out half checks the minimum speed first (driver, 2026-11-21).
+    for (const spec of HABIT_RULES.filter(rule => half === 'whole' || rule.half === half || (half === 'out' && rule.rule === 'overSlowing'))) {
       // The number said is the usual against the usual, the one the detail line and the series over sessions show.
       // A rule that holds on half the laps while the usual lap is level with the target (short sessions) names
       // nothing: a habit is what the driver usually does (driver, 2026-11-21).
@@ -196,6 +198,16 @@ function turnHabits(context: TurnContext): CornerHabit[] {
       detail: 'Open the laps side by side', action: null, otherActions: [], causes: [],
     }];
   });
+  // A slower apex named on both halves is one habit: the whole turn, its two losses added up.
+  const [into, out] = habits;
+  if (habits.length === 2 && into.rule === 'overSlowing' && out.rule === 'overSlowing') {
+    const lossSec = into.lossSec + out.lossSec;
+    return [{
+      ...into, half: 'whole', lossSec, priority: lossSec * into.repeatability * context.confidence,
+      causes: habitCauses('whole', into.action, ownUsual, reference, lengthM, context.sameCar),
+    }];
+  }
+  return habits;
 }
 
 /**

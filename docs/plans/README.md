@@ -28,9 +28,8 @@ the lap view's corner conclusion. Rules, thresholds and their validation sit in 
     54 m early can stay unnamed (Le Mans LMP3, second Mulsanne chicane).
   - "Lift, don't brake" is too rare to check (4 pairs), kept on the driver's answer.
   - "Closer to the inside" is weak on the outcome check (63% / 41%).
-  - Exit-only habits are shown but never picked.
+  - Exit-only habits ("Losing N km/h out of T2", the apex level) are shown but never picked.
   - The arc is not measured on 21% of focus rows.
-  - `focusSpeedLine` (`drivingHabits.ts`) and `cornerSpeedCue` (`cornerHabitText.ts`) are the same function twice.
 - **Accepted for now, to look at again if they bite:**
   - The target counts only sessions with 3 clean laps, so a fast one-lap qualifying is left out.
   - A target with 2 or 3 counted laps gives a noisier usual.

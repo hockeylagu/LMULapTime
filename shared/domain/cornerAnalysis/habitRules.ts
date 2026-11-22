@@ -92,7 +92,9 @@ export const HABIT_RULES: readonly HabitRuleSpec[] = [
     rule: 'exitSpeed', half: 'out', unit: 'km/h',
     gap: (own, reference) => diff(reference.exitKmh, own.exitKmh),
     holds: gap => gap >= SPEED_GAP_KMH,
-    line: (gap, turn) => `Exit ${turn} ${Math.round(gap)} km/h faster`,
+    // Named only with the apex level (a slower apex leads, analyzeCorners), and said as what is seen: nothing
+    // measured at the exit passes the outcome check, so there is no order to give.
+    line: (gap, turn) => `Losing ${Math.round(gap)} km/h out of ${turn}`,
   },
 ];
 

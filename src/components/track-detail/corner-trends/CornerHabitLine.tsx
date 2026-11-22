@@ -5,7 +5,8 @@ import type { CornerHabitTrend } from '../../../../shared/types/corners/cornerAn
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
 import { costChangeTone, CostSparkline, formatCostSec } from '../../common/CostSparkline.js';
 import { SlippingTag } from '../../common/HabitTags.js';
-import { cornerHabitText, cornerSpeedCue, sessionRefLabel } from './cornerHabitText.js';
+import { cornerHabitText, sessionRefLabel } from './cornerHabitText.js';
+import { habitSpeedLine } from '../../session-detail/debrief/habitText.js';
 
 /** Making the corner a focus or handing its slot back; `error` is the server's refusal ("Unpin one first"). */
 export interface CornerPinControl {
@@ -30,7 +31,7 @@ interface CornerHabitLineProps {
  */
 export const CornerHabitLine: React.FC<CornerHabitLineProps> = ({ trend, id, className, to, pin }) => {
   const { habit, tryLine, tryTitle, cost, gapSeries } = cornerHabitText(trend);
-  const speedCue = cornerSpeedCue(trend.habit);
+  const speedCue = habitSpeedLine(trend.habit);
   const session = sessionRefLabel(trend.session);
   const costs = trend.series.map(point => point.costSec);
   const hasCostTrend = costs.length > 1;

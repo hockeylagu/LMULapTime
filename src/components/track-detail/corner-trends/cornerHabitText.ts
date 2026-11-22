@@ -1,23 +1,10 @@
-import type { AnalysisSessionRef, CornerHabit, CornerHabitTrend } from '../../../../shared/types/corners/cornerAnalysis.js';
+import type { AnalysisSessionRef, CornerHabitTrend } from '../../../../shared/types/corners/cornerAnalysis.js';
 import { habitGapLabel, habitTryLine, habitTryTitle } from '../../session-detail/debrief/habitText.js';
 
 /** A session of the habit history as the lines name it: "Oct 21 Race". */
 export const sessionRefLabel = (session: AnalysisSessionRef): string =>
   `${new Date(session.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${session.sessionType}`;
 
-/** Compact speed cue ("Apex 96 → 100 km/h") for a habit; null without measured speeds. */
-export function cornerSpeedCue(habit: CornerHabit | null): string | null {
-  if (!habit) return null;
-  const { minKmh, targetMinKmh, exitKmh, targetExitKmh } = habit.speeds;
-  const pair = (label: string, own: number | null, target: number | null) =>
-    (own !== null && target !== null ? `${label} ${Math.round(own)} → ${Math.round(target)} km/h` : null);
-  const apex = pair('Apex', minKmh, targetMinKmh);
-  if (habit.rule === 'exitSpeed') {
-    const exit = pair('Exit', exitKmh, targetExitKmh);
-    return [exit, apex].filter(Boolean).join(' · ') || null;
-  }
-  return apex;
-}
 
 /**
  * What opens under a corner trends row: the corner's habit in the latest session with what the corner costs against

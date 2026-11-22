@@ -5,7 +5,7 @@ import type { LayoutCorners } from '../../../../shared/types/corners/cornerPasse
 import { MISTAKE_LINES } from '../../../../shared/domain/cornerAnalysis/analyzeCorners.js';
 import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { HISTORY_SESSIONS } from '../../../../shared/domain/cornerAnalysis/habitFocus.js';
-import { CAUSE_EXPLANATIONS, habitGapLabel, habitGapText, habitTriedTitle, habitTryLine, habitTryTitle, MISTAKE_EXPLANATIONS } from './habitText.js';
+import { CAUSE_EXPLANATIONS, habitGapLabel, habitGapText, habitSpeedLine, habitTriedTitle, habitTryLine, habitTryTitle, MISTAKE_EXPLANATIONS } from './habitText.js';
 import { sessionRefLabel } from '../../track-detail/corner-trends/cornerHabitText.js';
 import { buildTelemetryComparePath, type TelemetryLapRef } from '../../../utils/telemetryCompareLink.js';
 
@@ -123,18 +123,6 @@ function watchGoal({ benchmarkSec, percent, level, next }: PaceGoal): DebriefGoa
     : { reached: true, level, percent, next: null, line: `${level} pace: the top level`, title: now };
 }
 
-/** Compact speed cue for the collapsed focus row ("Apex 96 → 100 km/h"); null without measured speeds. */
-function focusSpeedLine(habit: CornerHabit): string | null {
-  const { minKmh, targetMinKmh, exitKmh, targetExitKmh } = habit.speeds;
-  const pair = (label: string, own: number | null, target: number | null) =>
-    (own !== null && target !== null ? `${label} ${Math.round(own)} → ${Math.round(target)} km/h` : null);
-  const apex = pair('Apex', minKmh, targetMinKmh);
-  if (habit.rule === 'exitSpeed') {
-    const exit = pair('Exit', exitKmh, targetExitKmh);
-    return [exit, apex].filter(Boolean).join(' · ') || null;
-  }
-  return apex;
-}
 
 /** Diagnostic part of `habit.detail` (line/grip/brake pressure) tucked under Details; null when none. */
 export function focusDiagnosis(habit: CornerHabit): string | null {
@@ -150,7 +138,7 @@ function focusLine(habit: CornerHabit, singleTurn: boolean): string {
     case 'brakesWhereLift': return "Lift, don't brake";
     case 'overSlowing': return `Carry ${Math.round(habit.gap)} km/h more`;
     case 'brakeEarly': return `Brake ${Math.round(habit.gap)} m later`;
-    case 'exitSpeed': return `Exit ${Math.round(habit.gap)} km/h faster`;
+    case 'exitSpeed': return `Losing ${Math.round(habit.gap)} km/h on the way out`;
   }
 }
 
@@ -174,7 +162,7 @@ export function drivingHabits(
       cornerId: item.cornerId, name: item.name, pinTurnId: item.pinTurnId, pinned: item.pinned, slipping: item.slipping,
       rule: habit?.rule ?? null,
       line: habit ? focusLine(habit, singleTurn) : item.name,
-      speedLine: habit ? focusSpeedLine(habit) : null,
+      speedLine: habitSpeedLine(habit),
       diagnosis: habit ? focusDiagnosis(habit) : null,
       detail: habit?.detail ?? 'No habit named here this session.',
       tryLine: habit ? habitTryLine(habit) : null,

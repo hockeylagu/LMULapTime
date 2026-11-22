@@ -125,7 +125,8 @@ describe('analyzeCorners', () => {
     expect(analysis.corners[0].reference).toMatchObject({ name: 'Dee' });
     // T2: 5 km/h quicker in the middle, 5 km/h slower out, 0.2 s lost after the slowest point: slower at the exit only.
     const [habit] = analysis.habits;
-    expect(habit).toMatchObject({ turnLabel: 'T2', half: 'out', rule: 'exitSpeed', gap: 5, confidence: 1, line: 'Exit T2 5 km/h faster', kind: 'exitOnly', action: null });
+    // Said as what is seen: nothing measured at the exit is a thing to do.
+    expect(habit).toMatchObject({ turnLabel: 'T2', half: 'out', rule: 'exitSpeed', gap: 5, confidence: 1, line: 'Losing 5 km/h out of T2', kind: 'exitOnly', action: null });
     expect(habit.detail).toBe('Exit 145 km/h, target 150 km/h · apex 95 km/h, target 90 km/h · no action is measured for a slower exit alone');
     expect(isExitOnly(habit)).toBe(true);
     // Tied on pace, the lower driver ordinal of the session: the choice never depends on the order given.
@@ -210,12 +211,18 @@ describe('analyzeCorners', () => {
   });
 
   it('says what else was measured under the headline, never as a headline of its own', () => {
-    // Slower out of T1 with a lower minimum: the exit speed headlines, the pedal timing and the gear are its causes.
+    // Slower out of T1 with a lower minimum: the slower apex leads (the exit is its result), the pedal timing and the
+    // gear on the way out are its causes.
     const out = atT1({ fromApex: 2.2, min: 87, exit: 145, partThrottle: 1.2, gear: 2 });
     expect(out.habits).toHaveLength(1);
-    expect(out.habits[0]).toMatchObject({ half: 'out', rule: 'exitSpeed', line: 'Exit T1 5 km/h faster' });
+    expect(out.habits[0]).toMatchObject({ half: 'out', rule: 'overSlowing', line: 'Carry 3 km/h more through T1' });
     expect(out.habits[0].causes.map(cause => cause.line)).toEqual(['0.7 s more part throttle', 'gear 2 against 3']);
     expect(isExitOnly(out.habits[0])).toBe(false);
+    // Slower on both sides of the apex: one habit for the whole turn, its two losses added up.
+    const both = atT1({ toApex: 2.2, fromApex: 2.2, min: 85 });
+    expect(both.habits).toHaveLength(1);
+    expect(both.habits[0]).toMatchObject({ half: 'whole', rule: 'overSlowing', line: 'Carry 5 km/h more through T1' });
+    expect(both.habits[0].lossSec).toBeCloseTo(0.4);
     // Another car's gearbox: its gear numbers say nothing about this car's.
     const otherCar = atT1({ fromApex: 2.2, min: 87, exit: 145, partThrottle: 1.2, gear: 2 }, {}, 'Car B');
     expect(otherCar.habits[0].causes.map(cause => cause.line)).toEqual(['0.7 s more part throttle']);

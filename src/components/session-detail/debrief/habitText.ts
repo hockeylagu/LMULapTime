@@ -24,6 +24,22 @@ export const HABIT_EXPLANATIONS: Record<HabitRule, string> = {
   exitSpeed: `Your speed at the end of the corner is at least ${SPEED_GAP_KMH} km/h under the target's.`,
 };
 
+/**
+ * The speeds to hit under a habit ("Apex 95 → 100 km/h · Exit 148 → 154 km/h"), the driver's then the target's: the
+ * apex, then the exit when it is slower too, as the result of the apex; a slow exit with the apex level leads with the
+ * exit. Null without measured speeds.
+ */
+export function habitSpeedLine(habit: Pick<CornerHabit, 'rule' | 'speeds'> | null): string | null {
+  if (!habit) return null;
+  const { minKmh, targetMinKmh, exitKmh, targetExitKmh } = habit.speeds;
+  const pair = (label: string, own: number | null, target: number | null) =>
+    (own !== null && target !== null ? `${label} ${Math.round(own)} → ${Math.round(target)} km/h` : null);
+  const apex = pair('Apex', minKmh, targetMinKmh);
+  const exitSlower = exitKmh !== null && targetExitKmh !== null && targetExitKmh - exitKmh >= SPEED_GAP_KMH;
+  const exit = habit.rule === 'exitSpeed' || exitSlower ? pair('Exit', exitKmh, targetExitKmh) : null;
+  return (habit.rule === 'exitSpeed' ? [exit, apex] : [apex, exit]).filter(Boolean).join(' · ') || null;
+}
+
 /** A brake point or a lift is its own advice: the headline already says it. */
 const HEADLINE_IS_ACTION: ReadonlySet<HabitRule> = new Set(['brakeEarly', 'brakesWhereLift']);
 

@@ -1,8 +1,7 @@
 import type { CornerMistake, HabitRule, MistakeCause, SessionCornerAnalysis } from '../../../../../shared/types/corners/cornerAnalysis.js';
 import { cornerHabit } from '../../../../../shared/domain/cornerAnalysis/habitFocus.js';
-import { habitTryLine, habitTryTitle } from '../../../session-detail/debrief/habitText.js';
+import { habitSpeedLine, habitTryLine, habitTryTitle } from '../../../session-detail/debrief/habitText.js';
 import { focusDiagnosis } from '../../../session-detail/debrief/drivingHabits.js';
-import { cornerSpeedCue } from '../../../track-detail/corner-trends/cornerHabitText.js';
 
 /**
  * What the corner analysis engine concluded at one corner of the lap view: the driver's usual over the session against
@@ -48,7 +47,7 @@ export function cornerConclusion(analysis: SessionCornerAnalysis, cornerId: numb
     habit: habit && {
       line: habit.line, rule: habit.rule, share: habit.repeatability,
       tryLine: habitTryLine(habit), tryTitle: habitTryTitle(habit.action),
-      speedCue: habit.rule ? cornerSpeedCue(habit) : null,
+      speedCue: habit.rule ? habitSpeedLine(habit) : null,
       diagnosis: habit.rule ? focusDiagnosis(habit) : null,
       causes: habit.causes.map(cause => cause.line),
     },
