@@ -100,3 +100,4 @@ test/fixtures/replays_api_temp/
 /test/fixtures/replays/*.json
 /test/utils/lapAlignment/__snapshots__/
 *.tsbuildinfo
+/public/voice/

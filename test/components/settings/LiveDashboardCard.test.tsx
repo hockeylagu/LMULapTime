@@ -5,6 +5,10 @@ import { requestBody } from '../../fixtures/requestUrl.js';
 
 // Desktop settings have their own request and state coverage in BrowserMonitorSetting.test.tsx.
 vi.mock('../../../src/components/settings/BrowserMonitorSetting.js', () => ({ BrowserMonitorSetting: () => null }));
+const clips = vi.hoisted(() => ({ say: vi.fn(() => Promise.resolve(false)), stop: vi.fn(), setOutput: vi.fn() }));
+vi.mock('../../../src/components/live/voice/clipVoice.js', () => ({
+  ClipVoice: class { say = clips.say; stop = clips.stop; setOutput = clips.setOutput; },
+}));
 vi.mock('../../../src/components/live/voice/audioOutput.js', () => ({
   audioOutputChoice: () => true, listAudioOutputs: () => Promise.resolve([{ id: 'a1', label: 'Headset' }]),
   revealAudioOutputNames: vi.fn(), routeAudio: vi.fn(),
@@ -68,7 +72,9 @@ describe('LiveDashboardCard', () => {
     fireEvent.click(screen.getByRole('option', { name: '40 %' }));
     await waitFor(() => expect(volume).toHaveTextContent('40 %'));
     expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"voiceVolume":40}' }));
+    // No George clips prepared: the browser voice says the sample.
     fireEvent.click(screen.getByRole('button', { name: 'Play sample' }));
+    await waitFor(() => expect(speak).toHaveBeenCalledOnce());
     expect(speak.mock.calls[0][0].volume).toBe(0.4);
     fireEvent.click(voice);
     await waitFor(() => expect(voice).not.toBeChecked());
@@ -77,7 +83,7 @@ describe('LiveDashboardCard', () => {
     expect(screen.getByRole('button', { name: 'Play sample' })).toBeDisabled();
   });
 
-  it('saves the radio output device', async () => {
+  it("saves the radio output device and plays the sample there in George's clip", async () => {
     const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null,
       ...(init?.method === 'POST' ? JSON.parse(requestBody(init.body)) as Record<string, unknown> : {}) }));
     vi.stubGlobal('fetch', fetchMock);
@@ -88,6 +94,10 @@ describe('LiveDashboardCard', () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Headset' }));
     await waitFor(() => expect(output).toHaveTextContent('Headset'));
     expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"voiceOutput":"a1"}' }));
+    clips.say.mockResolvedValueOnce(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Play sample' }));
+    expect(clips.setOutput).toHaveBeenLastCalledWith('a1');
+    expect(clips.say).toHaveBeenLastCalledWith('Box this lap. Energy 38 percent, no tyre change.', true, 0, 80);
   });
 
   it('shows the server message when the setting cannot be read', async () => {

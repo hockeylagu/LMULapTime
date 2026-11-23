@@ -9,8 +9,10 @@ import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './Setting
 import { BrowserMonitorSetting } from './BrowserMonitorSetting.js';
 import { RadioOutputSetting } from './RadioOutputSetting.js';
 import { radioVoiceSupported, speakRadio } from '../live/display/useStrategyRadio.js';
+import { ClipVoice } from '../live/voice/clipVoice.js';
 
-const VOICE_SAMPLE = 'Box this lap. Energy 62 percent, new mediums.';
+/** A demo call, so George's prepared clip exists for it (`tools/dev/prepareVoiceClips.ts`). */
+const VOICE_SAMPLE = 'Box this lap. Energy 38 percent, no tyre change.';
 
 /** VE or fuel kept at the pit entry and in a stop's load, in seconds of driving (the server accepts these values only). */
 const RESERVE_OPTIONS = RESERVE_SECONDS_CHOICES.map(seconds => ({
@@ -18,12 +20,26 @@ const RESERVE_OPTIONS = RESERVE_SECONDS_CHOICES.map(seconds => ({
   label: seconds === 0 ? 'No reserve' : `${seconds} s of driving`,
 }));
 
+/** George's clip on the chosen output; the browser's voice (Windows default only) when the clips are not prepared. */
+function playSample(clips: ClipVoice, output: string | null, volume: number): void {
+  const browserVoice = () => {
+    if (!radioVoiceSupported()) return;
+    window.speechSynthesis.cancel();
+    speakRadio(VOICE_SAMPLE, volume);
+  };
+  clips.stop();
+  clips.setOutput(output);
+  void clips.say(VOICE_SAMPLE, true, 0, volume).then(heard => { if (!heard) browserVoice(); }, browserVoice);
+}
+
 /** The live dashboard options: the page itself lives at `#/live`. */
 export const LiveDashboardCard: React.FC = () => {
   const [settings, setSettings] = useState<LiveSettings | null>(null);
   const [message, setMessage] = useState<SettingsFeedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const saved = useRef(0);
+  const [clips] = useState(() => new ClipVoice());
+  useEffect(() => () => clips.stop(), [clips]);
 
   useEffect(() => {
     const request = new AbortController();
@@ -112,8 +128,8 @@ export const LiveDashboardCard: React.FC = () => {
                 onChange={voiceVolume => void save({ voiceVolume })}
                 options={VOICE_VOLUME_CHOICES.map(value => ({ value, label: `${value} %` }))}
                 disabled={settings === null || isSaving || settings.voice === false} size="compact" mono className="w-28" />
-              <button type="button" disabled={!radioVoiceSupported() || settings === null || settings.voice === false}
-                onClick={() => { window.speechSynthesis.cancel(); speakRadio(VOICE_SAMPLE, settings?.voiceVolume ?? DEFAULT_LIVE_SETTINGS.voiceVolume); }}
+              <button type="button" disabled={settings === null || settings.voice === false}
+                onClick={() => playSample(clips, settings?.voiceOutput ?? null, settings?.voiceVolume ?? DEFAULT_LIVE_SETTINGS.voiceVolume)}
                 className={`rounded border border-lmu-rule px-3 py-1 text-sm text-lmu-text-soft hover:bg-lmu-card disabled:cursor-not-allowed disabled:text-lmu-faint ${FOCUS_RING}`}>
                 Play sample
               </button>
@@ -122,7 +138,8 @@ export const LiveDashboardCard: React.FC = () => {
               disabled={settings === null || isSaving || settings.voice === false} onChange={voiceOutput => void save({ voiceOutput })} />
             <p className="text-xs leading-relaxed text-lmu-muted">
               Strategy calls spoken on the live dashboard in the browser&apos;s English voice: urgent ones at once, the others on a straight.
-              The browser&apos;s voice always plays on the Windows default.
+              Play sample uses George&apos;s prepared clips on the radio output (the browser&apos;s voice when they are not prepared). The
+              browser&apos;s voice always plays on the Windows default.
               {!radioVoiceSupported() && ' This browser has no voice.'}
             </p>
           </div>

@@ -8,6 +8,7 @@ import { LiveFrame } from '../LiveFrame.js';
 import { LiveDashboardView } from '../display/LiveDashboardView.js';
 import { PedalBuffer } from '../pedalBuffer.js';
 import { DemoCornerView } from './DemoCornerView.js';
+import { DemoRadioSampler } from './DemoRadioSampler.js';
 import { DemoTyrePlanView } from './DemoTyrePlanView.js';
 import { demoTyrePlanFor } from './demoTyrePlan.js';
 import { DEMO_STRAIGHT_SECONDS } from './strategyWindow.js';
@@ -31,7 +32,7 @@ function buildDemo(scenario: string, carClass: string, reserveSeconds: number, p
 
 /** Explicit opt-in: mounts no game stream and needs no backend or recorded files. */
 export default function LiveDemoPage() {
-  const { reserveSeconds, pedalTraceSeconds, voiceVolume } = useLiveDashboardSettings();
+  const { reserveSeconds, pedalTraceSeconds, voiceVolume, voiceOutput } = useLiveDashboardSettings();
   const [params, setParams] = useSearchParams();
   const requested = params.get('scenario') ?? 'race';
   const requestedIndex = DEMO_SCENARIOS.findIndex(s => s.id === requested);
@@ -90,6 +91,7 @@ export default function LiveDemoPage() {
         <button type="button" className={SECONDARY_BUTTON} onClick={() => choose(DEMO_SCENARIOS[(index + 1) % DEMO_SCENARIOS.length].id)}>Next</button>
         <button type="button" className={SECONDARY_BUTTON} aria-pressed={tour} onClick={() => { if (!tour) choose(DEMO_SCENARIOS[0].id); setTour(!tour); }}>{tour ? 'Stop tour' : 'Tour all · 5 s each'}</button>
         <label className="flex items-center gap-2"><input type="checkbox" checked={animate} onChange={e => setAnimate(e.target.checked)} className={FOCUS_RING} />Animate pedals</label>
+        <DemoRadioSampler volume={voiceVolume} output={voiceOutput} />
         <a href="#/live" className={`text-lmu-text-soft underline underline-offset-4 ${FOCUS_RING}`}>Exit demo</a>
         {requested !== selected.id && <p role="status" className="w-full text-lmu-warn">Unknown scenario “{requested}”. Showing mid-stint.</p>}
         {requestedClass && !knownCarClass(requestedClass) && <p role="status" className="w-full text-lmu-warn">Unknown car class “{requestedClass}”. Using GT3.</p>}
