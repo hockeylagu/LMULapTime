@@ -97,9 +97,14 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
  * them), plus the formation lap of a race, run before its clock starts.
  */
 export function sessionLaps(sessionSeconds: number, lapSeconds: number, formationLap: boolean): number {
-  // A flag projected at whole laps of the same pace divides back to a whole number: no rounding lap on top.
-  return settable(sessionSeconds / lapSeconds) + (formationLap ? 1 : 0);
+  // A flag projected at whole laps of the same pace divides back to a whole number: no rounding lap on top. The pace is
+  // rounded to the millisecond and the leader's is not, so a crossing within `FLAG_LAP_TOLERANCE` of a lap past the flag
+  // is the flag lap (Sebring School 2026-11-22: leader 64.69926 s, own 64.699 s, 21 laps planned for 20).
+  return Math.ceil(sessionSeconds / lapSeconds - FLAG_LAP_TOLERANCE) + (formationLap ? 1 : 0);
 }
+
+/** A lap fraction no millisecond rounding of the pace reaches over a race (about 0.06 s of a 65 s lap). */
+const FLAG_LAP_TOLERANCE = 1e-3;
 
 export interface GaragePlanInput {
   /** A formation lap is still to run before the clock starts (a race before its clock runs). */

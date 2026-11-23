@@ -89,6 +89,12 @@ describe('planGarage', () => {
     // Practice and qualifying end with the clock: no flag lap added.
     expect(planGarage({ ...input, formationLap: false, raceLeaderLapSeconds: null })).toMatchObject({ laps: 30 });
   });
+  it('keeps the flag lap when the leader runs our pace, its estimate unrounded (Sebring School 2026-11-22: 21 planned, 20 run)', () => {
+    const input = { kind: 've' as const, formationLap: true, race: true, sessionSeconds: 1200, raceLeaderLapSeconds: 64.69926452636719,
+      lapSeconds: 64.699, perLap: 2.23, perLapSource: 'measured' as const, lapsMeasured: 13, reserveLaps: 0.7, capacity: 100, setInGarage: 45 };
+    // The leader's flag at 19 x 64.69926 s: our 19th crossing, 19 racing laps and the formation lap.
+    expect(planGarage(input)).toMatchObject({ laps: 20 });
+  });
   it('previews the first racing pit lap from the selected load, formation use and reserve', () => {
     const input = { kind: 've' as const, formationLap: true, sessionSeconds: 2700, raceLeaderLapSeconds: 121.4, lapSeconds: 121.4, perLap: 4.5,
       perLapSource: 'measured' as const, lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 };
