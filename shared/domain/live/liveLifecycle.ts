@@ -1,5 +1,6 @@
 import type { LiveLifecycle, LiveSessionInfo, LiveSessionKind } from '../../types/live.js';
 import type { LivePitState } from '../../types/liveStrategy.js';
+import type { LiveFieldReading } from '../../types/liveField.js';
 
 /** The scoring fields the live page is derived from (the rF2 scoring buffer, decoded by the server). */
 export interface LiveScoringReading {
@@ -35,6 +36,8 @@ export interface LiveScoringReading {
   playerClassPlace?: number | null;
   /** Every scoring entry has a terminal finish status; null when the full field was not copied. */
   allDriversFinished?: boolean | null;
+  /** Every car and the sector flags, for the radio's incident and traffic calls. */
+  field?: LiveFieldReading;
 }
 
 /**

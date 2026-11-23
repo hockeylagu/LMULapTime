@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LiveSettings } from '../../../shared/types/live.js';
-import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_SECONDS_CHOICES } from '../../../shared/types/live.js';
+import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_SECONDS_CHOICES, VOICE_VOLUME_CHOICES } from '../../../shared/types/live.js';
 import { apiErrorMessage, isAbortError } from '../../api/apiClient.js';
 import { fetchLiveSettings, saveLiveSettings } from '../../api/liveStream.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { Select } from '../common/dropdown/Select.js';
 import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './SettingsPanel.js';
 import { BrowserMonitorSetting } from './BrowserMonitorSetting.js';
+import { RadioOutputSetting } from './RadioOutputSetting.js';
+import { radioVoiceSupported, speakRadio } from '../live/display/useStrategyRadio.js';
+
+const VOICE_SAMPLE = 'Box this lap. Energy 62 percent, new mediums.';
 
 /** VE or fuel kept at the pit entry and in a stop's load, in seconds of driving (the server accepts these values only). */
 const RESERVE_OPTIONS = RESERVE_SECONDS_CHOICES.map(seconds => ({
@@ -91,6 +95,37 @@ export const LiveDashboardCard: React.FC = () => {
               disabled={settings === null || isSaving} size="compact" mono className="w-36" />
           </div>
           <p className="text-xs text-lmu-muted">Applies to the live dashboard and the demo.</p>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 text-sm text-lmu-text cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings?.voice ?? DEFAULT_LIVE_SETTINGS.voice}
+                disabled={settings === null || isSaving}
+                onChange={(event) => void save({ voice: event.target.checked })}
+                className={`h-4 w-4 accent-lmu-accent ${FOCUS_RING}`}
+              />
+              Radio voice calls
+            </label>
+            <div className="flex items-center gap-3 text-sm text-lmu-text">
+              <label htmlFor="live-voice-volume">Voice volume</label>
+              <Select id="live-voice-volume" value={settings?.voiceVolume ?? DEFAULT_LIVE_SETTINGS.voiceVolume}
+                onChange={voiceVolume => void save({ voiceVolume })}
+                options={VOICE_VOLUME_CHOICES.map(value => ({ value, label: `${value} %` }))}
+                disabled={settings === null || isSaving || settings.voice === false} size="compact" mono className="w-28" />
+              <button type="button" disabled={!radioVoiceSupported() || settings === null || settings.voice === false}
+                onClick={() => { window.speechSynthesis.cancel(); speakRadio(VOICE_SAMPLE, settings?.voiceVolume ?? DEFAULT_LIVE_SETTINGS.voiceVolume); }}
+                className={`rounded border border-lmu-rule px-3 py-1 text-sm text-lmu-text-soft hover:bg-lmu-card disabled:cursor-not-allowed disabled:text-lmu-faint ${FOCUS_RING}`}>
+                Play sample
+              </button>
+            </div>
+            <RadioOutputSetting value={settings?.voiceOutput ?? null} volume={settings?.voiceVolume ?? DEFAULT_LIVE_SETTINGS.voiceVolume}
+              disabled={settings === null || isSaving || settings.voice === false} onChange={voiceOutput => void save({ voiceOutput })} />
+            <p className="text-xs leading-relaxed text-lmu-muted">
+              Strategy calls spoken on the live dashboard in the browser&apos;s English voice: urgent ones at once, the others on a straight.
+              The browser&apos;s voice always plays on the Windows default.
+              {!radioVoiceSupported() && ' This browser has no voice.'}
+            </p>
+          </div>
           <div>
             <label className="flex items-center gap-3 text-sm text-lmu-text cursor-pointer">
               <input

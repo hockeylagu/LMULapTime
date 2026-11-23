@@ -1,6 +1,6 @@
 import type { GarageCheck } from '../liveScreens.js';
 import type { PlanReadout } from '../race/raceAction.js';
-import type { StrategyCall } from '../display/strategySpeech.js';
+import type { LiveCall } from '../../../../shared/domain/live/radio/liveCalls.js';
 
 /** The next stop as one MFD setup: the lap, the VE to load (null: none, `NO VE`), the tyres, and which of them changed. */
 export interface DemoStopCall {
@@ -58,9 +58,10 @@ export function demoTyrePlanFor(id: string, carClass: string): DemoTyrePlan | un
 }
 
 /** The plan change on the radio, the whole stop as the strip shows it: `Plan change. Using less energy. Box lap 21, …`. */
-export function planChangeCall(reason: string | undefined, next: DemoStopCall): StrategyCall {
+export function planChangeCall(reason: string | undefined, next: DemoStopCall): LiveCall {
   const tyres = /no change/i.test(next.tyres) ? 'no tyre change' : next.tyres.toLowerCase().replace(/\bmed\b/, 'medium');
   const energy = next.ve === null ? 'no energy' : `energy ${next.ve} percent`;
   const why = reason ? ` ${reason.charAt(0)}${reason.slice(1).toLowerCase().replace(/\bve\b/, 'energy')}.` : '';
-  return { key: `demo-plan|${next.lap}|${next.ve}|${next.tyres}`, text: `Plan change.${why} Box lap ${next.lap}, ${energy}, ${tyres}.` };
+  return { key: `demo-plan|${next.lap}|${next.ve}|${next.tyres}`, text: `Plan change.${why} Box lap ${next.lap}, ${energy}, ${tyres}.`,
+    priority: 2, family: 'strategy' };
 }

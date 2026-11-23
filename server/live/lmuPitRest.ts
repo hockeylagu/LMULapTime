@@ -2,6 +2,7 @@ import { lmuHttpGet } from './lmuHttp.js';
 import type { LiveVehicleCondition } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveForecastNode } from '../../shared/domain/live/liveForecast.js';
 import type { LiveRestUpdate, LiveSelectedTyres } from '../../shared/domain/live/liveStrategyTracker.js';
+import type { LivePrivateSessions } from '../../shared/types/liveField.js';
 import type { LivePitMenu } from '../../shared/types/liveStrategy.js';
 
 /**
@@ -203,6 +204,17 @@ export function parseForecast(body: unknown): Extract<LiveRestUpdate, { type: 'f
  * server need not have qualifying or a race. No race, or several of different lengths, leave the race length unknown;
  the same for the qualifying length (Daytona online 2026-11-05: PRACTICE 3, QUALIFYING 9, RACE 60).
  */
+/**
+ * `GET /rest/sessions`: the event's settings by name, each `{currentValue, stringValue, ...}`; private qualifying read
+ * `SESSSET_private_qual` 1 ("On"), Sebring School online 2026-11-23. Null without the qualifying setting.
+ */
+export function parsePrivateSessions(body: unknown): LivePrivateSessions | null {
+  const setting = (name: string) => num(record(record(body)?.[name])?.currentValue);
+  const qualifying = setting('SESSSET_private_qual');
+  if (qualifying === null) return null;
+  return { qualifying: qualifying > 0, practice: (setting('SESSSET_private_prac') ?? 0) > 0 };
+}
+
 export function parseSchedule(body: unknown): Extract<LiveRestUpdate, { type: 'schedule' }> | null {
   const sessions = record(body)?.scheduledSessions;
   if (!Array.isArray(sessions)) return null;

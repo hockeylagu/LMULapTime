@@ -42,7 +42,7 @@ function PlanChangeStrip({ reason, next }: { reason?: string; next: DemoStopCall
 }
 
 /** On track the race view as it is, the strip taking the pedal trace's place on the first straight of each lap. */
-function DemoStrategyDriving({ snapshot, store, buffer, plan }: { snapshot: LiveSnapshot; store: LiveTimingStore; buffer: PedalBuffer; plan: DemoTyrePlan }) {
+function DemoStrategyDriving({ snapshot, store, buffer, plan, volume }: { snapshot: LiveSnapshot; store: LiveTimingStore; buffer: PedalBuffer; plan: DemoTyrePlan; volume: number }) {
   const strip = useSyncExternalStore(listener => buffer.subscribe(listener),
     () => showsStrategy(buffer.visible, demoLapStart(buffer.latest ?? 0)));
   const view = racePlanView(snapshot);
@@ -56,7 +56,7 @@ function DemoStrategyDriving({ snapshot, store, buffer, plan }: { snapshot: Live
     <div className="h-[294px] shrink-0 overflow-hidden border-t border-lmu-border pt-3">
       {strip && plan.next ? <PlanChangeStrip reason={plan.reason} next={plan.next} /> : <LivePedalTrace buffer={buffer} />}
     </div>
-    <LiveStrategySpeech snapshot={snapshot} connection="live" buffer={buffer} plan={plan.next ? planChangeCall(plan.reason, plan.next) : null} />
+    <LiveStrategySpeech snapshot={snapshot} connection="live" buffer={buffer} plan={plan.next ? planChangeCall(plan.reason, plan.next) : null} volume={volume} />
   </>;
 }
 
@@ -64,8 +64,8 @@ function DemoStrategyDriving({ snapshot, store, buffer, plan }: { snapshot: Live
  * The tentative tyre plan, the demo's strategy scenarios: in the garage the TYRES row takes the plan's call (the race
  * strategy under it is the real engine's); in the race the tyre cell carries the next stop's call.
  */
-export function DemoTyrePlanView({ snapshot, store, buffer, plan }: { snapshot: LiveSnapshot; store: LiveTimingStore; buffer: PedalBuffer; plan: DemoTyrePlan }) {
-  if (snapshot.lifecycle === 'driving') return <DemoStrategyDriving snapshot={snapshot} store={store} buffer={buffer} plan={plan} />;
+export function DemoTyrePlanView({ snapshot, store, buffer, plan, volume }: { snapshot: LiveSnapshot; store: LiveTimingStore; buffer: PedalBuffer; plan: DemoTyrePlan; volume: number }) {
+  if (snapshot.lifecycle === 'driving') return <DemoStrategyDriving snapshot={snapshot} store={store} buffer={buffer} plan={plan} volume={volume} />;
   const screen = liveScreen(snapshot);
   const checks = screen.checks.map(check => check.label === 'TYRES' && plan.check ? { ...check, ...plan.check } : check);
   return <><LiveSessionBar snapshot={snapshot} connection="live" /><LiveStateScreen screen={{ ...screen, checks }} quali={plan.quali} /></>;

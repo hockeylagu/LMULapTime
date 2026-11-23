@@ -38,15 +38,15 @@ describe('live routes', () => {
   });
 
   it('reads the auto-open setting, on by default', async () => {
-    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false });
-    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false });
+    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null });
+    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null });
   });
 
   it('stores a valid auto-open setting', async () => {
     const { app, metadata } = setup();
     const response = await request(app).post('/api/live/settings').send({ autoOpen: false });
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ autoOpen: false, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false });
+    expect(response.body).toEqual({ autoOpen: false, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null });
     expect(metadata.get('live_auto_open')).toBe('false');
   });
 
@@ -54,7 +54,7 @@ describe('live routes', () => {
     const { app, live, metadata } = setup('false');
     const reserve = vi.spyOn(live, 'setReserveSeconds');
     const response = await request(app).post('/api/live/settings').send({ reserveSeconds: 30 });
-    expect(response.body).toEqual({ autoOpen: false, reserveSeconds: 30, pedalTraceSeconds: 30, diagnostics: false });
+    expect(response.body).toEqual({ autoOpen: false, reserveSeconds: 30, pedalTraceSeconds: 30, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null });
     expect(metadata.get('live_reserve_seconds')).toBe('30');
     expect(reserve).toHaveBeenCalledWith(30);
     expect((await request(app).post('/api/live/settings').send({ reserveSeconds: 40 })).status).toBe(400);
@@ -64,8 +64,8 @@ describe('live routes', () => {
   it('persists trace duration independently and preserves the other settings', async () => {
     const { app, metadata } = setup('false');
     metadata.set('live_reserve_seconds', '90');
-    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 60 })).body).toEqual({ autoOpen: false, reserveSeconds: 90, pedalTraceSeconds: 60, diagnostics: false });
-    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 25 })).body).toEqual({ autoOpen: false, reserveSeconds: 90, pedalTraceSeconds: 25, diagnostics: false });
+    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 60 })).body).toEqual({ autoOpen: false, reserveSeconds: 90, pedalTraceSeconds: 60, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null });
+    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 25 })).body).toEqual({ autoOpen: false, reserveSeconds: 90, pedalTraceSeconds: 25, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null });
     expect(metadata.get('live_pedal_trace_seconds')).toBe('25');
     expect((await request(app).get('/api/live/settings')).body).toHaveProperty('pedalTraceSeconds', 25);
     for (const pedalTraceSeconds of [0, -5, 31, 121, '60', null]) {
@@ -79,10 +79,46 @@ describe('live routes', () => {
     const capture = { directory: 'unused', status: () => ({ state: 'idle' }), diagnostics } as unknown as Pick<LiveCaptureController, 'directory' | 'status' | 'diagnostics'>;
     const { app, metadata } = setup(null, capture);
     const response = await request(app).post('/api/live/settings').send({ diagnostics: true });
-    expect(response.body).toEqual({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: true });
+    expect(response.body).toEqual({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: true, voice: true, voiceVolume: 80, voiceOutput: null });
     expect(metadata.get('live_diagnostics')).toBe('true');
     expect(diagnostics.enabled).toBe(true);
     expect((await request(app).post('/api/live/settings').send({ diagnostics: 'yes' })).status).toBe(400);
+  });
+
+  it('stores the voice switch and volume, and rejects other volumes', async () => {
+    const { app, metadata, live } = setup();
+    const setVoice = vi.spyOn(live, 'setVoice');
+    expect((await request(app).post('/api/live/settings').send({ voice: false, voiceVolume: 40 })).body)
+      .toEqual({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false, voice: false, voiceVolume: 40, voiceOutput: null });
+    expect(metadata.get('live_voice')).toBe('false');
+    expect(metadata.get('live_voice_volume')).toBe('40');
+    expect(setVoice).toHaveBeenLastCalledWith(false);
+    for (const body of [{ voice: 'off' }, { voiceVolume: 0 }, { voiceVolume: 45 }, { voiceVolume: '80' }]) {
+      expect((await request(app).post('/api/live/settings').send(body)).status).toBe(400);
+    }
+    expect((await request(app).get('/api/live/settings')).body).toMatchObject({ voice: false, voiceVolume: 40 });
+  });
+
+  it('stores the radio output, back to the Windows default with null, and rejects other values', async () => {
+    const { app, metadata } = setup();
+    expect((await request(app).post('/api/live/settings').send({ voiceOutput: 'a1b2' })).body).toMatchObject({ voiceOutput: 'a1b2', voice: true });
+    expect(metadata.get('live_voice_output')).toBe('a1b2');
+    for (const body of [{ voiceOutput: '' }, { voiceOutput: 4 }, { voiceOutput: 'x'.repeat(257) }]) {
+      expect((await request(app).post('/api/live/settings').send(body)).status).toBe(400);
+    }
+    expect((await request(app).post('/api/live/settings').send({ voiceOutput: null })).body).toMatchObject({ voiceOutput: null });
+  });
+
+  it('records what a page says became of a radio call, once', async () => {
+    const { app, live } = setup();
+    const report = vi.spyOn(live, 'reportCall').mockReturnValueOnce(true).mockReturnValueOnce(false);
+    expect((await request(app).post('/api/live/calls/7/outcome').send({ outcome: 'spoken' })).body).toEqual({ recorded: true });
+    expect((await request(app).post('/api/live/calls/7/outcome').send({ outcome: 'spoken' })).body).toEqual({ recorded: false });
+    expect(report).toHaveBeenCalledWith(7, 'spoken');
+    for (const [id, outcome] of [['7', 'expired'], ['7', 'queued'], ['x', 'spoken'], ['0', 'spoken']]) {
+      expect((await request(app).post(`/api/live/calls/${id}/outcome`).send({ outcome })).status).toBe(400);
+    }
+    expect(report).toHaveBeenCalledTimes(2);
   });
 
   it.each([[{}], [{ autoOpen: 'yes' }], [{ autoOpen: 1 }], [{ autoOpen: null }]])('rejects %j with 400', async body => {

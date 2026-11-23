@@ -19,8 +19,9 @@ function setup(replay: boolean | null = false, answer: (path: string) => RestAns
   const onUpdate = vi.fn();
   const onReplay = vi.fn();
   const onNavigation = vi.fn();
-  const poller = new LivePitPoller({ get, onUpdate, onReplay, onNavigation });
-  return { poller, paths, get, onUpdate, onReplay, onNavigation };
+  const onPrivateSessions = vi.fn();
+  const poller = new LivePitPoller({ get, onUpdate, onReplay, onNavigation, onPrivateSessions });
+  return { poller, paths, get, onUpdate, onReplay, onNavigation, onPrivateSessions };
 }
 
 describe('LivePitPoller', () => {
@@ -96,6 +97,26 @@ describe('LivePitPoller', () => {
     await vi.advanceTimersByTimeAsync(30 * PIT_POLL_TICK_MS);
     expect(new Set(t.paths.slice(count))).toEqual(new Set([STATE]));
     expect(t.onReplay).toHaveBeenLastCalledWith(true);
+    t.poller.stop();
+  });
+
+  it('reads private qualifying once a session, right after a state check, and again after an answer without it', async () => {
+    const SETTINGS = '/rest/sessions';
+    let body: unknown = {};
+    const t = setup(false, path => (path === SETTINGS ? { ok: true, body } : null));
+    t.poller.setMode('track', 'qualifying');
+    await vi.advanceTimersByTimeAsync(20 * PIT_POLL_TICK_MS);
+    expect(t.onPrivateSessions).not.toHaveBeenCalled();
+    body = { SESSSET_private_qual: { currentValue: 1, stringValue: 'On' }, SESSSET_private_prac: { currentValue: 0 } };
+    await vi.advanceTimersByTimeAsync(130 * PIT_POLL_TICK_MS);
+    const reads = t.paths.map((path, i) => ({ path, i })).filter(({ path }) => path === SETTINGS);
+    expect(reads).toHaveLength(2);
+    for (const { i } of reads) expect(t.paths[i - 1]).toBe(STATE);
+    expect(t.onPrivateSessions.mock.calls).toEqual([[{ qualifying: true, practice: false }]]);
+    expect(t.onUpdate).not.toHaveBeenCalled();
+    t.poller.setMode('track', 'race');
+    await vi.advanceTimersByTimeAsync(20 * PIT_POLL_TICK_MS);
+    expect(t.paths.filter(path => path === SETTINGS)).toHaveLength(3);
     t.poller.stop();
   });
 

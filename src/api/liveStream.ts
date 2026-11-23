@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useState, useSyncExternalStore } from 'react';
 import { LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
-import type { LivePedalBatch, LiveSettings, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
+import type { LivePedalBatch, LiveRadioCallEvent, LiveRadioPageOutcome, LiveSettings, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
 import { fetchJson, postJson } from './apiClient.js';
 
 /** No message (heartbeats included) for this long means the connection is dead even if the browser has not noticed. */
@@ -16,6 +16,8 @@ export interface LiveStreamOptions {
    * buffer it draws from. Read through a ref, so a new function each render is fine.
    */
   onPedals?: (batch: LivePedalBatch) => void;
+  /** Called for each radio call the server sends; read through a ref like `onPedals`. */
+  onCall?: (call: LiveRadioCallEvent) => void;
 }
 
 export interface LiveStreamState {
@@ -63,6 +65,7 @@ export function useLiveStream(options: LiveStreamOptions = {}): LiveStreamState 
   const [connection, setConnection] = useState<LiveConnection>('connecting');
   const [timing] = useState(() => new LiveTimingStore());
   const pedals = useEffectEvent((batch: LivePedalBatch) => options.onPedals?.(batch));
+  const radioCall = useEffectEvent((call: LiveRadioCallEvent) => options.onCall?.(call));
 
   useEffect(() => {
     let source: EventSource | null = null;
@@ -115,6 +118,12 @@ export function useLiveStream(options: LiveStreamOptions = {}): LiveStreamState 
         heard();
         pedals(batch);
       });
+      next.addEventListener(LIVE_STREAM_EVENTS.call, (event) => {
+        const call = parse<LiveRadioCallEvent>(event);
+        if (!call) return;
+        heard();
+        radioCall(call);
+      });
       next.addEventListener(LIVE_STREAM_EVENTS.heartbeat, heard);
       next.addEventListener('error', lost);
     }
@@ -131,6 +140,11 @@ export function useLiveStream(options: LiveStreamOptions = {}): LiveStreamState 
 
 export function fetchLiveSettings(signal?: AbortSignal): Promise<LiveSettings> {
   return fetchJson<LiveSettings>('/api/live/settings', { signal });
+}
+
+/** Tells the server what became of a radio call; best effort, the log keeps `sent` when it fails. */
+export function reportLiveCall(id: number, outcome: LiveRadioPageOutcome): void {
+  postJson(`/api/live/calls/${id}/outcome`, { outcome }).catch(() => { /* The call stays logged as sent. */ });
 }
 
 export function saveLiveSettings(settings: Partial<LiveSettings>, signal?: AbortSignal): Promise<LiveSettings> {

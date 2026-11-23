@@ -28,6 +28,13 @@ describe('LivePage', () => {
     expect(screen.getByRole('link', { name: 'LMU' })).toHaveAttribute('href', '#/dashboard');
   });
 
+  it('hands a radio call to the voice, which reports it failed without a browser voice', async () => {
+    vi.stubGlobal('speechSynthesis', undefined);
+    render(<LivePage />);
+    act(() => source().emit('call', { id: 9, priority: 1, text: 'Box this lap.', expiresAt: Date.now() + 10_000 }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/live/calls/9/outcome', expect.objectContaining({ body: '{"outcome":"failed"}' })));
+  });
+
   it.each([
     ['offline', null, 'WAITING FOR LMU', 'WAITING FOR LIVE DATA FROM THE GAME'],
     ['menu', null, 'IN MENU', 'JOIN A SESSION TO BEGIN'],

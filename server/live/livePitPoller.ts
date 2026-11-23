@@ -4,9 +4,10 @@ import type { LivePitMenu } from '../../shared/types/liveStrategy.js';
 import type { LiveCaptureObservation } from '../../shared/types/liveCapture.js';
 import { captureRestEvidence } from './capture/evidence.js';
 import { parseReplayPlayback } from './lmuNavigation.js';
+import type { LivePrivateSessions } from '../../shared/types/liveField.js';
 import {
   lmuGet, parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes,
-  parseSchedule, parseTireManagement, parseVehicleCondition,
+  parsePrivateSessions, parseSchedule, parseTireManagement, parseVehicleCondition,
 } from './lmuPitRest.js';
 import type { RestAnswer, RestGet } from './lmuPitRest.js';
 import type { DiagnosticSink } from './capture/diagnostics.js';
@@ -50,6 +51,8 @@ interface PitRead {
    * Every other read answered in a replay (200, or 404 for the two garage screens), so it needs no check of its own.
    */
   crashesInReplay: boolean;
+  /** The event's private qualifying and practice: handed to `onPrivateSessions`, not to the strategy. */
+  privateSessions?: boolean;
   parse(body: unknown): LiveRestUpdate | null;
 }
 
@@ -97,11 +100,20 @@ const READS: PitRead[] = [
   // The race length for the garage before the start; it does not change during the event. Never read in a replay
   // yet, so it waits for its own state check like the read that crashed one.
   { path: '/rest/sessions/GetSessionsInfoForEvent', every: { garage: 60_000 }, once: true, crashesInReplay: true, parse: parseSchedule },
+  // The event's settings, for private qualifying and practice (`SESSSET_private_qual`, `SESSSET_private_prac`): every
+  // car is in the scoring data but none is on the player's track (Sebring 2026-11-22). Answered in 16 ms on track;
+  // never read in a replay yet, so it waits for its own state check.
+  {
+    path: '/rest/sessions', every: { track: 60_000, garage: 60_000 }, once: true, crashesInReplay: true, privateSessions: true,
+    parse: () => null,
+  },
 ];
 
 export interface LivePitPollerOptions {
   diagnosticSink?: () => DiagnosticSink | undefined;
   onEvidence?: (observation: LiveCaptureObservation) => void;
+  /** The event's private qualifying and practice, once per loaded session. */
+  onPrivateSessions?(sessions: LivePrivateSessions): void;
   onUpdate(update: LiveRestUpdate): void;
   /** Whether a replay is playing changed (`navigation/state` `settingMode`; null when unknown). */
   onReplay(active: boolean | null): void;
@@ -274,7 +286,9 @@ export class LivePitPoller {
       if (evidence) this.options.onEvidence({ ...evidence, source: 'rest', elapsedSeconds: null,
         receivedAt: done, requestStartedAt: now, requestFinishedAt: done });
     }
-    if (update && next.read.once) this.onceDone.add(next.path);
+    const sessions = answer.ok && next.read.privateSessions ? parsePrivateSessions(answer.body) : null;
+    if ((update || sessions) && next.read.once) this.onceDone.add(next.path);
+    if (sessions) this.options.onPrivateSessions?.(sessions);
     if (update) this.options.onUpdate(update);
     // The estimate's tyres and repairs follow the MFD: read it again once the menu changes, not up to a minute later.
     if (update?.type === 'pitMenu') {

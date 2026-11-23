@@ -176,11 +176,21 @@ export interface LiveSettings {
   pedalTraceSeconds: number;
   /** Write a diagnostic JSONL file beside each recording, from the next session. Off by default. */
   diagnostics: boolean;
+  /** Radio voice calls on the live dashboard. On by default. */
+  voice: boolean;
+  /** Radio voice volume, in percent (one of `VOICE_VOLUME_CHOICES`). */
+  voiceVolume: number;
+  /**
+   * The audio output the radio plays on: a browser `deviceId` (kept by the browser for this site), null for the
+   * Windows default. Only Web Audio voices can follow it; the browser's own voice always plays on the default.
+   */
+  voiceOutput: string | null;
 }
 
 export const PEDAL_TRACE_SECONDS_CHOICES = [5, 10, 15, 20, 25, 30, 45, 60, 90, 120] as const;
 export const RESERVE_SECONDS_CHOICES = [0, 15, 30, 45, 60, 90, 120] as const;
-export const DEFAULT_LIVE_SETTINGS: LiveSettings = { autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false };
+export const VOICE_VOLUME_CHOICES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+export const DEFAULT_LIVE_SETTINGS: LiveSettings = { autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false, voice: true, voiceVolume: 80, voiceOutput: null };
 
 /** Server-sent event names on `GET /api/live/stream`. The data of each is JSON. */
 export const LIVE_STREAM_EVENTS = {
@@ -192,7 +202,37 @@ export const LIVE_STREAM_EVENTS = {
   timing: 'timing',
   /** `{ at: number }`: sent every ~15 s so the page can tell a dead connection. */
   heartbeat: 'heartbeat',
+  /** `LiveRadioCallEvent`: a radio call to say now; the page reports what became of it. */
+  call: 'call',
 } as const;
+
+/** What became of a radio call: set by the server (`queued`, `sent`, drops) or reported by the page that played it. */
+export type LiveRadioOutcome = 'queued' | 'sent' | 'spoken' | 'interrupted' | 'locked' | 'failed'
+  | 'dropped-budget' | 'expired' | 'replaced' | 'no-client';
+/** The outcomes a page may report for a call it was sent. */
+export const LIVE_RADIO_PAGE_OUTCOMES = ['spoken', 'interrupted', 'locked', 'failed'] as const satisfies readonly LiveRadioOutcome[];
+export type LiveRadioPageOutcome = (typeof LIVE_RADIO_PAGE_OUTCOMES)[number];
+
+/** A radio call for the page to say: text only, never audio bytes. */
+export interface LiveRadioCallEvent {
+  id: number;
+  priority: 1 | 2 | 3;
+  text: string;
+  /** Wall-clock ms after which the page drops it unsaid (a page that reconnects late). */
+  expiresAt: number;
+}
+
+/** A radio call as the debrief shows it: what the engineer proposed and what became of it. */
+export interface SessionRadioCall {
+  id: number;
+  gameTime: number;
+  /** The lap being driven when the call was proposed. */
+  lap: number | null;
+  priority: 1 | 2 | 3;
+  family: 'strategy' | 'damage' | 'deployment' | 'incident' | 'traffic' | 'clock';
+  text: string;
+  outcome: LiveRadioOutcome;
+}
 
 /** App-wide server-sent events on `GET /api/events`, separate from the live stream. */
 export const APP_EVENTS = {

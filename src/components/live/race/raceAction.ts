@@ -3,6 +3,7 @@ import type { LiveForecast, LivePitInfo, LiveResourcePlan, LiveTyreCrossover, Li
 import { UNKNOWN } from '../liveFormat.js';
 import { deploymentReadout } from './deploymentReadout.js';
 import { LIVE_TYRE_CHANGE_TREAD, LIVE_TYRE_TREAD_FLOOR, treadTone } from '../../../../shared/domain/live/liveInsights.js';
+import { racePlanMode, type RaceMode } from '../../../../shared/domain/live/radio/racePlanMode.js';
 import {
   CORNER_NAMES, compoundTone, formatAmount, formatPerLap, formatSecondsRange, formatSignedPerLap, resourceName, tyreCallText,
   type CompoundTone,
@@ -26,18 +27,12 @@ export interface PlanReadout {
   detailTone?: PlanTone;
 }
 
-/** Which advice leads; the place of every readout stays the same in each. */
-export type RaceMode = 'calculating' | 'pit-now' | 'in-pit' | 'pit' | 'stint' | 'sprint' | 'saving';
-
 export interface RacePlanView {
   mode: RaceMode;
   action: PlanReadout;
   /** Sprint keeps two supporting figures; pit and stint modes keep three. */
   cells: [PlanReadout, PlanReadout] | [PlanReadout, PlanReadout, PlanReadout];
 }
-
-/** The pit countdown leads from this many laps out; before that the per-lap use leads (mid-stint). */
-export const PIT_LEAD_LAPS = 2;
 
 /** `RAIN ~LAP 20 · 60%`, `RAIN ENDS ~LAP 25`, `DRY` (no rain to the end): the forecast explains, it never recommends. */
 export function forecastText(forecast: LiveForecast): string {
@@ -176,14 +171,16 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
     return cells;
   };
 
-  if (damage?.wheel) {
+  // Which advice leads (`racePlanMode`); the place of every readout stays the same in each.
+  const mode = racePlanMode(strategy);
+  if (mode === 'pit-now' && damage?.wheel) {
     return {
       mode: 'pit-now',
       action: { label: '', value: 'PIT NOW', tone: 'loss', note: `${damage.wheel.problem === 'flat' ? 'FLAT' : 'WHEEL OFF'} · ${CORNER_NAMES[damage.wheel.corner]}`, noteTone: 'loss' },
       cells: executionCells(true),
     };
   }
-  if (pit && (pit.state === 'entering' || pit.state === 'stopped')) {
+  if (mode === 'in-pit' && pit) {
     const penalty = pit.penalties > 0;
     return {
       mode: 'in-pit',
@@ -195,10 +192,10 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       cells: executionCells(true),
     };
   }
-  if (crossover?.when === 'now') {
+  if (mode === 'pit' && crossover?.when === 'now') {
     return { mode: 'pit', action: { label: 'PIT', value: 'THIS LAP', tone: 'loss' }, cells: executionCells(true) };
   }
-  if (!resource || !race || resource.perLap === null) {
+  if (mode === 'calculating' || !resource || !race) {
     return {
       mode: 'calculating',
       action: { label: '', value: 'CALCULATING', tone: 'muted', note: resource?.perLapSource === null ? `${name} / LAP AFTER ONE LAP` : undefined, noteTone: 'muted' },
@@ -210,7 +207,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
     };
   }
   const estimate = resource.learning ? ' · LEARNED' : resource.perLapSource === 'game' ? ' · GAME EST.' : resource.perLapSource === 'history' ? ' · YOUR RACES' : '';
-  if (race.finishReachable && !crossover) {
+  if (mode === 'sprint') {
     return {
       mode: 'sprint',
       action: {
@@ -220,15 +217,14 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
     };
   }
   const saving = resource.saving;
-  // This is a display cutoff for a modest scenario, not a claim that the saving is achievable.
-  if (!crossover && saving && saving.savePercent > 0 && saving.savePercent <= 5 && resource.lapsMeasured >= 3 && saving.source === 'measured' && !damage && !pit?.penalties) {
+  if (mode === 'saving' && saving) {
     return { mode: 'saving', action: { label: 'TO SKIP STOP', value: saving.targetPerLap.toFixed(2), unit: `${unit}/lap`,
       note: `SAVE ${saving.savePerLap.toFixed(2)} ${unit}/LAP`, noteTone: 'warn' },
       cells: [{ label: 'SHORT TO FINISH', value: formatAmount(saving.shortfall, unit), unit },
         tyresCell(tyres), { label: 'OR PIT IN', value: `${race.pitInLaps ?? 0}`, unit: 'LAPS' }] };
   }
   const pitInLaps = race.pitInLaps ?? 0;
-  if (pitInLaps <= PIT_LEAD_LAPS) {
+  if (mode === 'pit') {
     return {
       mode: 'pit',
       action: pitInLaps === 0

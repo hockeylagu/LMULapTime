@@ -31,7 +31,7 @@ function buildDemo(scenario: string, carClass: string, reserveSeconds: number, p
 
 /** Explicit opt-in: mounts no game stream and needs no backend or recorded files. */
 export default function LiveDemoPage() {
-  const { reserveSeconds, pedalTraceSeconds } = useLiveDashboardSettings();
+  const { reserveSeconds, pedalTraceSeconds, voiceVolume } = useLiveDashboardSettings();
   const [params, setParams] = useSearchParams();
   const requested = params.get('scenario') ?? 'race';
   const requestedIndex = DEMO_SCENARIOS.findIndex(s => s.id === requested);
@@ -71,7 +71,7 @@ export default function LiveDemoPage() {
   const choose = (id: string) => updateSearchParams(params, setParams, { scenario: id });
   return <>
     <LiveFrame>{selected.id === 'corners' && state.snapshot ? <DemoCornerView snapshot={state.snapshot} store={timing} buffer={buffer} />
-      : tyrePlan && state.snapshot ? <DemoTyrePlanView snapshot={state.snapshot} store={timing} buffer={buffer} plan={tyrePlan} />
+      : tyrePlan && state.snapshot ? <DemoTyrePlanView snapshot={state.snapshot} store={timing} buffer={buffer} plan={tyrePlan} volume={voiceVolume} />
         : <LiveDashboardView snapshot={state.snapshot} connection={state.connection} timing={timing} buffer={buffer} />}</LiveFrame>
     <aside aria-label="Offline demo controls" className="fixed bottom-3 left-1/2 z-50 w-max max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-xl border border-lmu-border bg-lmu-card p-3 font-sans text-sm text-lmu-text shadow-lg">
       <div className="flex flex-wrap items-center gap-3">

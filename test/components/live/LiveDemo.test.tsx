@@ -135,6 +135,18 @@ describe('offline live dashboard demo', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('animates the pedals on track until turned off', () => {
+    vi.useFakeTimers();
+    window.location.hash = '#/live?demo=1&scenario=race';
+    render(<LiveDemoPage />);
+    const before = vi.getTimerCount();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Animate pedals' }));
+    expect(vi.getTimerCount()).toBe(before + 1);
+    act(() => { vi.advanceTimersByTime(200); });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Animate pedals' }));
+    expect(screen.getByRole('checkbox', { name: 'Animate pedals' })).not.toBeChecked();
+  });
+
   it('falls back for an unknown scenario and keeps a visible demo label when controls are hidden', () => {
     window.location.hash = '#/live?demo=1&scenario=invalid';
     render(<LiveDemoPage />);

@@ -23,6 +23,7 @@ import { LiveService } from './live/liveService.js';
 import { loadLiveSettings } from './live/liveSettings.js';
 import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
 import { readPitLaneLoss, recordPitLaneLoss } from './core/live/dbPitLaneStore.js';
+import { logRadioCall, settleRadioCall } from './core/live/dbRadioLogStore.js';
 import { saveRacePlan } from './core/live/dbRacePlanStore.js';
 import { readStrategyHistory } from './sessions/sessionStrategy.js';
 import { readTyreWearProfile } from './sessions/sessionTyreWear.js';
@@ -141,6 +142,11 @@ const liveService = new LiveService({
   learning: automaticLearning,
   capture: liveCapture,
   reserveSeconds: loadLiveSettings(sessionDb).reserveSeconds,
+  radio: {
+    enabled: loadLiveSettings(sessionDb).voice,
+    log: entry => logRadioCall(sessionDb.getDb(), entry),
+    settle: (id, outcome) => settleRadioCall(sessionDb.getDb(), id, outcome),
+  },
   personalBest: (layoutKey, carClass) =>
     queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),
   pitLane: {

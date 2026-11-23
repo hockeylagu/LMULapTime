@@ -52,7 +52,30 @@ describe('rF2 scoring decode', () => {
       player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }) as unknown,
       leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }) as unknown,
       classLeader: expect.objectContaining({ id: 12, place: 4, vehicleClass: 'GT3' }) as unknown,
+      field: { sectorFlags: [0, 0, 0], cars: [expect.objectContaining({ id: 7 }), expect.objectContaining({ id: 12, isPlayer: true })] as unknown },
     });
+  });
+
+  it('decodes every car of the field and the sector flags for the radio', () => {
+    const buffer = scoringBuffer(2, [
+      { ...FIELD[0], doubles: { lapDist: 1520.5, pathLateral: -4.5, trackEdge: -6 }, bytes: { sector: 2, inPits: 1 } },
+      FIELD[1],
+    ]);
+    const base = SCORING.vehicles;
+    const v = VEHICLE_SCORING.offsets;
+    buffer.writeDoubleLE(3, base + v.localVel);
+    buffer.writeDoubleLE(4, base + v.localVel + 16);
+    buffer.write('397_25_963', base + v.vehFilename, 'utf8');
+    buffer.writeInt8(3, base + v.control);
+    buffer.writeUInt8(1, base + v.inGarageStall);
+    [11, 1, 11].forEach((flag, index) => buffer.writeInt8(flag, SCORING.info + SCORING_INFO.offsets.sectorFlag + index));
+    const { field } = decodeScoring(buffer);
+    expect(field?.sectorFlags).toEqual([11, 1, 11]);
+    expect(field?.cars[0]).toEqual({
+      id: 7, isPlayer: false, place: 1, vehicleClass: 'Hyper', vehicleName: 'Other', vehFilename: '397_25_963', totalLaps: 9, sector: 2,
+      lapDist: 1520.5, speed: 5, pathLateral: -4.5, trackEdge: -6, inPits: true, inGarage: true, control: 3, finishStatus: 0,
+    });
+    expect(field?.cars[1]).toMatchObject({ id: 12, isPlayer: true });
   });
 
   it('decodes the weather and every timing field of the player and the leader', () => {

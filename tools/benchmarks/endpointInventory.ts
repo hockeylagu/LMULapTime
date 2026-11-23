@@ -18,6 +18,7 @@ const exclusions: Record<string, string> = {
   '/api/habit-focus/pin': "Changes the driver's focus corners.",
   '/api/habit-focus/unpin': "Changes the driver's focus corners.",
   '/api/live/settings': 'Changes the live dashboard settings.',
+  '/api/live/calls/:id/outcome': 'Records what a dashboard page did with a radio call in the call log.',
   '/api/desktop/browser': 'Changes the desktop-local browser monitor preference.',
   '/api/peripherals/:id/settings': 'Changes peripheral settings.',
   '/api/peripherals/:id/health/refresh': 'Reads live vendor health and updates its cache; no hardware writes.',

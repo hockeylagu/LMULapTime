@@ -2,6 +2,7 @@ import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.j
 import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
 import type { LivePitState } from '../../shared/types/liveStrategy.js';
+import type { LiveFieldCar, LiveFieldReading } from '../../shared/types/liveField.js';
 import { knownCarClass } from '../../shared/domain/vehicleMapping.js';
 import { MAX_MAPPED_VEHICLES, SCORING, SCORING_BUFFER, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
@@ -79,6 +80,36 @@ function decodeVehicle(buffer: Buffer, base: number): LiveVehicleReading {
   };
 }
 
+/** Every copied car, compact: what the radio's incident and traffic calls read. */
+function decodeField(buffer: Buffer, count: number): LiveFieldReading {
+  const at = VEHICLE_SCORING.offsets;
+  const flags = SCORING.info + SCORING_INFO.offsets.sectorFlag;
+  const cars: LiveFieldCar[] = [];
+  for (let i = 0; i < count; i++) {
+    const base = SCORING.vehicles + i * SCORING.vehicleStride;
+    const velocity = base + at.localVel;
+    cars.push({
+      id: buffer.readInt32LE(base + at.id),
+      isPlayer: buffer.readUInt8(base + at.isPlayer) !== 0,
+      place: buffer.readUInt8(base + at.place),
+      vehicleClass: cString(buffer, base + at.vehicleClass, 32),
+      vehicleName: cString(buffer, base + at.vehicleName, 64),
+      vehFilename: cString(buffer, base + at.vehFilename, 32),
+      totalLaps: buffer.readInt16LE(base + at.totalLaps),
+      sector: buffer.readInt8(base + at.sector),
+      lapDist: buffer.readDoubleLE(base + at.lapDist),
+      speed: Math.hypot(buffer.readDoubleLE(velocity), buffer.readDoubleLE(velocity + 8), buffer.readDoubleLE(velocity + 16)),
+      pathLateral: buffer.readDoubleLE(base + at.pathLateral),
+      trackEdge: buffer.readDoubleLE(base + at.trackEdge),
+      inPits: buffer.readUInt8(base + at.inPits) !== 0,
+      inGarage: buffer.readUInt8(base + at.inGarageStall) !== 0,
+      control: buffer.readInt8(base + at.control),
+      finishStatus: buffer.readInt8(base + at.finishStatus),
+    });
+  }
+  return { sectorFlags: [buffer.readInt8(flags), buffer.readInt8(flags + 1), buffer.readInt8(flags + 2)], cars };
+}
+
 /**
  * The scoring header and info followed by the vehicles that were copied, at their buffer offsets.
  * The player is the vehicle with `isPlayer` set, the leader the one in place 1.
@@ -149,6 +180,7 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
     player,
     leader,
     classLeader,
+    field: decodeField(buffer, count),
   };
 }
 

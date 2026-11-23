@@ -484,6 +484,22 @@ export function initDbSchema(db: DatabaseType): void {
       measured_at INTEGER NOT NULL
     ) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS idx_live_pit_lane_layout ON live_pit_lane_losses(layout_key, car_class, measured_at);
+    -- Every radio call the live engine proposed, said or not (server/core/live/dbRadioLogStore.ts): the debrief's radio timeline.
+    CREATE TABLE IF NOT EXISTS live_radio_calls (
+      id INTEGER PRIMARY KEY,
+      run_id TEXT,
+      recording_id TEXT,
+      created_at INTEGER NOT NULL,
+      game_time REAL NOT NULL,
+      lap INTEGER,
+      call_key TEXT NOT NULL,
+      priority INTEGER NOT NULL,
+      family TEXT NOT NULL,
+      text TEXT NOT NULL,
+      outcome TEXT NOT NULL,
+      settled_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_live_radio_recording ON live_radio_calls(recording_id, game_time);
     -- The race plan shown before the start, one per race recording (server/core/live/dbRacePlanStore.ts): plan vs actual.
     CREATE TABLE IF NOT EXISTS live_race_plans (
       recording_id TEXT PRIMARY KEY,

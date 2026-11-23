@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes,
-  parseSchedule, parseTireManagement, parseVehicleCondition,
+  parsePrivateSessions, parseSchedule, parseTireManagement, parseVehicleCondition,
 } from '../../../server/live/lmuPitRest.js';
 
 /** Shapes as LMU build 14200 answered them (2026-10-16), trimmed to the fields read. */
@@ -97,5 +97,15 @@ describe('LMU pit REST parsers', () => {
     // Daytona online 2026-11-05: the qualifying length for the practice garage before it.
     expect(parseSchedule({ scheduledSessions: [session('PRACTICE', 3), session('QUALIFYING', 9), session('RACE', 60)] }))
       .toEqual({ type: 'schedule', raceMinutes: 60, hasQualifying: true, qualifyingMinutes: 9 });
+  });
+});
+
+describe('parsePrivateSessions', () => {
+  it('reads private qualifying and practice from the event settings', () => {
+    const on = { currentValue: 1, stringValue: 'On', settingID: 33 };
+    expect(parsePrivateSessions({ SESSSET_private_qual: on, SESSSET_private_prac: { currentValue: 0 } })).toEqual({ qualifying: true, practice: false });
+    expect(parsePrivateSessions({ SESSSET_private_qual: { currentValue: 0 } })).toEqual({ qualifying: false, practice: false });
+    expect(parsePrivateSessions({ SESSSET_private_prac: on })).toBeNull();
+    expect(parsePrivateSessions(null)).toBeNull();
   });
 });

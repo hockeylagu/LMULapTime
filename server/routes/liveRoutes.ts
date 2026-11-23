@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import type { Response } from 'express';
-import { APP_EVENTS, LIVE_HEARTBEAT_MS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_SECONDS_CHOICES } from '../../shared/types/live.js';
+import type { LiveRadioPageOutcome } from '../../shared/types/live.js';
+import { APP_EVENTS, LIVE_HEARTBEAT_MS, LIVE_RADIO_PAGE_OUTCOMES, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_SECONDS_CHOICES, VOICE_VOLUME_CHOICES } from '../../shared/types/live.js';
 import type { ServerContext } from '../core/serverContext.js';
 import type { LiveService } from '../live/liveService.js';
-import { isPedalTraceSeconds, isReserveSeconds, loadLiveSettings, saveLiveSettings } from '../live/liveSettings.js';
+import { isPedalTraceSeconds, isReserveSeconds, isVoiceOutput, isVoiceVolume, loadLiveSettings, saveLiveSettings } from '../live/liveSettings.js';
 import { SSE_HEADERS, writeSseEvent } from '../live/sse.js';
 import type { LiveCaptureController } from '../live/capture/controller.js';
 import { LearningReadinessError, LearningReadinessReader } from '../live/learning/readinessReader.js';
@@ -55,10 +56,18 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
 
   // Any setting may be sent alone; the others keep their stored values.
   router.post('/live/settings', (req, res) => {
-    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveSeconds?: unknown; pedalTraceSeconds?: unknown; diagnostics?: unknown };
+    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveSeconds?: unknown; pedalTraceSeconds?: unknown; diagnostics?: unknown; voice?: unknown; voiceVolume?: unknown; voiceOutput?: unknown };
     const current = loadLiveSettings(context.sessionDb);
-    if (body.autoOpen === undefined && body.reserveSeconds === undefined && body.pedalTraceSeconds === undefined && body.diagnostics === undefined) {
-      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveSeconds, pedalTraceSeconds, or diagnostics (true or false).' });
+    if (body.autoOpen === undefined && body.reserveSeconds === undefined && body.pedalTraceSeconds === undefined && body.diagnostics === undefined
+      && body.voice === undefined && body.voiceVolume === undefined && body.voiceOutput === undefined) {
+      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveSeconds, pedalTraceSeconds, diagnostics (true or false), voice (true or false), voiceVolume or voiceOutput.' });
+    }
+    if (body.voiceOutput !== undefined && !isVoiceOutput(body.voiceOutput)) {
+      return res.status(400).json({ error: 'voiceOutput must be an audio output id or null for the Windows default.' });
+    }
+    if (body.voice !== undefined && typeof body.voice !== 'boolean') return res.status(400).json({ error: 'voice must be true or false.' });
+    if (body.voiceVolume !== undefined && !isVoiceVolume(body.voiceVolume)) {
+      return res.status(400).json({ error: `voiceVolume must be one of ${VOICE_VOLUME_CHOICES.join(', ')}.` });
     }
     if (body.autoOpen !== undefined && typeof body.autoOpen !== 'boolean') return res.status(400).json({ error: 'autoOpen must be true or false.' });
     if (body.diagnostics !== undefined && typeof body.diagnostics !== 'boolean') return res.status(400).json({ error: 'diagnostics must be true or false.' });
@@ -73,11 +82,26 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
       reserveSeconds: isReserveSeconds(body.reserveSeconds) ? body.reserveSeconds : current.reserveSeconds,
       pedalTraceSeconds: isPedalTraceSeconds(body.pedalTraceSeconds) ? body.pedalTraceSeconds : current.pedalTraceSeconds,
       diagnostics: typeof body.diagnostics === 'boolean' ? body.diagnostics : current.diagnostics,
+      voice: typeof body.voice === 'boolean' ? body.voice : current.voice,
+      voiceVolume: isVoiceVolume(body.voiceVolume) ? body.voiceVolume : current.voiceVolume,
+      voiceOutput: isVoiceOutput(body.voiceOutput) ? body.voiceOutput : current.voiceOutput,
     });
     const saved = loadLiveSettings(context.sessionDb);
     live.setReserveSeconds(saved.reserveSeconds);
+    live.setVoice(saved.voice);
     if (capture?.diagnostics) capture.diagnostics.enabled = saved.diagnostics;
     res.json(saved);
+  });
+
+  // A page reports what became of a radio call it was sent (said, cut off by a P1, audio locked, failed); once per call.
+  router.post('/live/calls/:id/outcome', (req, res) => {
+    const id = Number(req.params.id);
+    const outcome = (req.body as { outcome?: unknown } | undefined)?.outcome;
+    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'The call id must be a positive whole number.' });
+    if (!(LIVE_RADIO_PAGE_OUTCOMES as readonly unknown[]).includes(outcome)) {
+      return res.status(400).json({ error: `outcome must be one of ${LIVE_RADIO_PAGE_OUTCOMES.join(', ')}.` });
+    }
+    res.json({ recorded: live.reportCall(id, outcome as LiveRadioPageOutcome) });
   });
 
   // App-wide events: the server can start a scan by itself (after a game session), and pages reload their data when it ends.

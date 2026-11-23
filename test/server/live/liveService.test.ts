@@ -7,6 +7,7 @@ import type { LiveLifecycle } from '../../../shared/types/live.js';
 import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
 import { LiveCaptureController } from '../../../server/live/capture/controller.js';
 import type { CaptureWorker } from '../../../server/live/capture/controller.js';
+import type { RadioLogEntry } from '../../../server/live/radio/radioScheduler.js';
 import { LiveService, PEDAL_FLUSH_MS, TIMING_MIN_INTERVAL_MS } from '../../../server/live/liveService.js';
 import type { LiveServiceOptions, LiveWorker } from '../../../server/live/liveService.js';
 import type { RestAnswer } from '../../../server/live/lmuPitRest.js';
@@ -237,6 +238,97 @@ describe('LiveService', () => {
     expect(stored[1]).toBe(stored[0]);
     expect(stored[2]).not.toBe(stored[1]);
     observe.mockRestore();
+    void service.stop();
+  });
+
+  it('sends a radio call to the pages and logs it, and stays quiet with the voice off', () => {
+    const update = Reflect.get(LiveStrategyTracker.prototype, 'update');
+    const spy = vi.spyOn(LiveStrategyTracker.prototype, 'update').mockImplementation(function (this: LiveStrategyTracker, ...args) {
+      const strategy = update.apply(this, args);
+      return strategy && { ...strategy, damage: { ...strategy.damage!, wheel: { problem: 'flat', corner: 'FL' } } };
+    });
+    const log = vi.fn((_entry: RadioLogEntry) => 41);
+    const settle = vi.fn(() => true);
+    const { service, frame } = setup({ radio: { enabled: true, log, settle } });
+    const sink = new FakeSink();
+    service.addClient(sink);
+    frame(reading({ currentEt: 30 }), { t: 30, throttle: 1, brake: 0 });
+    frame(reading({ currentEt: 31 }), { t: 31, throttle: 1, brake: 0 });
+    const call = sink.events().indexOf('call');
+    expect(sink.data(call)).toMatchObject({ id: 41, priority: 1, text: 'Front left puncture. Box this lap.' });
+    expect(log.mock.lastCall?.[0]).toMatchObject({ outcome: 'queued', text: 'Front left puncture. Box this lap.' });
+    expect(log.mock.lastCall?.[0].key).toContain('wheel-FL-flat');
+    expect(settle).toHaveBeenCalledWith(41, 'sent');
+    expect(service.reportCall(41, 'spoken')).toBe(true);
+    expect(settle).toHaveBeenLastCalledWith(41, 'spoken');
+    service.setVoice(false);
+    frame(reading({ currentEt: 400, sessionCode: 11 }), { t: 400, throttle: 1, brake: 0 });
+    expect(sink.events().filter(event => event === 'call')).toHaveLength(1);
+    spy.mockRestore();
+    void service.stop();
+  });
+
+  it('says the field\'s calls: the game\'s sector yellow ahead with no car to explain it', () => {
+    const log = vi.fn((_entry: RadioLogEntry) => 7);
+    const { service, frame } = setup({ radio: { enabled: true, log, settle: vi.fn(() => true) } });
+    const sink = new FakeSink();
+    service.addClient(sink);
+    const car = (id: number, lapDist: number, sector: number) => ({
+      id, isPlayer: id === 1, place: id, vehicleClass: 'GT3', vehicleName: 'Car', vehFilename: '', totalLaps: 3, sector, lapDist, speed: 50,
+      pathLateral: 0, trackEdge: 6, inPits: false, inGarage: false, control: 2, finishStatus: 0,
+    });
+    for (let t = 30; t <= 33; t += 0.2) {
+      frame(reading({ currentEt: t, trackLength: 3000, field: { sectorFlags: [11, 1, 11], cars: [car(1, 900 + 50 * (t - 30), 1), car(2, 1500 + 50 * (t - 30), 2), car(3, 2500 + 50 * (t - 30), 0)] } }),
+        { t, throttle: 0.5, brake: 0.2 });
+    }
+    const call = sink.events().indexOf('call');
+    expect(sink.data(call)).toMatchObject({ priority: 1, text: 'Yellow, sector 2.' });
+    expect(log.mock.lastCall?.[0]).toMatchObject({ family: 'incident' });
+    void service.stop();
+  });
+
+  it('makes field calls in qualifying once the game says it is not private', async () => {
+    let privateQualifying = 1;
+    const get = (path: string) => Promise.resolve<RestAnswer>(path === '/navigation/state'
+      ? { ok: true, body: { state: { navigationState: 'NAV_EVENT', settingMode: 'SETTING_GRANDPRIX' } } }
+      : path === '/rest/sessions' ? { ok: true, body: { SESSSET_private_qual: { currentValue: privateQualifying } } } : { ok: false, reason: 'error' });
+    const drive = async (from: number) => {
+      const { service, frame } = setup({ pit: { get }, radio: { enabled: true, log: vi.fn(() => 7), settle: vi.fn(() => true) } });
+      const sink = new FakeSink();
+      service.addClient(sink);
+      const car = (id: number, lapDist: number, sector: number, speed = 50) => ({
+        id, isPlayer: id === 1, place: id, vehicleClass: 'GT3', vehicleName: 'Car', vehFilename: '', totalLaps: 3, sector, lapDist, speed,
+        pathLateral: 2, trackEdge: 6, inPits: false, inGarage: false, control: 2, finishStatus: 0,
+      });
+      const at = (t: number) => frame(reading({ sessionCode: 5, currentEt: t, trackLength: 3000, field: { sectorFlags: [11, 1, 11],
+        cars: [car(1, 900 + 50 * (t - from), 1), car(2, 1500, 2, 0), car(3, 1900 + 50 * (t - from), 2), car(4, 2500 + 50 * (t - from), 0)] } }),
+      { t, throttle: 0.5, brake: 0.2 });
+      at(from);
+      await vi.advanceTimersByTimeAsync(20_000);
+      for (let t = from; t <= from + 3; t += 0.2) at(t);
+      const calls = sink.events().filter(event => event === 'call').length;
+      await service.stop();
+      return calls;
+    };
+    expect(await drive(30)).toBe(0);
+    privateQualifying = 0;
+    expect(await drive(30)).toBeGreaterThan(0);
+  });
+
+  it('says a car stopped ahead under the yellow, placed on the layout', () => {
+    const { service, frame } = setup({ radio: { enabled: true, log: vi.fn(() => 7), settle: vi.fn(() => true) } });
+    const sink = new FakeSink();
+    service.addClient(sink);
+    const car = (id: number, lapDist: number, sector: number, speed = 50) => ({
+      id, isPlayer: id === 1, place: id, vehicleClass: 'GT3', vehicleName: 'Car', vehFilename: '', totalLaps: 3, sector, lapDist, speed,
+      pathLateral: 2, trackEdge: 6, inPits: false, inGarage: false, control: 2, finishStatus: 0,
+    });
+    for (let t = 30; t <= 33; t += 0.2) {
+      frame(reading({ currentEt: t, trackLength: 3000, field: { sectorFlags: [11, 1, 11], cars: [car(1, 900 + 50 * (t - 30), 1), car(2, 1500, 2, 0), car(3, 1900 + 50 * (t - 30), 2), car(4, 2500 + 50 * (t - 30), 0)] } }),
+        { t, throttle: 0.5, brake: 0.2 });
+    }
+    expect(sink.data(sink.events().indexOf('call'))).toMatchObject({ priority: 1 });
+    expect((sink.data(sink.events().indexOf('call')) as { text: string }).text).toMatch(/^Yellow, sector 2\. Car stopped on track/);
     void service.stop();
   });
 

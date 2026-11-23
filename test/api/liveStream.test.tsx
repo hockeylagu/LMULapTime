@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { fetchLiveSettings, LIVE_SILENCE_MS, saveLiveSettings, useLiveStream } from '../../src/api/liveStream.js';
+import { fetchLiveSettings, LIVE_SILENCE_MS, reportLiveCall, saveLiveSettings, useLiveStream } from '../../src/api/liveStream.js';
 import type { LiveSnapshot } from '../../shared/types/live.js';
 import { FakeEventSource } from '../helpers/fakeEventSource.js';
 import { liveSnapshot, liveTiming } from '../helpers/liveSnapshot.js';
@@ -55,6 +55,13 @@ describe('useLiveStream', () => {
     expect(renders).toBe(before);
   });
 
+  it('hands radio calls to the callback', () => {
+    const onCall = vi.fn();
+    renderHook(() => useLiveStream({ onCall }));
+    act(() => FakeEventSource.byUrl('/api/live/stream').emit('call', { id: 4, priority: 1, text: 'Box this lap.', expiresAt: 1 }));
+    expect(onCall).toHaveBeenCalledWith({ id: 4, priority: 1, text: 'Box this lap.', expiresAt: 1 });
+  });
+
   it('does not recreate the silence timer for every incoming pedal batch', () => {
     const { unmount } = renderHook(() => useLiveStream());
     const source = FakeEventSource.byUrl('/api/live/stream');
@@ -95,5 +102,8 @@ describe('live settings requests', () => {
     await expect(fetchLiveSettings()).resolves.toEqual({ autoOpen: false });
     await saveLiveSettings({ autoOpen: false });
     expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"autoOpen":false}' }));
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    reportLiveCall(4, 'spoken');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith('/api/live/calls/4/outcome', expect.objectContaining({ body: '{"outcome":"spoken"}' })));
   });
 });

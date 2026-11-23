@@ -5,6 +5,7 @@ import type { LiveGameScreen, LiveScoringReading, LiveVehicleReading } from '../
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveRaceStrategies } from '../../shared/types/liveStrategy.js';
 import type { SessionStrategy } from '../../shared/types/session.js';
+import type { LivePrivateSessions } from '../../shared/types/liveField.js';
 import { LiveStrategyTracker } from '../../shared/domain/live/liveStrategyTracker.js';
 import { LiveResultTracker } from '../../shared/domain/live/liveResults.js';
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
@@ -12,7 +13,7 @@ import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.j
 import type { PitLaneLossRow } from '../core/live/dbPitLaneStore.js';
 import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
 import { DEFAULT_LIVE_SETTINGS, LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
-import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveSessionKind, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
+import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveRadioOutcome, LiveSessionKind, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
 import { TypedEmitter } from '../core/typedEmitter.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../core/workerThreads.js';
 import type { LiveReaderMessage } from './liveReader.js';
@@ -22,6 +23,10 @@ import { LivePitPoller } from './livePitPoller.js';
 import { parseNavigationState } from './lmuNavigation.js';
 import type { LivePitPollerOptions, PitPollMode } from './livePitPoller.js';
 import { writeSseEvent } from './sse.js';
+import { RadioScheduler, type RadioLogEntry } from './radio/radioScheduler.js';
+import { liveCalls } from '../../shared/domain/live/radio/liveCalls.js';
+import { FieldWatch } from '../../shared/domain/live/radio/field/fieldCalls.js';
+import { layoutTurnNamer } from './radio/layoutTurns.js';
 import type { SseSink } from './sse.js';
 import type { LiveCaptureController } from './capture/controller.js';
 import { LiveLearningCapture } from '../../shared/domain/learning/capture.js';
@@ -72,6 +77,12 @@ export interface LiveServiceOptions {
   tyreWearRevision?: () => string;
   /** The data plugin's hybrid deployment settings in kW for a car model and class; none without a plugin record. */
   deploymentKw?: (carModel: string, carClass: string) => readonly number[] | null;
+  /** The radio voice (Settings) and its call log (`server/core/live/dbRadioLogStore.ts`); no calls without it. */
+  radio?: {
+    enabled: boolean;
+    log(entry: RadioLogEntry): number;
+    settle(id: number, outcome: LiveRadioOutcome): boolean;
+  };
 }
 
 function offlineSnapshot(): LiveSnapshot {
@@ -141,6 +152,13 @@ export class LiveService {
   /** The car's last impact time; null until the first car reading, so an old impact triggers nothing. */
   private lastImpactEt: number | null = null;
   private readonly clients = new Map<SseSink, LiveClient>();
+  private readonly radio: RadioScheduler | null;
+  private readonly field = new FieldWatch();
+  private pitLaneSeconds: number | null = null;
+  /** The loaded layout's turn names for the incident calls, placed once per layout. */
+  /** The event's private qualifying and practice, from the last settings read; null until one answers. */
+  private privateSessions: LivePrivateSessions | null = null;
+  private turns: { layoutKey: string | null; name: ((lapDist: number, trackLength: number) => string | null) | null } = { layoutKey: null, name: null };
   private pedals: LivePedalSample[] = [];
   private worker: LiveWorker | null = null;
   private stopped = true;
@@ -154,6 +172,17 @@ export class LiveService {
 
   public constructor(private readonly options: LiveServiceOptions = {}) {
     this.reserveSeconds = options.reserveSeconds ?? DEFAULT_LIVE_SETTINGS.reserveSeconds;
+    const radio = options.radio;
+    this.radio = radio ? new RadioScheduler({
+      log: entry => radio.log(entry),
+      settle: (id, outcome) => { radio.settle(id, outcome); },
+      send: event => {
+        if (this.clients.size === 0) return false;
+        this.broadcast(LIVE_STREAM_EVENTS.call, event);
+        return true;
+      },
+      recordingId: () => this.options.capture?.status().recordingId ?? null,
+    }, radio.enabled, liveCalls) : null;
     this.identity = new LiveIdentityResolver({
       ...options.identity,
       personalBest: options.personalBest ?? (() => null),
@@ -163,6 +192,7 @@ export class LiveService {
       ...options.pit,
       diagnosticSink: () => this.options.capture?.diagnostics?.sink(),
       onUpdate: update => this.applyRest(update),
+      onPrivateSessions: sessions => { this.privateSessions = sessions; },
       onEvidence: observation => {
         if (!this.isReplaying()) this.record(() => this.options.capture?.observe(observation));
       },
@@ -193,6 +223,10 @@ export class LiveService {
     this.applyReading(this.lastReading);
   }
   public hasClients(): boolean { return this.clients.size > 0; }
+  /** The voice switch from Settings. */
+  public setVoice(enabled: boolean): void { this.radio?.setEnabled(enabled); }
+  /** A page reports what became of a call it was sent; false when the call is unknown or already settled. */
+  public reportCall(id: number, outcome: LiveRadioOutcome): boolean { return this.options.radio?.settle(id, outcome) ?? false; }
   /**
    * A session is loaded in the game, so the game may be writing its files. A replay counts too: the page shows it
    * as the menu, but one started from a session's monitor leaves that session loaded (and one from the main menu
@@ -337,13 +371,33 @@ export class LiveService {
     if (message.scoring) this.applyReading(message.scoring);
     else if (message.car) this.applyReading(this.lastReading);
     if (message.scoring) this.followPlayer(before, message.scoring.player);
-    if (message.pedal) this.bufferPedal(message.pedal);
+    if (message.scoring) this.followField(message.scoring);
+    if (message.pedal) {
+      this.bufferPedal(message.pedal);
+      this.radio?.observePedal(message.pedal);
+    }
     const { car } = message;
     if (car) this.record(() => this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
       elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
         fuelCapacityLitres: car.fuelCapacityLiters,
         dents: car.dentSeverity, detached: car.detached, lastImpactEt: car.lastImpactEt, compound: car.compound,
       } }));
+  }
+
+  /** The whole field into the radio's incident, traffic and rejoin calls, with the layout's turns and the lane loss. */
+  private followField(reading: LiveScoringReading): void {
+    if (!this.radio || !reading.field) return;
+    const layoutKey = this.snapshot.identity?.layoutKey ?? null;
+    if (layoutKey !== this.turns.layoutKey) {
+      let name: typeof this.turns.name = null;
+      try { name = layoutKey ? layoutTurnNamer(layoutKey) : null; } catch (error) { console.warn('[Live] Turn placement failed:', error); }
+      this.turns = { layoutKey, name };
+    }
+    const turns = this.turns.name;
+    this.radio.observeField(this.field.observe(reading.currentEt, reading.trackLength, reading.gamePhase, reading.field, {
+      snapshot: this.snapshot, pitLaneSeconds: this.pitLaneSeconds, privateSessions: this.privateSessions,
+      turnAt: lapDist => turns?.(lapDist, reading.trackLength) ?? null,
+    }));
   }
 
   /**
@@ -365,6 +419,7 @@ export class LiveService {
         this.pitLaneKey = key;
         const loss = layoutKey && carClass ? store.read(layoutKey, carClass) : null;
         this.tracker.setStoredLaneLoss(loss);
+        this.pitLaneSeconds = loss;
         this.strategy.setPitLaneLoss(loss);
       }
     } catch (error) {
@@ -568,6 +623,7 @@ export class LiveService {
       this.pendingTiming = null;
     }
     this.broadcast(LIVE_STREAM_EVENTS.snapshot, this.snapshot);
+    this.radio?.observeSnapshot(this.snapshot);
     if (next.lifecycle !== previous.lifecycle) {
       this.followPitMode();
       this.events.emit('lifecycle', next.lifecycle);
