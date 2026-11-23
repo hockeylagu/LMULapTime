@@ -1,7 +1,84 @@
 # Live voice calls (proposal)
 
-Proposed 2026-10-26, reviewed 2026-11-21. Nothing here is built beyond the existing demo-only experiment
-(`src/components/live/display/strategySpeech.ts`, `LiveStrategySpeech.tsx`, used by `DemoTyrePlanView`).
+Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22, in the browser voice:
+- Calls: `shared/domain/live/radio/liveCalls.ts` (`liveCalls`: every strategy, damage and deployment call that applies,
+  most important first, keyed per stop) on `racePlanMode.ts` (the race plan's leading advice, shared with the
+  dashboard). The scheduler says the first one not yet said, so a call heard lets the next one through. Box countdown
+  ("Box in 2 laps.", "Box next lap.", then the whole stop as P1), pit menu fixes (energy, fuel ratio, tyres), damage
+  with its repair and loss ("Stay out." only when the repair costs more), the deployment target in races and practice
+  (P2, waits 30 s), and on the race's first lap only P1 calls. No over-budget call on the box lap.
+- Scheduler: `server/live/radio/radioScheduler.ts` in the live service, on the game clock of the pedal samples: P1 at
+  once; P2/P3 in a slot (the first 3 s after the line, or 1 s flat out), one call per slot, 2 P3 a lap, dropped after 120 s
+  or when the call no longer applies, replaced by a newer one. A P2/P3 key is said once a run; a P1 may come back
+  after 60 s (a stop not taken). Reset on a new run or session.
+- Log: every proposed call in SQLite `live_radio_calls` (`server/core/live/dbRadioLogStore.ts`) with the recording,
+  game time, lap and outcome; the page reports `spoken`, `interrupted`, `locked` or `failed`
+  (`POST /api/live/calls/:id/outcome`).
+- Page: SSE `call` events played by `src/components/live/display/radioPlayer.ts` (a P1 cuts in, the rest wait their
+  turn) through `LiveRadio.tsx`; Settings has "Radio voice calls" (on by default) and the volume. The demo keeps its
+  own controls (`LiveStrategySpeech.tsx`).
+- Debrief: a live-recorded session's calls by lap with what became of each (`GET /api/session/:id/radio`,
+  `SessionRadioCard.tsx`), through the recordings matched to the session.
+- Checked off the car on five races with stops or sprints (2026-11-22, `.tmp/voice-sim/scheduler.ts`), step 2 wording:
+  COTA 10-20 1 call (was 18 with a 60 s repeat guard), COTA 10-21 x2 none (sprints), Le Mans 10-22 7 (puncture x2,
+  countdown, menu fix, save to skip, box), Le Mans 10-23 5 (countdown, menu fix, box, box again when not taken).
+
+- Field (steps 3 and 4): the scoring buffer's every car (`decodeField` in `server/live/rf2Decode.ts`,
+  `LiveFieldReading` in `shared/types/liveField.ts`) and the sector flags feed `FieldWatch`
+  (`shared/domain/live/radio/field/`) at about 5 Hz, green flag running only. `FieldTrack` keeps each car's progress
+  speed over 1 s, the field's speed profile (20 m bins) and the player's line, lap time and sectors.
+  - Incidents (P1, never repeated): a car slower than 3 m/s or half the field's speed there for 1.5 s (4.5 s for a
+    car that froze and jumped on), within 15 s at the player's pace; cars within 150 m are one call, a spot stays
+    one incident for 60 s. "Turn 6. Car stopped on track, left, in your path.", "Yellow, " in front when the game's
+    sector yellow covers it, "Turn 6 clear." on the same approach. A car more than 3 m off: "Car off right, Turn 6."
+    (P2); back on slowly within 6 s ahead after 2 s off: "Car rejoining, Turn 6, careful." The game's sector yellow
+    with no slow car to explain it after 2 s: "Yellow, sector 2.", green once it holds 10 s. Turns are named from
+    the layout's placed turns (`server/live/radio/layoutTurns.ts`), else the sector.
+  - Traffic (said at once, not slotted): a faster class closing within 6 s with the pass landing in a corner
+    ("Hyper Porsche behind, catching. Passes in 6 seconds.", "Two Hypers behind.") as a P2, a slower class ahead
+    as a P3 inside the lap budget; none on the race's first lap. Names from `resolveVehicle` + the manufacturer,
+    the class word only when it differs from the player's.
+  - Rejoin, on the box call: "Rejoin P4, behind the Genesis, ahead of two GT3s." from the stored pit lane loss plus
+    the planned service, the gaps from progress times the player's median lap.
+  - Clock and penalties: "Ten minutes.", "Last lap.", in qualifying "Time for one more lap." or "No time for another
+    lap.", and "Penalty pending." (P1, once per penalty count).
+- Checked off the car on five online races' diagnostics sidecars (2026-11-22, `.tmp/voice-sim/field.ts`): Portimão
+  1.83 calls a lap, Silverstone 10-29 1.31, Daytona 4.1 and 5.2 (GT3s ahead about 1.4 a lap, 44-58 more dropped
+  by the budget); "Rejoin P11." heard at Daytona 10-16. The parked car at Daytona T12 is said once, not every lap.
+
+- Voice test (step 1a, started 2026-11-22): the demo's radio sampler plays every call in the browser voice or Kokoro
+  (British male voices George, Lewis, Daniel, Fable; pace 0.9-1.3x) so the driver picks the voice and pace first
+  (driver: a male voice like a race engineer; pick voice and pace before any speed work). Kokoro q8 on the CPU
+  takes 3.5 s for "Box in 2 laps." in the browser on one thread, 2.4 s with threads (cross-origin isolated), 1.6 s
+  natively in Node (3.4 s for a 4 s call): every option misses the 1 s P1 target, so live use needs the clips and
+  cache below.
+- Driver picked George at 1.2x with pauses cut to 80 ms (2026-11-22); synthesis during a race is out (3-10 s a call,
+  CPU the game needs). Prepared clips instead: `tools/dev/prepareVoiceClips.ts` synthesizes, with the game closed,
+  every demo call (`demoRadio.ts`, 34) whole and in its sentences (`callSentences`), 66 clips, into
+  `public/voice/george/` (not committed) with a manifest; clips already made are kept, unused ones removed. The demo
+  sampler plays them whole or joined by sentence with a 0-120 ms join gap (`voice/clipVoice.ts`): no synthesis, no
+  CPU. Decided (driver, 2026-11-22): join at full stops only. Joined at commas too, each piece kept a sentence's own
+  end tone and sounded off against the whole call; by sentence is fine. So the live library is sentence variants:
+  per-track turn sentences ("Turn 6.", "Yellow, Turn 6.") plus a shared set for the rest of each call. Not all
+  of it yet (driver: the call list is not settled).
+- First online weekend with the radio (Sebring School GT3, 2026-11-22, browser voice): practice 53 calls in ~9 laps
+  (~6 a lap, above the 1-2.6 simulated: clears 1-2 s after their incident, green calls replaced or expired, the first
+  10 locked until the page was clicked); qualifying 9, of which all 6 incident calls were false: it was LMU's private
+  qualifying (20 drivers lapping in the results, none on the player's track, no game yellows); race 20 calls, right,
+  until lap 16, where the dev server serving the dashboard stopped with the app's browser pane. Fixed: "sector 1."
+  without a yellow now starts with a capital. Decided (driver): no field calls in a private session. `GET /rest/sessions` answered
+  `SESSSET_private_qual` "On" in that qualifying (16 ms, on track), so the poller reads it once a session
+  (`parsePrivateSessions`) and `FieldWatch` stays silent in private qualifying or practice; qualifying not yet read
+  counts as private. Slow cars are called within 8 s (stopped cars 15 s): the second race called slow cars 11-15 s
+  ahead that cleared a second later. Still open: the practice load.
+- Radio output (driver, 2026-11-22): Settings → Live dashboard → "Radio output" picks the Windows default or a device
+  (`LiveSettings.voiceOutput`, a browser device id, null for the default). The Web Audio voices (George's clips,
+  Kokoro) play there through `AudioContext.setSinkId` (Chrome/Edge); an unplugged device falls back to the default.
+  The browser's own voice (`speechSynthesis`) cannot be routed and stays on the default. Chrome lists the devices
+  only after a one-time microphone permission ("Show device names"; nothing is recorded); "Test output" beeps
+  on the chosen device.
+Still to build: the live yellow test with the voice on (thresholds, lagging cars, the far yellow), step 5 and the
+neural voice (step 1a).
 
 ## Outcome
 
@@ -14,8 +91,8 @@ in the post-race debrief so the wording and timing can be refined.
 ## Driver decisions (2026-10-26)
 
 - No Crew Chief: nothing else talks except LMU's own radio, which calls the lap time at the line.
-  Both stay available: a setting says whether LMU's lap-time call is on, and the after-line wait
-  follows it (see Timing).
+  The after-line slot is right at the line, not after LMU's lap-time call: waiting 3 s puts the call in
+  the first corner (driver, 2026-11-22), so no setting for the game's call.
 - Chrome, with a natural-sounding voice (see Voice).
 - Other cars: manufacturer, plus the class when it differs from the player's ("the Porsche", "Hyper Ferrari").
 - Quiet by default: decisions and safety only.
@@ -48,7 +125,7 @@ would ask it? Silence is an answer too: no call means "on plan", so nothing conf
 | Will my tyres last? | "Tyres won't reach the flag. Plan a change." | After the line, once |
 | Wets or slicks? | "Box this lap for wets." "Box this lap for slicks." | When the track reaches Slightly wet / Dry |
 | Is rain coming, is the track changing? | "Rain expected around lap 14." "Track now damp." | When it changes |
-| What is that yellow, is my line blocked? | "Yellow, Turn 6. Car stopped, left, on your line." | Within ~15 s of reaching it |
+| What is that yellow, is my line blocked? | "Yellow, Turn 6. Car stopped, left, in your path." | Within ~15 s of reaching it |
 | Who is coming, when do they pass? | "Hyper Ferrari behind. Passes in 6 seconds." | Before the pass |
 | Am I catching / being caught? | "Gap to P4 1.2, closing." (normal level only) | After the line |
 | How long is left? Time for another quali lap? | "Ten minutes." "Last lap." "Time for one more lap." | At those moments |
@@ -330,7 +407,7 @@ where and what as soon as it happens.
 Only incidents that affect the player get a full call. Relevance is the time until the player reaches
 the incident at their own pace (lap distance ahead, wrapping over the line), and whether it is on track:
 
-| Time to reach | On track / on your line | Off track |
+| Time to reach | On track / in your path | Off track |
 |---|---|---|
 | Under ~15 s | Full call, P1 | Short call, P2 ("car off right, clear") |
 | ~15-60 s | "Yellow far ahead, sector 3", P3, once | Silent |
@@ -342,7 +419,7 @@ by the sector's distance.
 
 | Call | Detection | P |
 |---|---|---|
-| "Yellow, Turn 6. Car stopped on track, left, on your line." | Car below ~40-50 % of the reference speed at its lap distance (or stopped), not in pits, within ~15 s ahead | P1 |
+| "Yellow, Turn 6. Car stopped on track, left, in your path." | Car below ~40-50 % of the reference speed at its lap distance (or stopped), not in pits, within ~15 s ahead | P1 |
 | "Yellow, Turn 1. Two cars off right. Track clear." | Several slow cars within ~150 m, all more than ~3 m beyond `trackEdge`, within ~15 s | P2 |
 | "Slow car ahead, 6 seconds. Off your line, right." | Same, before any yellow, within ~10 s | P1 |
 | "Car rejoining, Turn 9, careful." | A car that was off track moves back inside the edge, within ~15 s ahead | P1 |
@@ -354,7 +431,7 @@ by the sector's distance.
 - On or off track: `|pathLateral|` against `trackEdge` on that side; later the plugin boundaries
   (white line) for a sharper test.
 - Your line: the player's own `pathLateral` by lap distance from their last clean laps, compared in
-  the same frame as the stopped car's; within ~2.5 m is "on your line", otherwise "off your line, left
+  the same frame as the stopped car's; within ~2.5 m is "in your path", otherwise "clear of your line, left
   / right". No geometry needed.
 - Multiple cars: cluster slow cars by lap distance; say the count. At the start, one call per pile-up
   and the nearest first: a newer, closer incident replaces one still waiting (driver, 2026-11-21).
@@ -437,10 +514,10 @@ the text, so a call to refine is traced to its rule. Adding a call means adding 
 document then keeps only the phrasing rules below.
 
 Phrasing rules (consistent wording):
-- Order: what, where, side, line, action. "Yellow, Turn 6. Car stopped, left, on your line."
+- Order: what, where, side, line, action. "Yellow, Turn 6. Car stopped, left, in your path."
 - One verb for one action: "Box" (never "pit"), "Save", "Set", "Stay out", "Careful".
 - Places: "Turn 6" from the placed official turns, else "sector 2" or "{n} seconds"; never metres.
-- Sides: "left" / "right" in the direction of travel; lines: "on your line" / "off your line".
+- Sides: "left" / "right" in the direction of travel; lines: "in your path" / "clear of your line" (driver, 2026-11-22: "on/off your line" sounded alike and was easy to miss).
 - Cars: manufacturer, class word first only when it differs ("Hyper Ferrari"); position when the
   brand does not tell them apart.
 - Numbers: gaps and seconds to one decimal under 10 ("one point two"), whole numbers above; energy in
@@ -452,9 +529,9 @@ Phrasing rules (consistent wording):
 ## Timing: not distracting
 
 1. One fact per call, number first, at most about 8 words; P1 may repeat once ("Box, box").
-2. Two slots for P2/P3: just after the lap completes (about 3 s after the line while the LMU
-   lap-time call setting is on, at once when it is off; then on the first straight), or any straight (1 s flat out on the pedals; the placed
-   turns give the next straight ahead of time). Strategy calls prefer the after-the-line slot.
+2. Two slots for P2/P3: right at the line, for 3 s (any later lands in the first corner, driver 2026-11-22),
+   or any straight (1 s flat out on the pedals; the placed turns give the next straight ahead of time).
+   Strategy calls prefer the after-the-line slot.
 3. Budget: at most 2 P3 calls per lap and 1 per straight; the rest drop.
 4. Hysteresis: a call key repeats only after its state really changes (existing 60 s guard plus
    per-call thresholds, e.g. gaps move 0.2 s/lap).
@@ -467,7 +544,7 @@ Phrasing rules (consistent wording):
 7. Lifecycle and reset guards: speak only when `lifecycle === 'driving'`, `inRealtime`, and not in
    formation, countdown or pause (`gamePhase` 3, 4, 9). Reset scheduler state and hysteresis on
    session change, restart or reconnect so old keys never leak into a new run.
-8. A short earcon before P1 calls only.
+8. Optional, not planned for now (driver, 2026-11-22): a short earcon before P1 calls only.
 9. Audio only: nothing is added to the dashboard. Voice on/off and options live in Settings; the
    demo's control row stays demo-only.
 10. Browser playback, unlock and tabs: play through the Web Audio API (`AudioContext`) so P1 calls
@@ -476,8 +553,8 @@ Phrasing rules (consistent wording):
     earlier in the same page counts (the game-start switch to `#/live` keeps the page), so most
     sessions need nothing. After a reload with the voice on, the dashboard shows one "Click to
     enable radio" notice in the session bar's slot until clicked; the radio log records calls
-    dropped while locked. Only one active `#/live` tab plays audio (preventing echo across multiple
-    tabs); when no tab is connected, log `no-client` and skip synthesis.
+    dropped while locked. The driver keeps at most one dashboard tab open (2026-11-22), so every
+    connected page plays; when none is connected, log `no-client` and skip synthesis.
 
 ## Voice
 
@@ -533,7 +610,6 @@ what the budget is hiding.
   frame times or P1 latency, move synthesis to a persistent server worker and serve clips via
   `GET /api/live/calls/:id/audio`.
 - Settings: voice on/off, voice, volume, rate, verbosity (quiet / normal), per-family toggles,
-  LMU lap-time call on/off (on by default),
   "Play sample" for each family.
 
 ## Iterations
@@ -550,16 +626,16 @@ through `liveCalls` that counts calls per lap and per slot, and one drive in the
   behind the setting. Measure calls per lap on the Le Mans and COTA captures. Fix the three strategy
   keys found off the car (save by stop with a reachable cutoff, one box repeat, no over-budget after
   the last stop).
-2. Strategy and damage wording, the Hypercar deployment call (its live advice is built), plus the
-   radio log in the debrief.
-3. Flags, penalties and the session clock: decode the fields, check against an online race. Then the
+2. Built 2026-11-22: strategy and damage wording, the Hypercar deployment call, plus the radio log in
+   the debrief.
+3. Built 2026-11-22 (live test pending). Flags, penalties and the session clock: decode the fields, check against an online race. Then the
    incident detector (naming turns via `circuitTurns/placeTurns.ts`), tested on replays with crashes
    before any drive. Then tune the yellow calls live, with the voice on, in online races. Shared memory
    is the source (sector flags and the detector on every car's positions); the LMU REST API is read
    alongside only as a check (allowlisted reads, at most 1 Hz) and is used for a call only where shared
    memory has nothing. Log every yellow and call so the thresholds, the confirmation for lagging cars and
    the far-yellow call are set from what the driver heard (driver, 2026-11-21).
-4. Multiclass traffic with car names: faster class closing with time to the pass. Then the rejoin
+4. Built 2026-11-22. Multiclass traffic with car names: faster class closing with time to the pass. Then the rejoin
    call, which needs the same field data (positions and race times of every car).
 5. Same-class battle and gaps, only if steps 1-4 stay quiet enough.
 6. Optional: left/right spotter if latency allows; wheel button (below).

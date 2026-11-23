@@ -94,8 +94,10 @@ for VE cars, tyre/set coverage and MFD-versus-intended service checks, including
 stops and penalties. Retain insufficient-confidence states. Post-qualifying, pre-race and post-race
 screen refinements remain proposals: qualifying results may be provisional, garage settings should
 be checked against targets, and official XML owns final results. Multi-stint comparison and duplicate
-nearby-car traffic views are deferred. Strategy speech remains a demo-only experiment; do not
-silently enable it in the real dashboard.
+nearby-car traffic views are deferred. Strategy calls speak on the real dashboard in the browser voice
+(2026-11-22), with the voice on/off and volume in Settings and the calls in the debrief, plus incident, yellow,
+multiclass traffic, rejoin and clock calls from every car in shared memory; the rest is the
+[voice calls plan](proposed/LIVE_VOICE_CALLS.md).
 
 ### Offline preview
 
@@ -149,7 +151,7 @@ the `hybrid` diagnostics record served the Spa check and is removed). Still open
 3. The advice over a long stint: switch timing near the 20/80% edges. The in-lap low can sit far below the lap average
    (Spa: 6% with a 30% average), which the 20% edge on the average does not guard.
 
-The voice call ("Set deployment 40.") is planned in [Live voice calls](proposed/LIVE_VOICE_CALLS.md), not built.
+The voice call ("Set deployment 40.") is built in [Live voice calls](proposed/LIVE_VOICE_CALLS.md) (2026-11-22).
 
 VE remains measured independently. The [official energy guide](https://guide.lemansultimate.com/hc/en-gb/articles/13152376674191-What-is-Virtual-Energy-NRG)
 describes VE as a combined allowance and hybrid power as replacing combustion power while reducing
@@ -192,8 +194,8 @@ items and the open code-review findings.
 - Rival duel: two cars' corner passes over the same laps, on the corner passes and sequences already built
   (corner insight delivered 2026-11-19; see [code map](../CODE_MAP.md#3-life-of-a-replay-lap-vcr--telemetry-studio)).
 - [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules, browser
-  Web Worker TTS + pre-generated fixed clips, and iterations; starts with the Step 1a voice
-  listening test.
+  Web Worker TTS + pre-generated fixed clips, and iterations; steps 1b-4 built, next the live yellow test
+  with the voice on and the Step 1a voice listening test.
 - [Live wetness projection](proposed/LIVE_WETNESS_PROJECTION.md): when the track will reach the next wetness step,
   wetting from rain intensity and drying after it stops, timed from the steps; tyre crossover timing first, then
   pace and fuel. Starts by recording the rain unrounded.

@@ -306,6 +306,8 @@ reply beside shared memory VE, fuel, pit state and penalties), `lmu-fields` (the
 the app now uses instead of the standings call: `mVirtualEnergy` is the standings' `veFraction`, `mNumPenalties` its
 `penalties`, `mWear` the tread left, and `mPitState` reads 4 in the box and 0 down the pit lane (`rf2Decode.ts`).
 Older recordings also hold `standings` REST observations; new ones do not.
+Diagnostics of 2026-11-23 may hold `qualifying-field` (every car every 5 s in qualifying), since removed once the
+`GET /rest/sessions` settings read answered private qualifying (`docs/LMU_REST_API.md`).
 `lap-timing` records producer output at most once per second: timing fields, the atomic
 `lapEstimate` (seconds, reference seconds, delta seconds and distance/sector source), subscriber
 count and source session/lap clocks and distance. This does not confirm browser receipt. The

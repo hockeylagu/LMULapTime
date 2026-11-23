@@ -414,6 +414,13 @@ The API exposes 63 distinct session configuration rules modified via:
 }
 ```
 
+`GET /rest/sessions` lists these settings with their values. The app reads it once per loaded session (it waits for a
+state check that says no replay plays, never read in one yet) for `SESSSET_private_qual` and `SESSSET_private_prac`
+(`parsePrivateSessions`): the radio makes no field calls in a private session. First read (Sebring School online qualifying, 2026-11-23, on track, 200 in
+16 ms): an object keyed by setting name, each `{currentValue, numStepsTotal, settingID, stringValue, uiSelectionType,
+valueType}`; that private qualifying read `SESSSET_private_qual` `currentValue` 1, `stringValue` "On" (`numStepsTotal`
+2), and `SESSSET_private_prac` 0, "Off".
+
 #### Complete List of `SessionID` Enums:
 
 ```
