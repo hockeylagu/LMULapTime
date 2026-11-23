@@ -22,15 +22,15 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 - **3D Replay View** *(requires optional local data package)*: Switch between 2D and 3D with one button. Streams track scenery, sky/clouds, and cascaded sun shadows in Three.js, with official car liveries, rolling wheels, turning steering wheels, headlights/brake/rain/pit lamps, Chase/Cockpit/Hood/Roof/Trackside cameras, and a draped 3D racing line (`Line` menu).
 - **Fullscreen GPS map**: Follow-car camera with minimap HUD overlay, dynamic friction circle, sector lines, brake distance boards, ghost sync modes (`Distance`, `Time`, `From A`), and a docked live telemetry playback strip.
 - **Synchronized multi-channel traces**: Speed, lap delta, throttle & brake (with ABS/TC events), stepped gear changes, steering angle with real-time understeer/oversteer/scrub balance indicators, G-forces, dampers, tire temperatures & pressures, per-wheel slip, and Hypercar hybrid energy (SoC, Virtual Energy, Regen).
-- **Three-phase corner breakdown**: Micro-splits deconstructing every turn into Entry (braking point, trail brake decay), Rotation (apex minimum speed, yaw rate), and Exit (throttle pick-up timing, traction), with a shared measure marker (`Set A` / `X`) for segment deltas.
+- **Three-phase corner breakdown**: Micro-splits deconstructing every turn sequence into Entry (braking point, trail brake decay), Rotation (apex minimum speed, yaw rate), and Exit (throttle pick-up timing, traction), with a corner conclusion summary and a shared measure marker (`Set A` / `X`) for segment deltas.
 
 ![Fullscreen GPS Map - Follow-Car & Minimap HUD](assets/fullscreen_gps_map.png)
 
 ![Fullscreen GPS Map - Portimão Circuit Layout, Pit Lane & Runoff](assets/fullscreen_gps_map_portimao.png)
 
-### 🎬 Every Driver's Telemetry & Race Mode
+### 🎬 Every Driver's Telemetry & Session Replay
 ![Race Mode Replay - Every Car on One Clock & Standings Tower](assets/race_replay.png)
-- **Race Mode (every car on one clock)**: Watch the entire field move together on a shared session clock (1–16x) with a live standings tower, class gaps and intervals, pit/DNF states, an incident jump menu, and one-click switching between Race Mode and Lap View.
+- **Session Replay (2D & 3D, every car on one clock)**: Watch the entire field move together on a shared session clock (1–16x) in 2D or 3D (every car's body model, head/brake lamps, and contact shadows) with a live standings tower, class gaps and intervals, followed-car lap & sector timing, pit/DNF states, an incident jump menu, and one-click switching with Lap View.
 - **Reverse-engineered replay format**: LMU's binary `.Vcr` replays (`gMb1.002f`) are decoded to extract the trajectory and telemetry of every car in the session: position, speed, throttle and brake (with ABS/TC), steering, gear, wheel speeds/slip, headlights, and brake temperatures.
 - **Your own laps at 100 Hz**: LMU's native DuckDB telemetry is read and fused with the replay trajectory, cut cleanly at the timing line.
 - **Compare against anyone**: any of your laps against any other driver's lap from the same layout, aligned on track position (or synced by time / from marker A): speed and delta traces, pedals, racing lines on the map, sector and corner gaps.
@@ -56,12 +56,14 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 - **Fuel & Virtual Energy strategy**: per-lap use from the last laps, spare per lap, laps to the pit window, and the MFD settings for the next stop (refuel / VE, tyres).
 - **Hypercar hybrid deployment advice**: live battery charge-cycle guidance (`deploymentKw` or map steps) with countdowns to the next change in practice, qualifying, and race.
 - **Wet & dry tyre crossover**: advises slick-to-wet and wet-to-slick pit stops from track wetness, and flags tyre changes from per-wheel wear forecasts.
+- **Race engineer radio calls**: speaks concise pit, traffic, fuel/VE, and deployment calls on the live dashboard (with a voice sampler in the offline demo) and logs them in the session debrief.
 - **Lap timing**: current lap and sector splits against your best, track conditions, and a live throttle & brake trace.
 - **Offline demo**: practice, qualifying and race scenarios to try it without driving (`#/live?demo=1`).
 - **Live capture & learning**: each session is recorded to its own DuckDB file, reconciled with the results XML, and feeds validated fuel/VE forecast corrections (`LMU_LIVE_LEARNING=0` disables them). See [live capture storage](docs/LIVE_CAPTURE_FORMAT.md).
 
-### 🎯 Coaching
-- **Corner analysis**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) for every turn, with consistency scoring and faster-class comparison fallback when no same-car lap is faster.
+### 🎯 Coaching & Corner Trends
+- **Corner analysis & turn sequences**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) per layout and class, with consistency scoring, corner conclusions, and faster-class comparison fallback when no same-car lap is faster.
+- **Corner trends & habit focus**: tracks corner-by-corner time loss across sessions, selects a stable 2-corner **Habit Focus** with progress and pins, and jumps straight to the corner's apex in Telemetry Studio.
 - **Deterministic coaching**: driving deficits ranked by time lost, repeatability and confidence (`priority = timeLoss * repeatability * confidence`).
 
 ### 🔌 Plug & Play
