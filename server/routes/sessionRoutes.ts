@@ -15,6 +15,7 @@ import { queryCompactDashboard } from '../core/sessionSummaries/dashboardQueries
 import { getSessionLiveCaptures } from '../core/live/dbLiveCaptureStore.js';
 import { readSessionStrategy } from '../sessions/sessionStrategy.js';
 import { readSessionRacePlan } from '../core/live/dbRacePlanStore.js';
+import { readSessionRadioCalls } from '../core/live/dbRadioLogStore.js';
 
 function pageNumber(value: unknown, fallback: number, max = 500): number {
   const parsed = Number(value);
@@ -46,6 +47,11 @@ export function createSessionRouter(context: ServerContext): Router {
     const strategy = await readSessionStrategy(context.sessionDb, req.params.id);
     if (strategy === undefined) return res.status(404).json({ error: 'Session not found' });
     return res.json({ strategy, plan: strategy ? readSessionRacePlan(db, req.params.id) : null });
+  });
+  router.get('/session/:id/radio', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!db.prepare('SELECT 1 FROM sessions WHERE id = ?').get(req.params.id)) return res.status(404).json({ error: 'Session not found' });
+    return res.json({ calls: readSessionRadioCalls(db, req.params.id) });
   });
   router.get('/session/:id/personal-best/:driverOrdinal', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');

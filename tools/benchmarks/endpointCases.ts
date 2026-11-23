@@ -105,6 +105,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   if (session && opponent >= 0) add('personal-best-opponent', '/api/session/:id/personal-best/:driverOrdinal', `/api/session/${encodeURIComponent(session.id)}/personal-best/${opponent}`);
   // The telemetry cohort's session has a native recording: the strategy reads it.
   add('session-strategy', '/api/session/:id/strategy', session ? `/api/session/${encodeURIComponent(session.id)}/strategy` : undefined);
+  add('session-radio', '/api/session/:id/radio', session ? `/api/session/${encodeURIComponent(session.id)}/radio` : undefined);
   if (!cohort.sessions.length) add('session', '/api/session/:id');
   const locator = cohort.telemetry;
   const base = locator ? `/api/session/${encodeURIComponent(locator.sessionId)}` : undefined;

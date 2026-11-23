@@ -1,5 +1,5 @@
 import { fetchJson } from './apiClient.js';
-import type { SessionStrategy } from '../../shared/types/index.js';
+import type { SessionRadioCall, SessionStrategy } from '../../shared/types/index.js';
 import type { LiveRaceStrategies } from '../../shared/types/liveStrategy.js';
 
 export interface SessionStrategyResult {
@@ -13,4 +13,10 @@ export async function fetchSessionStrategy(sessionId: string, signal?: AbortSign
   const response = await fetchJson<{ strategy: SessionStrategy | null; plan?: LiveRaceStrategies | null }>(
     `/api/session/${encodeURIComponent(sessionId)}/strategy`, { signal });
   return response.strategy ? { strategy: response.strategy, plan: response.plan ?? null } : null;
+}
+
+/** The radio calls of the session's live recordings, in game-time order; empty when none was recorded live. */
+export async function fetchSessionRadio(sessionId: string, signal?: AbortSignal): Promise<SessionRadioCall[]> {
+  const response = await fetchJson<{ calls: SessionRadioCall[] }>(`/api/session/${encodeURIComponent(sessionId)}/radio`, { signal });
+  return response.calls;
 }

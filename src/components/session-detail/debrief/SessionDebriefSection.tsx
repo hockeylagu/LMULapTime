@@ -1,8 +1,9 @@
 import { ClipboardList } from 'lucide-react';
 import type { DetailedSession, DriverData } from '../../../../shared/types/index.js';
-import { fetchSessionStrategy } from '../../../api/sessionStrategyApi.js';
+import { fetchSessionRadio, fetchSessionStrategy } from '../../../api/sessionStrategyApi.js';
 import { useRequest } from '../../../api/useRequest.js';
 import { SessionStrategyCard } from './SessionStrategyCard.js';
+import { SessionRadioCard } from './SessionRadioCard.js';
 import { OneOffMistake, DrivingHabitsCard } from './DrivingHabitsCard.js';
 import { useDrivingHabits } from './useDrivingHabits.js';
 
@@ -13,8 +14,11 @@ function PlayerDebrief({ session, driverName }: { session: DetailedSession; driv
   // A race's strategy needs its telemetry recording: without one (online races) the side pane leaves it out.
   const strategy = useRequest(race ? session.id : null, fetchSessionStrategy);
   const hasStrategy = strategy.data !== null || strategy.error !== null;
+  // The radio log exists only for sessions recorded live.
+  const radio = useRequest(session.liveCaptures?.length ? session.id : null, fetchSessionRadio);
+  const hasRadio = (radio.data?.length ?? 0) > 0 || radio.error !== null;
   const mistake = state.status === 'ready' ? state.habits.mistake : null;
-  const hasSidePane = hasStrategy || mistake !== null;
+  const hasSidePane = hasStrategy || hasRadio || mistake !== null;
 
   return (
     <section
@@ -31,7 +35,8 @@ function PlayerDebrief({ session, driverName }: { session: DetailedSession; driv
         {hasSidePane && (
           <aside aria-label="Race and lap details" className="min-w-0 rounded-b-2xl border-t border-lmu-border bg-lmu-bg/45 px-5 pt-4 pb-5 lg:rounded-bl-none lg:border-t-0 lg:border-l">
             {hasStrategy && <SessionStrategyCard state={strategy} />}
-            {mistake && <div className={hasStrategy ? 'mt-4 border-t border-lmu-border/60 pt-4' : undefined}><OneOffMistake mistake={mistake} /></div>}
+            {hasRadio && <div className={hasStrategy ? 'mt-4 border-t border-lmu-border/60 pt-4' : undefined}><SessionRadioCard state={radio} /></div>}
+            {mistake && <div className={hasStrategy || hasRadio ? 'mt-4 border-t border-lmu-border/60 pt-4' : undefined}><OneOffMistake mistake={mistake} /></div>}
           </aside>
         )}
       </div>

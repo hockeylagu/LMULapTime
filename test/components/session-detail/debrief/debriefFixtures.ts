@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { DetailedSession, DriverData } from '../../../../shared/types/index.js';
+import type { DetailedSession, DriverData, SessionRadioCall } from '../../../../shared/types/index.js';
 import type { CornerHabit, SessionCornerAnalysis } from '../../../../shared/types/corners/cornerAnalysis.js';
 import { clearLayoutCornersCache } from '../../../../src/api/cornerApi.js';
 
@@ -100,7 +100,14 @@ export const layout = {
 
 const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
 
-/** Serves the session's corner analysis (or `analysisStatus` with an error), the layout's corners, a strategy and the unpin. */
+/** A live-recorded race's radio log: one call said, one cut off, one never said. */
+export const radioCalls: SessionRadioCall[] = [
+  { id: 1, gameTime: 300, lap: 4, priority: 2, family: 'strategy', text: 'Box in 2 laps.', outcome: 'spoken' },
+  { id: 2, gameTime: 420, lap: 6, priority: 1, family: 'strategy', text: 'Box this lap. Energy 38 percent, new medium.', outcome: 'interrupted' },
+  { id: 3, gameTime: 430, lap: 6, priority: 3, family: 'strategy', text: 'Energy use too high. Save to hold lap 19.', outcome: 'expired' },
+];
+
+/** Serves the session's corner analysis (or `analysisStatus` with an error), the layout's corners, a strategy, the radio log and the unpin. */
 export function mockWatchServer(analysisStatus = 200, body: unknown = analysis) {
   clearLayoutCornersCache();
   const fetchMock = vi.fn((input: string, _init?: RequestInit) => {
@@ -108,6 +115,7 @@ export function mockWatchServer(analysisStatus = 200, body: unknown = analysis) 
     if (url.startsWith('/api/session/R1/corner-analysis')) return analysisStatus === 200 ? json(body) : json({ error: 'Session summaries are rebuilding' }, analysisStatus);
     if (url.startsWith('/api/corners?')) return json(layout);
     if (url.startsWith('/api/session/R1/strategy')) return json({ strategy: null, plan: null });
+    if (url.startsWith('/api/session/R1/radio')) return json({ calls: radioCalls });
     if (url === '/api/habit-focus/unpin') return json({ pinned: false });
     return json({ error: 'Not found' }, 404);
   });

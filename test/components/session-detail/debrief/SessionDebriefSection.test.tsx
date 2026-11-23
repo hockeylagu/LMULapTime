@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import type { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { SessionDebriefSection } from '../../../../src/components/session-detail/debrief/SessionDebriefSection.js';
 import { requestBody } from '../../../fixtures/requestUrl.js';
+import type { SessionLiveCapture } from '../../../../shared/types/liveCapture.js';
 import { analysis, me, mockWatchServer, session } from './debriefFixtures.js';
 
 const renderSection = (props: { session: DetailedSession; selectedDriver: DriverData }) =>
@@ -134,6 +135,23 @@ describe('SessionDebriefSection', () => {
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/strategy$/);
     expect(screen.queryByRole('complementary')).toBeNull();
+  });
+
+  it("lists a live-recorded session's radio calls, collapsed, with what became of each", async () => {
+    mockWatchServer();
+    const recorded = { ...session, matchingReplayFile: undefined, liveCaptures: [{ recordingId: 'rec' } as SessionLiveCapture] };
+    renderSection({ session: recorded, selectedDriver: me });
+    const radio = await screen.findByTestId('session-radio');
+    expect(radio).toHaveTextContent('2 of 3 said');
+    // Collapsed until opened.
+    expect(within(radio).queryAllByRole('listitem')).toHaveLength(0);
+    fireEvent.click(within(radio).getByRole('button', { name: 'Radio' }));
+    const rows = within(radio).getAllByRole('listitem');
+    expect(rows.map(row => row.textContent)).toEqual([
+      'Lap 4Box in 2 laps.',
+      'Lap 6Box this lap. Energy 38 percent, new medium.cut off by a newer call',
+      'Lap 6Energy use too high. Save to hold lap 19.not said: no slot in time',
+    ]);
   });
 
   it('shows nothing for another driver than the player', () => {

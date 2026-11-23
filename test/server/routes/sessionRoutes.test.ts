@@ -274,6 +274,13 @@ describe('sessionRoutes and filterSessions', () => {
       expect(response.headers['cache-control']).toBe('no-store');
       expect((await request(app).get('/api/session/missing/strategy')).status).toBe(404);
     });
+    it("reads the radio calls of the session's live recordings, 404 for a missing session", async () => {
+      const response = await request(app).get('/api/session/sess_1/radio');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ calls: [] });
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect((await request(app).get('/api/session/missing/radio')).status).toBe(404);
+    });
     it('loads a driver PB on demand and validates its session and ordinal', async () => {
       const response = await request(app).get('/api/session/sess_1/personal-best/0');
       expect(response.status).toBe(200);
