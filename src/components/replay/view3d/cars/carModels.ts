@@ -126,10 +126,11 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
     const frames = new Set(drawn.flatMap(lamp => lampTexturePaths(lamp, rainFlashes, glows.get(lamp)!)));
     for (const frame of frames) paths.set(frame, false);
-    // The entry's readout (wheel and dash screens) is drawn on a car with its own materials, the lap's: its element atlases load with the cabin's.
+    // The entry's readout (wheel and dash screens) is drawn on a car with its own materials, the lap's: its element atlases and font sheets load with the cabin's.
     const readout = !shareMaterials && appearance.readout !== null ? car.descriptor.readouts[appearance.readout] ?? null : null;
     if (appearance.readout !== null && !readout && !shareMaterials) throw Error(`Car ${car.vehicleId} has no readout ${appearance.readout}`);
     for (const element of readout?.elements ?? []) if (element.texture !== null) paths.set(element.texture, paths.get(element.texture) !== false);
+    for (const font of readout?.fonts ?? []) paths.set(font.texture, paths.get(font.texture) !== false);
     const textures = new Map(await Promise.all([...paths.keys()].map(async path =>
       [path, await carTextures.load(path, frames.has(path) ? undefined : startFileOf(car, path))] as const)));
     // The cabin volumes, built once a livery; each material samples its own copy of the same source.
