@@ -149,7 +149,7 @@ describe('SessionDebriefSection', () => {
     const rows = within(radio).getAllByRole('listitem');
     expect(rows.map(row => row.textContent)).toEqual([
       'Lap 4Box in 2 laps.',
-      'Lap 6Box this lap. Energy 38 percent, new medium.cut off by a newer call',
+      'Lap 6Box this lap. Energy 38 percent. New medium.cut off by a newer call',
       'Lap 6Energy use too high. Save to hold lap 19.not said: no slot in time',
     ]);
   });

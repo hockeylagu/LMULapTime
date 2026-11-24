@@ -1,9 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveStrategySpeech } from '../../../src/components/live/display/LiveStrategySpeech.js';
-import { planChangeCall } from '../../../src/components/live/demo/demoTyrePlan.js';
-import { PedalBuffer } from '../../../src/components/live/pedalBuffer.js';
-import { liveSession, liveSnapshot, liveStrategy } from '../../helpers/liveSnapshot.js';
+import { LiveStrategySpeech } from '../../../../src/components/live/demo/LiveStrategySpeech.js';
+import { planChangeCall } from '../../../../src/components/live/demo/demoTyrePlan.js';
+import { PedalBuffer } from '../../../../src/components/live/pedalBuffer.js';
+import { liveSession, liveSnapshot, liveStrategy } from '../../../helpers/liveSnapshot.js';
 
 const empty = new PedalBuffer();
 /** `seconds` of pedal samples at 20 Hz, ending at `end`. */
@@ -73,7 +73,7 @@ describe('strategy voice POC', () => {
     urgent.strategy!.resource!.race!.pitInLaps = 0;
     rerender(<LiveStrategySpeech snapshot={urgent} connection="live" buffer={empty} />);
     expect(speak).toHaveBeenCalledTimes(2);
-    expect(speak.mock.calls[1][0].text).toBe('Box this lap. Energy 38 percent, new medium.');
+    expect(speak.mock.calls[1][0].text).toBe('Box this lap. Energy 38 percent. New medium.');
     rerender(<LiveStrategySpeech snapshot={urgent} connection="disconnected" buffer={empty} />);
     expect(cancel).toHaveBeenCalledTimes(2);
     expect(screen.getByRole('button', { name: 'Read strategy' })).toBeDisabled();
@@ -107,7 +107,7 @@ describe('strategy voice POC', () => {
       pit.strategy!.resource!.race!.pitInLaps = laps;
       rerender(<LiveStrategySpeech snapshot={pit} connection="live" buffer={empty} />);
     }
-    expect(speak.mock.calls.slice(2).map(call => call[0].text)).toEqual(['Box in 2 laps.', 'Box next lap.', 'Box this lap. Energy 38 percent, new medium.']);
+    expect(speak.mock.calls.slice(2).map(call => call[0].text)).toEqual(['Box in 2 laps.', 'Box next lap.', 'Box this lap. Energy 38 percent. New medium.']);
   });
 
   it('holds routine calls for a straight while urgent ones interrupt', () => {
@@ -125,7 +125,7 @@ describe('strategy voice POC', () => {
     const box = snapshot();
     box.strategy!.resource!.race!.pitInLaps = 0;
     rerender(<LiveStrategySpeech snapshot={box} connection="live" buffer={buffer} />);
-    expect(speak.mock.calls[2][0].text).toBe('Box this lap. Energy 38 percent, new medium.');
+    expect(speak.mock.calls[2][0].text).toBe('Box this lap. Energy 38 percent. New medium.');
   });
 
   it('voices a plan change on the straight, after urgent calls', () => {

@@ -8,10 +8,12 @@ const clip = (length: number) => ({ length, sampleRate: 1000, getChannelData: ()
 let joined: { length: number; copies: number[] } | null = null;
 const gains: number[] = [];
 const sinks: string[] = [];
+let closed = 0;
 
 class FakeContext {
   public destination = {};
   public resume = () => Promise.resolve();
+  public close = () => { closed += 1; return Promise.resolve(); };
   public setSinkId = (id: string) => { sinks.push(id); return Promise.resolve(); };
   public decodeAudioData = (data: ArrayBuffer) => Promise.resolve(clip(data.byteLength));
   public createBuffer(_channels: number, length: number) {
@@ -64,6 +66,25 @@ describe('prepared engineer clips', () => {
     voice.setOutput(null);
     await voice.say('Box this lap.', true, 0, 50);
     expect(sinks).toEqual(['headset', '']);
+  });
+
+  it('does not play a call still loading when a stop or a later call came, and reads a failed clip again', async () => {
+    const voice = new ClipVoice(json, binary);
+    const first = voice.say('Yellow, Turn 11.', true, 0, 50);
+    voice.stop();
+    expect(await first).toBe(true);
+    expect(joined).toBeNull();
+    const early = voice.say('Yellow, Turn 11.', true, 0, 50);
+    const late = voice.say('Box this lap.', true, 0, 50);
+    await Promise.all([early, late]);
+    expect(joined).toEqual({ length: 210, copies: [0] });
+    let fail = true;
+    const flaky = new ClipVoice(json, path => fail ? Promise.reject(new Error('offline')) : binary(path));
+    await expect(flaky.say('Box this lap.', true, 0, 50)).rejects.toThrow('offline');
+    fail = false;
+    expect(await flaky.say('Box this lap.', true, 0, 50)).toBe(true);
+    flaky.dispose();
+    expect(closed).toBe(1);
   });
 
   it('reads the manifest again for clips prepared since the page opened', async () => {

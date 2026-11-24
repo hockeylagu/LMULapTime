@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SECONDARY_BUTTON } from '../../common/buttonStyles.js';
 import { Select } from '../../common/dropdown/Select.js';
 import { RadioPlayer } from '../display/radioPlayer.js';
-import { radioVoiceSupported } from '../display/useStrategyRadio.js';
+import { radioVoiceSupported } from '../voice/browserVoice.js';
 import { ClipVoice } from '../voice/clipVoice.js';
 import { KOKORO_VOICES, type KokoroVoiceId } from '../voice/kokoroMessages.js';
 import { KokoroVoice, type KokoroStatus } from '../voice/kokoroVoice.js';
@@ -45,7 +45,7 @@ export function DemoRadioSampler({ volume, output = null }: { volume: number; ou
   const [ms, setMs] = useState<number | null>(null);
   const run = useRef(0);
   const supported = radioVoiceSupported();
-  useEffect(() => () => { player.stop(); kokoro.dispose(); }, [player, kokoro]);
+  useEffect(() => () => { player.stop(); kokoro.dispose(); clips.dispose(); }, [player, kokoro, clips]);
   useEffect(() => { clips.setOutput(output); kokoro.setOutput(output); }, [clips, kokoro, output]);
 
   const stop = () => { run.current += 1; player.stop(); kokoro.stop(); clips.stop(); };

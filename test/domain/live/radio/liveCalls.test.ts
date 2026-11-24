@@ -59,10 +59,21 @@ describe('radio calls', () => {
     const damaged = snapshot();
     damaged.strategy!.damage = { wheel: null, body: 0.4, suspension: null, partsDetached: false,
       impactLap: 10, lapsSinceImpact: 2, paceLossPerLap: 1, lossToFinish: 45, repairSeconds: 30, significant: true };
-    expect(texts(damaged)).toEqual(['Damage. Repair 30 seconds, costs 45 to the flag.']);
+    expect(texts(damaged)).toEqual(['Damage. Repair 30 seconds. Costs 45 to the flag.']);
     damaged.strategy!.damage.repairSeconds = 50;
     damaged.strategy!.damage.suspension = 0.7;
-    expect(texts(damaged)).toEqual(['Suspension damage. Repair 50 seconds, costs 45 to the flag. Stay out.']);
+    expect(texts(damaged)).toEqual(['Suspension damage. Repair 50 seconds. Costs 45 to the flag. Stay out.']);
+    // Past a minute to the nearest 5 seconds, so every value has a clip; said again only when the said repair changes.
+    damaged.strategy!.damage.repairSeconds = 127;
+    damaged.strategy!.damage.lossToFinish = 412;
+    const long = liveCalls(damaged)[0];
+    expect(long.text).toBe('Suspension damage. Repair 125 seconds. Costs over 5 minutes to the flag.');
+    damaged.strategy!.damage.repairSeconds = 126;
+    expect(liveCalls(damaged)[0].key).toBe(long.key);
+    damaged.strategy!.damage.repairSeconds = 400;
+    damaged.strategy!.damage.lossToFinish = 90;
+    expect(texts(damaged)).toEqual(['Suspension damage. Repair over 5 minutes. Costs 90 to the flag. Stay out.']);
+    damaged.strategy!.damage.repairSeconds = 50;
     damaged.strategy!.damage.wheel = { problem: 'flat', corner: 'FR' };
     expect(liveCalls(damaged)[0]).toMatchObject({ text: 'Front right puncture. Box this lap.', priority: 1, family: 'damage' });
   });
@@ -99,9 +110,17 @@ describe('radio calls', () => {
     value.strategy!.resource!.race!.pitInLaps = 0;
     value.strategy!.resource!.race!.sparePerLap = -0.3;
     value.strategy!.pit!.mfd!.tyres = 'No Change';
-    expect(liveCalls(value)[0]).toMatchObject({ text: 'Box this lap. Energy 38 percent, no tyre change.', priority: 1 });
+    expect(liveCalls(value)[0]).toMatchObject({ text: 'Box this lap. Energy 38 percent. No tyre change.', priority: 1 });
     // The over-budget call holds the pit lap: on the box lap it has nothing to say.
-    expect(texts(value)).toEqual(['Box this lap. Energy 38 percent, no tyre change.']);
+    expect(texts(value)).toEqual(['Box this lap. Energy 38 percent. No tyre change.']);
+    // A fuel car: whole litres, rounded up as the pit menu is set.
+    value.strategy!.resource!.kind = 'fuel';
+    value.strategy!.resource!.unit = 'L';
+    value.strategy!.resource!.race!.neededAfterStop = 45.3;
+    expect(texts(value)).toEqual(['Box this lap. Fuel 46 litres. No tyre change.']);
+    value.strategy!.resource!.race!.pitInLaps = 1;
+    value.strategy!.pit!.mfd!.resourceValue = 40;
+    expect(texts(value)).toContain('Pit menu fuel too low. Set 46.');
   });
 
   it('says a new deployment target in kW or map position, in races and practice, once per target', () => {
@@ -136,6 +155,14 @@ describe('radio calls', () => {
     expect(quali(150)).toEqual(['Time for one more lap.']);
     expect(quali(80)).toEqual(['No time for another lap.']);
     expect(quali(300)).toEqual([]);
+    // What was left at the line decides: 150 s left 70 s into the lap was 220 s at the line, two laps and more.
+    const midLap = (left: number, sinceLine: number) => clock({
+      session: liveSession({ kind: 'qualifying', elapsedSeconds: 1000 - left, endSeconds: 1000, playerLapsCompleted: 3, playerLapStartSeconds: 1000 - left - sinceLine }),
+      sessionBest: { lapSeconds: 100, lapSectors: [null, null, null], bestSectors: [null, null, null], bestPossibleSeconds: null },
+    });
+    expect(midLap(150, 70)).toEqual([]);
+    expect(midLap(80, 70)).toEqual(['Time for one more lap.']);
+    expect(midLap(20, 70)).toEqual(['No time for another lap.']);
   });
 
   it('keeps only P1 calls on the race\'s first lap', () => {

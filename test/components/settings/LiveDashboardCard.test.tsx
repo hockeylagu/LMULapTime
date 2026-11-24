@@ -5,9 +5,9 @@ import { requestBody } from '../../fixtures/requestUrl.js';
 
 // Desktop settings have their own request and state coverage in BrowserMonitorSetting.test.tsx.
 vi.mock('../../../src/components/settings/BrowserMonitorSetting.js', () => ({ BrowserMonitorSetting: () => null }));
-const clips = vi.hoisted(() => ({ say: vi.fn(() => Promise.resolve(false)), stop: vi.fn(), setOutput: vi.fn() }));
+const clips = vi.hoisted(() => ({ say: vi.fn(() => Promise.resolve(false)), stop: vi.fn(), setOutput: vi.fn(), dispose: vi.fn() }));
 vi.mock('../../../src/components/live/voice/clipVoice.js', () => ({
-  ClipVoice: class { say = clips.say; stop = clips.stop; setOutput = clips.setOutput; },
+  ClipVoice: class { say = clips.say; stop = clips.stop; setOutput = clips.setOutput; dispose = clips.dispose; },
 }));
 vi.mock('../../../src/components/live/voice/audioOutput.js', () => ({
   audioOutputChoice: () => true, listAudioOutputs: () => Promise.resolve([{ id: 'a1', label: 'Headset' }]),
@@ -97,7 +97,7 @@ describe('LiveDashboardCard', () => {
     clips.say.mockResolvedValueOnce(true);
     fireEvent.click(screen.getByRole('button', { name: 'Play sample' }));
     expect(clips.setOutput).toHaveBeenLastCalledWith('a1');
-    expect(clips.say).toHaveBeenLastCalledWith('Box this lap. Energy 38 percent, no tyre change.', true, 0, 80);
+    expect(clips.say).toHaveBeenLastCalledWith('Box this lap. Energy 38 percent. No tyre change.', true, 0, 80);
   });
 
   it('shows the server message when the setting cannot be read', async () => {

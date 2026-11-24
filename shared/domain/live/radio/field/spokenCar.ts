@@ -12,11 +12,15 @@ export const carClassOf = (car: Pick<LiveFieldCar, 'vehicleClass'>): string | nu
 export const classRank = (carClass: string | null): number | null => (carClass ? CLASS_RANK[carClass] ?? null : null);
 export const classWord = (carClass: string | null): string => (carClass ? CLASS_WORDS[carClass] ?? 'car' : 'car');
 
-/** The manufacturer, short, from the vehicle file (the entry name is the livery and names only a few cars). */
-export function brandOf(car: Pick<LiveFieldCar, 'vehFilename' | 'vehicleName'>): string | null {
-  const model = (resolveVehicle(car.vehFilename) ?? resolveVehicle(car.vehicleName))?.model;
+/** A model's manufacturer as said on the radio: short; null when unknown. */
+export function spokenBrand(model: string | null | undefined): string | null {
   const brand = resolveCarManufacturer(model);
   return brand ? SHORT_BRANDS[brand] ?? brand : null;
+}
+
+/** The manufacturer, short, from the vehicle file (the entry name is the livery and names only a few cars). */
+export function brandOf(car: Pick<LiveFieldCar, 'vehFilename' | 'vehicleName'>): string | null {
+  return spokenBrand((resolveVehicle(car.vehFilename) ?? resolveVehicle(car.vehicleName))?.model);
 }
 
 /**

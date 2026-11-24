@@ -20,6 +20,12 @@ interface Approach { motion: CarMotion; seconds: number; passAt: number }
  * or a corner, a group of them as one call, and a slower-class car the player reaches in a corner (P3). Each approach
  * is said once: its key carries when the car came within reach. Said at once, not in a slot: the pass comes first.
  */
+/** Seconds to a pass, whole and at least one: "1 second", "4 seconds". */
+export function passSeconds(seconds: number): string {
+  const whole = Math.max(1, Math.round(seconds));
+  return whole === 1 ? '1 second' : `${whole} seconds`;
+}
+
 export class TrafficWatch {
   private readonly since = new Map<number, number>();
 
@@ -67,14 +73,14 @@ export class TrafficWatch {
       const [approach] = behind;
       calls.push({
         key: key(`traffic-behind-${event(approach)}`), priority: 2, family: 'traffic', immediate: true,
-        text: `${spokenCar(approach.motion.car, playerClass)} behind, catching. Passes in ${Math.max(1, Math.round(approach.seconds))} seconds.`,
+        text: `${spokenCar(approach.motion.car, playerClass)} behind, catching. Passes in ${passSeconds(approach.seconds)}.`,
         waitSeconds: Math.max(1, approach.seconds - 1),
       });
     }
     for (const approach of ahead.filter(inCorner)) {
       calls.push({
         key: key(`traffic-ahead-${event(approach)}`), priority: 3, family: 'traffic', immediate: true,
-        text: `${spokenCar(approach.motion.car, playerClass)} ahead, ${Math.max(1, Math.round(approach.seconds))} seconds.`,
+        text: `${spokenCar(approach.motion.car, playerClass)} ahead. ${passSeconds(approach.seconds)}.`,
         waitSeconds: Math.max(1, approach.seconds - 1),
       });
     }

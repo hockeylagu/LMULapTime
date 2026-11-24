@@ -3,27 +3,13 @@ import type { LiveSnapshot } from '../../../../shared/types/live.js';
 import type { LiveConnection } from '../../../api/liveStream.js';
 import type { PedalBuffer } from '../pedalBuffer.js';
 import { liveCalls, type LiveCall } from '../../../../shared/domain/live/radio/liveCalls.js';
+import { speakRadio } from '../voice/browserVoice.js';
 
 /** A fluctuating estimate must not alternate between the same two radio calls. */
 const REPEAT_GUARD_MS = 60_000;
 
-export const radioVoiceSupported = (): boolean =>
-  typeof window.speechSynthesis?.speak === 'function' && typeof window.SpeechSynthesisUtterance === 'function';
-
-/** Speaks one text in the browser's English voice at `volume` percent; null when the browser refused it. */
-export function speakRadio(text: string, volume: number, onError?: () => void): SpeechSynthesisUtterance | null {
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-GB';
-  utterance.rate = 1;
-  utterance.volume = Math.min(1, Math.max(0, volume / 100));
-  if (onError) utterance.onerror = onError;
-  try { window.speechSynthesis.speak(utterance); }
-  catch { return null; }
-  return utterance;
-}
-
 /**
- * The strategy calls as radio: urgent calls (box now, puncture) speak at once; the others wait for a straight
+ * The demo's own radio, with no server to schedule it: urgent calls (box now, puncture) speak at once; the others wait for a straight
  * (1 s flat out), like an engineer who keeps quiet in the braking zones. `plan` is a plan change from the strategy
  * engine; an urgent snapshot call still goes first. Each call is said once while its key holds.
  */

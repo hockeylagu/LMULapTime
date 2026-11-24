@@ -11,7 +11,7 @@ import { CompoundText } from '../race/CompoundText.js';
 import { LiveDamageRow } from '../race/LiveDamageRow.js';
 import type { PedalBuffer } from '../pedalBuffer.js';
 import { racePlanView } from '../race/raceAction.js';
-import { LiveStrategySpeech } from '../display/LiveStrategySpeech.js';
+import { LiveStrategySpeech } from './LiveStrategySpeech.js';
 import { planChangeCall, type DemoStopCall, type DemoTyrePlan } from './demoTyrePlan.js';
 import { demoLapStart, showsStrategy } from './strategyWindow.js';
 

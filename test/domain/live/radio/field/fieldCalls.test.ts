@@ -152,11 +152,11 @@ describe('field calls', () => {
     victims.forEach((victim, index) => { victim.car = { ...victim.car, lapDist: 1450 + index * 30, pathLateral: 10, trackEdge: 6 }; });
     state = 'off';
     radio.step(3);
-    expect(radio.heard).toMatchObject([{ text: 'Two cars off right, Turn 6.', priority: 2, family: 'incident' }]);
+    expect(radio.heard).toMatchObject([{ text: 'Turn 6. Two cars off right.', priority: 2, family: 'incident' }]);
     state = 'back';
     for (const victim of victims) victim.car = { ...victim.car, pathLateral: 3 };
     radio.step(0.4);
-    expect(radio.heard.filter(call => call.text.includes('rejoining'))).toMatchObject([{ text: 'Car rejoining, Turn 6, careful.', priority: 1 }]);
+    expect(radio.heard.filter(call => call.text.includes('rejoining'))).toMatchObject([{ text: 'Turn 6. Car rejoining, careful.', priority: 1 }]);
   });
 
   it('waits longer on a car that froze and jumped on before, and leaves a car far ahead for later', () => {
@@ -245,7 +245,7 @@ describe('field calls', () => {
       at(15, { id: 7, place: 9, ...PORSCHE, inPits: true }),
     ]);
     // The Porsches at 10 and 20 s and the Genesis at 29 s pass during the stop; the car in the pits does not count.
-    expect(rejoinText(track, 30)).toBe('Rejoin P4, behind the Genesis, ahead of two GT3s.');
+    expect(rejoinText(track, 30)).toBe('Rejoin P4. Behind the Genesis. Ahead of two GT3s.');
     expect(rejoinText(new FieldTrack(), 30)).toBeNull();
   });
 

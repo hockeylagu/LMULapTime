@@ -99,11 +99,12 @@ export class IncidentWatch {
         const line = this.line(track, onTrack);
         const event = spot?.key ?? `incident-${spotKey}`;
         const text = sentence(`${yellowAt(incident.lapDist) ? 'Yellow, ' : ''}${place}.`) + ` ${sentence(what)} on track, ${sideOf(onTrack)}${line ? `, ${line}` : ''}.`;
-        calls.push({ key: key(event), text, priority: 1, family: 'incident' });
+        // Said before the car is reached, or not at all.
+        calls.push({ key: key(event), text, priority: 1, family: 'incident', waitSeconds: Math.max(2, seconds - 1) });
         if (!spot) this.announced.push({ key: event, lapDist: incident.lapDist, where: place, at: now, cleared: false });
       } else if (!this.announced.some(near)) {
         const count = incident.cars.length;
-        const text = `${count === 1 ? 'Car' : `${countWord(count).charAt(0).toUpperCase()}${countWord(count).slice(1)} cars`} off ${sideOf(incident.cars)}, ${place}.`;
+        const text = `${sentence(place)}. ${count === 1 ? 'Car' : `${sentence(countWord(count))} cars`} off ${sideOf(incident.cars)}.`;
         calls.push({ key: key(`off-${spotKey}`), text, priority: 2, family: 'incident', waitSeconds: Math.max(1, seconds - 1) });
       }
     }
@@ -158,7 +159,8 @@ export class IncidentWatch {
         this.rejoins.push(group);
       }
       if (!calls.some(call => call.key === key(group.event))) {
-        calls.push({ key: key(group.event), text: `Car rejoining, ${place}, careful.`, priority: 1, family: 'incident' });
+        calls.push({ key: key(group.event), text: `${sentence(place)}. Car rejoining, careful.`, priority: 1, family: 'incident',
+          waitSeconds: Math.max(2, track.secondsAhead(ahead) - 1) });
       }
     }
     return calls;
@@ -178,7 +180,8 @@ export class IncidentWatch {
         && apart(entry.lapDist, motion.car.lapDist, track.length) <= CLUSTER_M);
       if (blocked) continue;
       entry.cleared = true;
-      calls.push({ key: key(`clear-${entry.key}`), text: `${sentence(entry.where)} clear.`, priority: 2, family: 'incident', immediate: true });
+      calls.push({ key: key(`clear-${entry.key}`), text: `${sentence(entry.where)} clear.`, priority: 2, family: 'incident', immediate: true,
+        waitSeconds: Math.max(2, track.secondsAhead(ahead) - 1) });
     }
     return calls;
   }

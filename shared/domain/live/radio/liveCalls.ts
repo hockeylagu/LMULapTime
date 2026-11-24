@@ -14,7 +14,10 @@ export interface LiveCall {
   text: string;
   priority: LiveCallPriority;
   family: LiveCallFamily;
-  /** How long a P2/P3 may wait for its slot before it no longer helps; the scheduler's default without it. */
+  /**
+   * How long the call may wait before it no longer helps: a P2/P3 for its slot, a P1 or an `immediate` call behind one
+   * being said (the page drops it after that). The scheduler's defaults without it.
+   */
   waitSeconds?: number;
   /** A P2/P3 said without waiting for a slot, after anything playing: the moment comes before a slot would (traffic). */
   immediate?: boolean;
@@ -22,8 +25,18 @@ export interface LiveCall {
 
 const SPOKEN_CORNERS: Record<LiveCorner, string> = { FL: 'Front left', FR: 'Front right', RL: 'Rear left', RR: 'Rear right' };
 
-/** What a stop loads, as set in the pit menu: whole percent of VE, litres to one decimal; the unit is left out. */
-const spokenSetting = (value: number, unit: '%' | 'L'): string => (unit === '%' ? `${Math.round(value)}` : value.toFixed(1));
+/**
+ * What a stop loads, as set in the pit menu: whole percent of VE, whole litres rounded up (driver, 2026-11-23: a value
+ * the engineer's clips can say); the unit is left out.
+ */
+const spokenSetting = (value: number, unit: '%' | 'L'): string =>
+  `${unit === '%' ? Math.round(value) : Math.ceil(Math.round(value * 10) / 10)}`;
+
+/** Seconds as the damage call says them, each with a clip: the nearest 5 (at least 5) to 5 minutes, null past that. */
+const spokenSeconds = (seconds: number): number | null => {
+  const stepped = Math.max(5, Math.round(seconds / 5) * 5);
+  return stepped <= 300 ? stepped : null;
+};
 
 /** The MFD tyre setting as said on the radio: `no tyre change`, `new medium`. */
 const spokenTyres = (setting: string | null | undefined): string | null => {
@@ -84,8 +97,11 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
     // The whole stop, as the MFD should read: what to load and the tyres.
     const amount = resource && race.neededAfterStop != null
       ? `${name} ${spokenSetting(race.neededAfterStop, resource.unit)}${resource.unit === '%' ? ' percent' : ' litres'}` : null;
-    const load = [amount, spokenTyres(pit?.mfd?.tyres)].filter(Boolean).join(', ');
-    call(`box-now-${stop}`, load ? `Box this lap. ${load.charAt(0).toUpperCase()}${load.slice(1)}.` : 'Box this lap.', 1);
+    // Each value its own sentence, so prepared clips join at full stops: "Energy 38 percent." and "No tyre change."
+    // instead of one clip per load and tyre pair.
+    const load = [amount, spokenTyres(pit?.mfd?.tyres)].filter(part => part !== null)
+      .map(part => ` ${part.charAt(0).toUpperCase()}${part.slice(1)}.`).join('');
+    call(`box-now-${stop}`, `Box this lap.${load}`, 1);
   }
   if (mode === 'pit' && (race?.pitInLaps === 1 || race?.pitInLaps === 2)) {
     call(`box-in-${race.pitInLaps}-${stop}`, race.pitInLaps === 2 ? 'Box in 2 laps.' : 'Box next lap.', 2);
@@ -115,8 +131,10 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
     // LMU's repair estimate against our measured loss to the flag; staying out is said only when the repair alone costs more.
     const what = damage.suspension ? 'Suspension damage' : 'Damage';
     const verdict = damage.repairSeconds >= damage.lossToFinish ? ' Stay out.' : '';
-    call(`damage-${Math.round(damage.repairSeconds)}`,
-      `${what}. Repair ${Math.round(damage.repairSeconds)} seconds, costs ${Math.round(damage.lossToFinish)} to the flag.${verdict}`, 2, 'damage');
+    const repair = spokenSeconds(damage.repairSeconds);
+    const cost = spokenSeconds(damage.lossToFinish);
+    call(`damage-${repair ?? 'long'}`,
+      `${what}. Repair ${repair === null ? 'over 5 minutes' : `${repair} seconds`}. Costs ${cost ?? 'over 5 minutes'} to the flag.${verdict}`, 2, 'damage');
   }
   if (mode === 'saving' && resource?.saving) {
     call(`saving-avoids-stop-${stop}`, `Save ${Math.max(1, Math.ceil(resource.saving.savePercent))} percent to skip the stop.`, 3);
@@ -133,7 +151,7 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
 const TEN_MINUTES = 600;
 
 /**
- * The session clock: "Ten minutes." and "Last lap." in a race (P3); in qualifying, at each line, whether the lap
+ * The session clock: "Ten minutes." and "Last lap." in a race (P3); in qualifying, once a lap, whether the lap
  * started leaves time for one more (P2), from the player's session best.
  */
 function clockCalls(snapshot: LiveSnapshot, call: (event: string, text: string, priority: LiveCallPriority, family: LiveCallFamily) => void): void {
@@ -147,9 +165,13 @@ function clockCalls(snapshot: LiveSnapshot, call: (event: string, text: string, 
   const pace = snapshot.sessionBest?.lapSeconds ?? null;
   const lap = session.playerLapsCompleted;
   if (session.kind !== 'qualifying' || left === null || pace === null || !lap || snapshot.strategy?.pit?.state !== 'none') return;
-  // A lap started before the clock runs out still counts; only the next one would not start.
-  if (left < pace) call(`quali-lap-${lap}`, 'No time for another lap.', 2, 'clock');
-  else if (left < 2 * pace) call(`quali-lap-${lap}`, 'Time for one more lap.', 2, 'clock');
+  // A lap started before the clock runs out still counts; only the next one would not start. What was left at the
+  // line decides, wherever in the lap the call is made: judged on the clock now, "one more lap" came twice, the first
+  // a lap early (Sebring qualifying 2026-11-22).
+  const start = session.playerLapStartSeconds ?? session.elapsedSeconds;
+  const atLine = left + Math.max(0, session.elapsedSeconds - start);
+  if (atLine < pace) call(`quali-lap-${lap}`, 'No time for another lap.', 2, 'clock');
+  else if (atLine < 2 * pace) call(`quali-lap-${lap}`, 'Time for one more lap.', 2, 'clock');
 }
 
 /** On the race's first lap only P1 calls speak; then the most urgent first, keeping the order within a priority. */

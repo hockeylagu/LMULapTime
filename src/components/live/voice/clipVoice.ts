@@ -17,6 +17,8 @@ export class ClipVoice {
   private context: AudioContext | null = null;
   private buffers = new Map<string, Promise<AudioBuffer>>();
   private source: AudioBufferSourceNode | null = null;
+  /** Counts the calls and stops: a call still loading when a later one or a stop came does not play. */
+  private run = 0;
   private output: string | null = null;
   private routed: string | null | undefined;
 
@@ -46,6 +48,8 @@ export class ClipVoice {
 
   /** Plays the call; resolves once heard (or stopped), false when the clips for it are missing. */
   public async say(text: string, whole: boolean, gapMs: number, volume: number): Promise<boolean> {
+    this.run += 1;
+    const run = this.run;
     // Created from the click that asked for it, so the browser lets it play.
     this.context ??= new AudioContext();
     const context = this.context;
@@ -55,8 +59,9 @@ export class ClipVoice {
       await routeAudio(context, this.output);
     }
     const files = await this.files(text, whole);
-    if (!files) return false;
+    if (!files || files.length === 0) return false;
     const clips = await Promise.all(files.map(file => this.buffer(context, file)));
+    if (run !== this.run) return true;
     const gap = Math.round((gapMs / 1000) * clips[0].sampleRate);
     const joined = context.createBuffer(1, clips.reduce((sum, clip) => sum + clip.length, 0) + gap * (clips.length - 1), clips[0].sampleRate);
     let offset = 0;
@@ -64,7 +69,7 @@ export class ClipVoice {
       joined.copyToChannel(clip.getChannelData(0), 0, offset);
       offset += clip.length + gap;
     }
-    this.stop();
+    this.source?.stop();
     const gain = context.createGain();
     gain.gain.value = Math.min(1, Math.max(0, volume / 100));
     const source = context.createBufferSource();
@@ -80,8 +85,17 @@ export class ClipVoice {
   }
 
   public stop(): void {
+    this.run += 1;
     this.source?.stop();
     this.source = null;
+  }
+
+  /** Stops and frees the audio output (the page that owned the voice closes). */
+  public dispose(): void {
+    this.stop();
+    void this.context?.close();
+    this.context = null;
+    this.routed = undefined;
   }
 
   private load(): Promise<ClipManifest | null> {
@@ -95,6 +109,8 @@ export class ClipVoice {
     if (!buffer) {
       buffer = this.readBinary(`${BASE}${file}`).then(data => context.decodeAudioData(data));
       this.buffers.set(file, buffer);
+      // A clip that failed to load is read again the next time, not failed for good.
+      buffer.catch(() => this.buffers.delete(file));
     }
     return buffer;
   }

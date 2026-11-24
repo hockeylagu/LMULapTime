@@ -103,7 +103,7 @@ const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.
 /** A live-recorded race's radio log: one call said, one cut off, one never said. */
 export const radioCalls: SessionRadioCall[] = [
   { id: 1, gameTime: 300, lap: 4, priority: 2, family: 'strategy', text: 'Box in 2 laps.', outcome: 'spoken' },
-  { id: 2, gameTime: 420, lap: 6, priority: 1, family: 'strategy', text: 'Box this lap. Energy 38 percent, new medium.', outcome: 'interrupted' },
+  { id: 2, gameTime: 420, lap: 6, priority: 1, family: 'strategy', text: 'Box this lap. Energy 38 percent. New medium.', outcome: 'interrupted' },
   { id: 3, gameTime: 430, lap: 6, priority: 3, family: 'strategy', text: 'Energy use too high. Save to hold lap 19.', outcome: 'expired' },
 ];
 

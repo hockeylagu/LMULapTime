@@ -4,7 +4,8 @@ import type { LiveConnection } from '../../../api/liveStream.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import type { PedalBuffer } from '../pedalBuffer.js';
 import type { LiveCall } from '../../../../shared/domain/live/radio/liveCalls.js';
-import { radioVoiceSupported, useStrategyRadio } from './useStrategyRadio.js';
+import { radioVoiceSupported } from '../voice/browserVoice.js';
+import { useStrategyRadio } from './useStrategyRadio.js';
 
 /** The demo's voice controls: opt-in for each visit, with a button to read the current call again. */
 export function LiveStrategySpeech({ snapshot, connection, buffer, plan = null, volume = 100 }: {

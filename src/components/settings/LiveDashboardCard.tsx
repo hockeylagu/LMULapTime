@@ -8,11 +8,11 @@ import { Select } from '../common/dropdown/Select.js';
 import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './SettingsPanel.js';
 import { BrowserMonitorSetting } from './BrowserMonitorSetting.js';
 import { RadioOutputSetting } from './RadioOutputSetting.js';
-import { radioVoiceSupported, speakRadio } from '../live/display/useStrategyRadio.js';
+import { radioVoiceSupported, speakRadio } from '../live/voice/browserVoice.js';
 import { ClipVoice } from '../live/voice/clipVoice.js';
 
 /** A demo call, so George's prepared clip exists for it (`tools/dev/prepareVoiceClips.ts`). */
-const VOICE_SAMPLE = 'Box this lap. Energy 38 percent, no tyre change.';
+const VOICE_SAMPLE = 'Box this lap. Energy 38 percent. No tyre change.';
 
 /** VE or fuel kept at the pit entry and in a stop's load, in seconds of driving (the server accepts these values only). */
 const RESERVE_OPTIONS = RESERVE_SECONDS_CHOICES.map(seconds => ({
@@ -39,7 +39,7 @@ export const LiveDashboardCard: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const saved = useRef(0);
   const [clips] = useState(() => new ClipVoice());
-  useEffect(() => () => clips.stop(), [clips]);
+  useEffect(() => () => clips.dispose(), [clips]);
 
   useEffect(() => {
     const request = new AbortController();
@@ -137,9 +137,9 @@ export const LiveDashboardCard: React.FC = () => {
             <RadioOutputSetting value={settings?.voiceOutput ?? null} volume={settings?.voiceVolume ?? DEFAULT_LIVE_SETTINGS.voiceVolume}
               disabled={settings === null || isSaving || settings.voice === false} onChange={voiceOutput => void save({ voiceOutput })} />
             <p className="text-xs leading-relaxed text-lmu-muted">
-              Strategy calls spoken on the live dashboard in the browser&apos;s English voice: urgent ones at once, the others on a straight.
-              Play sample uses George&apos;s prepared clips on the radio output (the browser&apos;s voice when they are not prepared). The
-              browser&apos;s voice always plays on the Windows default.
+              Radio calls on the live dashboard: urgent ones at once, the others on a straight. They play from George&apos;s prepared clips
+              on the radio output; a call with no clip yet is said in the browser&apos;s English voice, which always plays on the Windows
+              default. Play sample does the same.
               {!radioVoiceSupported() && ' This browser has no voice.'}
             </p>
           </div>

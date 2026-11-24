@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DemoRadioSampler } from '../../../../src/components/live/demo/DemoRadioSampler.js';
 
 const kokoro = vi.hoisted(() => ({ say: vi.fn(() => Promise.resolve(900)), ended: vi.fn(() => Promise.resolve()), stop: vi.fn(), dispose: vi.fn(), setOutput: vi.fn() }));
-const clips = vi.hoisted(() => ({ say: vi.fn((text: string) => Promise.resolve(text.startsWith('Box'))), stop: vi.fn(), setOutput: vi.fn() }));
-vi.mock('../../../../src/components/live/voice/clipVoice.js', () => ({ ClipVoice: class { say = clips.say; stop = clips.stop; setOutput = clips.setOutput; } }));
+const clips = vi.hoisted(() => ({ say: vi.fn((text: string) => Promise.resolve(text.startsWith('Box'))), stop: vi.fn(), setOutput: vi.fn(), dispose: vi.fn() }));
+vi.mock('../../../../src/components/live/voice/clipVoice.js', () => ({ ClipVoice: class { say = clips.say; stop = clips.stop; setOutput = clips.setOutput; dispose = clips.dispose; } }));
 vi.mock('../../../../src/components/live/voice/kokoroVoice.js', () => ({
   KokoroVoice: class { say = kokoro.say; ended = kokoro.ended; stop = kokoro.stop; dispose = kokoro.dispose; setOutput = kokoro.setOutput; },
 }));
