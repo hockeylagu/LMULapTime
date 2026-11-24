@@ -12,11 +12,33 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   or when the call no longer applies, replaced by a newer one. A P2/P3 key is said once a run; a P1 may come back
   after 60 s (a stop not taken). Reset on a new run or session.
 - Log: every proposed call in SQLite `live_radio_calls` (`server/core/live/dbRadioLogStore.ts`) with the recording,
-  game time, lap and outcome; the page reports `spoken`, `interrupted`, `locked` or `failed`
+  game time, lap and outcome; the page reports `spoken`, `interrupted`, `locked`, `failed` or `late`
   (`POST /api/live/calls/:id/outcome`).
-- Page: SSE `call` events played by `src/components/live/display/radioPlayer.ts` (a P1 cuts in, the rest wait their
-  turn) through `LiveRadio.tsx`; Settings has "Radio voice calls" (on by default) and the volume. The demo keeps its
-  own controls (`LiveStrategySpeech.tsx`).
+- Timing fixes (2026-11-23, from reading the pipeline; to check in the next race's log):
+  - A P2/P3 keeps waiting for its slot while the page is still saying a call (the scheduler knows from the outcomes;
+    a page that never answers holds it 20 s at most). Sent at once it queued on the page and was said up to 15 s
+    later, wherever the car was by then.
+  - A call said at once (a P1, traffic, a clear) carries how long it stays worth saying (`waitSeconds`: an incident
+    until a second before the car is reached, traffic until a second before the pass); the others keep 30 s (P1) and
+    15 s. Past it the page drops the call and reports `late`.
+  - Calls no page could say (`no-client`: none connected, or reloading; `locked`: not clicked yet) are no longer
+    spent for the run: they are proposed again, while they still apply, when a page connects and when a page says
+    its radio can speak (`POST /api/live/calls/ready`, sent when the voice is on and the page was clicked).
+- Page: SSE `call` events played by `src/components/live/display/radioPlayer.ts` (a P1 cuts a P2/P3 and waits for a
+  P1, the rest wait their turn) through `LiveRadio.tsx`, in the browser voice (`voice/browserVoice.ts`); Settings has
+  "Radio voice calls" (on by default) and the volume. The demo keeps its own controls
+  (`demo/LiveStrategySpeech.tsx`).
+- Player fixes from the Sebring log (2026-11-23): of eight calls spoken right after a cut none reported its end, six
+  held every later call for 10 s to 5 minutes, and a P1 could cut a P1 ("Car stopped on track" lost to "Yellow,
+  sector 3."). Now a call the browser has not started in 2 s, or not ended in 3 s plus 200 ms a character, is
+  reported `failed` and the next one goes on; the call after a cut is spoken 50 ms later; a P1 waits for a P1. The
+  scheduler reads the page's outcome: a call `failed` or `interrupted` is proposed once more a run while it still
+  applies. Cause, reproduced silently in Chrome (2026-11-23): the races run in Chrome, this PC has no British Windows
+  voice, so `en-GB` gives the online "Google UK English Female", and that voice drops a call spoken in the same task
+  as `cancel()` with no event at all (6 of 6; spoken 1 to 250 ms later, 14 of 14 played). The Windows voices do not
+  have the fault. A call said in the browser voice sends its text to Google's speech service and needs the network; the prepared clips
+  (below) need neither. Check the log after the next race: no `interrupted` P1, no `failed` rows. The qualifying clock call is judged on what was left at the line (`LiveSessionInfo.playerLapStartSeconds`):
+  judged on the clock now it came twice, the first a lap early.
 - Debrief: a live-recorded session's calls by lap with what became of each (`GET /api/session/:id/radio`,
   `SessionRadioCard.tsx`), through the recordings matched to the session.
 - Checked off the car on five races with stops or sprints (2026-11-22, `.tmp/voice-sim/scheduler.ts`), step 2 wording:
@@ -30,15 +52,15 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   - Incidents (P1, never repeated): a car slower than 3 m/s or half the field's speed there for 1.5 s (4.5 s for a
     car that froze and jumped on), within 15 s at the player's pace; cars within 150 m are one call, a spot stays
     one incident for 60 s. "Turn 6. Car stopped on track, left, in your path.", "Yellow, " in front when the game's
-    sector yellow covers it, "Turn 6 clear." on the same approach. A car more than 3 m off: "Car off right, Turn 6."
-    (P2); back on slowly within 6 s ahead after 2 s off: "Car rejoining, Turn 6, careful." The game's sector yellow
+    sector yellow covers it, "Turn 6 clear." on the same approach. A car more than 3 m off: "Turn 6. Car off right."
+    (P2); back on slowly within 6 s ahead after 2 s off: "Turn 6. Car rejoining, careful." The game's sector yellow
     with no slow car to explain it after 2 s: "Yellow, sector 2.", green once it holds 10 s. Turns are named from
     the layout's placed turns (`server/live/radio/layoutTurns.ts`), else the sector.
   - Traffic (said at once, not slotted): a faster class closing within 6 s with the pass landing in a corner
     ("Hyper Porsche behind, catching. Passes in 6 seconds.", "Two Hypers behind.") as a P2, a slower class ahead
     as a P3 inside the lap budget; none on the race's first lap. Names from `resolveVehicle` + the manufacturer,
     the class word only when it differs from the player's.
-  - Rejoin, on the box call: "Rejoin P4, behind the Genesis, ahead of two GT3s." from the stored pit lane loss plus
+  - Rejoin, on the box call: "Rejoin P4. Behind the Genesis. Ahead of two GT3s." from the stored pit lane loss plus
     the planned service, the gaps from progress times the player's median lap.
   - Clock and penalties: "Ten minutes.", "Last lap.", in qualifying "Time for one more lap." or "No time for another
     lap.", and "Penalty pending." (P1, once per penalty count).
@@ -59,8 +81,24 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   sampler plays them whole or joined by sentence with a 0-120 ms join gap (`voice/clipVoice.ts`): no synthesis, no
   CPU. Decided (driver, 2026-11-22): join at full stops only. Joined at commas too, each piece kept a sentence's own
   end tone and sounded off against the whole call; by sentence is fine. So the live library is sentence variants:
-  per-track turn sentences ("Turn 6.", "Yellow, Turn 6.") plus a shared set for the rest of each call. Not all
-  of it yet (driver: the call list is not settled).
+  turn sentences ("Turn 6.", "Yellow, Turn 6.") plus a shared set for the rest of each call.
+- George on the live dashboard (driver, 2026-11-23: the demo was to find the voice, the races use it). The page's
+  `RadioPlayer` plays a call from the clips, joined by sentence with a 40 ms gap, at the Settings volume on the radio
+  output, when every sentence of the call has a clip; else the whole call is said in the browser voice, on the same
+  time limits. `shared/domain/live/radio/radioSentences.ts` lists every sentence a clip can cover, most useful first,
+  and `prepareVoiceClips.ts` makes them (the manifest is written as it goes, so a stopped run keeps its clips). A
+  sentence with a number or a name needs one clip per value, so each value is a sentence of its own and never paired
+  with another: the stop's load and its tyres ("Energy 38 percent. No tyre change."), a car ahead and its seconds
+  ("GT3 Lexus ahead. 4 seconds."); pit laps 1-200, percents, litres, fuel ratios 0.50-1.50 and 37 turn names x 3
+  remain the bulk: 1,406 sentences (2,793 while pairs had a clip each). No browser voice is the aim (driver,
+  2026-11-23), so the calls with open-ended values were reworded into short sentences of their own (driver's choices):
+  fuel in whole litres rounded up ("Fuel 46 litres. New medium.", "Set 46."); the rejoin as "Rejoin P4. Behind the
+  Genesis. Ahead of two GT3s."; the damage as "Repair 30 seconds. Costs 45 to the flag.", to the nearest
+  5 s up to 5 minutes, "over 5 minutes" past that; cars off and rejoining with the turn first ("Turn 2. Two cars
+  off right.", "Turn 6. Car rejoining, careful."), as the stopped-car call. Only a value past the library's ranges
+  still falls to the browser voice: more than six cars in a group, a pit lap past 200, a load past 120 litres, a
+  class place past 60. `.tmp/voice-cover/cover.ts` counts the logged calls the library covers. A wording change in
+  `liveCalls` or `radio/field/` is copied to `radioSentences` and the clips prepared again with the game closed.
 - First online weekend with the radio (Sebring School GT3, 2026-11-22, browser voice): practice 53 calls in ~9 laps
   (~6 a lap, above the 1-2.6 simulated: clears 1-2 s after their incident, green calls replaced or expired, the first
   10 locked until the page was clicked); qualifying 9, of which all 6 incident calls were false: it was LMU's private
@@ -116,12 +154,12 @@ would ask it? Silence is an answer too: no call means "on plan", so nothing conf
 | Question while driving | Answer | When |
 |---|---|---|
 | Will my energy/fuel last to the stop or the flag? | Silence = yes; "Energy use too high. Save to hold lap 18." | After the line, when the plan breaks |
-| When do I pit, and what do I set? | "Box in 2 laps." "Box this lap. Energy 62 percent, new mediums." | After the line; last straight before pit entry |
+| When do I pit, and what do I set? | "Box in 2 laps." "Box this lap. Energy 62 percent. New medium." | After the line; last straight before pit entry |
 | Hypercar: should I change the deployment? | Silence = keep it; "Set deployment 40." | Next straight, when the advice changes |
 | Is my pit menu right? | "Pit menu energy too low. Set 62." | When a stop is planned and the MFD is wrong |
 | Puncture, wheel gone? | "Front right puncture. Box this lap." | At once |
 | Where do I rejoin after the stop? | "Rejoin P6, behind the BMW, ahead of two Hypers." | With "Box in 2 laps" and on the box lap |
-| Is the damage worth fixing? | "Repair 30 seconds, costs 12 to the flag. Stay out." | First straight after the damage read |
+| Is the damage worth fixing? | "Repair 30 seconds. Costs 12 to the flag. Stay out." | First straight after the damage read |
 | Will my tyres last? | "Tyres won't reach the flag. Plan a change." | After the line, once |
 | Wets or slicks? | "Box this lap for wets." "Box this lap for slicks." | When the track reaches Slightly wet / Dry |
 | Is rain coming, is the track changing? | "Rain expected around lap 14." "Track now damp." | When it changes |
@@ -313,7 +351,7 @@ adds P3.
 
 | Call | Trigger | P |
 |---|---|---|
-| "Box this lap. Energy 62 percent, new mediums." | Plan pit lap is the current lap; on the last straight before pit entry | P1 |
+| "Box this lap. Energy 62 percent. New medium." | Plan pit lap is the current lap; on the last straight before pit entry | P1 |
 | "Box in 2 laps." / "Box next lap." | Plan pit lap changes to 2 / 1 laps away | P2 |
 | "Pit menu energy too low. Set 62." | MFD read below the needed amount while a stop is planned | P2 |
 | "Fuel ratio too low. Set 0.88." | MFD ratio below recommendation | P2 |
@@ -328,7 +366,7 @@ adds P3.
 | Call | Trigger | P |
 |---|---|---|
 | "Front left puncture. Box this lap." | Wheel `flat` or `detached` (shared memory, already decoded in `rf2Decode.ts`); once per wheel | P1 |
-| "Suspension damage. Repair 30 seconds, costs 12 to the flag. Stay out." | Significant damage with repair and projected loss known | P2 |
+| "Suspension damage. Repair 30 seconds. Costs 12 to the flag. Stay out." | Significant damage with repair and projected loss known | P2 |
 | "Tyres won't reach the flag. Plan a change." | Projected tread below the floor | P3 |
 
 Repair seconds are LMU's estimate and the pace loss is our median measure; the call says which wins.
@@ -422,7 +460,7 @@ by the sector's distance.
 | "Yellow, Turn 6. Car stopped on track, left, in your path." | Car below ~40-50 % of the reference speed at its lap distance (or stopped), not in pits, within ~15 s ahead | P1 |
 | "Yellow, Turn 1. Two cars off right. Track clear." | Several slow cars within ~150 m, all more than ~3 m beyond `trackEdge`, within ~15 s | P2 |
 | "Slow car ahead, 6 seconds. Off your line, right." | Same, before any yellow, within ~10 s | P1 |
-| "Car rejoining, Turn 9, careful." | A car that was off track moves back inside the edge, within ~15 s ahead | P1 |
+| "Turn 9. Car rejoining, careful." | A car that was off track moves back inside the edge, within ~15 s ahead | P1 |
 | "Yellow far ahead, sector 3." | Incident or sector yellow 15-60 s ahead | P3 |
 | "Turn 6 clear." | Only after an "on track" call, once the car has moved off or away before the player arrives | P2 |
 
@@ -463,7 +501,7 @@ by the sector's distance.
 |---|---|---|
 | "Hyper Ferrari behind, catching. Passes in 6 seconds." | Faster-class car within ~4 s and closing, pass in a braking zone or corner (~0.9 per lap measured with the groups) | P2 |
 | "Two Hypers behind." | Group of faster cars arriving together (2+ within 6 s), one call for the group (~0.2 per lap measured) | P2 |
-| "GT3 Aston ahead, 3 seconds." (prototype drivers) | Slower class ahead within reach before the next braking zone (Daytona: 2.3 such passes per lap in all, 0.9-1.3 in braking zones and corners) | P3 |
+| "GT3 Aston ahead. 3 seconds." (prototype drivers) | Slower class ahead within reach before the next braking zone (Daytona: 2.3 such passes per lap in all, 0.9-1.3 in braking zones and corners) | P3 |
 | "The Porsche behind, 0.6, closing." | Same-class car within 1 s and gaining over two laps | P3 |
 | "Gap to P4 1.2, closing." | Once per lap after the line, only while the gap changes by more than 0.2 s/lap | P3 |
 
@@ -589,7 +627,7 @@ fetching them.
 Every call the engine produces is stored, spoken or not: `recordingId` (linked to the reconciled
 session via the existing XML reconciliation), game time, lap, lap distance, key, priority, text, and
 outcome (`spoken`, `dropped-budget`, `expired`, `replaced`, `interrupted`, `locked`, `no-client`,
-`failed`). The debrief of the reconciled session shows it as a radio timeline by lap, so wording,
+`failed`, `late`). The debrief of the reconciled session shows it as a radio timeline by lap, so wording,
 timing and too-chatty laps can be refined after each race. Dropped calls stay in the log; they show
 what the budget is hiding.
 
