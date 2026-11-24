@@ -83,7 +83,7 @@ it('draws the metallic layer only for paint with a flake map, from the black reg
     return (compile(material).uniforms.paint_base.value as Vector4[]).map(base => base.z);
   };
   expect(metallic({albedo: map('a')})).toEqual([0, 0, 0, 0, 0]);
-  const flaked = metallic({albedo: map('a'), metallicFlakes: map('f')});
+  const flaked = metallic({albedo: map('a'), metallicFlakeNoise: map('f')});
   expect(flaked[0]).toBeCloseTo(0.8); expect(flaked.slice(1)).toEqual([0, 0, 0, 0]);
 });
 

@@ -122,7 +122,7 @@ export function paintLayers(paint: CarSurface, texture: (path: string) => Textur
   const regions = REGIONS.map(name => group(group(parameters, 'regions'), name));
   const coat = regions.map(r => new Vector4(number(r, 'clearCoatSpecStrength'), number(r, 'clearCoatRoughness'), Math.sqrt(number(r, 'clearCoatRefractiveIndex')), number(r, 'baseCoatSpecStrength')));
   const base = regions.map((r, i) => new Vector4(number(r, 'baseCoatRoughness'), Math.sqrt(number(r, 'baseCoatRefractiveIndex')),
-    i === 0 && paint.maps.metallicFlakes?.texture ? number(r, 'metallicPaintStrength') : 0, i === 1 && paint.maps.carbon?.texture ? number(r, 'carbonFibreStrength') : 0));
+    i === 0 && paint.maps.metallicFlakeNoise?.texture ? number(r, 'metallicPaintStrength') : 0, i === 1 && paint.maps.carbon?.texture ? number(r, 'carbonFibreStrength') : 0));
   const lacquer = regions.map(r => colour(r.lacquerColour));
   const carbonScale = group(parameters, 'uvScale').carbonFibre;
   if (!Array.isArray(carbonScale) || carbonScale.length !== 2 || !carbonScale.every(Number.isFinite)) throw Error('Car paint has no uvScale.carbonFibre');
