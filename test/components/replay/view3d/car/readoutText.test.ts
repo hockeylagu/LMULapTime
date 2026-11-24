@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CarReadout, CarReadoutFont, CarReadoutText } from '../../../../../shared/types/scenes/car.js';
 import { lapTimeText, readoutGlyphQuads, readoutText, readoutTextQuads } from '../../../../../src/components/replay/view3d/car/readoutText.js';
+import { setReadoutLapExtras } from '../../../../../src/components/replay/view3d/car/readoutLapExtras.js';
 
 const field = (extra: Partial<CarReadoutText> = {}): CarReadoutText => ({
   name: 'Speed', font: 0, scale: [1, 1], offset: [0.5, 0.25], alignW: 0, alignH: 0, alphaColor: null, units: 1, defaultValue: '', ...extra,
@@ -51,6 +52,58 @@ describe('readout text (decoded from the game)', () => {
     expect(at('LapsCompleted', 1050)).toBe('2');
     expect(readoutText(field({name: 'BestLap'}), {x: 0, y: 0, z: 0}, 1050, {...lap, currentLap: 1})).toBe('-:--.---');
     expect(readoutText(field({name: 'CurrentLap'}), {x: 0, y: 0, z: 0}, 1050, {})).toBeNull();
+  });
+
+  it('shows sector times: the finished lap for 10 s after the line, then this lap finished or running', () => {
+    const laps = [{lapNumber: 1, lapTimeSec: 90, s1Sec: 30, s2Sec: 31, s3Sec: 29}, {lapNumber: 2, lapTimeSec: 88, s1Sec: 29.5, s2Sec: 30, s3Sec: 28.5}];
+    const lap = {currentLap: 2, lapStartTimeSec: 100, timeReference: 'session' as const, laps};
+    const at = (name: CarReadoutText['name'], timeSec: number) => readoutText(field({name}), {x: 0, y: 0, z: 0}, timeSec, lap);
+    expect(at('LapTimeSector1', 105)).toBe('0:30.000');
+    expect(at('LapTimeSector3', 105)).toBe('0:29.000');
+    expect(at('LapTimeSector1', 120)).toBe('0:20.000');
+    expect(at('LapTimeSector2', 120)).toBe('-:--.---');
+    expect(at('LapTimeSector1', 140)).toBe('0:29.500');
+    expect(at('LapTimeSector2', 140)).toBe('0:10.500');
+    expect(at('LapTimeSector3', 180)).toBe('0:20.500');
+  });
+
+  it('shows the delta, predicted lap and last-lap use once the extras are registered', () => {
+    const laps = [{lapNumber: 1, lapTimeSec: 90, s1Sec: 0, s2Sec: 0, s3Sec: 0}];
+    const points = [{x: 0, y: 0, z: 0, fuel: 50, virtualEnergy: 80}, {x: 0, y: 0, z: 0, fuel: 48.7, virtualEnergy: 76.5}];
+    const lap = {currentLap: 2, lapStartTimeSec: 0, timeReference: 'session' as const, laps, points};
+    const at = (name: CarReadoutText['name'], index: number) => readoutText(field({name}), points[index], 0, lap, index);
+    expect(at('DeltaPositive', 1)).toBeNull();
+    expect(at('LapTimePredicted', 1)).toBeNull();
+    setReadoutLapExtras(lap, {referenceLapSec: 90, delta: [0, -0.4567], previousFuelUsed: 2.5, previousEnergyUsed: 4.25});
+    expect(at('DeltaNegative', 1)).toBe('-0.457');
+    expect(at('DeltaPositive', 1)).toBe('');
+    expect(at('DeltaNeutral', 1)).toBe('');
+    expect(at('DeltaPositive', 0)).toBe('+0.000');
+    expect(at('LapTimePredicted', 1)).toBe('1:29.543');
+    expect(at('FuelUsedThisLap', 1)).toBe('1.30');
+    expect(at('FuelLastLap', 1)).toBe('2.50');
+    expect(at('VirtualEnergyUsedThisLap', 1)).toBe('3.50');
+    expect(at('VirtualEnergyLastLap', 1)).toBe('4.25');
+    expect(readoutText(field({name: 'DeltaPositive'}), points[1], 0, lap, 1)).toBe('');
+    const first = {currentLap: 1, lapStartTimeSec: 0, laps: []};
+    setReadoutLapExtras(first, {referenceLapSec: null, delta: null, previousFuelUsed: null, previousEnergyUsed: null});
+    expect(readoutText(field({name: 'DeltaNeutral'}), {x: 0, y: 0, z: 0}, 0, first, 0)).toBe(' -.---');
+    expect(readoutText(field({name: 'LapTimePredicted'}), {x: 0, y: 0, z: 0}, 0, first, 0)).toBe('-:--.---');
+    expect(readoutText(field({name: 'FuelLastLap'}), {x: 0, y: 0, z: 0}, 0, first, 0)).toBeNull();
+  });
+
+  it('shows the place, the laps in the stint and the battery level', () => {
+    const laps = [1, 2, 3, 4, 5].map(lapNumber => ({lapNumber, lapTimeSec: 90, s1Sec: 0, s2Sec: 0, s3Sec: 0, isPitStop: lapNumber === 3}));
+    const lap = {currentLap: 6, lapStartTimeSec: 500, timeReference: 'session' as const, laps, driverSlot: 7,
+      standingsHistory: [{timeSec: 0, order: [3, 7, 1]}, {timeSec: 520, order: [7, 3, 1]}]};
+    expect(readoutText(field({name: 'Place'}), {x: 0, y: 0, z: 0}, 510, lap)).toBe(' 2/3');
+    expect(readoutText(field({name: 'Place'}), {x: 0, y: 0, z: 0}, 530, lap)).toBe(' 1/3');
+    expect(readoutText(field({name: 'Place'}), {x: 0, y: 0, z: 0}, 30, {...lap, timeReference: 'lap'})).toBe(' 1/3');
+    expect(readoutText(field({name: 'LapsInStint'}), {x: 0, y: 0, z: 0}, 510, lap)).toBe('2');
+    expect(readoutText(field({name: 'LapsInStint'}), {x: 0, y: 0, z: 0}, 510, {...lap, laps: laps.map(row => ({...row, isPitStop: false}))})).toBe('5');
+    expect(readoutText(field({name: 'BatteryLevelDigit'}), {x: 0, y: 0, z: 0, soc: 63.4}, 0, lap)).toBe('63');
+    expect(readoutText(field({name: 'BatteryLevelDigit'}), {x: 0, y: 0, z: 0, soc: 7.26}, 0, lap)).toBe('7.3');
+    expect(readoutText(field({name: 'Laps'}), {x: 0, y: 0, z: 0}, 510, lap)).toBeNull();
   });
 
   it('lays glyphs out on whole pixels from the anchor, aligned by advance width and cell height - 2', () => {

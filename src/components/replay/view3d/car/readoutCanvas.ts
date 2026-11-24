@@ -4,6 +4,7 @@ import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.j
 import type { RenderPose } from '../scene/replayPose.js';
 import { readoutQuads, type ReadoutQuad } from './readoutDraw.js';
 import { readoutTextQuads, type ReadoutLapContext } from './readoutText.js';
+import { readoutLapExtras } from './readoutLapExtras.js';
 
 /** Side of the readout canvas in pixels where the package gives no size (the game's canvases are 1024 or 2048 px square); quads are in canvas units. */
 export const READOUT_CANVAS_PX = 1024;
@@ -12,11 +13,11 @@ const MAX_GLYPHS = 63;
 
 /**
  * A car's readout canvas: the texture the game redraws every frame for the screen materials the readout names (`CarReadout.material`).
- * `draw` takes the lap's sample; the canvas is repainted at the next `readoutPainter.flush` when its quads changed.
+ * `draw` takes the lap's sample and its index in the lap; the canvas is repainted at the next `readoutPainter.flush` when its quads changed.
  */
 export interface ReadoutCanvas {
   readonly texture: Texture;
-  draw(point: ReplayTrajectoryPoint, timeSec: number, lap: ReadoutLapContext): void;
+  draw(point: ReplayTrajectoryPoint, timeSec: number, lap: ReadoutLapContext, index?: number): void;
 }
 
 interface PaintedCanvas extends ReadoutCanvas { paint(renderer: WebGLRenderer): void }
@@ -110,8 +111,9 @@ export function createReadoutCanvas(readout: CarReadout, atlas: (path: string) =
   };
   const canvas: PaintedCanvas = {
     texture: target.texture,
-    draw(point, timeSec, lap) {
-      const next = readoutQuads(readout, point, timeSec), glyphs = readoutTextQuads(readout, point, timeSec, lap), key = JSON.stringify([next, glyphs]);
+    draw(point, timeSec, lap, index = -1) {
+      const delta = readoutLapExtras(lap)?.delta?.[index];
+      const next = readoutQuads(readout, point, timeSec, delta), glyphs = readoutTextQuads(readout, point, timeSec, lap, index), key = JSON.stringify([next, glyphs]);
       if (key === shown) return;
       shown = key;
       next.forEach((quad, index) => {
@@ -152,7 +154,7 @@ export function createReadoutStates(car: Object3D, points: ReplayTrajectoryPoint
       const point = points[pose.index], next = points[pose.index + 1] ?? point;
       if (!point) return;
       const timeSec = (point.timeSec ?? 0) + ((next?.timeSec ?? 0) - (point.timeSec ?? 0)) * pose.fraction;
-      for (const canvas of canvases) canvas.draw(point, timeSec, lap);
+      for (const canvas of canvases) canvas.draw(point, timeSec, lap, pose.index);
     },
   };
 }

@@ -11,6 +11,7 @@ import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 import { RaceModeContext } from '../race/raceModeContext.js';
 import { useConsistencyLapSelection } from './useConsistencyLapSelection.js';
+import { useReadoutLapExtras } from './readoutLapLoader.js';
 
 export interface ReplayInspectorContentProps {
   isOpen: boolean;
@@ -124,6 +125,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     if (controlledView === undefined) setUncontrolledView(nextView);
     onViewChange?.(nextView);
   };
+  useReadoutLapExtras(activeView === '3d', activeSessionId, trajectory, metadata, selectedSource);
   const [activeTab, setActiveTab] = useState<'map' | 'corners'>('map');
   const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
   const [colorBy, setColorBy] = useState<MapColorMode>('pedal');

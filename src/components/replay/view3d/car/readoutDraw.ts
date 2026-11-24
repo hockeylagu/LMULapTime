@@ -17,11 +17,11 @@ export const TC_FLASH_HZ = 10;
 
 /**
  * An element's input from the lap's sample, and the flash rate the game gives it; null where the replay carries nothing the game
- * reads for it: the element is not drawn (wheel slip, lap delta, flags, tyre temperatures and pressures, fuel, battery; user
- * decision 2026-11-24). A TC bar's input is wheel slip, so it is drawn only while TC intervenes (full and flashing); an ABS bar
- * only while ABS is active (full).
+ * reads for it: the element is not drawn (wheel slip, flags, tyre temperatures and pressures, fuel, battery; user decision
+ * 2026-11-24). A TC bar's input is wheel slip, so it is drawn only while TC intervenes (full and flashing); an ABS bar only while
+ * ABS is active (full). `delta` is the lap delta at this sample (`readoutLapExtras`), undefined while unknown.
  */
-export function readoutInput(element: CarReadoutElement, readout: CarReadout, point: ReplayTrajectoryPoint): {x: number; flashHz: number | null} | null {
+export function readoutInput(element: CarReadoutElement, readout: CarReadout, point: ReplayTrajectoryPoint, delta?: number): {x: number; flashHz: number | null} | null {
   const flag = (value: boolean | undefined) => value === undefined ? null : {x: value ? 1 : 0, flashHz: null};
   switch (element.name) {
     case 'RPMBar': return point.engineRpm === undefined ? null : {x: rpmInput(point.engineRpm, readout.rpm.min, readout.rpm.max, readout.revLimitRpm), flashHz: null};
@@ -40,12 +40,15 @@ export function readoutInput(element: CarReadoutElement, readout: CarReadout, po
     }
     // The game passes a constant 0 for a pending pit request.
     case 'PitPendingIcon': return {x: 0, flashHz: null};
-    // No replay input: locked wheels, fuel and battery, launch control, lap delta, tyres, pit and flag state, overheating, settings.
+    // The lap delta, positive on one bar and negated on the other (a negative input draws the bar off).
+    case 'DeltaPositiveBar': return delta === undefined ? null : {x: delta, flashHz: null};
+    case 'DeltaNegativeBar': return delta === undefined ? null : {x: -delta, flashHz: null};
+    // No replay input: locked wheels, fuel and battery, launch control, tyres, pit and flag state, overheating, settings.
     case 'FuelBar': case 'FuelUsageBar': case 'BatteryBar': case 'BatteryUsageBar': case 'BatteryRegenBar': case 'VirtualEnergyUsageBar':
     case 'LCCountdownLeft': case 'LCCountdownRight': case 'ABSLockedLeftIcon': case 'ABSLockedRightIcon':
     case 'ABSLockedRearLeftIcon': case 'ABSLockedRearRightIcon': case 'TyreTempFLIcon': case 'TyreTempFRIcon': case 'TyreTempRLIcon':
-    case 'TyreTempRRIcon': case 'TyrePressFLIcon': case 'TyrePressFRIcon': case 'TyrePressRLIcon': case 'TyrePressRRIcon': case 'DeltaPositiveBar':
-    case 'DeltaNegativeBar': case 'PitAcceptedIcon': case 'BlueFlagIcon': case 'YellowFlagIcon': case 'BlackFlagIcon': case 'FuelLowIcon':
+    case 'TyreTempRRIcon': case 'TyrePressFLIcon': case 'TyrePressFRIcon': case 'TyrePressRLIcon': case 'TyrePressRRIcon':
+    case 'PitAcceptedIcon': case 'BlueFlagIcon': case 'YellowFlagIcon': case 'BlackFlagIcon': case 'FuelLowIcon':
     case 'OverheatingIcon': case 'SettingChangeIcon':
       return null;
   }
@@ -95,9 +98,9 @@ export function readoutQuad(element: CarReadoutElement, value: number): ReadoutQ
 }
 
 /** The quads of every drawn element of a readout for a lap sample, in the file's order (the game's draw order). */
-export function readoutQuads(readout: CarReadout, point: ReplayTrajectoryPoint, timeSec: number): Array<ReadoutQuad | null> {
+export function readoutQuads(readout: CarReadout, point: ReplayTrajectoryPoint, timeSec: number, delta?: number): Array<ReadoutQuad | null> {
   return readout.elements.map(element => {
-    const input = readoutInput(element, readout, point);
+    const input = readoutInput(element, readout, point, delta);
     return input === null ? null : readoutQuad(element, readoutValue(element, input.x, input.flashHz, timeSec));
   });
 }

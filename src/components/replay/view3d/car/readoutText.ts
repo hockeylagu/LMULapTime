@@ -1,18 +1,26 @@
 import type { CarReadout, CarReadoutFont, CarReadoutText } from '../../../../../shared/types/scenes/car.js';
-import type { ReplayLapSummary, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import type { ReplayLapSummary, ReplayStandingsSnapshot, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import type { ReadoutQuad } from './readoutDraw.js';
+import { readoutLapExtras } from './readoutLapExtras.js';
 
 /**
  * The game's text fields of a wheel/dash readout (docs/PACKAGE_FORMAT.md#readouts in the pipeline repo, decoded from the game's
  * executable): the string each field shows and the glyph quads it draws in the readout canvas. Pure: the canvas is `readoutCanvas.ts`.
  */
 
-/** What the lap adds to its samples: its number, the session time it started at and the session's laps (lap times, best). */
+/**
+ * What the lap adds to its samples: its number, the session time it started at, the session's laps (lap times, sectors, pit stops),
+ * the car's replay slot, the running order and the lap's samples. The delta and the previous lap's use come from `readoutLapExtras`,
+ * registered for this object.
+ */
 export interface ReadoutLapContext {
   currentLap?: number;
   lapStartTimeSec?: number;
   timeReference?: 'session' | 'lap';
   laps?: ReplayLapSummary[];
+  driverSlot?: number;
+  standingsHistory?: ReplayStandingsSnapshot[];
+  points?: ReplayTrajectoryPoint[];
 }
 
 /** The game's placeholder for a lap time it does not have. */
@@ -31,6 +39,44 @@ export function lapTimeText(seconds: number): string {
 const decimals = (value: number, below: number, above: number, limit = 10) => value.toFixed(Math.abs(value) < limit ? below : above);
 const celsius = (value: number, units: number) => String(Math.round(units === 2 ? value * 1.8 + 32 : value));
 const setting = (value: number | undefined) => value === undefined ? null : String(Math.round(value));
+/** Litres, or gallons for `units` 2, with two decimals (the game's fuel use fields). */
+const fuelText = (litres: number, units: number) => (units === 2 ? litres * LITRES_TO_GALLONS : litres).toFixed(2);
+/** The game's `+%1d.%03d` / `-%1d.%03d` of a delta, capped at 9.999. */
+const deltaText = (delta: number) => `${delta >= 0 ? '+' : '-'}${(Math.min(9999, Math.round(Math.abs(delta) * 1000)) / 1000).toFixed(3)}`;
+
+/** The lap's first value and the one at this sample, for the used-this-lap fields; null where the lap carries none. */
+function usedThisLap(context: ReadoutLapContext, point: ReplayTrajectoryPoint, value: (point: ReplayTrajectoryPoint) => number | undefined): number | null {
+  const first = context.points?.find(sample => value(sample) !== undefined), now = value(point);
+  return first === undefined || now === undefined ? null : Math.max(0, value(first)! - now);
+}
+
+/**
+ * A sector field (1..3), the game's FUN_140d9c270: for 10 s after the line the sector of the lap just finished; else this lap's
+ * finished sector, the running time of the sector the car is in, or `-:--.---` for one not reached yet. Null without timing.
+ */
+function sectorText(sector: 1 | 2 | 3, context: ReadoutLapContext, timeSec: number): string | null {
+  const timing = lapTiming(context, timeSec);
+  if (!timing) return null;
+  if (timing.inLap < FINISHED_LAP_SHOWN_SEC && timing.previous) {
+    const finished = [timing.previous.s1Sec, timing.previous.s2Sec, timing.previous.s3Sec][sector - 1];
+    if (finished > 0) return lapTimeText(finished);
+  }
+  const own = (context.laps ?? []).find(lap => lap.lapNumber === context.currentLap);
+  if (!own || own.s1Sec <= 0 || own.s2Sec <= 0 || timing.inLap < 0) return NO_LAP_TIME;
+  const start = sector === 1 ? 0 : sector === 2 ? own.s1Sec : own.s1Sec + own.s2Sec, length = [own.s1Sec, own.s2Sec, own.s3Sec][sector - 1];
+  if (timing.inLap < start) return NO_LAP_TIME;
+  return lapTimeText(length > 0 && timing.inLap >= start + length ? length : timing.inLap - start);
+}
+
+/** The car's place in the running order at session time `sessionSec`: ` <place>/<cars>`; null without one. */
+function placeText(context: ReadoutLapContext, sessionSec: number): string | null {
+  const history = context.standingsHistory, slot = context.driverSlot;
+  if (!history?.length || slot === undefined || !Number.isFinite(sessionSec)) return null;
+  let snapshot: ReplayStandingsSnapshot | null = null;
+  for (const row of history) { if (row.timeSec > sessionSec) break; snapshot = row; }
+  const place = snapshot ? snapshot.order.indexOf(slot) : -1;
+  return snapshot && place >= 0 ? ` ${place + 1}/${snapshot.order.length}` : null;
+}
 
 /**
  * The lap's timing at sample time `timeSec` (session time, or lap time on a lap clock): seconds into the lap (negative in the run-up
@@ -50,8 +96,9 @@ function lapTiming(context: ReadoutLapContext, timeSec: number): {inLap: number;
  * would show its `defaultValue` or the player-only data the replay lacks; user decision 2026-11-24). `units` 0 (the player's setting)
  * reads as metric.
  */
-export function readoutText(field: CarReadoutText, point: ReplayTrajectoryPoint, timeSec: number, context: ReadoutLapContext): string | null {
-  const units = field.units, corner = (values: readonly number[] | undefined, names: readonly string[]) => values?.[names.indexOf(field.name)];
+export function readoutText(field: CarReadoutText, point: ReplayTrajectoryPoint, timeSec: number, context: ReadoutLapContext, index = -1): string | null {
+  const units = field.units, extras = readoutLapExtras(context), delta = extras?.delta?.[index];
+  const corner = (values: readonly number[] | undefined, names: readonly string[]) => values?.[names.indexOf(field.name)];
   switch (field.name) {
     case 'Gears': return point.gear === undefined ? null : point.gear === 0 ? 'N' : point.gear < 0 ? 'R' : String(point.gear);
     case 'Speed': return point.speedKmh === undefined ? null : String(Math.round(Math.abs(point.speedKmh) * (units === 2 ? KMH_TO_MPH : 1)));
@@ -97,15 +144,34 @@ export function readoutText(field: CarReadoutText, point: ReplayTrajectoryPoint,
     case 'BrakeBias': return point.brakeBiasRear === undefined ? null : String(100 - Math.round(point.brakeBiasRear * 100));
     case 'BrakeBiasExact': return point.brakeBiasRear === undefined ? null : (100 - point.brakeBiasRear * 100).toFixed(2);
     case 'LapsCompleted': return context.currentLap === undefined ? null : String(Math.max(0, context.currentLap - 1));
-    // No replay or telemetry value: battery and per-lap fuel/energy use, the lap delta and predicted lap, sector times, place and laps,
-    // boost, motor and brake maps, bias delta and migration, anti-roll bars, track state and the setting-change popup.
-    case 'BoostMotorTempDigit': case 'FuelLastLap': case 'FuelUsedThisLap': case 'FuelFinishAverage': case 'FuelUse': case 'BatteryLevelDigit':
-    case 'BatteryLastLap': case 'BatteryUsedThisLap': case 'BatteryFinishAverage': case 'BatteryUse': case 'VirtualEnergyLastLap':
-    case 'VirtualEnergyUsedThisLap': case 'VirtualEnergyFinishAverage': case 'VirtualEnergyUse': case 'Place': case 'Laps': case 'DeltaPositive':
-    case 'DeltaNegative': case 'DeltaNeutral': case 'BoostDigit': case 'BoostMap': case 'BatteryRegenLevel': case 'MotorMap': case 'MotorMapText':
-    case 'BrakeMap': case 'BrakeBiasDelta': case 'BrakeBiasMigration': case 'AntiRollBarFront': case 'AntiRollBarRear': case 'LapTimeSector1':
-    case 'LapTimeSector2': case 'LapTimeSector3': case 'LapTimePredicted': case 'TrackState': case 'LapsInStint': case 'SettingChangeTitle':
-    case 'SettingChangeValue':
+    // Laps since the stint began: completed laps minus those completed when the car left the pits after its last pit-stop lap.
+    case 'LapsInStint': {
+      const current = context.currentLap;
+      if (current === undefined) return null;
+      const pitLaps = (context.laps ?? []).filter(lap => lap.isPitStop && lap.lapNumber < current).map(lap => lap.lapNumber);
+      return String(Math.max(0, current - 1 - (pitLaps.length ? Math.max(...pitLaps) : 0)));
+    }
+    case 'LapTimeSector1': return sectorText(1, context, timeSec);
+    case 'LapTimeSector2': return sectorText(2, context, timeSec);
+    case 'LapTimeSector3': return sectorText(3, context, timeSec);
+    // The delta to the reference lap draws in one of three fields: the neutral ` -.---` without a reference, else the + or - one.
+    case 'DeltaNeutral': return !extras ? null : extras.delta ? '' : ' -.---';
+    case 'DeltaPositive': return delta === undefined ? null : delta >= 0 ? deltaText(delta) : '';
+    case 'DeltaNegative': return delta === undefined ? null : delta < 0 ? deltaText(delta) : '';
+    case 'LapTimePredicted': return !extras ? null : delta === undefined || extras.referenceLapSec === null ? NO_LAP_TIME : lapTimeText(extras.referenceLapSec + delta);
+    case 'FuelUsedThisLap': { const value = usedThisLap(context, point, sample => sample.fuel); return value === null ? null : fuelText(value, units); }
+    case 'FuelLastLap': return extras?.previousFuelUsed == null ? null : fuelText(extras.previousFuelUsed, units);
+    case 'VirtualEnergyUsedThisLap': { const value = usedThisLap(context, point, sample => sample.virtualEnergy); return value === null ? null : decimals(value, 2, 1); }
+    case 'VirtualEnergyLastLap': return extras?.previousEnergyUsed == null ? null : decimals(extras.previousEnergyUsed, 2, 1);
+    case 'BatteryLevelDigit': return point.soc === undefined ? null : decimals(point.soc, 1, 0);
+    case 'Place': return placeText(context, context.timeReference === 'lap' ? (context.lapStartTimeSec ?? NaN) + timeSec : timeSec);
+    // No replay or telemetry value, or a rule not decoded (only what the replay has, user decision 2026-11-24): motor temperature,
+    // battery use, fuel and energy averages and use, the lap count (its race-type rule is not decoded), boost, motor and brake maps,
+    // regen level, bias delta and migration, anti-roll bars, track state and the setting-change popup.
+    case 'BoostMotorTempDigit': case 'FuelFinishAverage': case 'FuelUse': case 'BatteryLastLap': case 'BatteryUsedThisLap': case 'BatteryFinishAverage':
+    case 'BatteryUse': case 'VirtualEnergyFinishAverage': case 'VirtualEnergyUse': case 'Laps': case 'BoostDigit': case 'BoostMap':
+    case 'BatteryRegenLevel': case 'MotorMap': case 'MotorMapText': case 'BrakeMap': case 'BrakeBiasDelta': case 'BrakeBiasMigration':
+    case 'AntiRollBarFront': case 'AntiRollBarRear': case 'TrackState': case 'SettingChangeTitle': case 'SettingChangeValue':
       return null;
   }
 }
@@ -136,9 +202,9 @@ export function readoutGlyphQuads(field: CarReadoutText, font: CarReadoutFont, c
 }
 
 /** Each text field's glyph quads for a lap sample (empty where it shows nothing), in the file's order; none without a canvas size. */
-export function readoutTextQuads(readout: CarReadout, point: ReplayTrajectoryPoint, timeSec: number, context: ReadoutLapContext): ReadoutQuad[][] {
+export function readoutTextQuads(readout: CarReadout, point: ReplayTrajectoryPoint, timeSec: number, context: ReadoutLapContext, index = -1): ReadoutQuad[][] {
   return readout.texts.map(field => {
-    const text = readout.canvasSize ? readoutText(field, point, timeSec, context) : null;
+    const text = readout.canvasSize ? readoutText(field, point, timeSec, context, index) : null;
     return text === null ? [] : readoutGlyphQuads(field, readout.fonts[field.font], readout.canvasSize!, text);
   });
 }

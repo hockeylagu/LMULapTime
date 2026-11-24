@@ -61,4 +61,14 @@ describe('readout draw rules (decoded from the game)', () => {
     expect(readoutInput(element({name: 'ABSLockedLeftIcon', orientation: 3}), row, {...point, absActive: true})).toBeNull();
     expect(readoutQuads(row, {x: 0, y: 0, z: 0}, 0)[0]).toBeNull();
   });
+
+  it('fills the delta bars from the lap delta, one positive and one negated', () => {
+    const row = readout([element({name: 'DeltaPositiveBar', maxValue: 2}), element({name: 'DeltaNegativeBar', maxValue: 2})]);
+    expect(readoutQuads(row, {x: 0, y: 0, z: 0}, 0)).toEqual([null, null]);
+    expect(readoutInput(row.elements[0], row, {x: 0, y: 0, z: 0}, 0.5)).toEqual({x: 0.5, flashHz: null});
+    expect(readoutInput(row.elements[1], row, {x: 0, y: 0, z: 0}, 0.5)).toEqual({x: -0.5, flashHz: null});
+    const [positive, negative] = readoutQuads(row, {x: 0, y: 0, z: 0}, 0, -1);
+    expect(positive?.argb).toEqual(row.elements[0].offAlphaColor);
+    expect(negative?.argb).not.toEqual(row.elements[1].offAlphaColor);
+  });
 });
