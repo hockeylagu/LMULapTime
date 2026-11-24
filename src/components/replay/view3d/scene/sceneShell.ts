@@ -19,6 +19,7 @@ import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
 import { createPointerSurface, type DrawnCamera, type RaySpan } from './pointerSurface.js';
 import { underCarBaker } from '../car/carContactShadow.js';
+import { readoutPainter } from '../car/readoutCanvas.js';
 import { linkUnderCarBake } from '../car/underCarBake.js';
 import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
@@ -351,6 +352,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       // A new primary car brings its own game cameras, whose shadow keys may differ.
       environment.setShadowCascades(shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null);
       underCarBaker.flush(renderer); // Bakes at most one car body's under-car shade per frame; every car of that body then shows it.
+      readoutPainter.flush(renderer); // Repaints the screen readouts whose lap sample changed them.
       content?.beforeDraw(camera);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);

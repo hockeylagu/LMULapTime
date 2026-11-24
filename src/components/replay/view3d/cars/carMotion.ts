@@ -1,12 +1,13 @@
 import type { Group, Object3D } from 'three';
 import { createWheelAnimation, type WheelAnimation } from './wheelAnimation.js';
 import { createLampStates, type LampStates } from '../car/lampStates.js';
+import { createReadoutStates, type ReadoutStates } from '../car/readoutCanvas.js';
 import type { WheelLap } from './wheelMotion.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { RenderPose } from '../scene/replayPose.js';
 
 /**
- * A car's wheels and lamps along its track: the lap view's lap, or the race's samples of one pose window. The build and the wheels'
+ * A car's wheels, lamps and screen readouts along its track: the lap view's lap, or the race's samples of one pose window. The build and the wheels'
  * road fit (a few hundred ground rays) wait until the car is drawn with them (`wheels`, `lights` read): a race's far cars never
  * build, and the scenery streaming in does not refit a car until it is drawn again.
  */
@@ -35,7 +36,7 @@ export function createCarMotion(car: Group, surfaceHeight: SurfaceHeight): CarMo
   /** A body without wheel rigs keeps still wheels; a rig the package gets wrong throws (`attachWheelRigs`). */
   const rigged = rest.some(({node}) => node.name.startsWith('wheel_'));
   let key: object | null = null, pending: (() => WheelLap) | null = null, stale = false;
-  let wheels: WheelAnimation | null = null, lights: LampStates[] = [];
+  let wheels: WheelAnimation | null = null, lights: LampStates[] = [], readouts: ReadoutStates | null = null;
   const build = () => {
     if (pending) {
       const lap = pending();
@@ -44,6 +45,7 @@ export function createCarMotion(car: Group, surfaceHeight: SurfaceHeight): CarMo
       wheels = rigged ? createWheelAnimation(car, lap, surfaceHeight) : null;
       const lamps = createLampStates(car, lap.points);
       lights = lamps ? [lamps] : [];
+      readouts = createReadoutStates(car, lap.points);
     } else if (stale) {
       stale = false;
       wheels?.refreshHeights();
@@ -60,6 +62,7 @@ export function createCarMotion(car: Group, surfaceHeight: SurfaceHeight): CarMo
       build();
       wheels?.update(pose);
       for (const light of lights) light.update(pose);
+      readouts?.update(pose);
     },
     refreshHeights() { stale = true; },
   };

@@ -120,13 +120,14 @@ export function syntheticPackage() {
       states: { off: 0, on: null, brake: null }, defaultLit: false, hiddenInOwnCockpit: true,
     }],
     glowMaterialIds: [],
-    appearances: [{ alias: 'TEST_CAR', number: '7', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: ['option_NumplateA'] }],
+    appearances: [{ alias: 'TEST_CAR', number: '7', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: ['option_NumplateA'], readout: null }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
     cameras: { frame: 'native car frame', cockpitViewRule: 'in: the driver camera only', list: [
       { name: 'cockpit', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in', lodMultiplier: 1, shadow: null },
       { name: 'hood', position: [0.3, 0.92, -0.96], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.5, 800], cockpitView: 'out', lodMultiplier: 1, shadow: null },
       { name: 'roof', position: [0.3, 1.5, 0.2], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out', lodMultiplier: 1, shadow: null },
     ], chase: { lodMultiplier: 1.5 } },
+    readouts: [],
   };
   /** The car body row of the top-level `bodies` list; `vehicleIds` is every id the vehicle records give it. */
   const car = {
@@ -145,7 +146,7 @@ export function syntheticPackage() {
     vehicles.splice(0, vehicles.length, ...specs);
     const ids = specs.flatMap(spec => spec.vehicleIds).sort();
     car.vehicleIds = ids;
-    descriptor.appearances = ids.map(alias => ({ alias, number: '7', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: [] }));
+    descriptor.appearances = ids.map(alias => ({ alias, number: '7', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: [], readout: null }));
   };
   const logos: { logos: Record<string, string> } = { logos: { Ferrari: '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>' } };
   const manifest: Record<string, unknown> = { schemaVersion: PACKAGE_SCHEMA, id: 'synthetic', version: '1' };

@@ -1,4 +1,4 @@
-import { BufferGeometry, Mesh, MeshBasicMaterial, PropertyBinding, type Group, type Material, type Object3D, type Texture } from 'three';
+import { BufferGeometry, Mesh, MeshBasicMaterial, PropertyBinding, RepeatWrapping, SRGBColorSpace, type Group, type Material, type Object3D, type Texture } from 'three';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { appearanceOf, startFileOf, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
@@ -7,6 +7,7 @@ import { cockpitVolumeTexture } from '../car/cockpitOcclusion.js';
 import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp } from '../car/carLamps.js';
 import { flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
+import { createReadoutCanvas, type ReadoutCanvas } from '../car/readoutCanvas.js';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { makeCar } from './carObject.js';
 import type { CarTemplates } from './carTemplates.js';
@@ -125,6 +126,10 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
     const frames = new Set(drawn.flatMap(lamp => lampTexturePaths(lamp, rainFlashes, glows.get(lamp)!)));
     for (const frame of frames) paths.set(frame, false);
+    // The entry's readout (wheel and dash screens) is drawn on a car with its own materials, the lap's: its element atlases load with the cabin's.
+    const readout = !shareMaterials && appearance.readout !== null ? car.descriptor.readouts[appearance.readout] ?? null : null;
+    if (appearance.readout !== null && !readout && !shareMaterials) throw Error(`Car ${car.vehicleId} has no readout ${appearance.readout}`);
+    for (const element of readout?.elements ?? []) if (element.texture !== null) paths.set(element.texture, paths.get(element.texture) !== false);
     const textures = new Map(await Promise.all([...paths.keys()].map(async path =>
       [path, await carTextures.load(path, frames.has(path) ? undefined : startFileOf(car, path))] as const)));
     // The cabin volumes, built once a livery; each material samples its own copy of the same source.
@@ -133,7 +138,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
       if (!bytes) throw Error(`Car ${car.vehicleId} has no cabin volume ${path}`);
       return [path, cockpitVolumeTexture(bytes, row)] as const;
     }));
-    return {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
+    return {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, readout, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** With `shareMaterials`, the materials of each parsed body, by content: every car of the body draws with the same ones. */
   const sharedMaterials = new WeakMap<Group, Map<string, Material>>(), shared = new WeakSet<Material>();
@@ -152,7 +157,7 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody, kind: ModelKind = 'body'): Promise<Group> => {
-    const {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, interiorPaths, hiddenNames} = await partsOf(car, kind);
+    const {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, readout, interiorPaths, hiddenNames} = await partsOf(car, kind);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
       // Shared materials are the field's (`shareMaterials`); the car the cameras ride on and the ghost own theirs.
@@ -171,10 +176,32 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     const lampMaterials = new Map<CarLamp, Material>();
     let materials = shareMaterials ? sharedMaterials.get(template) : undefined;
     if (!materials) { materials = new Map<string, Material>(); if (shareMaterials) sharedMaterials.set(template, materials); }
+    // The readout canvas replaces the albedo of the screen materials it names: one canvas for the model, made at its first such material.
+    let canvas: ReadoutCanvas | null = null;
+    const atlasOf = (path: string) => {
+      const copy = copyOf(path);
+      copy.wrapS = RepeatWrapping; copy.wrapT = RepeatWrapping; copy.colorSpace = SRGBColorSpace; copy.needsUpdate = true;
+      return copy;
+    };
+    const showsReadout = (material: Material) => readout !== null && recipeOf(material).name === readout.material;
     const replace = (material: Material) => {
-      const recipe = recipeOf(material), plain = white(material), key = `${carMaterialKey(recipe, appearance)}${plain ? '|white' : ''}`;
+      const recipe = recipeOf(material), plain = white(material), screen = showsReadout(material);
+      const key = `${carMaterialKey(recipe, appearance)}${plain ? '|white' : ''}${screen ? '|readout' : ''}`;
       let created = materials.get(key);
-      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading, volumeOf, !plain); materials.set(key, created); if (shareMaterials) shared.add(created); }
+      if (!created) {
+        let texture = copyOf;
+        if (screen) {
+          const albedo = recipe.surface?.maps.albedo?.texture;
+          if (!albedo) throw Error(`Car ${car.vehicleId} readout material ${recipe.name} has no albedo map`);
+          canvas ??= createReadoutCanvas(readout!, atlasOf);
+          const shown = canvas.texture;
+          texture = path => path === albedo ? shown : copyOf(path);
+        }
+        created = createCarMaterial(recipe, appearance, texture, shading, volumeOf, !plain);
+        // The canvas is the game's sRGB render target, whatever the file texture's colour role.
+        if (screen) canvas!.texture.colorSpace = SRGBColorSpace;
+        materials.set(key, created); if (shareMaterials) shared.add(created);
+      }
       return created;
     };
     for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, [...drawn, ...surfaces], rainFlashes, (lamp, current) => {
@@ -193,7 +220,9 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     })) mesh.removeFromParent();
     model.traverse(object => {
       if (!(object instanceof Mesh) || glowMeshes.includes(object)) return;
+      const screen = (Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]).some(showsReadout);
       object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);
+      if (screen) object.userData.readoutCanvas = canvas;
       object.castShadow = true; object.receiveShadow = true;
     });
     return model;

@@ -1,7 +1,7 @@
 // Copied from LMUTrackPipeline/shared/contract/bodyDescriptor.ts, do not edit: change it there and run npm run package -- sync-contract.
 /**
- * The body descriptor `vehicles/bodies/<folder>.json` (docs/PACKAGE_FORMAT.md, Vehicles): option nodes, lamps, glow materials, appearances, materials and
- * cameras. The structural rules that need no GLB; whether the nodes it names exist in the GLB, the wheel rig and the lamp state rules are file-content checks
+ * The body descriptor `vehicles/bodies/<folder>.json` (docs/PACKAGE_FORMAT.md, Vehicles): option nodes, lamps, glow materials, appearances, materials,
+ * cameras and the wheel/dash readouts. The structural rules that need no GLB; whether the nodes it names exist in the GLB, the wheel rig and the lamp state rules are file-content checks
  * (`pipeline/package/validateAssets.ts`).
  *
  * Left loosely typed (neither the pipeline nor the app validates their insides structurally): an appearance's `paint.maps`/`paint.parameters`, a material's
@@ -81,6 +81,8 @@ export interface CarAppearance {
   materialTextures?: Record<string, string>;
   /** The body's option part nodes this entry shows; the others stay hidden. */
   optionNodes: string[];
+  /** Index into the body's `readouts` of this entry's wheel/dash readout; null when its cockpit draws none. */
+  readout: number | null;
 }
 
 /** A camera of the car, named by role, in the native car frame of the GLB (+x left, +y up, -z forward). */
@@ -137,10 +139,77 @@ export interface BodyDescriptor {
   materials: CarMaterialRecipe[];
   /** `chase`: the orbiting chase camera's LOD multiplier. */
   cameras: {frame: string; cockpitViewRule: string; list: CarCamera[]; chase: {lodMultiplier: number}};
+  /** The distinct readouts of the body's entries, each used by at least one appearance (`readout`); empty when no entry draws one. */
+  readouts: CarReadout[];
 }
 
-export const BODY_DESCRIPTOR_KEYS = ['optionNodes', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras'] as const;
-const APPEARANCE_KEYS = ['alias', 'number', 'albedo', 'paint', 'optionNodes'];
+/**
+ * The readout elements the game draws into a readout canvas, in its own order (the executable's element table, docs/PACKAGE_FORMAT.md#readouts). The game's
+ * `FlagDisplay` element is not one: it draws into a canvas of its own and is not published.
+ */
+export const CAR_READOUT_ELEMENTS = [
+  'FuelBar', 'FuelUsageBar', 'BatteryBar', 'BatteryUsageBar', 'BatteryRegenBar', 'VirtualEnergyBar', 'VirtualEnergyUsageBar', 'RPMBar',
+  'RPMAltBar', 'LCCountdownLeft', 'LCCountdownRight', 'TCLeftBar', 'TCRightBar', 'TCActiveBar', 'ABSLeftBar', 'ABSRightBar',
+  'ABSLockedLeftIcon', 'ABSLockedRightIcon', 'ABSLockedRearLeftIcon', 'ABSLockedRearRightIcon', 'HeadlightsIcon',
+  'TyreTempFLIcon', 'TyreTempFRIcon', 'TyreTempRLIcon', 'TyreTempRRIcon', 'TyrePressFLIcon', 'TyrePressFRIcon', 'TyrePressRLIcon',
+  'TyrePressRRIcon', 'BrakeTempFLIcon', 'BrakeTempFRIcon', 'BrakeTempRLIcon', 'BrakeTempRRIcon', 'DeltaPositiveBar', 'DeltaNegativeBar',
+  'PitPendingIcon', 'PitAcceptedIcon', 'BlueFlagIcon', 'YellowFlagIcon', 'BlackFlagIcon', 'FuelLowIcon', 'OverheatingIcon',
+  'PitLimiterIcon', 'PitLimiterAltIcon', 'SettingChangeIcon',
+] as const;
+export type CarReadoutElementName = typeof CAR_READOUT_ELEMENTS[number];
+
+/** A cockpitinfo colour as the file writes it: `[a, r, g, b]`, integers 0..255 (argb, not rgba). */
+export type CarReadoutArgb = [number, number, number, number];
+
+/**
+ * One element of a readout: a quad the game draws into the canvas every frame, in `elements` order. Values are the cockpitinfo's own; a null is a key the
+ * file leaves out, where the game uses its default (AlphaColor and AltAlphaColor white, MaxValue 1, Threshold 0, AltValue 0, AltUvOffset 0). The draw
+ * rules (orientation, rounding, flashing, the alternate colour) are in docs/PACKAGE_FORMAT.md#readouts.
+ */
+export interface CarReadoutElement {
+  name: CarReadoutElementName;
+  /** `textures/<sha256>.ktx2.zst` relative to the vehicles folder, the element's atlas; null for the game's plain white texture (`READOUT`). */
+  texture: string | null;
+  /** The quad in canvas units (0..1, v down from the top) and its texture rectangle; UVs may run past 1 (the texture repeats). */
+  scale: [number, number];
+  offset: [number, number];
+  uvMin: [number, number];
+  uvMax: [number, number];
+  alphaColor: CarReadoutArgb | null;
+  offAlphaColor: CarReadoutArgb;
+  altAlphaColor: CarReadoutArgb | null;
+  /** 0 fills left to right, 1 bottom up, 2 shows one cell; 3..5 are on above `threshold`, 6..8 below it; 4/7 flash at 5 Hz, 5/8 at 1 Hz. */
+  orientation: number;
+  /** Segments (cells) of the element, at least 1. */
+  elements: number;
+  renderOrder: number;
+  maxValue: number | null;
+  threshold: number | null;
+  altValue: number | null;
+  altUvOffset: [number, number] | null;
+  /** The element's input while the game has none for it. */
+  defaultValue: number;
+}
+
+/**
+ * A wheel/dash readout: the elements the game draws each frame into the canvas that replaces the texture of every material named `material` (the cockpitinfo
+ * `ReadoutBackground`). The canvas starts transparent each frame and is drawn with that material's own blend.
+ */
+export interface CarReadout {
+  /** The `name` of the body materials that show the canvas (one or more of `materials`). */
+  material: string;
+  /** RPMDisplayMin/MaxValue (RPMBar) and RPMAltDisplayMin/MaxValue (RPMAltBar) as written; -1 where the file leaves one out. */
+  rpm: {min: number; max: number; altMin: number; altMax: number};
+  /** The engine's rev limit at its default setting (engine `RevLimitRange` at `RevLimitSetting`): the top of the rpm range when that `max` is negative or above it. */
+  revLimitRpm: number;
+  elements: CarReadoutElement[];
+}
+
+export const BODY_DESCRIPTOR_KEYS = ['optionNodes', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras', 'readouts'] as const;
+const APPEARANCE_KEYS = ['alias', 'number', 'albedo', 'paint', 'optionNodes', 'readout'];
+const READOUT_KEYS = ['material', 'rpm', 'revLimitRpm', 'elements'] as const;
+const READOUT_ELEMENT_KEYS = ['name', 'texture', 'scale', 'offset', 'uvMin', 'uvMax', 'alphaColor', 'offAlphaColor', 'altAlphaColor', 'orientation', 'elements',
+  'renderOrder', 'maxValue', 'threshold', 'altValue', 'altUvOffset', 'defaultValue'] as const;
 /** Option part nodes: unique GLB node names that three.js keeps as they are (no characters it would sanitise). */
 const OPTION_NODE = /^option_[A-Za-z0-9_]+$/;
 /** Every texture path the descriptor text mentions. */
@@ -215,6 +284,57 @@ function parseLamp(value: unknown, what: string, declared: ReadonlySet<string>):
   }
 }
 
+function pair(value: unknown, what: string): [number, number] {
+  const values = array(value, what, 2).map(n => finite(n, what));
+  if (values.length !== 2) throw Error(`${what}: expected two numbers`);
+  return values as [number, number];
+}
+
+function argb(value: unknown, what: string): void {
+  const channels = array(value, what, 4);
+  if (channels.length !== 4) throw Error(`${what}: expected [a, r, g, b]`);
+  channels.forEach(channel => count(channel, what, 255));
+}
+
+function integer(value: unknown, what: string): number {
+  if (!Number.isSafeInteger(finite(value, what))) throw Error(`${what}: expected an integer`);
+  return value as number;
+}
+
+/** One readout: exact keys in order, its material named by the body, the rpm range, a positive rev limit and unique, known elements. */
+function parseReadout(value: unknown, what: string, declared: ReadonlySet<string>, materialNames: ReadonlySet<string>): void {
+  const readout = record(value, what);
+  orderedKeys(readout, READOUT_KEYS, what);
+  if (!materialNames.has(text(readout.material, `${what}.material`, 200))) throw Error(`${what}.material: no body material is named ${readout.material}`);
+  const rpm = record(readout.rpm, `${what}.rpm`);
+  orderedKeys(rpm, ['min', 'max', 'altMin', 'altMax'], `${what}.rpm`);
+  for (const key of ['min', 'max', 'altMin', 'altMax']) finite(rpm[key], `${what}.rpm.${key}`);
+  if (!(finite(readout.revLimitRpm, `${what}.revLimitRpm`) > 0)) throw Error(`${what}.revLimitRpm: must be positive`);
+  const names = array(readout.elements, `${what}.elements`, CAR_READOUT_ELEMENTS.length).map((item, i) => {
+    const at = `${what}.elements[${i}]`, element = record(item, at);
+    orderedKeys(element, READOUT_ELEMENT_KEYS, at);
+    const name = text(element.name, `${at}.name`, 64);
+    if (!(CAR_READOUT_ELEMENTS as readonly string[]).includes(name)) throw Error(`${at}.name: ${name} is not a readout element`);
+    if (element.texture !== null) {
+      if (typeof element.texture !== 'string' || !DESCRIPTOR_TEXTURE_PATH.test(element.texture)) throw Error(`${at}.texture: expected a texture path or null`);
+      if (!declared.has(element.texture)) throw Error(`${at}.texture: ${element.texture} is not a texture of the body`);
+    }
+    for (const key of ['scale', 'offset', 'uvMin', 'uvMax']) pair(element[key], `${at}.${key}`);
+    argb(element.offAlphaColor, `${at}.offAlphaColor`);
+    for (const key of ['alphaColor', 'altAlphaColor']) if (element[key] !== null) argb(element[key], `${at}.${key}`);
+    const orientation = integer(element.orientation, `${at}.orientation`);
+    if (orientation < 0 || orientation > 8) throw Error(`${at}.orientation: expected 0 to 8`);
+    if (integer(element.elements, `${at}.elements`) < 1) throw Error(`${at}.elements: must be at least 1`);
+    integer(element.renderOrder, `${at}.renderOrder`);
+    for (const key of ['maxValue', 'threshold', 'altValue']) if (element[key] !== null) finite(element[key], `${at}.${key}`);
+    if (element.altUvOffset !== null) pair(element.altUvOffset, `${at}.altUvOffset`);
+    finite(element.defaultValue, `${at}.defaultValue`);
+    return name;
+  });
+  if (!names.length) throw Error(`${what}.elements: empty`);
+  if (new Set(names).size !== names.length) throw Error(`${what}.elements: an element is listed twice`);
+}
+
 /** A descriptor's `optionNodes` (or an appearance's): `option_` names, sorted, unique. */
 function optionNodes(value: unknown, at: string): string[] {
   const names = array(value, at, 4096).map((name, i) => text(name, `${at}[${i}]`, 200));
@@ -230,7 +350,8 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
 
 /**
  * The descriptor of the body `row` (its catalog row): exact keys in order, option nodes, appearances covering exactly the body's vehicle ids and carrying no
- * build selector, the lamps, glow materials, materials and the three cameras, and every texture the descriptor names is one the row declares.
+ * build selector, the lamps, glow materials, materials, the three cameras and the readouts (each used by an appearance), and every texture the descriptor
+ * names is one the row declares.
  */
 export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDescriptor {
   const what = `${row.folder} descriptor`, descriptor = record(value, what);
@@ -238,6 +359,7 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
   const declared = new Set<string>(row.textures.map(texture => descriptorTexturePath(texture.sha256)));
   const declaredVolumes = new Set<string>(row.volumes.map(volume => descriptorVolumePath(volume.sha256))), usedVolumes = new Set<string>();
   const options = new Set(optionNodes(descriptor.optionNodes, `${what}.optionNodes`));
+  const readoutIndexes: Array<number | null> = [];
   const aliases = array(descriptor.appearances, `${what}.appearances`, 5000).map((item, i) => {
     const at = `${what}.appearances[${i}]`, appearance = record(item, at);
     knownKeys(appearance, APPEARANCE_KEYS, ['materialTextures'], at);
@@ -252,17 +374,18 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
         if (typeof path !== 'string' || !DESCRIPTOR_TEXTURE_PATH.test(path)) throw Error(`${at}.materialTextures: invalid livery texture`);
       }
     }
+    readoutIndexes.push(appearance.readout === null ? null : count(appearance.readout, `${at}.readout`));
     return alias;
   });
   if (!sameList(aliases, row.vehicleIds)) throw Error(`${what}: the appearance aliases differ from the body's vehicleIds`);
   array(descriptor.lamps, `${what}.lamps`, 4096).forEach((lamp, i) => parseLamp(lamp, `${what}.lamps[${i}]`, declared));
   const glow = array(descriptor.glowMaterialIds, `${what}.glowMaterialIds`, 4096).map((id, i) => text(id, `${what}.glowMaterialIds[${i}]`, 200));
   sortedUnique(glow, `${what}.glowMaterialIds`);
-  const materialIds = new Set<string>();
+  const materialIds = new Set<string>(), materialNames = new Set<string>();
   array(descriptor.materials, `${what}.materials`, 4096).forEach((item, i) => {
     const at = `${what}.materials[${i}]`, material = record(item, at);
     materialIds.add(text(material.id, `${at}.id`, 200));
-    text(material.name, `${at}.name`, 200);
+    materialNames.add(text(material.name, `${at}.name`, 200));
     if (typeof material.paint !== 'boolean') throw Error(`${at}.paint: expected a boolean`);
     if (material.reflectionOcclusion !== undefined) {
       if (material.paint) throw Error(`${at}.reflectionOcclusion: a paint material has none`);
@@ -312,6 +435,11 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
     return text(camera.name, `${at}.name`, 64);
   });
   if (!sameList(names, ['cockpit', 'hood', 'roof'])) throw Error(`${what}.cameras.list: expected exactly the cockpit, hood and roof cameras`);
+  const readouts = array(descriptor.readouts, `${what}.readouts`, 64);
+  readouts.forEach((readout, i) => parseReadout(readout, `${what}.readouts[${i}]`, declared, materialNames));
+  if (new Set(readouts.map(readout => JSON.stringify(readout))).size !== readouts.length) throw Error(`${what}.readouts: a readout is listed twice`);
+  readoutIndexes.forEach((index, i) => { if (index !== null && index >= readouts.length) throw Error(`${what}.appearances[${i}].readout: no readout ${index}`); });
+  readouts.forEach((_, index) => { if (!readoutIndexes.includes(index)) throw Error(`${what}.readouts[${index}]: no appearance uses it`); });
   const raw = JSON.stringify(descriptor);
   for (const path of raw.match(ANY_TEXTURE_PATH) ?? []) if (!declared.has(path)) throw Error(`${row.folder}: descriptor uses undeclared texture vehicles/${path}`);
   for (const path of raw.match(ANY_VOLUME_PATH) ?? []) if (!declaredVolumes.has(path)) throw Error(`${row.folder}: descriptor uses undeclared volume vehicles/${path}`);

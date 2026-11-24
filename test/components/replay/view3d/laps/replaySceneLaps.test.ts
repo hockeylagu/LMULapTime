@@ -160,7 +160,7 @@ const layout = {
 const hashOf = (name: string) => Buffer.from(name).toString('hex').padEnd(64, '0');
 const car = {
   resource: {sha256: 'body',textures: ['seat', 'trim'].map(name => ({sha256: hashOf(name), levels: 12, start: {sha256: hashOf(`${name}-start`), levels: 10}})), volumes: []}, file: async () => new ArrayBuffer(0), interiorFile: async () => null, volumes: new Map(), vehicleId: 'veh',
-  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true},
+  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA'], readout: null}], readouts: [], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true},
       ...['seat', 'trim'].map(name => ({id: name, name, paint: false, surface: {kind: 'diffuse', maps: {albedo: {texture: descriptorTexturePath(hashOf(name)), uv: 'uv0', scale: [1, 1]}}, finish: {roughness: 0.6, metalness: 0}, normalShadowInfluence: 0}}))], glowMaterialIds: ['glow'],
     lamps: [
       {role: 'headlight', nodes: ['lamp.Glow'], material: 'lampGlowMaterial', frames: ['textures/off.ktx2', 'textures/on.ktx2'], animation: {method: null, rate: null, sequence: null},

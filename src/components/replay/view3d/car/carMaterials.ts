@@ -109,8 +109,9 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
       material = new MeshStandardMaterial(finish(config));
       break;
     case 'dashboard':
-      // A screen's layers (a data layer over its backdrop) blend by their alpha: an opaque layer would hide the one under it.
-      material = new MeshStandardMaterial({ ...finish(config), transparent: true });
+      // A screen draws as the game blends it (`renderState`, below): its backing layer is opaque and the layer the game draws the
+      // readouts into blends over it by alpha.
+      material = new MeshStandardMaterial(finish(config));
       break;
     case 'glass': case 'windscreen':
       // The scenery's glass program, on the physical model as the scenery's glass (configureSurfaceMaterial.ts).
