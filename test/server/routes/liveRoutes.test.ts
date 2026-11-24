@@ -119,6 +119,10 @@ describe('live routes', () => {
       expect((await request(app).post(`/api/live/calls/${id}/outcome`).send({ outcome })).status).toBe(400);
     }
     expect(report).toHaveBeenCalledTimes(2);
+    // A page whose radio can speak says so: the calls no page could say come again.
+    const ready = vi.spyOn(live, 'radioReady');
+    expect((await request(app).post('/api/live/calls/ready').send({})).body).toEqual({ ok: true });
+    expect(ready).toHaveBeenCalledTimes(1);
   });
 
   it.each([[{}], [{ autoOpen: 'yes' }], [{ autoOpen: 1 }], [{ autoOpen: null }]])('rejects %j with 400', async body => {

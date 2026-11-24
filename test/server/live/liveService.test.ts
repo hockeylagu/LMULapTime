@@ -259,11 +259,28 @@ describe('LiveService', () => {
     expect(log.mock.lastCall?.[0]).toMatchObject({ outcome: 'queued', text: 'Front left puncture. Box this lap.' });
     expect(log.mock.lastCall?.[0].key).toContain('wheel-FL-flat');
     expect(settle).toHaveBeenCalledWith(41, 'sent');
+    // A call the page could not say is sent once more.
+    expect(service.reportCall(41, 'failed')).toBe(true);
+    expect(sink.events().filter(event => event === 'call')).toHaveLength(2);
     expect(service.reportCall(41, 'spoken')).toBe(true);
     expect(settle).toHaveBeenLastCalledWith(41, 'spoken');
+    // With no page connected the call is logged as such, and comes again for the page that connects; that page,
+    // still locked after its reload, gets it once more when it says its radio can speak.
+    const late = setup({ radio: { enabled: true, log, settle } });
+    late.frame(reading({ currentEt: 30 }), { t: 30, throttle: 1, brake: 0 });
+    late.frame(reading({ currentEt: 31 }), { t: 31, throttle: 1, brake: 0 });
+    expect(settle).toHaveBeenLastCalledWith(41, 'no-client');
+    const reloaded = new FakeSink();
+    late.service.addClient(reloaded);
+    const calls = () => reloaded.events().filter(event => event === 'call').length;
+    expect(calls()).toBe(1);
+    late.service.reportCall(41, 'locked');
+    late.service.radioReady();
+    expect(calls()).toBe(2);
+    void late.service.stop();
     service.setVoice(false);
     frame(reading({ currentEt: 400, sessionCode: 11 }), { t: 400, throttle: 1, brake: 0 });
-    expect(sink.events().filter(event => event === 'call')).toHaveLength(1);
+    expect(sink.events().filter(event => event === 'call')).toHaveLength(2);
     spy.mockRestore();
     void service.stop();
   });

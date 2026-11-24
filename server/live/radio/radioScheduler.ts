@@ -1,5 +1,5 @@
 import type { LiveCall } from '../../../shared/domain/live/radio/liveCalls.js';
-import type { LivePedalSample, LiveRadioCallEvent, LiveRadioOutcome, LiveSnapshot } from '../../../shared/types/live.js';
+import type { LivePedalSample, LiveRadioCallEvent, LiveRadioOutcome, LiveRadioPageOutcome, LiveSnapshot } from '../../../shared/types/live.js';
 
 /**
  * A P2/P3 key is said once per run: a warning that flickers with the estimate stays quiet once heard (COTA 2026-10-20
@@ -15,6 +15,10 @@ const STRAIGHT_SECONDS = 1;
 const LINE_SLOT = { from: 0, to: 3 } as const;
 /** At most this many P3 calls per lap; the rest are dropped. */
 const P3_PER_LAP = 2;
+/** A call the page has not started this long after it was sent is dropped there (`late`), unless the call says. */
+const LIFE_SECONDS = { 1: 30, 2: 15, 3: 15 } as const;
+/** A page that never says what became of a call (closed while speaking) holds the slotted calls no longer than this. */
+const TALKING_SECONDS = 20;
 
 /** One call as logged: where it was proposed and what became of it. */
 export interface RadioLogEntry {
@@ -59,6 +63,12 @@ export class RadioScheduler {
   private previous = new Set<string>();
   private waiting: Waiting | null = null;
   private readonly said = new Map<string, number>();
+  /** Calls sent to a page, by id, until it says what became of them: the radio is talking. */
+  private readonly awaiting = new Map<number, { key: string; since: number }>();
+  /** Keys of calls no page could say (none connected, or its audio still locked). */
+  private readonly unheard = new Set<string>();
+  /** Keys that had their second try this run. */
+  private readonly retried = new Set<string>();
   private flatSince: number | null = null;
   private lineAt: number | null = null;
   private laps: number | null = null;
@@ -106,6 +116,38 @@ export class RadioScheduler {
     this.remember();
     this.strategyCalls = this.enabled ? this.propose(snapshot) : [];
     this.select();
+  }
+
+  /**
+   * What a page did with a call it was sent. One it could not say (the voice failed, or a P1 cut it) is proposed once
+   * more while it still applies: "Last lap." cut after a second was never heard (Sebring 2026-11-22).
+   */
+  public observeOutcome(id: number, outcome: LiveRadioPageOutcome): void {
+    const key = this.awaiting.get(id)?.key;
+    this.awaiting.delete(id);
+    if (key === undefined) return;
+    if (outcome === 'locked') { this.unheard.add(key); return; }
+    if ((outcome !== 'failed' && outcome !== 'interrupted') || this.retried.has(key)) return;
+    this.retried.add(key);
+    this.said.delete(key);
+    this.select();
+  }
+
+  /**
+   * A page connected or unlocked its audio: the calls no page could say are proposed again while they still apply (the
+   * first ten calls of a practice were sent before the page was clicked and never came back, Sebring 2026-11-22).
+   */
+  public observeListener(): void {
+    if (this.unheard.size === 0) return;
+    for (const key of this.unheard) this.said.delete(key);
+    this.unheard.clear();
+    this.select();
+  }
+
+  /** A page is still saying a call: a slotted call sent now would queue behind it and be said wherever the car is by then. */
+  private talking(now: number): boolean {
+    for (const [id, sent] of this.awaiting) if (now - sent.since > TALKING_SECONDS || now < sent.since - 1) this.awaiting.delete(id);
+    return this.awaiting.size > 0;
   }
 
   /** A call not said yet this run; a P1 again once it went away and came back after a minute. */
@@ -170,7 +212,7 @@ export class RadioScheduler {
       return;
     }
     const slot = this.slot(now);
-    if (slot === null || slot === this.usedSlot) return;
+    if (slot === null || slot === this.usedSlot || this.talking(now)) return;
     if (waiting.call.priority === 3 && this.p3ThisLap >= P3_PER_LAP) { this.spend(waiting, 'dropped-budget', now); return; }
     this.waiting = null;
     this.usedSlot = slot;
@@ -189,8 +231,12 @@ export class RadioScheduler {
   private deliver(id: number, call: LiveCall, now: number): void {
     this.said.set(call.key, now);
     this.sink.settle(id, 'sent');
-    const sent = this.sink.send({ id, priority: call.priority, text: call.text, expiresAt: Date.now() + (call.priority === 1 ? 30_000 : 15_000) });
-    if (!sent) this.sink.settle(id, 'no-client');
+    // A call said at once may still wait behind one being said: `waitSeconds` is how long it stays worth saying.
+    const life = (call.priority === 1 || call.immediate ? call.waitSeconds : undefined) ?? LIFE_SECONDS[call.priority];
+    const sent = this.sink.send({ id, priority: call.priority, text: call.text, expiresAt: Date.now() + life * 1000 });
+    if (sent) { this.awaiting.set(id, { key: call.key, since: now }); return; }
+    this.sink.settle(id, 'no-client');
+    this.unheard.add(call.key);
   }
 
   private log(call: LiveCall, now: number): number {
@@ -215,6 +261,9 @@ export class RadioScheduler {
     this.fieldCalls = [];
     this.previous = new Set();
     this.said.clear();
+    this.awaiting.clear();
+    this.retried.clear();
+    this.unheard.clear();
     this.lineAt = null;
     this.laps = null;
     this.p3ThisLap = 0;

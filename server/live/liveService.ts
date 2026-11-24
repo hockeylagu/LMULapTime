@@ -13,7 +13,7 @@ import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.j
 import type { PitLaneLossRow } from '../core/live/dbPitLaneStore.js';
 import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
 import { DEFAULT_LIVE_SETTINGS, LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
-import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveRadioOutcome, LiveSessionKind, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
+import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveRadioOutcome, LiveRadioPageOutcome, LiveSessionKind, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
 import { TypedEmitter } from '../core/typedEmitter.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../core/workerThreads.js';
 import type { LiveReaderMessage } from './liveReader.js';
@@ -226,7 +226,13 @@ export class LiveService {
   /** The voice switch from Settings. */
   public setVoice(enabled: boolean): void { this.radio?.setEnabled(enabled); }
   /** A page reports what became of a call it was sent; false when the call is unknown or already settled. */
-  public reportCall(id: number, outcome: LiveRadioOutcome): boolean { return this.options.radio?.settle(id, outcome) ?? false; }
+  public reportCall(id: number, outcome: LiveRadioPageOutcome): boolean {
+    const recorded = this.options.radio?.settle(id, outcome) ?? false;
+    if (recorded) this.radio?.observeOutcome(id, outcome);
+    return recorded;
+  }
+  /** A page's radio can speak now: the calls no page could say are proposed again. */
+  public radioReady(): void { this.radio?.observeListener(); }
   /**
    * A session is loaded in the game, so the game may be writing its files. A replay counts too: the page shows it
    * as the menu, but one started from a session's monitor leaves that session loaded (and one from the main menu
@@ -315,6 +321,8 @@ export class LiveService {
     this.ensureTimers();
     this.followPitMode();
     this.send(sink, LIVE_STREAM_EVENTS.snapshot, this.snapshot);
+    // The calls sent while no page was connected come again; a page still locked says so and they wait for its click.
+    this.radio?.observeListener();
     return () => this.removeClient(sink);
   }
 

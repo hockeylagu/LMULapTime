@@ -147,6 +147,11 @@ export function reportLiveCall(id: number, outcome: LiveRadioPageOutcome): void 
   postJson(`/api/live/calls/${id}/outcome`, { outcome }).catch(() => { /* The call stays logged as sent. */ });
 }
 
+/** Tells the server this page's radio can speak, so the calls no page could say come again; best effort. */
+export function reportRadioReady(): void {
+  postJson('/api/live/calls/ready', {}).catch(() => { /* The calls come with the next page that connects. */ });
+}
+
 export function saveLiveSettings(settings: Partial<LiveSettings>, signal?: AbortSignal): Promise<LiveSettings> {
   return postJson<LiveSettings>('/api/live/settings', settings, { signal });
 }

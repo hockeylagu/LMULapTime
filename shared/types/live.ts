@@ -37,6 +37,8 @@ export interface LiveSessionInfo {
   /** Session end time in seconds; null when unknown. LMU sessions, races included, are always timed. */
   endSeconds: number | null;
   playerLapsCompleted: number | null;
+  /** Session clock when the player's lap in progress started; null when unknown. */
+  playerLapStartSeconds?: number | null;
   playerPlace: number | null;
   playerClassPlace?: number | null;
   finishStatus?: number;
@@ -207,10 +209,10 @@ export const LIVE_STREAM_EVENTS = {
 } as const;
 
 /** What became of a radio call: set by the server (`queued`, `sent`, drops) or reported by the page that played it. */
-export type LiveRadioOutcome = 'queued' | 'sent' | 'spoken' | 'interrupted' | 'locked' | 'failed'
+export type LiveRadioOutcome = 'queued' | 'sent' | 'spoken' | 'interrupted' | 'locked' | 'failed' | 'late'
   | 'dropped-budget' | 'expired' | 'replaced' | 'no-client';
 /** The outcomes a page may report for a call it was sent. */
-export const LIVE_RADIO_PAGE_OUTCOMES = ['spoken', 'interrupted', 'locked', 'failed'] as const satisfies readonly LiveRadioOutcome[];
+export const LIVE_RADIO_PAGE_OUTCOMES = ['spoken', 'interrupted', 'locked', 'failed', 'late'] as const satisfies readonly LiveRadioOutcome[];
 export type LiveRadioPageOutcome = (typeof LIVE_RADIO_PAGE_OUTCOMES)[number];
 
 /** A radio call for the page to say: text only, never audio bytes. */
@@ -218,7 +220,7 @@ export interface LiveRadioCallEvent {
   id: number;
   priority: 1 | 2 | 3;
   text: string;
-  /** Wall-clock ms after which the page drops it unsaid (a page that reconnects late). */
+  /** Wall-clock ms after which the page drops it unsaid (`late`): it waited too long behind a call being said. */
   expiresAt: number;
 }
 

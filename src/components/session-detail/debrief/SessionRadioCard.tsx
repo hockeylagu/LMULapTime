@@ -12,6 +12,7 @@ const OUTCOME_NOTES: Record<LiveRadioOutcome, string | null> = {
   interrupted: 'cut off by a newer call',
   locked: 'not said: voice not enabled on the page',
   failed: 'not said: the voice failed',
+  late: 'not said: too late to help',
   queued: 'not said',
   'dropped-budget': 'not said: lap budget used',
   expired: 'not said: no slot in time',

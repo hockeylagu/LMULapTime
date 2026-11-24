@@ -93,7 +93,13 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
     res.json(saved);
   });
 
-  // A page reports what became of a radio call it was sent (said, cut off by a P1, audio locked, failed); once per call.
+  // A page says its radio can speak (the voice is on and the page was clicked): the calls no page could say come again.
+  router.post('/live/calls/ready', (_req, res) => {
+    live.radioReady();
+    res.json({ ok: true });
+  });
+
+  // A page reports what became of a radio call it was sent (said, cut off by a P1, audio locked, failed, too late); once per call.
   router.post('/live/calls/:id/outcome', (req, res) => {
     const id = Number(req.params.id);
     const outcome = (req.body as { outcome?: unknown } | undefined)?.outcome;

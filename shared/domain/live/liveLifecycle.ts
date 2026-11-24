@@ -150,6 +150,7 @@ function sessionInfo(reading: LiveScoringReading): LiveSessionInfo {
     elapsedSeconds: reading.currentEt,
     endSeconds: timed ? reading.endEt : null,
     playerLapsCompleted: reading.player?.totalLaps ?? null,
+    playerLapStartSeconds: reading.player?.lapStartEt ?? null,
     playerPlace: reading.player?.place ?? null,
     playerClassPlace: reading.playerClassPlace ?? null,
     finishStatus: reading.player?.finishStatus ?? 0,

@@ -4,7 +4,10 @@ import type { LiveRadioCallEvent, LiveRadioOutcome, LiveSnapshot } from '../../.
 import { RadioScheduler, type RadioLogEntry } from '../../../../server/live/radio/radioScheduler.js';
 import { liveSession, liveSnapshot } from '../../../helpers/liveSnapshot.js';
 
-function setup({ clients = true, enabled = true } = {}) {
+/** `hears`: the page says every call at once, reported by the next pedal sample; false, the test reports the outcomes. */
+function setup({ clients = true, enabled = true, hears = true } = {}) {
+  const page = { connected: clients };
+  let reported = 0;
   const log: Array<RadioLogEntry & { id: number }> = [];
   const outcomes = new Map<number, LiveRadioOutcome>();
   const sent: LiveRadioCallEvent[] = [];
@@ -12,7 +15,7 @@ function setup({ clients = true, enabled = true } = {}) {
   const scheduler = new RadioScheduler({
     log: entry => { log.push({ ...entry, id: log.length + 1 }); outcomes.set(log.length, entry.outcome); return log.length; },
     settle: (id, outcome) => { outcomes.set(id, outcome); },
-    send: event => { if (clients) sent.push(event); return clients; },
+    send: event => { if (page.connected) sent.push(event); return page.connected; },
     recordingId: () => 'rec-1',
   }, enabled, () => Array.isArray(next) ? next : next ? [next] : []);
   let laps = 3;
@@ -23,13 +26,14 @@ function setup({ clients = true, enabled = true } = {}) {
   const drive = (seconds: number, flat: boolean) => {
     for (let index = 0; index < Math.round(seconds * 10); index += 1) {
       t += 0.1;
+      while (hears && reported < sent.length) { scheduler.observeOutcome(sent[reported].id, 'spoken'); reported += 1; }
       scheduler.observePedal({ t, throttle: flat ? 1 : 0.3, brake: flat ? 0 : 0.8 });
     }
   };
   const line = () => { laps += 1; scheduler.observeSnapshot(snap()); };
   scheduler.observePedal({ t, throttle: 0.3, brake: 0.5 });
   const field = (calls: LiveCall[]) => { scheduler.observeField(calls); };
-  return { scheduler, log, outcomes, sent, propose, field, drive, line, said: () => sent.map(event => event.text) };
+  return { scheduler, page, log, outcomes, sent, propose, field, drive, line, said: () => sent.map(event => event.text) };
 }
 const call = (key: string, priority: LiveCall['priority']): LiveCall => ({ key, text: `${key}.`, priority, family: 'strategy' });
 
@@ -152,6 +156,95 @@ describe('radio scheduler', () => {
     radio.scheduler.setEnabled(false);
     radio.field([{ ...call('late', 1), family: 'incident' }]);
     expect(radio.said()).not.toContain('late.');
+  });
+
+  it('proposes once more a call the page could not say, while it still applies', () => {
+    const radio = setup({ hears: false });
+    radio.propose([call('box', 1), call('last-lap', 3)]);
+    // The P1 failed on the page: said again at once, and only once.
+    radio.scheduler.observeOutcome(1, 'failed');
+    expect(radio.said()).toEqual(['box.', 'box.']);
+    radio.scheduler.observeOutcome(3, 'failed');
+    expect(radio.said()).toHaveLength(2);
+    radio.drive(1.2, true);
+    expect(radio.said()).toEqual(['box.', 'box.', 'last-lap.']);
+    // The P3 was cut by a P1: it takes the next slot.
+    radio.scheduler.observeOutcome(2, 'interrupted');
+    radio.drive(0.5, false);
+    radio.drive(1.2, true);
+    expect(radio.said()).toEqual(['box.', 'box.', 'last-lap.', 'last-lap.']);
+    // A call heard, or one that no longer applies, is left alone.
+    radio.scheduler.observeOutcome(4, 'spoken');
+    radio.propose(call('gone', 1));
+    radio.propose(null);
+    radio.scheduler.observeOutcome(5, 'failed');
+    expect(radio.said()).toHaveLength(5);
+  });
+
+  it('holds a slotted call while the page is still saying one, a P1 never', () => {
+    const radio = setup({ hears: false });
+    radio.propose([call('a', 2), call('b', 2)]);
+    radio.drive(1.2, true);
+    expect(radio.said()).toEqual(['a.']);
+    // The next slot opens while "a" is still being said: "b" would queue on the page and come out in a corner.
+    radio.line();
+    radio.drive(0.5, false);
+    expect(radio.said()).toEqual(['a.']);
+    radio.propose([call('a', 2), call('b', 2), call('box', 1)]);
+    expect(radio.said()).toEqual(['a.', 'box.']);
+    radio.scheduler.observeOutcome(1, 'spoken');
+    radio.drive(0.2, false);
+    expect(radio.said()).toEqual(['a.', 'box.']);
+    radio.scheduler.observeOutcome(3, 'spoken');
+    radio.drive(0.3, false);
+    expect(radio.said()).toEqual(['a.', 'box.', 'b.']);
+    // A page that never answers (closed while speaking) holds the next call 20 s, no longer.
+    radio.propose({ ...call('c', 2), waitSeconds: 60 });
+    radio.drive(1, false);
+    radio.drive(15, true);
+    expect(radio.said()).toHaveLength(3);
+    radio.drive(5, true);
+    radio.drive(1, false);
+    radio.drive(1.2, true);
+    expect(radio.said()).toEqual(['a.', 'box.', 'b.', 'c.']);
+  });
+
+  it('gives a call said at once its own time to be said, the others the default', () => {
+    const radio = setup();
+    const life = (index: number) => Math.round((radio.sent[index].expiresAt - Date.now()) / 1000);
+    radio.propose([call('box', 1), { ...call('car-stopped', 1), waitSeconds: 6 }, { ...call('menu', 2), waitSeconds: 60 }]);
+    radio.field([{ ...call('traffic', 2), immediate: true, waitSeconds: 3 }]);
+    radio.drive(1.2, true);
+    expect(radio.said()).toEqual(['box.', 'car-stopped.', 'traffic.', 'menu.']);
+    // The slotted call's wait is for its slot: once sent it starts at once, on the default.
+    expect([0, 1, 2, 3].map(life)).toEqual([30, 6, 3, 15]);
+  });
+
+  it('proposes again the calls no page could say, once a page can speak', () => {
+    const radio = setup({ clients: false, hears: false });
+    radio.propose([call('box', 1), call('menu', 2)]);
+    radio.drive(1.2, true);
+    expect([...radio.outcomes.values()]).toEqual(['no-client', 'no-client']);
+    // A page connects, still locked after a reload: it says so, and the calls wait for its click.
+    radio.page.connected = true;
+    radio.scheduler.observeListener();
+    expect(radio.said()).toEqual(['box.']);
+    radio.scheduler.observeOutcome(3, 'locked');
+    radio.drive(0.5, false);
+    radio.drive(1.2, true);
+    expect(radio.said()).toEqual(['box.', 'menu.']);
+    radio.scheduler.observeOutcome(4, 'locked');
+    radio.drive(3, true);
+    expect(radio.said()).toHaveLength(2);
+    radio.scheduler.observeListener();
+    expect(radio.said()).toEqual(['box.', 'menu.', 'box.']);
+    // A call that no longer applies stays unsaid, and one dropped late on the page is not said again.
+    radio.scheduler.observeOutcome(5, 'late');
+    radio.propose(null);
+    radio.scheduler.observeListener();
+    radio.drive(0.5, false);
+    radio.drive(1.2, true);
+    expect(radio.said()).toHaveLength(3);
   });
 
   it('logs calls with no page connected as no-client, and proposes nothing with the voice off', () => {
