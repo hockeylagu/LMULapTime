@@ -94,11 +94,12 @@ function waterParts(config: SurfaceConfig, { sample, uv, number, uniforms }: Sha
 
 /**
  * Luminous kinds: the albedo texture is emission only. The bright panels glow most toward the eye, up to three times head-on, by
- * 1 + 2 (N.V)^n: a sun-bright panel narrowly (n 64), a trackside one broadly (n 8).
+ * 1 + 2 (N.V)^n: a sun-bright panel narrowly (n 64), a trackside one broadly (n 8). The texture times its strength is written
+ * straight to the image as a game light value, converted to the scene by GAME_LIGHT_UNIT as the car lamps are.
  */
 function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): ExtendedParts {
   const kind = config.kind;
-  const mult = kind === 'highLumSun' ? '500.0' : kind === 'highLumTrackside' ? '100.0' : '20.0';
+  const mult = glslNumber((kind === 'highLumSun' ? 500 : kind === 'highLumTrackside' ? 100 : 20) * GAME_LIGHT_UNIT);
   const facing = kind === 'highLumSun' ? '64.0' : kind === 'highLumTrackside' ? '8.0' : null;
   const view = facing ? `*(1.0+2.0*pow(clamp(dot(normal,normalize(vViewPosition)),0.0,1.0),${facing}))` : '';
   return {

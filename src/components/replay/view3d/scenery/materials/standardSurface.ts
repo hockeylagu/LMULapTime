@@ -1,3 +1,4 @@
+import { GAME_LIGHT_UNIT } from '../../atmosphere/sunSamples.js';
 import { glslNumber, list, value, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
@@ -127,12 +128,13 @@ export function standardShaderParts(config: SurfaceConfig, { sample, uv, number,
   const normals = (maps.normal || maps.normalAlt || maps.detail && on('detailNormal'))
     ? `normal=surfaceNormalVector(normal,${uv(normalUV)},${tangentNormal});` : 'vec3 sourceGeometryNormal=normal;';
   const f0 = ((1.4 - 1) / (1.4 + 1)) ** 2;
-  // Emission is diffuse illumination, not standalone additive radiance.
+  // Emission is diffuse illumination, not standalone additive radiance: a game light value summed with the sun's light before the
+  // 1/pi, so it converts to the scene by GAME_LIGHT_UNIT as the sun does.
   const emissiveMask = ['rgb', 'rgba'].includes(f.emissiveMask ?? '') ? `${sample('emissive')}.rgb` : f.emissiveMask === 'rg' ? `vec3(${sample('emissive')}.g)` : 'vec3(1.0)';
   // A surface lit at night only glows while the scene's day share is under full day (`sceneDayLight`).
   const lit = f.emissive === 'always' ? '' : f.emissive === 'night' ? '*(1.0-step(1.0,surface_dayLight))' : null;
   const emissive = lit !== null
-    ? `${vec(list(p.emissive, 'colour').map(x => x * x))}*${n(p.emissive, 'strength')}*${emissiveMask}*diffuseColor.rgb*${glslNumber(1 / Math.PI)}*(1.0-surfaceMetallic)*(1.0-surfaceSpecular*${glslNumber(f0)})${lit}`
+    ? `${vec(list(p.emissive, 'colour').map(x => x * x))}*${n(p.emissive, 'strength')}*${emissiveMask}*diffuseColor.rgb*${glslNumber(GAME_LIGHT_UNIT / Math.PI)}*(1.0-surfaceMetallic)*(1.0-surfaceSpecular*${glslNumber(f0)})${lit}`
     : 'vec3(0.0)';
   const physical = `material.specularColor=vec3(${glslNumber(f0)}); material.specularColorBlended=vec3(${glslNumber(f0)});`;
   return { albedo, normals, emissive, physical, occlusion: maps.aoSpec ? 'reflectedLight.indirectSpecular*=aoSpec.r;' : '' };
