@@ -168,6 +168,19 @@ export interface ReplayTrajectoryPoint {
   tireSlipPct?: number;
   wheelLockActive?: boolean;
   fuel?: number;
+  /**
+   * The car's settings as the game's telemetry recording logs them (player laps only): the TC, TC cut, TC slip and ABS maps, the fuel
+   * mixture map and the rear brake bias (0..1). Shown by the cockpit readouts.
+   */
+  tcMap?: number;
+  tcCut?: number;
+  tcSlip?: number;
+  absMap?: number;
+  engineMixture?: number;
+  brakeBiasRear?: number;
+  /** Engine oil and water temperatures, °C (player laps only). */
+  oilTemp?: number;
+  waterTemp?: number;
   virtualEnergy?: number;
   soc?: number;
   regenRate?: number;

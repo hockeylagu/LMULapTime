@@ -3,6 +3,7 @@ import { createWheelAnimation, type WheelAnimation } from './wheelAnimation.js';
 import { createLampStates, type LampStates } from '../car/lampStates.js';
 import { createReadoutStates, type ReadoutStates } from '../car/readoutCanvas.js';
 import type { WheelLap } from './wheelMotion.js';
+import type { ReadoutLapContext } from '../car/readoutText.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { RenderPose } from '../scene/replayPose.js';
 
@@ -16,7 +17,7 @@ export interface CarMotion {
    * Takes the car's track, read from `source` when next built: a no-op for the track it already has (`key`, the lap or the pose
    * window).
    */
-  setTrack(key: object, source: () => WheelLap): void;
+  setTrack(key: object, source: () => WheelLap & ReadoutLapContext): void;
   readonly wheels: WheelAnimation | null;
   readonly lights: readonly LampStates[];
   /** Moves the wheels and switches the lamps for the pose (the track's sample `pose.index`); builds them first if needed. */
@@ -35,7 +36,7 @@ export function createCarMotion(car: Group, surfaceHeight: SurfaceHeight): CarMo
   const rest = [envelope, ...(envelope ? rigNodes(envelope) : [])].flatMap(node => node ? [{node, position: node.position.clone(), quaternion: node.quaternion.clone()}] : []);
   /** A body without wheel rigs keeps still wheels; a rig the package gets wrong throws (`attachWheelRigs`). */
   const rigged = rest.some(({node}) => node.name.startsWith('wheel_'));
-  let key: object | null = null, pending: (() => WheelLap) | null = null, stale = false;
+  let key: object | null = null, pending: (() => WheelLap & ReadoutLapContext) | null = null, stale = false;
   let wheels: WheelAnimation | null = null, lights: LampStates[] = [], readouts: ReadoutStates | null = null;
   const build = () => {
     if (pending) {
@@ -45,7 +46,7 @@ export function createCarMotion(car: Group, surfaceHeight: SurfaceHeight): CarMo
       wheels = rigged ? createWheelAnimation(car, lap, surfaceHeight) : null;
       const lamps = createLampStates(car, lap.points);
       lights = lamps ? [lamps] : [];
-      readouts = createReadoutStates(car, lap.points);
+      readouts = createReadoutStates(car, lap.points, lap);
     } else if (stale) {
       stale = false;
       wheels?.refreshHeights();

@@ -202,12 +202,73 @@ export interface CarReadout {
   rpm: {min: number; max: number; altMin: number; altMax: number};
   /** The engine's rev limit at its default setting (engine `RevLimitRange` at `RevLimitSetting`): the top of the rpm range when that `max` is negative or above it. */
   revLimitRpm: number;
+  /** The canvas in pixels: the size of the readout material's own texture, which the game draws into; null where the install lacks that texture. */
+  canvasSize: [number, number] | null;
   elements: CarReadoutElement[];
+  /** The text fields, in the file's order (drawn after the elements). */
+  texts: CarReadoutText[];
+  /** The fonts the texts use (`CarReadoutText.font`), each used by one or more. */
+  fonts: CarReadoutFont[];
+}
+
+/**
+ * The text (font digit) fields the game reads, in its own order (the executable's field table, docs/PACKAGE_FORMAT.md#readouts): what each
+ * shows and how the game formats it is listed there.
+ */
+export const CAR_READOUT_TEXTS = [
+  'Gears', 'Speed', 'RPM', 'OilTempDigit', 'WaterTempDigit', 'BoostMotorTempDigit', 'FuelLevelDigit', 'FuelLastLap', 'FuelUsedThisLap',
+  'FuelFinishAverage', 'FuelUse', 'BatteryLevelDigit', 'BatteryLastLap', 'BatteryUsedThisLap', 'BatteryFinishAverage', 'BatteryUse',
+  'VirtualEnergyLevelDigit', 'VirtualEnergyLastLap', 'VirtualEnergyUsedThisLap', 'VirtualEnergyFinishAverage', 'VirtualEnergyUse', 'Place',
+  'Laps', 'CurrentLap', 'BestLap', 'LastLap', 'DeltaPositive', 'DeltaNegative', 'DeltaNeutral', 'TTempLF', 'TTempRF', 'TTempLR', 'TTempRR',
+  'TPressLF', 'TPressRF', 'TPressLR', 'TPressRR', 'BTempLF', 'BTempRF', 'BTempLR', 'BTempRR', 'EngineMixture', 'BoostDigit', 'BoostMap',
+  'BatteryRegenLevel', 'MotorMap', 'MotorMapText', 'BrakeMap', 'BrakeBias', 'BrakeBiasExact', 'BrakeBiasDelta', 'BrakeBiasMigration',
+  'TCMap', 'TCSlip', 'TCCut', 'ABSMap', 'AntiRollBarFront', 'AntiRollBarRear', 'LapTimeSector1', 'LapTimeSector2', 'LapTimeSector3',
+  'LapTimePredicted', 'TrackState', 'LapsCompleted', 'LapsInStint', 'SettingChangeTitle', 'SettingChangeValue',
+] as const;
+export type CarReadoutTextName = typeof CAR_READOUT_TEXTS[number];
+
+/**
+ * A text field: the game formats a value into a string each frame and draws it glyph by glyph in `font`, anchored at `offset` x the canvas
+ * size and aligned by `alignW`/`alignH` (docs/PACKAGE_FORMAT.md#readouts). Values are the cockpitinfo's own.
+ */
+export interface CarReadoutText {
+  name: CarReadoutTextName;
+  /** Index into the readout's `fonts`. */
+  font: number;
+  scale: [number, number];
+  offset: [number, number];
+  /** 0 left, 1 centre, 2 right of the anchor. */
+  alignW: number;
+  /** 0 top, 1 middle, 2 bottom. */
+  alignH: number;
+  /** The glyphs' colour; null is white, opaque. */
+  alphaColor: CarReadoutArgb | null;
+  /** 0 the player's unit setting, 1 metric, 2 imperial. */
+  units: number;
+  /** The text the game starts from each frame and keeps where it writes no value. */
+  defaultValue: string;
+}
+
+/**
+ * A readout font as the game loads it: the font sheet with its grid, background and cell-tick colours cleared, glyphs in cells of `cell` pixels
+ * from character 32, `columns` per row.
+ */
+export interface CarReadoutFont {
+  /** `textures/<sha256>.ktx2.zst`, stored as decoded RGBA8 like the element atlases. */
+  texture: string;
+  /** The sheet in pixels. */
+  size: [number, number];
+  cell: [number, number];
+  columns: number;
+  /** The advance in pixels of each glyph from character 32, in order (at most 255). */
+  advances: number[];
 }
 
 export const BODY_DESCRIPTOR_KEYS = ['optionNodes', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras', 'readouts'] as const;
 const APPEARANCE_KEYS = ['alias', 'number', 'albedo', 'paint', 'optionNodes', 'readout'];
-const READOUT_KEYS = ['material', 'rpm', 'revLimitRpm', 'elements'] as const;
+const READOUT_KEYS = ['material', 'rpm', 'revLimitRpm', 'canvasSize', 'elements', 'texts', 'fonts'] as const;
+const READOUT_TEXT_KEYS = ['name', 'font', 'scale', 'offset', 'alignW', 'alignH', 'alphaColor', 'units', 'defaultValue'] as const;
+const READOUT_FONT_KEYS = ['texture', 'size', 'cell', 'columns', 'advances'] as const;
 const READOUT_ELEMENT_KEYS = ['name', 'texture', 'scale', 'offset', 'uvMin', 'uvMax', 'alphaColor', 'offAlphaColor', 'altAlphaColor', 'orientation', 'elements',
   'renderOrder', 'maxValue', 'threshold', 'altValue', 'altUvOffset', 'defaultValue'] as const;
 /** Option part nodes: unique GLB node names that three.js keeps as they are (no characters it would sanitise). */
@@ -333,6 +394,40 @@ function parseReadout(value: unknown, what: string, declared: ReadonlySet<string
   });
   if (!names.length) throw Error(`${what}.elements: empty`);
   if (new Set(names).size !== names.length) throw Error(`${what}.elements: an element is listed twice`);
+  if (readout.canvasSize !== null && pair(readout.canvasSize, `${what}.canvasSize`).some(side => !Number.isSafeInteger(side) || side < 1)) {
+    throw Error(`${what}.canvasSize: expected positive whole pixels or null`);
+  }
+  const fonts = array(readout.fonts, `${what}.fonts`, 64).map((item, i) => {
+    const at = `${what}.fonts[${i}]`, font = record(item, at);
+    orderedKeys(font, READOUT_FONT_KEYS, at);
+    if (typeof font.texture !== 'string' || !DESCRIPTOR_TEXTURE_PATH.test(font.texture)) throw Error(`${at}.texture: expected a texture path`);
+    if (!declared.has(font.texture)) throw Error(`${at}.texture: ${font.texture} is not a texture of the body`);
+    const size = pair(font.size, `${at}.size`), cell = pair(font.cell, `${at}.cell`);
+    if ([...size, ...cell].some(side => !Number.isSafeInteger(side) || side < 1) || cell[0] > size[0] || cell[1] > size[1]) throw Error(`${at}: expected whole pixel sizes, cells within the sheet`);
+    if (integer(font.columns, `${at}.columns`) !== Math.floor(size[0] / cell[0])) throw Error(`${at}.columns: expected the sheet width over the cell width`);
+    const advances = array(font.advances, `${at}.advances`, 255);
+    if (!advances.length || advances.length !== Math.min(255, (font.columns as number) * Math.floor(size[1] / cell[1]))) throw Error(`${at}.advances: expected one per cell, at most 255`);
+    advances.forEach((advance, j) => count(advance, `${at}.advances[${j}]`, cell[0] - 1));
+    return font.texture;
+  });
+  if (new Set(fonts).size !== fonts.length) throw Error(`${what}.fonts: a font is listed twice`);
+  const used = new Set<number>();
+  const texts = array(readout.texts, `${what}.texts`, CAR_READOUT_TEXTS.length).map((item, i) => {
+    const at = `${what}.texts[${i}]`, field = record(item, at);
+    orderedKeys(field, READOUT_TEXT_KEYS, at);
+    const name = text(field.name, `${at}.name`, 64);
+    if (!(CAR_READOUT_TEXTS as readonly string[]).includes(name)) throw Error(`${at}.name: ${name} is not a readout text`);
+    const font = count(field.font, `${at}.font`, 63);
+    if (font >= fonts.length) throw Error(`${at}.font: no font ${font}`);
+    used.add(font);
+    pair(field.scale, `${at}.scale`); pair(field.offset, `${at}.offset`);
+    for (const key of ['alignW', 'alignH', 'units']) if (![0, 1, 2].includes(integer(field[key], `${at}.${key}`))) throw Error(`${at}.${key}: expected 0, 1 or 2`);
+    if (field.alphaColor !== null) argb(field.alphaColor, `${at}.alphaColor`);
+    if (typeof field.defaultValue !== 'string' || field.defaultValue.length > 64) throw Error(`${at}.defaultValue: expected text of at most 64 characters`);
+    return name;
+  });
+  if (new Set(texts).size !== texts.length) throw Error(`${what}.texts: a text is listed twice`);
+  if (used.size !== fonts.length) throw Error(`${what}.fonts: a font no text uses`);
 }
 
 /** A descriptor's `optionNodes` (or an appearance's): `option_` names, sorted, unique. */

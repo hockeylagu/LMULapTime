@@ -559,6 +559,22 @@ export class DuckDbReader {
       return [...before, ...during];
     };
 
+    // Settings the recording logs as change events (ts, value), and the engine temperatures; older recordings may lack them.
+    const settingTables = {tcMap: 'TCLevel', tcCut: 'TCCut', tcSlip: 'TCSlipAngle', absMap: 'ABSLevel', engineMixture: 'FuelMixtureMap', brakeBiasRear: 'Brake Bias Rear'} as const;
+    const settingEvents = Object.fromEntries(await Promise.all(Object.entries(settingTables).map(async ([key, table]) =>
+      [key, (await this.hasTable(table)) && (await this.hasColumn(table, 'ts')) ? await fetchEventChannel(table, 1) : []] as const)));
+    const [oilTempData, waterTempData] = await Promise.all([
+      fetchContinuousChannel<{ value: number }>((await this.hasTable('Engine Oil Temp')) ? 'Engine Oil Temp' : null, 'value', 7),
+      fetchContinuousChannel<{ value: number }>((await this.hasTable('Engine Water Temp')) ? 'Engine Water Temp' : null, 'value', 7),
+    ]);
+    /** A setting's value at `ts`: its last event at or before it (none before the first). */
+    const settingAt = (key: keyof typeof settingTables, ts: number): number | undefined => {
+      const events = settingEvents[key];
+      let value: number | undefined;
+      for (const event of events) { if (event.ts <= ts) value = Number(event.value); else break; }
+      return value;
+    };
+
     const [
       speedData,
       throttleData,
@@ -830,6 +846,9 @@ export class DuckDbReader {
 
       const regenRow = getChannelRow(regenRateData, i);
       const regenRate = regenRow?.value !== undefined ? parseFloat(regenRow.value.toFixed(1)) : undefined;
+      const oilTemp = getChannelRow(oilTempData, i)?.value, waterTemp = getChannelRow(waterTempData, i)?.value;
+      const settings = Object.fromEntries((Object.keys(settingTables) as Array<keyof typeof settingTables>)
+        .flatMap(key => { const value = settingAt(key, pointTime); return value === undefined ? [] : [[key, value]]; }));
 
       points.push({
         x: 0,
@@ -856,6 +875,9 @@ export class DuckDbReader {
         virtualEnergy,
         soc,
         regenRate,
+        ...settings,
+        ...(oilTemp === undefined ? {} : { oilTemp: parseFloat(oilTemp.toFixed(1)) }),
+        ...(waterTemp === undefined ? {} : { waterTemp: parseFloat(waterTemp.toFixed(1)) }),
       });
     }
 

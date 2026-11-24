@@ -7,7 +7,7 @@ const element = (extra: Partial<CarReadoutElement> = {}): CarReadoutElement => (
   alphaColor: [255, 0, 255, 0], offAlphaColor: [0, 0, 0, 0], altAlphaColor: null, orientation: 0, elements: 10, renderOrder: 0,
   maxValue: null, threshold: null, altValue: null, altUvOffset: null, defaultValue: 0, ...extra,
 });
-const readout = (elements: CarReadoutElement[]): CarReadout => ({material: 'SCREEN', rpm: {min: 5000, max: 9000, altMin: 7000, altMax: -1}, revLimitRpm: 8000, elements});
+const readout = (elements: CarReadoutElement[]): CarReadout => ({material: 'SCREEN', rpm: {min: 5000, max: 9000, altMin: 7000, altMax: -1}, revLimitRpm: 8000, canvasSize: [1024, 1024], elements, texts: [], fonts: []});
 
 describe('readout draw rules (decoded from the game)', () => {
   it('tops the rpm range at the display maximum only when it is within the rev limit', () => {
