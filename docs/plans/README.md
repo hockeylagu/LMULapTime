@@ -161,13 +161,9 @@ that evidence in the next-stop load and fuel-ratio estimates. The deployment adv
 
 ## Peripheral acceptance
 
-The optional Simagic integration is implemented; [plugin setup](../PLUGINS.md) owns operation.
-The remaining hardware gate is one real LMU + SimPro event: the mapped wheel switches at most once
-in its first garage, only if different; qualifying, race, garage returns and reconnects do not cause
-another automatic switch. No track/replay/demo writes; no wheelbase switching. Suggest never touches
-hardware. Confirm absent/disconnected devices, rejected/unknown readback and missing/renamed presets
-are visible without automatic selection retries or blocking recording. Apply remains an explicit
-Settings action, refused on track. Existing fake-plugin tests do not replace this hardware event.
+Done 2026-11-24: the optional Simagic integration passed its hardware gate in real LMU + SimPro
+events (driver-confirmed: the mapped wheel preset switches as intended). Nothing open;
+[plugin setup](../PLUGINS.md) owns operation.
 
 ## Analysis backlog
 
