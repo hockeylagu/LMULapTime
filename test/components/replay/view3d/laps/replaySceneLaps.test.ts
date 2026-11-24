@@ -8,7 +8,7 @@ import { describeLoad, type SceneLoadProgress } from '../../../../../src/compone
 import { sceneSun } from '../../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import { isStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
-import { SUN_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
@@ -300,7 +300,7 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   // A glow is drawn only through a lamp with a known unlit frame that has a texture, with that lamp's own material.
   const headlight = oldCar.getObjectByName('lampGlow') as Mesh<BufferGeometry, ShaderMaterial>;
   expect(headlight.material.name).toBe('lamp-lampGlowMaterial');
-  expect([headlight.material.uniforms.scale.value, headlight.castShadow, headlight.userData.cockpitView]).toEqual([500 * SUN_UNIT, false, 'out']);
+  expect([headlight.material.uniforms.scale.value, headlight.castShadow, headlight.userData.cockpitView]).toEqual([500 * GAME_LIGHT_UNIT, false, 'out']);
   expect([oldCar.getObjectByName('brakeGlow'), oldCar.getObjectByName('discGlow')]).toEqual([undefined, undefined]);
   // The road draws from its material's batch, which holds its geometry.
   const roadBatch = world.getObjectsByProperty('isBatchedMesh', true).find(batch => (batch as Mesh).material === road.material) as Mesh;

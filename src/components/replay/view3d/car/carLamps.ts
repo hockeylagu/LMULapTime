@@ -1,6 +1,6 @@
 import { NormalBlending, RepeatWrapping, ShaderMaterial, type Texture } from 'three';
 import type { CarLamp, CarMaterialRecipe } from '../../../../../shared/types/scenes/car.js';
-import { SUN_UNIT } from '../atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
 import { sceneDayLight, screenStrength } from '../scene/dayLight.js';
 import { lampStateFrames, litByEvent, switches, type LampSwitch } from './lampStates.js';
 
@@ -71,7 +71,7 @@ export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Textu
     name: `lamp-${lamp.material}`,
     uniforms: {
       // A display glow follows the scene's day share as its screen does.
-      map: {value: texture}, scale: display ? {get value() { return screenStrength(glow.displayNight, glow.displayIntensity, sceneDayLight.value) * SUN_UNIT; }} : {value: scale * SUN_UNIT},
+      map: {value: texture}, scale: display ? {get value() { return screenStrength(glow.displayNight, glow.displayIntensity, sceneDayLight.value) * GAME_LIGHT_UNIT; }} : {value: scale * GAME_LIGHT_UNIT},
       boostGain: {value: viewBoost?.gain ?? 0}, boostPower: {value: viewBoost?.power ?? 1},
       // The material's own opacity (a ghost car fades its lamps with its body).
       opacity: {get value() { return material.opacity; }},

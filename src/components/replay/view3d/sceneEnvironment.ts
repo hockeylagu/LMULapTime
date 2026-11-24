@@ -11,7 +11,7 @@ import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditio
 import { createHaze } from './atmosphere/haze.js';
 import { cloudCoverage, cloudSheets, sunVisibility, type CloudEye, type CloudSheet } from './atmosphere/clouds.js';
 import { createCloudLayer } from './atmosphere/cloudLayer.js';
-import { SUN_UNIT, sunRadiance } from './atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT, sunRadiance } from './atmosphere/sunSamples.js';
 import { crownSun } from './scenery/materials/foliageCrown.js';
 import { convolveReflection, type ReflectionCubes } from './reflectionCube.js';
 import { integrationTexture, setSceneryReflection } from './scenery/materials/sceneryReflection.js';
@@ -216,7 +216,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   /** Everything the sun and the weather set; the first environment is made again when `environments` (until the venue is captured). */
   const light = ({lighting, sunElevationDeg, clouds, weather, radiance}: SceneSun, environments = true) => {
     // The weather thickens the haze; the clouds toward the sun dim the sun's light further.
-    const clearSun = radiance.clone().multiplyScalar(SUN_UNIT), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
+    const clearSun = radiance.clone().multiplyScalar(GAME_LIGHT_UNIT), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
     const turned = !toSun.equals(heading.copy(lighting.sunDirection).normalize());
     toSun.copy(lighting.sunDirection).normalize();
     if (lit) {

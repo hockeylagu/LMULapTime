@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { Color, type Matrix3, Vector3 } from 'three';
 import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyBoxDirection, skyColourLook, skyConditions, skyHazeDepth, skyRadiance, skyTurbidity, sunwardHaze } from '../../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { hosekSkyState, hosekXyz } from '../../../../../src/components/replay/view3d/atmosphere/hosekSky.js';
-import { SUN_UNIT, sunRadiance } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT, sunRadiance } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const sun = new Vector3(1, 1, 0).normalize(), clear = skyConditions(undefined, 0);
@@ -44,7 +44,7 @@ it('is the model in the light unit, lifted out of negative channels and tinted i
   const look = skyColourLook(sky, sunRadiance(sky.sun, 45, 0), 45, clear);
   const [X, Y, Z] = hosekXyz(state, 1.001, Math.SQRT1_2 * look.sunProximity), rgb = sky.hosek.xyzToRgb.map(row => row[0] * X + row[1] * Y + row[2] * Z);
   const lift = Math.min(0, ...rgb), lifted = rgb.map(v => v - lift), saturation = (Math.max(...lifted) - Math.min(...lifted)) / Math.max(...lifted);
-  const expected = lifted.map((v, i) => v * (1 + saturation * (look.gain[i] - 1)) * SUN_UNIT), got = skyRadiance(sky, sun, clear, up);
+  const expected = lifted.map((v, i) => v * (1 + saturation * (look.gain[i] - 1)) * GAME_LIGHT_UNIT), got = skyRadiance(sky, sun, clear, up);
   [got.r, got.g, got.b].forEach((v, i) => expect(v / expected[i]).toBeCloseTo(1, 4));
 });
 

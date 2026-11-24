@@ -4,7 +4,7 @@ import type { CarLamp, CarMaterialRecipe } from '../../../../../shared/types/sce
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp } from '../../../../../src/components/replay/view3d/car/carLamps.js';
 import { createLampStates, lampStateFrame, lampStateFrames, pitFlashLit, rainLampsFlash, switches, flashes } from '../../../../../src/components/replay/view3d/car/lampStates.js';
-import { SUN_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { sceneDayLight } from '../../../../../src/components/replay/view3d/scene/dayLight.js';
 
 const EMISSION = {scale: 1, vertexColour: false, viewBoost: null, ambientScaled: false, vertexAlpha: false};
@@ -110,9 +110,9 @@ it('draws a lamp without a lamp emission only when its material is a dashboard s
   expect(() => lampGlow(lit, display({emissiveStrength: 10000}))).toThrow('no night strength');
   const material = createLampMaterial(lit, {displayIntensity: 10000, displayNight: 6000}, new Texture());
   // Full day: the day strength; a quarter day share: a quarter of the way from the night strength.
-  expect(material.uniforms.scale.value).toBeCloseTo(10000 * SUN_UNIT);
+  expect(material.uniforms.scale.value).toBeCloseTo(10000 * GAME_LIGHT_UNIT);
   sceneDayLight.value = 0.25;
-  try { expect(material.uniforms.scale.value).toBeCloseTo(7000 * SUN_UNIT); } finally { sceneDayLight.value = 1; }
+  try { expect(material.uniforms.scale.value).toBeCloseTo(7000 * GAME_LIGHT_UNIT); } finally { sceneDayLight.value = 1; }
   expect(material.vertexShader).toContain('attribute vec4 _lmu_colour;');
   expect(material.fragmentShader).toContain('tex.rgb * vColour.rgb * scale');
   // A screen whose parts carry no vertex colour glows white.

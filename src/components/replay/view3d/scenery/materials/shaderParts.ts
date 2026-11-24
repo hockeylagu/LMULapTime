@@ -1,3 +1,4 @@
+import { GAME_LIGHT_UNIT } from '../../atmosphere/sunSamples.js';
 import { readsDayLight } from '../../scene/dayLight.js';
 import { tyreReadsAxle, tyreShaderParts } from '../../car/tyreSurface.js';
 import { clearcoatShaderParts } from './clearcoatSurface.js';
@@ -110,7 +111,8 @@ function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): Extend
 /**
  * Screens: a dashboard (the screen texture times the vertex colour, a decal laid over it by its alpha, with its own roughness) or
  * an external monitor (screen times decal). The screen lights itself as a constant light inside the diffuse sum, so it shows
- * albedo times its strength over pi, in the sun's units, with the usual environment lighting on top at half the specular level.
+ * albedo times its strength over pi, a game light value converted to the scene by GAME_LIGHT_UNIT as the sun is, with the usual
+ * environment lighting on top at half the specular level.
  * Its strength runs from its night strength to its day strength with the scene's day share (`sceneDayLight`).
  */
 function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): ExtendedParts {
@@ -125,7 +127,7 @@ function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): 
     albedo: `${albedo} surfaceMetallic=0.0; surfaceSpecular=0.5;`,
     normals: '', occlusion: '',
     physical: `material.specularColor=vec3(${glslNumber(f0)}); material.specularColorBlended=vec3(${glslNumber(f0)});`,
-    emissive: `diffuseColor.rgb*mix(${number(value(screen, 'emissiveNight'))},${number(value(screen, 'emissiveStrength'))},surface_dayLight)*${number((1 - 0.5 * f0) / Math.PI)}`,
+    emissive: `diffuseColor.rgb*mix(${number(value(screen, 'emissiveNight'))},${number(value(screen, 'emissiveStrength'))},surface_dayLight)*${number((1 - 0.5 * f0) / Math.PI * GAME_LIGHT_UNIT)}`,
   };
 }
 

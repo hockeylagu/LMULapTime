@@ -1,5 +1,5 @@
 import { type Color, DepthTexture, FloatType, HalfFloatType, Matrix3, Mesh, NearestFilter, OrthographicCamera, PlaneGeometry, Scene, ShaderMaterial, Vector2, Vector3, Vector4, WebGLRenderTarget, type Camera, type IUniform, type Object3D, type Texture, type WebGLRenderer } from 'three';
-import { SUN_UNIT } from './atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT } from './atmosphere/sunSamples.js';
 import { surfaceAlphaCut } from './scenery/materials/shaderContext.js';
 import { profilesAt, timeOfDayPosition, weatherWeight } from './atmosphere/timeOfDay.js';
 import type { SceneryCamera, SceneryCameraLook, SceneryCameraProfile, SceneryCameraType, SceneryCameraTypeProfile, SceneryToneCurve } from '../../../../shared/types/scenes/scenery.js';
@@ -20,7 +20,7 @@ const NEUTRAL_KELVIN = 6500;
  * (−ln(1 − T), `meterGrey`) and U what one unit of the scene's light measures on the camera's own scale. No constant of the app's.
  */
 /** U: what one unit of the scene's light measures on a camera of the package's luminance scale. */
-export const meterUnit = (sceneLuminanceScale: number): number => 1 / (SUN_UNIT * sceneLuminanceScale);
+export const meterUnit = (sceneLuminanceScale: number): number => 1 / (GAME_LIGHT_UNIT * sceneLuminanceScale);
 
 /** The camera's tone curve for one exposed linear component. */
 export function toneCurve(curve: SceneryToneCurve, x: number): number {

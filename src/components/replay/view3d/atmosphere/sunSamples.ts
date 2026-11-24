@@ -9,10 +9,11 @@ import type { ScenerySun } from '../../../../../shared/types/scenes/scenery.js';
  */
 
 /**
- * Scene radiance per unit of the package's light (the sun grid here, the sky model in skyDome.ts): the grid's midday sun is near
- * 100 and the scene was calibrated at 4.0, the one conversion between the two.
+ * Scene radiance per unit of the game's light, the unit the package writes every light value in: the sun grid here, the sky model in
+ * skyDome.ts, lamp emission and screen strengths (the game adds a screen's strength to the same diffuse sum as the sun). The grid's
+ * midday sun is near 100 and the scene was calibrated at 4.0: the one conversion between the two, for every game light value.
  */
-export const SUN_UNIT = 0.04;
+export const GAME_LIGHT_UNIT = 0.04;
 
 /** Kasten and Young's relative air mass: how many atmospheres the sun's ray crosses at an elevation, 1 at the zenith. */
 export const relativeAirMass = (elevationDeg: number) => 1 / (Math.sin(MathUtils.degToRad(elevationDeg)) + 0.50572 * (elevationDeg + 6.07995) ** -1.6364);

@@ -1,7 +1,7 @@
 import { BackSide, Color, MathUtils, Matrix3, ShaderMaterial, Vector2, Vector3 } from 'three';
 import type { SceneryDaylight, ScenerySky, ScenerySkyColourProfiles } from '../../../../../shared/types/scenes/scenery.js';
 import { HOSEK_GLSL, hosekSkyState, hosekXyz, type HosekSkyState } from './hosekSky.js';
-import { SUN_UNIT, sunRadiance } from './sunSamples.js';
+import { GAME_LIGHT_UNIT, sunRadiance } from './sunSamples.js';
 import { profilesAt, timeOfDayPosition, weatherWeight } from './timeOfDay.js';
 
 /**
@@ -9,7 +9,7 @@ import { profilesAt, timeOfDayPosition, weatherWeight } from './timeOfDay.js';
  * formulas).
  *
  * The dome is the Hosek-Wilkie clear sky (hosekSky.ts) cooked from the package's datasets at its ground albedo and the weather's
- * turbidity, dimmed by the layout's altitude, in the same light unit as the package's sun (SUN_UNIT): the dome, the sun and the
+ * turbidity, dimmed by the layout's altitude, in the same light unit as the package's sun (GAME_LIGHT_UNIT): the dome, the sun and the
  * ambient they feed keep the ratios they have in the source. The time-of-day colour look, chosen by the direct sun's strength like
  * the camera's profiles, scales cos γ from the sun and tints the saturated sky; the package's matrix takes XYZ to the scene's RGB.
  * The dome then hazes toward its own haze colour over the package's sky haze depth, divided by the view's height above the horizon.
@@ -121,7 +121,7 @@ const SKY_RGB_GLSL = `${HOSEK_GLSL}
         vec3 rgb = xyzToRgb * vec3(xyY.x * xyY.z / xyY.y, xyY.z, (1.0 - xyY.x - xyY.y) * xyY.z / xyY.y);
         rgb -= min(0.0, min(rgb.r, min(rgb.g, rgb.b)));
         float high = max(max(rgb.r, max(rgb.g, rgb.b)), 1e-5), saturation = (high - min(rgb.r, min(rgb.g, rgb.b))) / high;
-        return rgb * mix(vec3(1.0), gain, saturation) * ${SUN_UNIT.toFixed(6)};
+        return rgb * mix(vec3(1.0), gain, saturation) * ${GAME_LIGHT_UNIT.toFixed(6)};
       }`;
 
 /**
@@ -180,7 +180,7 @@ function radiance(model: SkyModel, direction: Vector3, target: Color): Color {
   const x = X0 / sum, y = Y0 / sum, Y = Y0 * model.isothermal;
   const xyz = [x * Y / y, Y, (1 - x - y) * Y / y], rgb = model.xyzToRgb.map(row => row[0] * xyz[0] + row[1] * xyz[1] + row[2] * xyz[2]);
   const lift = Math.min(0, ...rgb), lifted = rgb.map(value => value - lift), high = Math.max(...lifted, 1e-5), saturation = (high - Math.min(...lifted)) / high;
-  const channel = (i: number) => lifted[i] * MathUtils.lerp(1, model.look.gain[i], saturation) * SUN_UNIT;
+  const channel = (i: number) => lifted[i] * MathUtils.lerp(1, model.look.gain[i], saturation) * GAME_LIGHT_UNIT;
   return target.setRGB(channel(0), channel(1), channel(2));
 }
 

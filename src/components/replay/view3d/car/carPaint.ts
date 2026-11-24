@@ -2,7 +2,7 @@ import { ShaderChunk, Vector3, Vector4, type IUniform, type Material, type MeshP
 import { patchTextureFocus } from '../scenery/textureFocus.js';
 import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
-import { SUN_UNIT } from '../atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
 import type { ReflectionCubes } from '../reflectionCube.js';
 import { patchAmbientLookup } from '../scenery/materials/patchSurfaceShader.js';
 import { OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
@@ -32,7 +32,7 @@ const LIGHTS_WITH_GLINT = ShaderChunk.lights_fragment_begin.slice(0, DIRECTIONAL
     clearcoatSpecularDirect = paintGlint(clearcoatSpecularDirect, directLight, geometryViewDir, geometryClearcoatNormal, paintCoatRoughness, material.clearcoatF0, material.clearcoatF90);`);
 
 /** The scene's light units per package unit, as a GLSL literal: the glint's limit is stated in the package's units. */
-const SUN_UNIT_LITERAL = Number.isInteger(SUN_UNIT) ? `${SUN_UNIT}.0` : String(SUN_UNIT);
+const GAME_LIGHT_UNIT_LITERAL = Number.isInteger(GAME_LIGHT_UNIT) ? `${GAME_LIGHT_UNIT}.0` : String(GAME_LIGHT_UNIT);
 
 /** Each paint material's uniforms, for the reflection cubes a probe hands it later, and what stands over its car. */
 const paintUniforms = new WeakMap<Material, Record<string, IUniform>>();
@@ -80,7 +80,7 @@ const FRAGMENT = {
       float disc = dotNH > paint_glint.x ? 1.0 / (1.0 - paint_glint.x) : 0.0;
       vec3 glint = (spec + light.color * dotNL * F_Schlick(f0, f90, dotVH) * disc) * paint_glint.z;
       float limit = mix(paint_edge.z, paint_edge.w, saturate(1.0 / (1.0 - paint_edge.y * edge)) + roughness);
-      return min(glint, vec3(limit * limit * ${SUN_UNIT_LITERAL}));
+      return min(glint, vec3(limit * limit * ${GAME_LIGHT_UNIT_LITERAL}));
     }
     vec3 paintProbe(vec3 r, float roughness, bool explicitLevel) {
       vec3 light = vec3(0.0);

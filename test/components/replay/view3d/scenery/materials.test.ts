@@ -8,6 +8,7 @@ import { cardFacing, trackCardFacing, trackShadowEye } from '../../../../../src/
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { surfaceAlphaCut } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
 import { shaderParts } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
+import { GAME_LIGHT_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { readSurfaceConfig, SURFACE_KINDS, terrainLayerCount, textureAsset, type SurfaceConfig, type SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 import { imageUriMap, resolveMapUri } from '../../../../../src/components/replay/view3d/scenery/materials/textureSource.js';
 import { surface } from './surfaceFixture.js';
@@ -98,8 +99,10 @@ describe('shaderParts', () => {
     const config = surface('dashboard', { maps: { albedo: map('A', true) }, parameters: { dashboard: { roughness: 0.4, emissiveStrength: 9, emissiveNight: 1.5 } } });
     const dash = shaderParts(config, { uniforms: false });
     // The screen's light is a constant light in the diffuse sum: albedo times its strength over pi, less the specular share; the
-    // strength runs from the night one to the day one with the scene's day share.
-    const share = (1 - 0.5 * (0.4 / 2.4) ** 2) / Math.PI;
+    // strength runs from the night one to the day one with the scene's day share. The strength is a game light value, in the sun's
+    // unit: converted by GAME_LIGHT_UNIT as the sun is (a strength of 100, the midday sun's, gives 4 / pi before the specular share).
+    const share = (1 - 0.5 * (0.4 / 2.4) ** 2) / Math.PI * GAME_LIGHT_UNIT;
+    expect(100 * GAME_LIGHT_UNIT).toBeCloseTo(4, 9);
     expect(dash.albedo).toContain('surfaceRoughness=0.40000000');
     expect(dash.emissive).toBe(`diffuseColor.rgb*mix(1.50000000,9.00000000,surface_dayLight)*${share.toFixed(8)}`);
     expect(dash.declarations).toContain('uniform float surface_dayLight;');

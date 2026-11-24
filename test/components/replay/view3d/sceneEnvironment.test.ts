@@ -3,13 +3,13 @@ import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, Dir
 import { addSceneEnvironment, sceneLighting, sceneSun, solarPosition, sunSeenFrom, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { hazeProgram } from '../../../../src/components/replay/view3d/atmosphere/haze.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
-import { SUN_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
+import { GAME_LIGHT_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
 import { cascadeShadowUniforms } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { crownSun } from '../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 
 /** The sun's light in scene units, as the environment's sun carries it. */
-const sunColour = (sun: Parameters<typeof sunRadiance>[0], elevationDeg: number, cloudCover: number) => sunRadiance(sun, elevationDeg, cloudCover).multiplyScalar(SUN_UNIT);
+const sunColour = (sun: Parameters<typeof sunRadiance>[0], elevationDeg: number, cloudCover: number) => sunRadiance(sun, elevationDeg, cloudCover).multiplyScalar(GAME_LIGHT_UNIT);
 
 const probe = vi.hoisted(() => ({render: vi.fn<(scene: Scene) => void>(), dispose: vi.fn(), cubemaps: 0}));
 vi.mock('three', async importOriginal => {
@@ -105,12 +105,12 @@ it('computes the sun position: overhead at the equator at solar noon on the equi
 
 it("takes the sun's colour and strength from the layout's sun grid in scene units, dimmed by the replay's cloud cover", () => {
   // Grid samples come back exactly, scaled by the one unit conversion.
-  expect(sunColour(testSun(), 90, 0).toArray().map(v => +v.toFixed(9))).toEqual([100 * SUN_UNIT, 104 * SUN_UNIT, 95 * SUN_UNIT].map(v => +v.toFixed(9)));
+  expect(sunColour(testSun(), 90, 0).toArray().map(v => +v.toFixed(9))).toEqual([100 * GAME_LIGHT_UNIT, 104 * GAME_LIGHT_UNIT, 95 * GAME_LIGHT_UNIT].map(v => +v.toFixed(9)));
   const low = sunColour(testSun(), 3, 0), high = sunColour(testSun(), 90, 0);
   expect(low.b / low.r).toBeLessThan(high.b / high.r); expect(low.r).toBeLessThan(high.r);
   // Full cover halves the synthetic grid; half cover sits between.
-  expect(sunColour(testSun(), 90, 1).g).toBeCloseTo(52 * SUN_UNIT, 9);
-  expect(sunColour(testSun(), 90, 0.5).g).toBeCloseTo(78 * SUN_UNIT, 9);
+  expect(sunColour(testSun(), 90, 1).g).toBeCloseTo(52 * GAME_LIGHT_UNIT, 9);
+  expect(sunColour(testSun(), 90, 0.5).g).toBeCloseTo(78 * GAME_LIGHT_UNIT, 9);
 });
 
 it("thickens the haze with the layout's haze scale and air pollution and colours it with the sky above the horizon toward the view", () => {
