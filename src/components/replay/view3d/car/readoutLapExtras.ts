@@ -1,4 +1,4 @@
-import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import type { ReplayLapSummary, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { computeLapComparisons } from '../../../../utils/replayComparison.js';
 
 /**
@@ -29,11 +29,19 @@ export function readoutLapExtras(lap: object): ReadoutLapExtras | null {
   return registry.get(lap) ?? null;
 }
 
-/** The lap number of the reference: the fastest lap finished before `currentLap`, as the BestLap field picks it. */
+/**
+ * The laps finished before `currentLap` that count for a best: timed and valid. An invalid lap (cut, or a partial lap a session
+ * reset or a jump to the garage ends) is never the best.
+ */
+export function finishedLapsBefore(laps: readonly ReplayLapSummary[] | undefined, currentLap: number): ReplayLapSummary[] {
+  return (laps ?? []).filter(lap => lap.lapNumber < currentLap && lap.lapTimeSec > 0 && lap.isValid !== false);
+}
+
+/** The lap number of the reference: the fastest valid lap finished before `currentLap`, as the BestLap field picks it. */
 export function referenceLapNumber(trajectory: Pick<ReplayTrajectoryData, 'currentLap' | 'laps'>): number | null {
   const current = trajectory.currentLap;
   if (current === undefined) return null;
-  const done = (trajectory.laps ?? []).filter(lap => lap.lapNumber < current && lap.lapTimeSec > 0);
+  const done = finishedLapsBefore(trajectory.laps, current);
   if (!done.length) return null;
   return done.reduce((best, lap) => lap.lapTimeSec < best.lapTimeSec ? lap : best).lapNumber;
 }

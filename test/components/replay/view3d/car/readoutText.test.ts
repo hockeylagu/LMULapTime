@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CarReadout, CarReadoutFont, CarReadoutText } from '../../../../../shared/types/scenes/car.js';
 import { lapTimeText, readoutGlyphQuads, readoutText, readoutTextQuads } from '../../../../../src/components/replay/view3d/car/readoutText.js';
-import { setReadoutLapExtras } from '../../../../../src/components/replay/view3d/car/readoutLapExtras.js';
+import { referenceLapNumber, setReadoutLapExtras } from '../../../../../src/components/replay/view3d/car/readoutLapExtras.js';
 
 const field = (extra: Partial<CarReadoutText> = {}): CarReadoutText => ({
   name: 'Speed', font: 0, scale: [1, 1], offset: [0.5, 0.25], alignW: 0, alignH: 0, alphaColor: null, units: 1, defaultValue: '', ...extra,
@@ -51,6 +51,12 @@ describe('readout text (decoded from the game)', () => {
     expect(at('BestLap', 1050)).toBe('1:33.250');
     expect(at('LapsCompleted', 1050)).toBe('2');
     expect(readoutText(field({name: 'BestLap'}), {x: 0, y: 0, z: 0}, 1050, {...lap, currentLap: 1})).toBe('-:--.---');
+    // An invalid lap (a partial lap a session reset ends) is never the best, though it shows as the last lap.
+    const reset = {...lap, laps: [laps[0], {...laps[1], lapTimeSec: 23.85, isValid: false}, laps[2]]};
+    expect(readoutText(field({name: 'BestLap'}), {x: 0, y: 0, z: 0}, 1050, reset)).toBe('1:35.500');
+    expect(readoutText(field({name: 'LastLap'}), {x: 0, y: 0, z: 0}, 1050, reset)).toBe('0:23.850');
+    expect(referenceLapNumber(reset)).toBe(1);
+    expect(referenceLapNumber({...reset, laps: [{...laps[0], isValid: false}, reset.laps[1]]})).toBeNull();
     expect(readoutText(field({name: 'CurrentLap'}), {x: 0, y: 0, z: 0}, 1050, {})).toBeNull();
   });
 

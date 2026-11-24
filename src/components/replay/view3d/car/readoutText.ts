@@ -1,7 +1,7 @@
 import type { CarReadout, CarReadoutFont, CarReadoutText } from '../../../../../shared/types/scenes/car.js';
 import type { ReplayLapSummary, ReplayStandingsSnapshot, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import type { ReadoutQuad } from './readoutDraw.js';
-import { readoutLapExtras } from './readoutLapExtras.js';
+import { finishedLapsBefore, readoutLapExtras } from './readoutLapExtras.js';
 
 /**
  * The game's text fields of a wheel/dash readout (docs/PACKAGE_FORMAT.md#readouts in the pipeline repo, decoded from the game's
@@ -85,9 +85,9 @@ function placeText(context: ReadoutLapContext, sessionSec: number): string | nul
 function lapTiming(context: ReadoutLapContext, timeSec: number): {inLap: number; previous: ReplayLapSummary | null; best: number | null} | null {
   const start = context.timeReference === 'lap' ? 0 : context.lapStartTimeSec;
   if (context.currentLap === undefined || start === undefined) return null;
-  const done = (context.laps ?? []).filter(lap => lap.lapNumber < context.currentLap! && lap.lapTimeSec > 0);
-  const previous = done.find(lap => lap.lapNumber === context.currentLap! - 1) ?? null;
-  const best = done.length ? Math.min(...done.map(lap => lap.lapTimeSec)) : null;
+  const previous = (context.laps ?? []).find(lap => lap.lapNumber === context.currentLap! - 1 && lap.lapTimeSec > 0) ?? null;
+  const valid = finishedLapsBefore(context.laps, context.currentLap);
+  const best = valid.length ? Math.min(...valid.map(lap => lap.lapTimeSec)) : null;
   return {inLap: timeSec - start, previous, best};
 }
 
