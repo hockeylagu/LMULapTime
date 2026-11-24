@@ -57,6 +57,8 @@ describe('readout draw rules (decoded from the game)', () => {
     expect(readoutInput(row.elements[4], row, point)).toEqual({x: 300, flashHz: null});
     expect(readoutInput(row.elements[5], row, point)).toEqual({x: 0.4, flashHz: null});
     expect(readoutInput(row.elements[1], row, {...point, tcActive: true})).toEqual({x: 1, flashHz: 10});
+    expect(readoutInput(row.elements[2], row, {...point, absActive: true})).toEqual({x: 1, flashHz: null});
+    expect(readoutInput(element({name: 'ABSLockedLeftIcon', orientation: 3}), row, {...point, absActive: true})).toBeNull();
     expect(readoutQuads(row, {x: 0, y: 0, z: 0}, 0)[0]).toBeNull();
   });
 });

@@ -18,7 +18,8 @@ export const TC_FLASH_HZ = 10;
 /**
  * An element's input from the lap's sample, and the flash rate the game gives it; null where the replay carries nothing the game
  * reads for it: the element is not drawn (wheel slip, lap delta, flags, tyre temperatures and pressures, fuel, battery; user
- * decision 2026-11-24). A TC bar's input is wheel slip, so it is drawn only while TC intervenes (full and flashing).
+ * decision 2026-11-24). A TC bar's input is wheel slip, so it is drawn only while TC intervenes (full and flashing); an ABS bar
+ * only while ABS is active (full).
  */
 export function readoutInput(element: CarReadoutElement, readout: CarReadout, point: ReplayTrajectoryPoint): {x: number; flashHz: number | null} | null {
   const flag = (value: boolean | undefined) => value === undefined ? null : {x: value ? 1 : 0, flashHz: null};
@@ -29,6 +30,9 @@ export function readoutInput(element: CarReadoutElement, readout: CarReadout, po
     case 'HeadlightsIcon': return flag(point.headlights);
     case 'TCActiveBar': return flag(point.tcActive);
     case 'TCLeftBar': case 'TCRightBar': return point.tcActive === true ? {x: 1, flashHz: TC_FLASH_HZ} : null;
+    // The game fills an ABS bar from a per-axle value the replay lacks; its ABS-active flag shows when ABS works, so the bars are full
+    // then and not drawn otherwise. The locked-wheel icons need that value too.
+    case 'ABSLeftBar': case 'ABSRightBar': return point.absActive === true ? {x: 1, flashHz: null} : null;
     case 'VirtualEnergyBar': return point.virtualEnergy === undefined ? null : {x: point.virtualEnergy / 100, flashHz: null};
     case 'BrakeTempFLIcon': case 'BrakeTempFRIcon': case 'BrakeTempRLIcon': case 'BrakeTempRRIcon': {
       const temperature = point.brakeTemps?.[['BrakeTempFLIcon', 'BrakeTempFRIcon', 'BrakeTempRLIcon', 'BrakeTempRRIcon'].indexOf(element.name)];
@@ -36,9 +40,9 @@ export function readoutInput(element: CarReadoutElement, readout: CarReadout, po
     }
     // The game passes a constant 0 for a pending pit request.
     case 'PitPendingIcon': return {x: 0, flashHz: null};
-    // No replay input: wheel slip (ABS), fuel and battery, launch control, lap delta, tyres, pit and flag state, overheating, settings.
+    // No replay input: locked wheels, fuel and battery, launch control, lap delta, tyres, pit and flag state, overheating, settings.
     case 'FuelBar': case 'FuelUsageBar': case 'BatteryBar': case 'BatteryUsageBar': case 'BatteryRegenBar': case 'VirtualEnergyUsageBar':
-    case 'LCCountdownLeft': case 'LCCountdownRight': case 'ABSLeftBar': case 'ABSRightBar': case 'ABSLockedLeftIcon': case 'ABSLockedRightIcon':
+    case 'LCCountdownLeft': case 'LCCountdownRight': case 'ABSLockedLeftIcon': case 'ABSLockedRightIcon':
     case 'ABSLockedRearLeftIcon': case 'ABSLockedRearRightIcon': case 'TyreTempFLIcon': case 'TyreTempFRIcon': case 'TyreTempRLIcon':
     case 'TyreTempRRIcon': case 'TyrePressFLIcon': case 'TyrePressFRIcon': case 'TyrePressRLIcon': case 'TyrePressRRIcon': case 'DeltaPositiveBar':
     case 'DeltaNegativeBar': case 'PitAcceptedIcon': case 'BlueFlagIcon': case 'YellowFlagIcon': case 'BlackFlagIcon': case 'FuelLowIcon':
