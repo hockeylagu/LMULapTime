@@ -5,6 +5,7 @@ import type { RenderPose } from '../scene/replayPose.js';
 import { readoutQuads, type ReadoutQuad } from './readoutDraw.js';
 import { readoutTextQuads, type ReadoutLapContext } from './readoutText.js';
 import { readoutLapExtras } from './readoutLapExtras.js';
+import { isStreaming } from '../scenery/materials/mipStreaming.js';
 
 /** Side of the readout canvas in pixels where the package gives no size (the game's canvases are 1024 or 2048 px square); quads are in canvas units. */
 export const READOUT_CANVAS_PX = 1024;
@@ -20,14 +21,20 @@ export interface ReadoutCanvas {
   draw(point: ReplayTrajectoryPoint, timeSec: number, lap: ReadoutLapContext, index?: number): void;
 }
 
-interface PaintedCanvas extends ReadoutCanvas { paint(renderer: WebGLRenderer): void }
+interface PaintedCanvas extends ReadoutCanvas { paint(renderer: WebGLRenderer): void; sharp(): boolean }
 
 const due = new Set<PaintedCanvas>();
+/** Canvases last painted while one of their atlases still drew from its reduced levels: painted again once all are sharp. */
+const blurred = new Set<PaintedCanvas>();
 const clearColour = new Color(), savedColour = new Color();
 
-/** Paints the canvases whose quads changed since the last frame; called once per frame before the scene draws. */
+/**
+ * Paints the canvases whose quads changed since the last frame, and those whose atlases sharpened since they were painted (a paused
+ * lap's canvas would otherwise keep the blurred glyphs of its first paint); called once per frame before the scene draws.
+ */
 export const readoutPainter = {
   flush(renderer: WebGLRenderer) {
+    for (const canvas of blurred) if (canvas.sharp()) { blurred.delete(canvas); due.add(canvas); }
     if (!due.size) return;
     const target = renderer.getRenderTarget(), alpha = renderer.getClearAlpha();
     renderer.getClearColor(savedColour);
@@ -128,10 +135,12 @@ export function createReadoutCanvas(readout: CarReadout, atlas: (path: string) =
       renderer.setRenderTarget(target);
       renderer.clear(true, false, false);
       renderer.render(scene, camera);
+      if (!canvas.sharp()) blurred.add(canvas);
     },
+    sharp: () => ![...atlases.values()].some(isStreaming),
   };
   target.texture.addEventListener('dispose', () => {
-    due.delete(canvas); target.dispose();
+    due.delete(canvas); blurred.delete(canvas); target.dispose();
     for (const mesh of [...quads, ...texts]) { mesh.geometry.dispose(); mesh.material.dispose(); }
     for (const map of atlases.values()) map.dispose();
   });
