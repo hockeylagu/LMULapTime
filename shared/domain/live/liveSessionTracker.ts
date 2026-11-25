@@ -30,6 +30,11 @@ export class LiveSessionTracker {
   private sessionLaneLoss: number | null = null;
   private measured: PitLaneMeasurement | null = null;
   private stopCost: number | null = null;
+  /** The player's stops counted so far (null before a race reading), and whether the plan had a stop ahead since. */
+  private pitStops: number | null = null;
+  private stopPlanned = false;
+  /** Stops the player made with one planned for fuel or VE; a stop with none planned (a repair) is not one the leader makes too. */
+  private stopsMade = 0;
   /** Clock and lap share at the pit lane entry of the stop in progress; null outside the lane. */
   private laneEntry: { et: number; fraction: number } | null = null;
 
@@ -65,12 +70,20 @@ export class LiveSessionTracker {
     const stopAhead = race?.finishReachable === false && (pit?.state === 'none' || pit?.state === 'request') && racePlanMode(strategy) !== 'saving';
     const laneLoss = this.storedLaneLoss ?? this.sessionLaneLoss ?? 0;
     if (stopAhead) this.stopCost = laneLoss + (pit?.plannedServiceSeconds ?? pit?.serviceSeconds ?? 0);
+    // Only planned stops are the leader's too: the Sebring race repair stop (2026-11-25) had none planned. Stops made
+    // before the first reading (an app restart) count as planned.
+    this.stopPlanned ||= stopAhead;
+    const stops = player?.pitStops ?? 0;
+    if (this.pitStops === null) this.stopsMade = stops;
+    else if (stops > this.pitStops) { if (this.stopPlanned) this.stopsMade += stops - this.pitStops; this.stopPlanned = false; }
+    this.pitStops = stops;
     const lapFraction = player && reading.trackLength > 0 ? player.lapDist / reading.trackLength : null;
     const lapSeconds = this.lane.pace();
     const own: LiveOwnPace = {
       lapSeconds,
       stopSeconds: stopAhead ? this.stopCost ?? 0 : this.stopLeft(pit?.state, reading.currentEt, lapFraction, lapSeconds ?? player?.estimatedLapTime ?? null),
       stopCostSeconds: this.stopCost ?? laneLoss,
+      stopsMade: this.stopsMade,
       lapFraction,
     };
     return {
@@ -97,5 +110,6 @@ export class LiveSessionTracker {
     return Math.max(0, this.stopCost - Math.max(0, et - this.laneEntry.et - driven * pace));
   }
 
-  private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; this.stopCost = null; this.laneEntry = null; }
+  private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; this.stopCost = null; this.laneEntry = null;
+    this.pitStops = null; this.stopPlanned = false; this.stopsMade = 0; }
 }

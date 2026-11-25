@@ -74,6 +74,8 @@ export interface LiveOwnPace {
   stopSeconds: number;
   /** What one stop costs (pit lane loss plus service), also once the player's is behind: the leader's still to make. */
   stopCostSeconds: number;
+  /** The player's stops made with one planned for fuel or VE (`LiveSessionTracker`): a repair stop is not the leader's. */
+  stopsMade: number;
   /** Share of the lap in progress already driven, 0..1; null when unknown. */
   lapFraction: number | null;
 }
@@ -89,7 +91,7 @@ export interface LiveOwnPace {
  *   a stop or a spin crosses later), and it has `1 + ceil((F - c - s) / p)` laps, or 1 when `c >= F`, with `s` the
  *   time its planned stop still costs (Le Mans race 2026-10-22: the class leader's pace and no stop read 17 laps to
  *   lap 11, the car ran 16). The leader itself counts the same way to `E`. Laps already lost never add extra laps.
- *   The leader is taken to make the player's stops: while it has made fewer than the player's done and planned, one
+ *   The leader is taken to make the player's fuel/VE stops (`stopsMade`, not repairs): while it has made fewer than the player's done and planned, one
  *   more stop of the player's cost delays `F` (`projectRaceFlagSeconds`).
  *   Never fewer than the lap in progress. Marked `estimated`, since the lap time estimates move.
  * Null when it is not a race, the race clock does not run yet (`raceClockRunning`), the player has finished, there is no usable lap start or estimate, or the leader
@@ -100,7 +102,7 @@ export function computeLapsLeft(
   player: LiveVehicleReading | null,
   leader: LiveVehicleReading | null,
   classLeader: LiveVehicleReading | null = null,
-  own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, lapFraction: null },
+  own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, stopsMade: 0, lapFraction: null },
 ): LiveLapsLeft | null {
   if (!session || !player || player.finishStatus === FINISHED) return null;
   if (session.kind === 'qualifying') return ownLapsLeft(session, player);
@@ -119,7 +121,7 @@ export function computeLapsLeft(
     const pace = ownPace ?? leader.estimatedLapTime;
     return projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, pace) === null ? null : lapsTo(session.endSeconds, leader.lapStartEt, pace);
   }
-  const leaderStops = (leader.pitStops ?? 0) < (player.pitStops ?? 0) + (stop > 0 ? 1 : 0);
+  const leaderStops = (leader.pitStops ?? 0) < own.stopsMade + (stop > 0 ? 1 : 0);
   const leaderStop = leaderStops && Number.isFinite(own.stopCostSeconds) ? Math.max(0, own.stopCostSeconds) : 0;
   const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leaderLapSeconds(leader), leaderStop);
   if (flag === null) return null;

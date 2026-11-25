@@ -59,6 +59,26 @@ describe('LiveSessionTracker race distance', () => {
     expect(lapsLeft(30)).toEqual({ laps: 1, estimated: true });
   });
 
+  it('takes a planned stop for the leader too, but not a repair stop (Sebring race 2026-11-25)', () => {
+    // Leader at 100 s a lap from 0 s to a 1020 s clock: the flag at 1100 s, or 1030 s with a 30 s stop of its own.
+    const leader = vehicleReading({ id: 1, totalLaps: 0, lapStartEt: 0, estimatedLapTime: 100, pitStops: 0 });
+    const reading = (pitStops: number) => scoringReading({ currentEt: 80, endEt: 1020, trackLength: TRACK, leader,
+      player: vehicleReading({ id: 3, totalLaps: 0, lapStartEt: 30, lapDist: TRACK / 2, estimatedLapTime: 100, pitStops }) });
+    const pit = { ...planned.pit!, state: 'none' as const, serviceSeconds: 0, plannedServiceSeconds: 0 };
+    const reachable = liveStrategy({ pit, resource: { ...planned.resource!, race: { ...planned.resource!.race!, finishReachable: true } } });
+    const short = liveStrategy({ pit, resource: { ...planned.resource!, race: { ...planned.resource!.race!, finishReachable: false } } });
+    const race = (before: typeof planned) => {
+      const tracker = new LiveSessionTracker();
+      tracker.setStoredLaneLoss(30);
+      tracker.apply(reading(0), deriveLiveState(reading(0), 'driving'), before);
+      return tracker.apply(reading(1), deriveLiveState(reading(1), 'driving'), reachable).lapsLeft;
+    };
+    // A stop with none planned: the bare flag, 1 + ceil((1100 - 130) / 100).
+    expect(race(reachable)).toEqual({ laps: 11, estimated: true });
+    // The planned stop made: the leader still has its own to make, 1 + ceil((1030 - 130) / 100).
+    expect(race(short)).toEqual({ laps: 10, estimated: true });
+  });
+
   it('counts the stored pit lane loss of a planned stop from the start, before any stop of its own', () => {
     // At 250 s, half round lap 3: the next line at 300. With the stored 40 s and 10 s of service: (1020 - 300 - 50) / 100.
     const stored = new LiveSessionTracker();

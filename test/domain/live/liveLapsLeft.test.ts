@@ -21,7 +21,7 @@ describe('laps left', () => {
     const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2900, estimatedLapTime: 213 });
     const player = vehicleReading({ id: 7, vehicleClass: 'Hyper', lapStartEt: 2914, estimatedLapTime: 216 });
     const classLeader = vehicleReading({ id: 9, vehicleClass: 'Hyper', lapStartEt: 2800, estimatedLapTime: 210 });
-    const own = (patch: Partial<LiveOwnPace>): LiveOwnPace => ({ lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, lapFraction: null, ...patch });
+    const own = (patch: Partial<LiveOwnPace>): LiveOwnPace => ({ lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, stopsMade: 0, lapFraction: null, ...patch });
     // The class leader's pace read 6, one too many; the car's own 216 s reads the 5 it ran.
     expect(computeLapsLeft(session, player, overall, classLeader)).toEqual({ laps: 6, estimated: true });
     expect(computeLapsLeft(session, player, overall, classLeader, own({ lapSeconds: 216 }))).toEqual({ laps: 5, estimated: true });
@@ -39,7 +39,7 @@ describe('laps left', () => {
     const session = { kind: 'race' as const, endSeconds: 1944, elapsedSeconds: 1930.4, gamePhase: 5 };
     const leader = vehicleReading({ id: 1, vehicleClass: 'LMP2', lapStartEt: 1850.3, estimatedLapTime: 88.6, lastLapTime: 89.6 });
     const player = vehicleReading({ id: 7, vehicleClass: 'LMP3', lapStartEt: 1930.35, estimatedLapTime: 96 });
-    const own: LiveOwnPace = { lapSeconds: 97.6, stopSeconds: 0, stopCostSeconds: 0, lapFraction: 0 };
+    const own: LiveOwnPace = { lapSeconds: 97.6, stopSeconds: 0, stopCostSeconds: 0, stopsMade: 0, lapFraction: 0 };
     expect(computeLapsLeft(session, player, leader, null, own)).toEqual({ laps: 2, estimated: true });
     // A slow last lap (start, pit or incident) is not its pace: the estimate stands.
     expect(computeLapsLeft(session, player, { ...leader, lastLapTime: 120 }, null, own)).toEqual({ laps: 1, estimated: true });
@@ -50,7 +50,7 @@ describe('laps left', () => {
     const session = { kind: 'race' as const, endSeconds: 1327, elapsedSeconds: 201.7, gamePhase: 5 };
     const leader = vehicleReading({ id: 1, vehicleClass: 'GT3', lapStartEt: 195.8, estimatedLapTime: 64, lastLapTime: 69.15, totalLaps: 1 });
     const player = vehicleReading({ id: 7, vehicleClass: 'GT3', lapStartEt: 201.6, estimatedLapTime: 65.5, totalLaps: 1 });
-    const own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, lapFraction: 0.002 };
+    const own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, stopsMade: 0, lapFraction: 0.002 };
     expect(computeLapsLeft(session, player, leader, leader, own)).toEqual({ laps: 18, estimated: true });
   });
   it('takes the leader at its last lap when faster than its estimate (Le Mans 2026-11-24: 6 laps run)', () => {
@@ -59,7 +59,7 @@ describe('laps left', () => {
     const session = { kind: 'race' as const, endSeconds: 1388, elapsedSeconds: 1170, gamePhase: 5 };
     const leader = vehicleReading({ id: 1, vehicleClass: 'GT3', lapStartEt: 1144.2, estimatedLapTime: 243.9, lastLapTime: 236.84, totalLaps: 4 });
     const player = vehicleReading({ id: 7, vehicleClass: 'GT3', lapStartEt: 1165, estimatedLapTime: 241.2, totalLaps: 4 });
-    const own: LiveOwnPace = { lapSeconds: 241.6, stopSeconds: 0, stopCostSeconds: 0, lapFraction: 0.02 };
+    const own: LiveOwnPace = { lapSeconds: 241.6, stopSeconds: 0, stopCostSeconds: 0, stopsMade: 0, lapFraction: 0.02 };
     expect(computeLapsLeft(session, player, leader, leader, own)).toEqual({ laps: 2, estimated: true });
   });
   it('delays the flag by the stop the leader still makes', () => {
@@ -67,14 +67,16 @@ describe('laps left', () => {
     const session = { kind: 'race' as const, endSeconds: 3789, elapsedSeconds: 2520, gamePhase: 5 };
     const leader = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2501, estimatedLapTime: 209.4, pitStops: 0 });
     const player = vehicleReading({ id: 7, vehicleClass: 'Hyper', lapStartEt: 2334, estimatedLapTime: 212, pitStops: 0 });
-    const own: LiveOwnPace = { lapSeconds: 212, stopSeconds: 49, stopCostSeconds: 49, lapFraction: 0.88 };
+    const own: LiveOwnPace = { lapSeconds: 212, stopSeconds: 49, stopCostSeconds: 49, stopsMade: 0, lapFraction: 0.88 };
     // Its stop puts the flag at 2501 + 6 x 209.4 + 49 = 3806 s, not 3967 s: laps 11 to 17, not to 18.
     expect(computeLapsLeft(session, player, leader, leader, own)).toEqual({ laps: 7, estimated: true });
     expect(computeLapsLeft(session, player, leader, leader, { ...own, stopCostSeconds: 0 })).toEqual({ laps: 8, estimated: true });
     // Once the leader has stopped as often as the player will, its flag is the bare one again.
     expect(computeLapsLeft(session, player, { ...leader, pitStops: 1 }, leader, own)).toEqual({ laps: 8, estimated: true });
     // The player's stop behind it, the leader's still ahead: its cost still delays the flag.
-    expect(computeLapsLeft(session, { ...player, pitStops: 1 }, leader, leader, { ...own, stopSeconds: 0 })).toEqual({ laps: 7, estimated: true });
+    expect(computeLapsLeft(session, { ...player, pitStops: 1 }, leader, leader, { ...own, stopSeconds: 0, stopsMade: 1 })).toEqual({ laps: 7, estimated: true });
+    // A repair stop (none planned, Sebring race 2026-11-25) is not one the leader makes: the bare flag.
+    expect(computeLapsLeft(session, { ...player, pitStops: 1 }, leader, leader, { ...own, stopSeconds: 0 })).toEqual({ laps: 8, estimated: true });
   });
   it('accepts canonical aliases and keeps WEC and ELMS LMP2 separate', () => {
     const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2400, estimatedLapTime: 100 });
