@@ -70,7 +70,7 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('race', 'Race · opening and stint', 'Mid-stint · VE', () => {}),
   scenario('overuse', 'Race · opening and stint', 'Consumption over target', s => { s.strategy!.resource!.race!.sparePerLap = -0.3; }),
   scenario('fuel-ratio', 'Race · opening and stint', 'Fuel runs out before VE', s => { s.strategy!.fuelRatio = { recommended: 0.95, source: 'measured', pairedLaps: 5, garageSetting: 0.9, mfdSetting: 0.9, excessLitres: null, fuelBiasLaps: -2 }; }),
-  scenario('saving', 'Race · opening and stint', 'Save to skip stop', s => { s.strategy!.resource!.saving = { targetPerLap: 3.9, savePerLap: 0.1, savePercent: 2.5, shortfall: 2, source: 'measured' }; }),
+  scenario('saving', 'Race · opening and stint', 'Save to finish', s => { s.strategy!.resource!.saving = { targetPerLap: 3.9, savePerLap: 0.1, savePercent: 2.5, shortfall: 2, source: 'measured' }; }),
   scenario('multi-stop', 'Race · opening and stint', 'Multiple stops remaining', s => { s.strategy!.resource!.race!.stopsAfterNext = 2; }),
   scenario('pit-request', 'Race · pit stop', 'Pit request', s => { s.strategy!.pit!.state = 'request'; }),
   scenario('pit-three', 'Race · pit stop', 'Pit in three laps · next MFD setup', s => { Object.assign(s.strategy!.resource!.race!, { pitInLaps: 3, pitLap: 16 }); }),

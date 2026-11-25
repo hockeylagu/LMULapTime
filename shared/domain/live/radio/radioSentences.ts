@@ -2,6 +2,7 @@ import { LAYOUT_TURN_LISTS } from '../../circuitTurns/turnLists.js';
 import { SAFETY_CAR_CLASS, VEHICLE_MODELS } from '../../vehicleMapping.js';
 import { classWord, countWord, spokenBrand } from './field/spokenCar.js';
 import { passSeconds } from './field/trafficCalls.js';
+import { SAVE_TO_FINISH_MAX_PERCENT } from './racePlanMode.js';
 
 /** A turn as said on the radio: "Turn 6", "Turn 10A", or its name where the source gives no number. */
 export const spokenTurn = (turn: { number?: number; suffix?: string; name?: string }): string | null =>
@@ -112,8 +113,8 @@ export function radioSentences(): string[] {
     ...turns(),
     ...LITRES.map(setting => `Set ${setting}.`),
     ...range(1, 200).map(lap => `Save to hold lap ${lap}.`),
-    // Saving is advised only up to 5 percent (`racePlanMode`).
-    ...range(1, 5).map(percent => `Save ${percent} percent to skip the stop.`),
+    // Saving is advised only up to `SAVE_TO_FINISH_MAX_PERCENT` (`racePlanMode`).
+    ...range(1, SAVE_TO_FINISH_MAX_PERCENT).map(percent => `Save ${percent} percent to finish.`),
     ...traffic(),
     ...rejoin(),
     ...DAMAGE_SECONDS.flatMap(seconds => [`Repair ${seconds} seconds.`, `Costs ${seconds} to the flag.`]),

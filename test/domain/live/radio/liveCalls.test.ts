@@ -81,9 +81,9 @@ describe('radio calls', () => {
   it('says the saving in whole percent, rounded up', () => {
     const saving = snapshot();
     saving.strategy!.resource!.saving = { targetPerLap: 2.4, savePerLap: 0.1, savePercent: 0.1, shortfall: 1, source: 'measured' };
-    expect(texts(saving)).toEqual(['Save 1 percent to skip the stop.']);
+    expect(texts(saving)).toEqual(['Save 1 percent to finish.']);
     saving.strategy!.resource!.saving.savePercent = 3.2;
-    expect(texts(saving)).toEqual(['Save 4 percent to skip the stop.']);
+    expect(texts(saving)).toEqual(['Save 4 percent to finish.']);
   });
 
   it('explains tyre coverage, and only the penalty in the pit lane', () => {

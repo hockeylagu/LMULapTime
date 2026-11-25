@@ -44,6 +44,21 @@ function drive(tracker: LiveSessionTracker, from: number, to: number) {
 }
 
 describe('LiveSessionTracker race distance', () => {
+  it('plans no stop, nor one for the leader, when a small saving reaches the flag (Le Mans 2026-11-24: laps left 5 <-> 6)', () => {
+    // Lap 5 of 6 at a 1388 s clock: the leader 236.84 s a lap from 1144.2 s, the player 5 s into its lap from 1165 s.
+    const leader = vehicleReading({ id: 1, totalLaps: 4, lapStartEt: 1144.2, estimatedLapTime: 243.9, lastLapTime: 236.84 });
+    const player = vehicleReading({ id: 3, totalLaps: 4, lapStartEt: 1165, lapDist: (5 / 241.2) * TRACK, estimatedLapTime: 241.2 });
+    const reading = scoringReading({ currentEt: 1170, endEt: 1388, trackLength: TRACK, player, leader });
+    const short = (savePercent: number) => liveStrategy({
+      resource: { ...planned.resource!, saving: { targetPerLap: 8.9, savePerLap: 0.4, savePercent, shortfall: 0.7, source: 'measured' } },
+      pit: { ...planned.pit!, state: 'none', serviceSeconds: 10, plannedServiceSeconds: 10 } });
+    const lapsLeft = (savePercent: number) => new LiveSessionTracker().apply(reading, deriveLiveState(reading, 'driving'), short(savePercent)).lapsLeft;
+    // 4.2 % to save: no stop, the leader takes the flag after two more laps.
+    expect(lapsLeft(4.2)).toEqual({ laps: 2, estimated: true });
+    // Beyond the saving: the stop is planned and the leader makes one too, which moved the flag (the 5 the race read).
+    expect(lapsLeft(30)).toEqual({ laps: 1, estimated: true });
+  });
+
   it('counts the stored pit lane loss of a planned stop from the start, before any stop of its own', () => {
     // At 250 s, half round lap 3: the next line at 300. With the stored 40 s and 10 s of service: (1020 - 300 - 50) / 100.
     const stored = new LiveSessionTracker();

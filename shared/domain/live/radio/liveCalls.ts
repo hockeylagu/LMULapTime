@@ -139,7 +139,7 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
       `${what}. Repair ${repair === null ? 'over 5 minutes' : `${repair} seconds`}. Costs ${cost ?? 'over 5 minutes'} to the flag.${verdict}`, 2, 'damage');
   }
   if (mode === 'saving' && resource?.saving) {
-    call(`saving-avoids-stop-${stop}`, `Save ${Math.max(1, Math.ceil(resource.saving.savePercent))} percent to skip the stop.`, 3);
+    call(`saving-to-finish-${stop}`, `Save ${Math.max(1, Math.ceil(resource.saving.savePercent))} percent to finish.`, 3);
   }
   // Not on the box lap: holding the pit lap means nothing once the stop is now (Le Mans 2026-10-22, 10-23).
   if (mode !== 'sprint' && race?.sparePerLap != null && race.sparePerLap < 0 && race.pitInLaps !== 0) {

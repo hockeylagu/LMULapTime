@@ -19,7 +19,7 @@ export const DEMO_RADIO_CALLS: readonly DemoRadioGroup[] = [
     call(2, 'Pit menu has no tyre change. Set new tyres.'),
     call(2, 'Rejoin P4. Behind the Genesis. Ahead of two GT3s.'),
     call(3, 'Energy use too high. Save to hold lap 19.'),
-    call(3, 'Save 4 percent to skip the stop.'),
+    call(3, 'Save 4 percent to finish.'),
     call(3, "Tyres won't reach the stop. Plan a change."),
     call(2, 'Fuel runs out before energy. Check your fuel ratio.'),
     call(2, 'Set deployment 40.'),

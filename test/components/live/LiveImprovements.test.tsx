@@ -80,7 +80,7 @@ describe('live dashboard improvements', () => {
     const strategy = liveStrategy();
     const resource = { ...strategy.resource!, saving: { targetPerLap: 2.4, savePerLap: 0.1, savePercent: 4, shortfall: 1, source: 'measured' as const } };
     const snapshot = liveSnapshot({ strategy: { ...strategy, resource } });
-    expect(racePlanView(snapshot)).toMatchObject({ mode: 'saving', action: { label: 'TO SKIP STOP', value: '2.40', note: 'SAVE 0.10 %/LAP' } });
+    expect(racePlanView(snapshot)).toMatchObject({ mode: 'saving', action: { label: 'SAVE TO FINISH', value: '4', unit: '%', note: 'TARGET 2.40 %/LAP' } });
     resource.saving.savePercent = 30;
     expect(racePlanView(snapshot).mode).toBe('stint');
     resource.saving.savePercent = 4; resource.lapsMeasured = 1;

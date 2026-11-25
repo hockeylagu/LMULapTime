@@ -218,8 +218,8 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   }
   const saving = resource.saving;
   if (mode === 'saving' && saving) {
-    return { mode: 'saving', action: { label: 'TO SKIP STOP', value: saving.targetPerLap.toFixed(2), unit: `${unit}/lap`,
-      note: `SAVE ${saving.savePerLap.toFixed(2)} ${unit}/LAP`, noteTone: 'warn' },
+    return { mode: 'saving', action: { label: 'SAVE TO FINISH', value: `${Math.max(1, Math.ceil(saving.savePercent))}`, unit: '%',
+      note: `TARGET ${saving.targetPerLap.toFixed(2)} ${unit}/LAP`, noteTone: 'warn' },
       cells: [{ label: 'SHORT TO FINISH', value: formatAmount(saving.shortfall, unit), unit },
         tyresCell(tyres), { label: 'OR PIT IN', value: `${race.pitInLaps ?? 0}`, unit: 'LAPS' }] };
   }

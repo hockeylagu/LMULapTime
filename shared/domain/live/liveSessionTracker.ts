@@ -7,6 +7,7 @@ import type { LiveScoringReading, LiveState } from './liveLifecycle.js';
 import { LivePitLaneMeter } from './livePitLane.js';
 import type { PitLaneMeasurement } from './livePitLane.js';
 import { LiveWeatherTracker } from './liveWeather.js';
+import { racePlanMode } from './radio/racePlanMode.js';
 
 /** The snapshot fields that come from following the scoring readings over time. */
 export type LiveSessionDetails = Pick<LiveSnapshot, 'lapsLeft' | 'weather' | 'recentLaps' | 'sessionBest'>;
@@ -60,7 +61,8 @@ export class LiveSessionTracker {
     }
     const race = strategy?.resource?.race;
     const pit = strategy?.pit;
-    const stopAhead = race?.finishReachable === false && (pit?.state === 'none' || pit?.state === 'request');
+    // Saving to the flag is the plan when it is small: no stop then, nor one for the leader (`SAVE_TO_FINISH_MAX_PERCENT`).
+    const stopAhead = race?.finishReachable === false && (pit?.state === 'none' || pit?.state === 'request') && racePlanMode(strategy) !== 'saving';
     const laneLoss = this.storedLaneLoss ?? this.sessionLaneLoss ?? 0;
     if (stopAhead) this.stopCost = laneLoss + (pit?.plannedServiceSeconds ?? pit?.serviceSeconds ?? 0);
     const lapFraction = player && reading.trackLength > 0 ? player.lapDist / reading.trackLength : null;
