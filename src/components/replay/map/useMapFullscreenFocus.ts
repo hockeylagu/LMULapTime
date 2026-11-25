@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent } from 'react';
+import { lockPageScroll } from '../../common/pageScrollLock.js';
 
 /** The fullscreen map's z-index (its `data-map-expanded` classes); the replay header stands just above it. */
 const OVER_EXPANDED_MAP = '1001';
@@ -51,10 +52,7 @@ export function useMapFullscreenFocus(
       }
       if (branch.parentElement === document.body) break;
     }
-    const bodyOverflow = document.body.style.overflow;
-    const rootOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
+    const releaseScroll = lockPageScroll();
     // Help is body-portaled above this map. Its own focus/Escape handling owns that layer.
     const hasNestedDialog = () => [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
       .some(dialog => dialog !== map && !map.contains(dialog));
@@ -90,8 +88,7 @@ export function useMapFullscreenFocus(
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('focusin', onFocus);
       siblings.forEach(({ node, inert }) => { node.inert = inert; });
-      document.body.style.overflow = bodyOverflow;
-      document.documentElement.style.overflow = rootOverflow;
+      releaseScroll();
       if (previousRole === null) map.removeAttribute('role'); else map.setAttribute('role', previousRole);
       if (previousModal === null) map.removeAttribute('aria-modal'); else map.setAttribute('aria-modal', previousModal);
       if (previousTabIndex === null) map.removeAttribute('tabindex');

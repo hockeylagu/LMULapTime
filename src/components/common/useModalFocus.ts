@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef } from 'react';
+import { lockPageScroll } from './pageScrollLock.js';
 
 /** Isolates a body-portaled dialog, traps focus, and restores its trigger and scrolling. */
 export function useModalFocus(isOpen: boolean, onClose: () => void) {
@@ -12,8 +13,7 @@ export function useModalFocus(isOpen: boolean, onClose: () => void) {
     const siblings = [...document.body.children].filter((node): node is HTMLElement => node instanceof HTMLElement && node !== dialog);
     const originalInert = siblings.map(node => node.inert);
     siblings.forEach(node => { node.inert = true; });
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const releaseScroll = lockPageScroll();
     const focusable = () => [...dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], select:not([disabled]), input:not([disabled]), [tabindex="0"]')];
     const focusFirst = () => (focusable()[0] ?? dialog).focus();
     focusFirst();
@@ -37,7 +37,7 @@ export function useModalFocus(isOpen: boolean, onClose: () => void) {
       window.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('focusin', onFocus);
       siblings.forEach((node, index) => { node.inert = originalInert[index]; });
-      document.body.style.overflow = overflow;
+      releaseScroll();
       if (trigger?.isConnected) trigger.focus();
     };
   }, [isOpen]);

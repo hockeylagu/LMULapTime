@@ -17,6 +17,7 @@ import { createPlaybackCursor } from './replayPlaybackCursor.js';
 import { PLAYBACK_SPEEDS, steppedPlaybackSpeed, type LapLanding, type ReplayFullscreenControls } from './replayFullscreenControls.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
 import { useGhostSync } from './ghostSyncContext.js';
+import { lockPageScroll } from '../../common/pageScrollLock.js';
 
 export interface UseReplayInspectorDataProps {
   isOpen: boolean;
@@ -164,9 +165,7 @@ export function useReplayInspectorData({
   // Lock body scroll
   useEffect(() => {
     if (!isOpen) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prevOverflow; };
+    return lockPageScroll();
   }, [isOpen]);
 
   // Opening, closing or another session: what was shown is cleared before the load starts.
