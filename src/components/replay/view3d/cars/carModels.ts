@@ -2,7 +2,7 @@ import { BufferGeometry, Mesh, MeshBasicMaterial, PropertyBinding, RepeatWrappin
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { appearanceOf, startFileOf, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
-import { carMaterialKey, createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
+import { carMaterialKey, carPartOrder, carSortOffset, createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
 import { cockpitVolumeTexture } from '../car/cockpitOcclusion.js';
 import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp } from '../car/carLamps.js';
 import { flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
@@ -216,15 +216,20 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
       }))} : undefined;
       const glow = glows.get(lamp)!;
       created = createLampMaterial(lamp, glow, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp, rainFlashes, glow)!), switching, !white(current));
+      if (created.transparent) created.userData.sortOffset = carSortOffset(recipeOf(current));
       lampMaterials.set(lamp, created);
       return created;
     })) mesh.removeFromParent();
     model.traverse(object => {
-      if (!(object instanceof Mesh) || glowMeshes.includes(object)) return;
-      const screen = (Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]).some(showsReadout);
-      object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);
-      if (screen) object.userData.readoutCanvas = canvas;
-      object.castShadow = true; object.receiveShadow = true;
+      if (!(object instanceof Mesh)) return;
+      if (!glowMeshes.includes(object)) {
+        const screen = (Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]).some(showsReadout);
+        object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);
+        if (screen) object.userData.readoutCanvas = canvas;
+        object.castShadow = true; object.receiveShadow = true;
+      }
+      // The blended parts draw in the game's order: the outside windscreen over the lamp glows.
+      object.renderOrder = carPartOrder(Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]);
     });
     return model;
   };

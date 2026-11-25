@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { FrontSide, NoColorSpace, SRGBColorSpace, Texture, Vector2, type IUniform } from 'three';
-import { carMaterialKey, createCarMaterial, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
+import { carMaterialKey, carPartOrder, carSortOffset, createCarMaterial, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
@@ -95,6 +95,17 @@ it('draws tyres, screens and windscreens with the surface program: a screen laye
     ['MeshStandardMaterial', false, true], ['MeshStandardMaterial', false, true], ['MeshStandardMaterial', true, false], ['MeshStandardMaterial', true, false],
     ['MeshPhysicalMaterial', true, false], ['MeshStandardMaterial', true, false],
   ]);
+});
+
+it("orders blended parts by the game's sortOffset (the outside windscreen over the lamp glows), opaque parts first", () => {
+  const blended = (sortOffset?: number) => createCarMaterial({ ...recipe(), surface: { ...recipe().surface, renderState: { alphaBlend: true }, ...(sortOffset === undefined ? {} : { sortOffset }) } as CarSurface }, appearance, () => new Texture(), testShading());
+  const opaque = createCarMaterial({ ...recipe(), surface: { ...recipe().surface, sortOffset: 6 } as CarSurface }, appearance, () => new Texture(), testShading());
+  expect(carSortOffset({ ...recipe(), surface: { ...recipe().surface, sortOffset: 5 } as CarSurface })).toBe(5);
+  expect(carSortOffset(undefined)).toBe(0);
+  expect(carPartOrder([blended(5)])).toBe(5);
+  expect(carPartOrder([blended(), blended(2)])).toBe(2);
+  expect(carPartOrder([blended()])).toBe(0);
+  expect(carPartOrder([opaque])).toBe(0);
 });
 
 it('draws an alpha-masked part one side, as every car part, its edges by alpha to coverage', () => {

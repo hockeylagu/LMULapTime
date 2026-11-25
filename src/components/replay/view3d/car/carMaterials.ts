@@ -1,4 +1,4 @@
-import { DoubleSide, MeshPhysicalMaterial, type Data3DTexture, MeshStandardMaterial, NoColorSpace, RepeatWrapping, ShaderChunk, SRGBColorSpace, type Texture } from 'three';
+import { DoubleSide, MeshPhysicalMaterial, type Data3DTexture, type Material, MeshStandardMaterial, NoColorSpace, RepeatWrapping, ShaderChunk, SRGBColorSpace, type Texture } from 'three';
 import { patchTextureFocus } from '../scenery/textureFocus.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
@@ -56,6 +56,24 @@ function nativeSurface(recipe: CarMaterialRecipe, appearance: CarAppearance): Su
     normalShadowInfluence: surface.normalShadowInfluence,
     parameters: surface.parameters as SurfaceConfig['parameters'],
   };
+}
+
+/**
+ * The game's draw order of a native material among the blended ones (its surface `sortOffset`, 0 without one): a higher one draws
+ * later, over the others, whatever their distance. The outside windscreen (5) is drawn after the lamp glows (0) in the game: on many
+ * bodies it covers the tail lights, keeping 7–30 % of the glow under its tinted, lit layer (game captures of 2026-11-24).
+ */
+export function carSortOffset(recipe: CarMaterialRecipe | undefined): number {
+  const offset = recipe?.surface?.sortOffset;
+  return typeof offset === 'number' && Number.isFinite(offset) ? offset : 0;
+}
+
+/**
+ * The draw order of a car part (three's `renderOrder`): the highest `carSortOffset` of its blended materials, 0 for an opaque part.
+ * The blended parts sort by it first, then by distance.
+ */
+export function carPartOrder(materials: readonly Material[]): number {
+  return Math.max(0, ...materials.map(material => material.transparent && typeof material.userData.sortOffset === 'number' ? material.userData.sortOffset : 0));
 }
 
 /** Every texture path a recipe's material samples for an appearance: its albedo, its surface maps, plus the paint maps for car paint. */
@@ -184,6 +202,8 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   hazeProgram(material);
   material.shadowSide = DoubleSide;
   material.name = recipe.name;
+  // Its parts' draw order among the blended ones (`carSortOffset`).
+  if (material.transparent) material.userData.sortOffset = carSortOffset(recipe);
   const occlusion = recipe.reflectionOcclusion;
   if (occlusion) {
     if (!volume) throw Error(`Car material ${recipe.name}: no cabin volume for its reflection occlusion`);

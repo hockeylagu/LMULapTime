@@ -39,6 +39,8 @@ export interface CarSurface {
   parameters?: Record<string, unknown>;
   normalYSign?: number;
   normalShadowInfluence?: number;
+  /** The game's draw order among blended materials: a higher one draws later (the outside windscreen, 5, over the lamp glows). */
+  sortOffset?: number;
   renderState?: {alphaBlend?: boolean; alphaMask?: boolean};
   finish?: {roughness: number; metalness: number};
   [key: string]: unknown;

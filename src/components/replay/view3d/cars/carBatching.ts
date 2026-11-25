@@ -148,7 +148,7 @@ export async function batchCars(tables: readonly CarParts[]): Promise<CarBatchSe
       draws: members.length, vertices, indices, material: first.material, name: `car batch ${first.material.name}`,
       castShadow: first.castShadow && !shadowOnly, receiveShadow: first.receiveShadow, frustumCulled: false, matrixAutoUpdate: false,
     });
-    batch.sortObjects = first.material.transparent; batch.layers.set(UNSEEN_LAYER);
+    batch.sortObjects = first.material.transparent; batch.renderOrder = first.renderOrder; batch.layers.set(UNSEEN_LAYER);
     const ids = new Map<BufferGeometry, number>();
     for (const geometry of geometries) {
       ids.set(geometry, batch.addGeometry(geometry));
