@@ -104,8 +104,8 @@ export interface DrivenCar {
 
 /**
  * Every car of a scene drawn with its full model. `build` is the one path for every car (the lap's car, the race's near cars, a set
- * per body), drawn without the parts marked interior: the car the cameras ride on (the lap's, the race's followed one, which is the
- * field's model of it) adds them with `cabin`. The race's cars of a body share their materials; the lap's car owns its own, which
+ * per body), drawn with the exterior's parts marked interior at their distance levels (the cabin seen through the windows): the car
+ * the cameras ride on (the lap's, the race's followed one, which is the field's model of it) adds the interior file's with `cabin`. The race's cars of a body share their materials; the lap's car owns its own, which
  * go with it when the lap changes. Glass and decals are batched and
  * sorted in their batch. The lap's ghost stays part by part (`ghost`): its see-through parts draw in a fixed order.
  */
@@ -120,13 +120,6 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
      */
     async build(bodies: readonly LoadedBody[], {ownMaterials = false}: {ownMaterials?: boolean} = {}): Promise<DrawnCars> {
       const from = ownMaterials ? ownModels : models, cars = await Promise.all(bodies.map(body => from.car(body)));
-      for (const car of cars) {
-        // The parts marked interior are seats and dashboards, small through a window: only the car the cameras ride on draws them
-        // (its cabin).
-        const dropped: Object3D[] = [];
-        car.traverse(object => { if (object.userData.interior === true) dropped.push(object); });
-        for (const part of dropped) part.removeFromParent();
-      }
       return createDrawnCars(cars, surfaceHeight, {sharedMaterial: from.sharedMaterial});
     },
     /**
@@ -144,7 +137,7 @@ export function createCarSets(templates: CarTemplates, carTextures: CarTextures,
       const added: Object3D[] = [], drawing: Array<{mesh: Object3D; mask: number}> = [];
       // A copy of the list: each part found a parent leaves it.
       for (const part of cabin.children.slice()) {
-        const name = part.userData.cabinParent as string | null, parent = name === null ? envelope : envelope.getObjectByName(name);
+        const parent = envelope.getObjectByName(part.userData.cabinParent as string);
         // A part under a node this livery leaves out (another livery's option part) stays out with it.
         if (!parent) continue;
         // The car is drawn while its cabin builds: until shown, the cabin waits in a layer no pass draws (`UNSEEN_LAYER`).

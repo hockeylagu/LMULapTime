@@ -52,9 +52,9 @@ export interface CarTemplates {
    */
   body(car: LoadedBody): Promise<Group>;
   /**
-   * What the driver cameras add to the car closest to them (the lap's, the race's followed one): the exterior's parts marked
-   * interior, which every car leaves out, and the interior file's, at their full level. Each part, a copy, names the car node it
-   * hangs under (`userData.cabinParent`, null for the body's root) and is marked interior. The car's exterior and interior parses
+   * What the driver cameras add to the car closest to them (the lap's, the race's followed one): the interior file's parts, at their
+   * full level (every car draws the exterior's parts marked interior itself). Each part, a copy, names the car node it hangs under
+   * (`userData.cabinParent`) and is marked interior. The car's exterior and interior parses
    * stay until another car takes the cameras: switching between the lap view and the race, the same car builds without a parse.
    */
   cabin(car: LoadedBody): Promise<Group>;
@@ -100,20 +100,14 @@ export function createCarTemplates(): CarTemplates {
       const {interior} = car.resource;
       const exteriorParse = body(car), insideParse = interior ? parse(interior.sha256, () => car.interiorFile()) : null;
       ridden = new Map([[car.resource.sha256, exteriorParse], ...(interior && insideParse ? [[interior.sha256, insideParse] as const] : [])]);
-      const [exterior, inside] = await Promise.all([exteriorParse, insideParse]);
-      const cabin = new Group(), add = (node: Object3D, parent: string | null) => {
+      // The exterior's parts marked interior are on every car already (at their distance levels); the exterior's parse is still read
+      // (and held) for the car's next build.
+      const [, inside] = await Promise.all([exteriorParse, insideParse]);
+      const cabin = new Group(), add = (node: Object3D, parent: string) => {
         const copy = closeCopy(node);
         copy.userData.cabinParent = parent; copy.userData.interior = true;
         cabin.add(copy);
       };
-      // The outermost parts marked interior: a marked part's own parts come with it.
-      const marked: Object3D[] = [];
-      exterior.traverse(object => {
-        if (object.userData.interior !== true || fartherLevel(object)) return;
-        for (let at = object.parent; at; at = at.parent) if (at.userData.interior === true) return;
-        marked.push(object);
-      });
-      for (const node of marked) add(node, node.parent === exterior ? null : node.parent!.name);
       if (inside) {
         // The interior's parts hang under its chassis node, placed as the body's (both files place the chassis alike, so each part's
         // footprint stands).

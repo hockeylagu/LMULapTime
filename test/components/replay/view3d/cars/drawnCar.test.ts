@@ -27,10 +27,10 @@ vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async (
   return {
     createCarModels: (_templates: unknown, _textures: unknown, _shading: unknown, {shareMaterials = false} = {}) => {
       loaders.push(shareMaterials);
-      // A cabin of two dash panels under the body's root and a part under a node the car leaves out.
+      // A cabin of two dash panels under the body and a part under a node the car leaves out.
       const cabin = async () => {
         const parts = new three.Group(), material = new three.MeshStandardMaterial(), geometry = new three.BoxGeometry(1, 1, 1);
-        for (const name of ['dash', 'dash 2']) { const dash = new three.Mesh(geometry, material); dash.name = name; dash.userData.cabinParent = null; parts.add(dash); }
+        for (const name of ['dash', 'dash 2']) { const dash = new three.Mesh(geometry, material); dash.name = name; dash.userData.cabinParent = 'body'; parts.add(dash); }
         const lost = new three.Mesh(geometry, material); lost.name = 'lost'; lost.userData.cabinParent = 'other livery'; parts.add(lost);
         return parts;
       };
@@ -93,10 +93,11 @@ describe('createCarSets', () => {
   const body = {vehicleId: 'oreca'} as unknown as LoadedBody;
   const sortedBatches = (car: Group) => batchesIn(car).filter(batch => batch.sortObjects);
 
-  it('builds every car on one path, with shared materials: glass sorted in its batch, every level kept, the interior left out', async () => {
+  it('builds every car on one path, with shared materials: glass sorted in its batch, every level and the interior parts kept', async () => {
     const set = await sets().build([body]), [drawn] = set.cars;
     expect(loaders).toEqual([true, false]);
-    expect(drawn.car.getObjectByName('cabin')).toBeUndefined();
+    // The cabin seen through the windows.
+    expect(drawn.car.getObjectByName('cabin')).toBeDefined();
     expect(drawn.car.getObjectByName('far')).toBeDefined();
     expect(sortedBatches(drawn.car)).toHaveLength(1);
     set.dispose();

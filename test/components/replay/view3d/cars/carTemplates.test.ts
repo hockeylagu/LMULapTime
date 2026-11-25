@@ -37,25 +37,30 @@ describe('createCarTemplates', () => {
     expect(a.getObjectByName('hull')!.userData.footprint).toEqual([-1, -0.5, -2, 1, 0.5, 2]);
   });
 
-  it("builds a cabin from the exterior's parts marked interior and the interior file's, leaving the parses as they were", async () => {
-    const outside = parsed('hull'), chassis = outside.scene.getObjectByName('chassis')!;
-    // A seat marked interior with a level of it drawn from 20 m, and a mirror marked interior on the body's root.
-    const seat = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial()), farSeat = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
-    seat.name = 'seat'; seat.userData.interior = true; farSeat.name = 'far seat'; farSeat.userData.lod = {inM: 20, outM: null}; seat.add(farSeat); chassis.add(seat);
-    const mirror = new Group(); mirror.name = 'mirror'; mirror.userData.interior = true; outside.scene.add(mirror);
-    vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async bytes => (bytes === interior ? parsed('dash') : outside) as never);
+  it("builds a cabin from the interior file's parts at their full level, leaving the exterior's parts marked interior on the body", async () => {
+    const outside = parsed('hull'), seat = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
+    seat.name = 'seat'; seat.userData.interior = true; outside.scene.getObjectByName('chassis')!.add(seat);
+    // The interior's dash with a level of it drawn from 20 m.
+    const inside = parsed('dash'), farDash = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
+    farDash.name = 'far dash'; farDash.userData.lod = {inM: 20, outM: null}; inside.scene.getObjectByName('dash')!.add(farDash);
+    vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async bytes => (bytes === interior ? inside : outside) as never);
     const templates = createCarTemplates(), car = body('A', true);
     templates.hold(car);
     const whole = await templates.body(car), cabin = await templates.cabin(car);
     expect(car.file).toHaveBeenCalledTimes(1);
     expect(car.interiorFile).toHaveBeenCalledTimes(1);
-    expect(cabin.children.map(part => [part.name, part.userData.cabinParent as unknown, part.userData.interior as unknown])).toEqual([
-      ['seat', 'chassis', true], ['mirror', null, true], ['dash', 'chassis', true],
-    ]);
-    expect(cabin.getObjectByName('far seat')).toBeUndefined();
+    expect(cabin.children.map(part => [part.name, part.userData.cabinParent as unknown, part.userData.interior as unknown])).toEqual([['dash', 'chassis', true]]);
+    expect(cabin.getObjectByName('far dash')).toBeUndefined();
     expect(cabin.getObjectByName('dash')!.userData.footprint).toEqual([-1, -0.5, -2, 1, 0.5, 2]);
     expect(parts(whole)).toEqual(['hull', 'seat']);
-    expect(whole.getObjectByName('far seat')).toBeDefined();
+    expect(inside.scene.getObjectByName('far dash')).toBeDefined();
+  });
+
+  it('builds an empty cabin for a body without an interior file', async () => {
+    const outside = parsed('hull'), seat = new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial());
+    seat.name = 'seat'; seat.userData.interior = true; outside.scene.getObjectByName('chassis')!.add(seat);
+    vi.spyOn(GLTFLoader.prototype, 'parseAsync').mockImplementation(async () => outside as never);
+    expect((await createCarTemplates().cabin(body('A', false))).children).toEqual([]);
   });
 
   it('parses the file again once a parse settles, unless the body is held', async () => {
