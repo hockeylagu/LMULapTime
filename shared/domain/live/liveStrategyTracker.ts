@@ -96,6 +96,8 @@ export class LiveStrategyTracker {
   private sessionKey: string | null = null;
   private readonly meters: Record<LiveResourceKind, LiveUsageMeter> = { ve: new LiveUsageMeter(), fuel: new LiveUsageMeter() };
   private eventLaps: number[] = [];
+  /** The event's qualifying pole lap (the qualifying leader's best), for the race garage's leader pace. */
+  private qualifyingBest: number | null = null;
   private ratios: number[] = [];
   private lastPair: string | null = null;
   /** Wet or dry, with hysteresis (null before the first reading). */
@@ -167,7 +169,7 @@ export class LiveStrategyTracker {
     this.schedule = null;
     this.meters.ve.clear();
     this.meters.fuel.clear();
-    this.eventLaps = [];
+    this.eventLaps = []; this.qualifyingBest = null;
     this.ratios = []; this.wet = null; this.wetness = null; this.eventTyreWear = null; this.eventCompound = ''; this.ratioOptions = []; this.eventEstimate = null;
     this.resetSession();
     this.sessionKey = null;
@@ -260,6 +262,9 @@ export class LiveStrategyTracker {
       this.sessionKey = sessionKey;
     }
     this.et = reading.currentEt;
+    if (liveSessionKind(reading.sessionCode) === 'qualifying' && reading.leader && reading.leader.bestLapTime > 0) {
+      this.qualifyingBest = reading.leader.bestLapTime;
+    }
     this.pitState = player.pitState ?? 'none';
     this.penalties = player.penalties ?? 0;
     // Another compound wears differently but barely changes VE or fuel use: only the tyre wear starts again.
@@ -594,7 +599,11 @@ export class LiveStrategyTracker {
     const wetPace = this.wet === true && ownLaps !== null;
     const lapSeconds = (wetPace ? ownLaps : null) ?? classLeaderLapSeconds(reading.player, reading.classLeader) ?? ownLaps ?? estimated;
     const tyres = this.garageTyres(race && !clockRunning && reading.player?.inPits === false);
-    const leaderEstimate = race ? reading.leader?.estimatedLapTime ?? null : null;
+    // On the grid the leader's estimate is the class pace, not its own: the qualifying pole lap, when faster, is closer
+    // (Le Mans 2026-11-24: estimate about 241 s, pole 238.3 s, race laps 236.5-238.3 s; 5 laps planned for the 6 run).
+    const leaderEstimates = race ? [reading.leader?.estimatedLapTime, this.qualifyingBest].filter((value): value is number =>
+      value != null && value > 0) : [];
+    const leaderEstimate = leaderEstimates.length > 0 ? Math.min(...leaderEstimates) : null;
     const leaderLapSeconds = leaderEstimate !== null && wetPace && estimated !== null ? leaderEstimate * ownLaps / estimated : leaderEstimate;
     const plan = planGarage({
       kind,

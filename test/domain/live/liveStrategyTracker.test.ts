@@ -311,6 +311,23 @@ describe('LiveStrategyTracker', () => {
     expect(plan()).toMatchObject({ needed: 75, stops: 1 });
   });
 
+  it('plans the race leader at the qualifying pole lap when faster than its estimate (Le Mans 2026-11-24: 5 planned, 6 run)', () => {
+    const garageLaps = (withQualifying: boolean) => {
+      const tracker = new LiveStrategyTracker();
+      tracker.applyRest({ type: 'schedule', raceMinutes: 20, hasQualifying: true });
+      const player = (totalLaps: number) => vehicleReading({ totalLaps, estimatedLapTime: 241.208, vehicleClass: 'GT3' });
+      // Pole 238.29 s; the grid gives every car the class estimate, about 241 s.
+      if (withQualifying) context(tracker, at(700, { sessionCode: 5, endEt: 900, player: player(3),
+        leader: vehicleReading({ id: 3, bestLapTime: 238.29, estimatedLapTime: 241.2 }) }), { lapsLeft: null });
+      return context(tracker, at(30, { sessionCode: 10, inRealtime: false, gamePhase: 0, player: player(0), classLeader: null,
+        leader: vehicleReading({ id: 3, bestLapTime: 0, estimatedLapTime: 241.2 }) }), { lapsLeft: null })?.garage?.laps;
+    };
+    // The leader at 238.29 s starts a sixth lap before the clock ends: 6 racing laps and the formation lap.
+    expect(garageLaps(true)).toBe(7);
+    // Without qualifying the estimate stays: 5 racing laps.
+    expect(garageLaps(false)).toBe(6);
+  });
+
   it('plans a wet race garage from the event wet laps, not the dry estimates (Le Mans 2026-11-11: 18 planned, 16 run)', () => {
     const garageLaps = (track: Partial<LiveScoringReading>) => {
       const tracker = new LiveStrategyTracker();

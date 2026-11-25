@@ -18,21 +18,22 @@ export function raceClockRunning(gamePhase: number, elapsedSeconds: number): boo
 
 const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
 
-/** A last lap more than this much slower than the estimate is a pit, incident or start lap, not the leader's pace. */
+/** A last lap more than this much off the estimate is a pit, incident or start lap, not the leader's pace. */
 const LEADER_LAST_LAP_MAX_RATIO = 1.1;
 
 /**
- * The leader's lap time for the flag: its last lap when slower than the game's estimate, which follows its best laps
- * (Barcelona race 2026-11-12: estimate about 88.6 s, last laps 89.6 s; two laps at the estimate put the flag 2 s early,
- * ahead of the player's crossing, and laps left read one short all race). A last lap slower by more than
- * `LEADER_LAST_LAP_MAX_RATIO` is not its pace, nor is its start lap (Sebring School races 2026-11-17: 69-70.7 s against
- * about 64 s, inside the ratio; it moved the flag a lap later and laps left read one too many until its second lap).
+ * The leader's lap time for the flag: its last lap, slower or faster than the game's estimate, which does not follow its
+ * pace (Barcelona race 2026-11-12: estimate about 88.6 s, last laps 89.6 s, laps left one short all race; Le Mans race
+ * 2026-11-24: estimate about 241-244 s, last laps 236.5-238.3 s, laps left one short to lap 4, then switching 5 <-> 6).
+ * A last lap off the estimate by more than `LEADER_LAST_LAP_MAX_RATIO` is not its pace, nor is its start lap (Sebring
+ * School races 2026-11-17: 69-70.7 s against about 64 s, inside the ratio; it moved the flag a lap later and laps left
+ * read one too many until its second lap).
  */
 function leaderLapSeconds(leader: LiveVehicleReading): number {
   const estimate = leader.estimatedLapTime;
   const last = leader.lastLapTime;
-  return leader.totalLaps >= 2 && positive(estimate) && positive(last) && last > estimate && last <= estimate * LEADER_LAST_LAP_MAX_RATIO
-    ? last : estimate;
+  return leader.totalLaps >= 2 && positive(estimate) && positive(last)
+    && last >= estimate / LEADER_LAST_LAP_MAX_RATIO && last <= estimate * LEADER_LAST_LAP_MAX_RATIO ? last : estimate;
 }
 
 /** The class leader's estimated lap time when it races in the player's (known) class, else null. */
