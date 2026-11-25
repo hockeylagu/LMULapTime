@@ -1,16 +1,20 @@
 import type { LiveSnapshot } from '../../types/live.js';
-import type { LiveAccuracyComparison, LiveAuditRecord, LiveUsageObservation } from '../../types/liveAudit.js';
-import type { LiveScoringReading } from './liveLifecycle.js';
+import type { LiveAccuracyComparison, LiveAuditCar, LiveAuditRecord, LiveUsageObservation } from '../../types/liveAudit.js';
+import type { LiveScoringReading, LiveVehicleReading } from './liveLifecycle.js';
 import { liveTrackWet } from '../lapConditions.js';
 
 /** Bump when the forecasting formulas change; history keeps the version that produced each estimate. */
-export const LIVE_MODEL_VERSION = 23;
+export const LIVE_MODEL_VERSION = 24;
 /** Uncorrected estimator recorded for training and used as the exact calibration compatibility version. */
 export const LIVE_BASELINE_MODEL_VERSION = 5;
 interface Baseline { snapshot: LiveSnapshot; regime: string; et: number }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const difference = (actual: number | null, predicted: number | null): number | null =>
   actual !== null && predicted !== null ? actual - predicted : null;
+const auditCar = (car: LiveVehicleReading | null | undefined): LiveAuditCar | null => car ? {
+  id: car.id, vehicleClass: car.vehicleClass, totalLaps: car.totalLaps, lapStartEt: car.lapStartEt, lastLapTime: car.lastLapTime,
+  estimatedLapTime: car.estimatedLapTime, pitStops: car.pitStops ?? null, inPits: car.inPits, finishStatus: car.finishStatus,
+} : null;
 
 /**
  * Live strategy audit tracker: runs inside the capture controller.
@@ -62,7 +66,8 @@ export class LiveAuditTracker {
       strategy?.fuelRatio?.garageSetting, strategy?.pit?.mfd, strategy?.pit?.state,
       strategy?.resource?.reserveLaps, strategy?.garage?.reserveLaps, strategy?.resource?.perLap,
       strategy?.garage?.needed, strategy?.fuelRatio?.recommended,
-      strategy?.crossover?.action, strategy?.crossover?.compound, strategy?.crossover?.when, strategy?.crossover?.reason]);
+      strategy?.crossover?.action, strategy?.crossover?.compound, strategy?.crossover?.when, strategy?.crossover?.reason,
+      snapshot.lapsLeft?.laps]);
     const observedKey = JSON.stringify([observation.fuel, observation.ve]);
     const measurement = observedKey !== this.observationKey && (observation.fuel !== null || observation.ve !== null);
     const completedLap = lap !== this.last?.session?.playerLapsCompleted;
@@ -72,7 +77,8 @@ export class LiveAuditTracker {
     const comparison = measurement ? this.compare(observation, regime) : null;
     if (reason) {
       this.save({ runId: this.runId, sequence: ++this.sequence, recordedAt: now, modelVersion: LIVE_MODEL_VERSION,
-        reason, snapshot: clone(snapshot), observation: clone(observation), comparison });
+        reason, snapshot: clone(snapshot), observation: clone(observation), comparison,
+        ...(session.kind === 'race' ? { race: { leader: auditCar(reading.leader), classLeader: auditCar(reading.classLeader) } } : {}) });
     }
     this.settings = settingKey; this.observationKey = observedKey;
     this.last = snapshot;

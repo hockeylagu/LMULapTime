@@ -361,7 +361,10 @@ comparison. New snapshots may contain optional `strategy.crossover` (`LiveTyreCr
 now/planned-stop, reason slightly-wet/dry and average path wetness (0..1). Slicks are not advised while rain falls
 (model version 15). Advice action, compound, timing or
 reason changes create a `settings` checkpoint, including removal; wetness fluctuation alone does not.
-Older snapshots omit the field; no schema version change or reparse is needed. It is diagnostic context; permanent frozen learning events and compact examples remain
+A change of `snapshot.lapsLeft.laps` also creates a `settings` checkpoint. Race checkpoints carry `race`
+(`LiveAuditCar` in `shared/types/liveAudit.ts`): the overall and class leaders' id, class, laps, lap start, last and
+estimated lap time, pit stops, pit lane and finish status as the game reported them, the inputs of `computeLapsLeft`
+(model version 24). Older records omit both; no schema version change or reparse is needed. It is diagnostic context; permanent frozen learning events and compact examples remain
 separate. Disposable REST/error sidecars can be deleted without removing these checkpoints.
 Deleting a closed DuckDB recording removes its audit history; eligible compact learning facts can
 survive separately under the normal invalidation rules.

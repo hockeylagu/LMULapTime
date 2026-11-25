@@ -85,3 +85,18 @@ it('checkpoints crossover changes immediately without logging every wetness fluc
   expect(records.at(-1)?.snapshot.strategy?.crossover).toBeNull();
   expect(records).toHaveLength(count + 1);
 });
+
+it('records the leaders behind laps left in a race, and each laps-left change (Sebring race 2026-11-25)', () => {
+  const { tracker, records } = setup();
+  const leader = vehicleReading({ id: 7, place: 1, vehicleClass: 'LMP2_ELMS', totalLaps: 9, lapStartEt: 1122.1, lastLapTime: 111.58,
+    estimatedLapTime: 108.6, pitStops: 0 });
+  const reading = scoringReading({ currentEt: 1123.6, leader, classLeader: null });
+  const snapshot = liveSnapshot({ session: liveSession({ kind: 'race', elapsedSeconds: 1123.6, playerLapsCompleted: reading.player!.totalLaps }),
+    strategy: liveStrategy(), lapsLeft: { laps: 8, estimated: true } });
+  tracker.update(snapshot, reading, empty, 0);
+  expect(records.at(-1)?.race).toEqual({ classLeader: null, leader: { id: 7, vehicleClass: 'LMP2_ELMS', totalLaps: 9, lapStartEt: 1122.1,
+    lastLapTime: 111.58, estimatedLapTime: 108.6, pitStops: 0, inPits: false, finishStatus: 0 } });
+  snapshot.lapsLeft = { laps: 7, estimated: true };
+  tracker.update(snapshot, reading, empty, 1000);
+  expect(records.at(-1)).toMatchObject({ reason: 'settings', snapshot: { lapsLeft: { laps: 7 } } });
+});

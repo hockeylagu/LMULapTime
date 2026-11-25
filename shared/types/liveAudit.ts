@@ -28,6 +28,19 @@ export interface LiveAccuracyComparison {
   ratioError: number | null;
 }
 
+/** A car's inputs to the race distance (`computeLapsLeft`), as the game reported them. */
+export interface LiveAuditCar {
+  id: number;
+  vehicleClass: string;
+  totalLaps: number;
+  lapStartEt: number;
+  lastLapTime: number;
+  estimatedLapTime: number;
+  pitStops: number | null;
+  inPits: boolean;
+  finishStatus: number;
+}
+
 export interface LiveAuditRecord {
   runId: string;
   sequence: number;
@@ -38,4 +51,9 @@ export interface LiveAuditRecord {
   snapshot: LiveSnapshot;
   observation: LiveUsageObservation;
   comparison: LiveAccuracyComparison | null;
+  /**
+   * The overall and class leaders behind `snapshot.lapsLeft` in a race, so a laps-left change can be traced to its cause
+   * (Le Mans 2026-11-24 and Sebring 2026-11-25 could not be). Absent outside races and in older records.
+   */
+  race?: { leader: LiveAuditCar | null; classLeader: LiveAuditCar | null };
 }

@@ -47,6 +47,12 @@ function garageLine(g: Garage): string {
 
 const value = (x: number | null | undefined, digits = 0): string => x == null ? '-' : x.toFixed(digits);
 
+/** The overall leader behind laps left (records from model version 24). */
+interface AuditCar { totalLaps: number; lapStartEt: number; lastLapTime: number; estimatedLapTime: number; pitStops: number | null }
+const leaderText = (car: AuditCar | null | undefined): string => car
+  ? ` | ldr L${car.totalLaps} start ${value(car.lapStartEt, 1)} last ${value(car.lastLapTime, 2)} est ${value(car.estimatedLapTime, 2)} stops ${car.pitStops ?? '-'}`
+  : '';
+
 function line(s: Snapshot): string {
   const st = s.strategy ?? {};
   const race = st.resource?.race;
@@ -76,10 +82,11 @@ for (const filename of fs.readdirSync(directory).filter(name => name.endsWith('.
     let total: number | null = null;
     let garage: Garage | null = null;
     for (const row of rows) {
-      const snapshot = (JSON.parse(row.data) as { snapshot?: Snapshot }).snapshot;
+      const record = JSON.parse(row.data) as { snapshot?: Snapshot; race?: { leader: AuditCar | null } };
+      const snapshot = record.snapshot;
       if (!snapshot) continue;
       const at = value(Number(row.elapsed_seconds), 1).padStart(7);
-      const text = line(snapshot);
+      const text = `${line(snapshot)}${leaderText(record.race?.leader)}`;
       if (text !== last) console.log(`  ${at} ${text}`);
       last = text;
       if (snapshot.strategy?.garage && total === null) garage = snapshot.strategy.garage;
