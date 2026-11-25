@@ -1,6 +1,7 @@
 import React, { useMemo, useSyncExternalStore } from 'react';
 import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { CarClassBadge } from '../../common/CarClassBadge.js';
+import { CarLogo } from '../../vehicle/CarLogo.js';
 import type { RaceClock } from './raceClock.js';
 import { raceClassTone } from './raceClassTone.js';
 import { raceStandingsAt, type RaceStandingsIndex } from './raceStandings.js';
@@ -24,6 +25,7 @@ export const RaceCarTooltip: React.FC<Props> = ({ index, clock, slot }) => {
     <div role="tooltip" data-testid="race-car-tooltip"
       className="inline-block rounded-md border border-lmu-border bg-lmu-card px-2.5 py-1.5 text-xs leading-5 text-lmu-text-soft shadow-lg">
       <div className="flex items-center gap-1.5 font-semibold text-lmu-text">
+        <CarLogo carType={car.carType} size="xs" />
         {car.carNumber && <span className={`font-mono ${raceClassTone(car.carClass).text}`}>#{car.carNumber}</span>}
         <span className="truncate">{car.name}{car.isPlayer ? ' (You)' : ''}</span>
       </div>

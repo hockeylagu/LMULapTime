@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useSyncExternalStore } from 'react';
 import { formatTime } from '../../../../shared/domain/timing/timeFormat.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { CarLogo } from '../../vehicle/CarLogo.js';
 import type { RaceClock } from './raceClock.js';
 import { raceStandingsAt, type RaceGap, type RaceStandingsIndex } from './raceStandings.js';
 import { raceClassTone } from './raceClassTone.js';
@@ -75,6 +76,8 @@ export const RaceStandingsTower: React.FC<Props> = ({ index, clock, followSlot, 
                   <span aria-hidden="true" className={`h-3.5 w-1 rounded-sm ${dimmed ? tone.barFaded : tone.bar}`} />{row.position}
                 </span>
                 <span className="flex min-w-0 items-center gap-1.5">
+                  {/* A car without a known make keeps the logo's space, so the numbers line up. */}
+                  <CarLogo carType={row.car.carType} size="xs" className={dimmed ? 'opacity-50' : ''} fallback={<span aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />} />
                   {row.car.carNumber && <span className={`shrink-0 font-mono ${dimmed ? tone.textFaded : tone.text}`}>#{row.car.carNumber}</span>}
                   <span className={`truncate ${followed ? 'font-extrabold' : ''}`}>{row.car.name}</span>
                   {you && <span className="shrink-0 rounded bg-lmu-accent/20 px-1.5 text-[11px] font-bold text-lmu-accent-soft">You</span>}
