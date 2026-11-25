@@ -97,12 +97,15 @@ describe('radio calls', () => {
     expect(texts(tyres)).toEqual(['Penalty. No service on this stop.']);
   });
 
-  it('warns when fuel limits an otherwise covered energy plan', () => {
+  it('warns that fuel runs out before energy only with a stop coming, the one place the ratio changes', () => {
     const value = snapshot();
     value.strategy!.resource!.race!.finishReachable = true;
     value.strategy!.fuelRatio = { recommended: 0.9, source: 'measured', pairedLaps: 4,
-      garageSetting: 0.8, mfdSetting: 0.8, excessLitres: null, fuelBiasLaps: -1 };
-    expect(texts(value)).toEqual(['Fuel runs out before energy. Check your fuel ratio.']);
+      garageSetting: 0.9, mfdSetting: 0.9, excessLitres: null, fuelBiasLaps: -1 };
+    expect(texts(value)).toEqual([]);
+    value.strategy!.resource!.race!.finishReachable = false;
+    value.strategy!.resource!.race!.pitInLaps = 1;
+    expect(texts(value)).toEqual(['Box next lap.', 'Fuel runs out before energy. Check your fuel ratio.']);
   });
 
   it('says the whole stop on the box call, no tyre change included, before anything else', () => {

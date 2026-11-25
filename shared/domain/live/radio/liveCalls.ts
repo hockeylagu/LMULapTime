@@ -115,6 +115,11 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
     if (fuelRatio?.recommended != null && fuelRatio.mfdSetting != null && fuelRatio.mfdSetting < fuelRatio.recommended) {
       call(`pit-ratio-short-${stop}`, `Fuel ratio too low. Set ${fuelRatio.recommended.toFixed(2)}.`, 2);
     }
+    // The ratio changes only at a stop, so it is said with the stop's menu, never on a lap with none coming (driver,
+    // 2026-11-24, after hearing it on lap 2 at Le Mans).
+    if (fuelRatio?.fuelBiasLaps != null && fuelRatio.fuelBiasLaps < 0) {
+      call(`fuel-limits-energy-${stop}`, 'Fuel runs out before energy. Check your fuel ratio.', 2);
+    }
   }
   const coverage = tyres?.coverage;
   if (coverage && coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD) {
@@ -123,9 +128,6 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
     } else {
       call(`tyre-coverage-${coverage.target}-${stop}`, `Tyres won't reach the ${coverage.target === 'finish' ? 'flag' : 'stop'}. Plan a change.`, 3);
     }
-  }
-  if (fuelRatio?.fuelBiasLaps != null && fuelRatio.fuelBiasLaps < 0) {
-    call('fuel-limits-energy', 'Fuel runs out before energy. Check your fuel ratio.', 2);
   }
   if (damage?.significant && damage.lossToFinish !== null && damage.repairSeconds !== null) {
     // LMU's repair estimate against our measured loss to the flag; staying out is said only when the repair alone costs more.
