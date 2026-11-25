@@ -31,7 +31,8 @@ const GREEN = 11;
 
 /** A sentence starts with a capital: "sector 1." without a yellow is "Sector 1." (Sebring practice 2026-11-22). */
 const sentence = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
-/** Characters the engineer says a second: "Michelin Chicane. Slow car on track, right, clear of your line." took 3.9 s. */
+/** Characters the engineer says a second: "Michelin Chicane. Slow car on track, right, clear of your line." took 3.9 s (the
+ * wording before 2026-11-25). */
 const SPOKEN_CHARS_PER_S = 16;
 /**
  * How long a call about a car `seconds` ahead may wait and still end a second before the car is reached; null when it
@@ -98,6 +99,8 @@ export class IncidentWatch {
       const place = where(incident.lapDist);
       if (!place) continue;
       const onTrack = incident.cars.filter(motion => motion.offSince === null);
+      // Cars just back on are the rejoin call's: said as stopped they would hide it.
+      if (onTrack.length > 0 && onTrack.every(motion => motion.rejoinedAt !== null && now - motion.rejoinedAt <= REJOIN_S)) continue;
       // Keyed by the car and where it stands: a car parked for good is said once a run (Daytona 2026-11-05 lap after lap).
       const spotKey = `${incident.anchor.car.id}-${Math.round(incident.anchor.car.lapDist / 50)}`;
       const near = (entry: Announced) => now - entry.at <= SPOT_S && apart(entry.lapDist, incident.lapDist, track.length) <= CLUSTER_M;
@@ -109,8 +112,11 @@ export class IncidentWatch {
         const stopped = onTrack.every(motion => motion.speed < STOPPED_MS);
         const what = onTrack.length === 1 ? (stopped ? 'Car stopped' : 'Slow car')
           : `${countWord(onTrack.length)} cars ${stopped ? 'stopped' : 'slow'}`;
-        const line = this.line(track, onTrack);
-        text = sentence(`${yellowAt(incident.lapDist) ? 'Yellow, ' : ''}${place}.`) + ` ${sentence(what)} on track, ${sideOf(onTrack)}${line ? `, ${line}` : ''}.`;
+        // Short, so it ends well before the car (Sebring race 2026-11-25, driver: "Car stopped on track, left, in your
+        // path." and "Slow car on track, right, clear of your line." ran 3.6-3.8 s): "on track" is what the call is (a
+        // car off says "off"), and only a car in the path adds a sentence.
+        text = sentence(`${yellowAt(incident.lapDist) ? 'Yellow, ' : ''}${place}.`) + ` ${sentence(what)}, ${sideOf(onTrack)}.`
+          + (this.inPath(track, onTrack) ? ' In your path.' : '');
         if (spot) spot.onTrack = true;
       } else {
         const count = incident.cars.length;
@@ -146,16 +152,12 @@ export class IncidentWatch {
     return incidents;
   }
 
-  /** "in your path" when a car sits within 2.5 m of the player's usual line there, else "clear of your line"; null before the player drove it. */
-  private line(track: FieldTrack, cars: readonly CarMotion[]): string | null {
-    let known = false;
-    for (const motion of cars) {
+  /** Whether a car sits within 2.5 m of the player's usual line there; false before the player drove it. */
+  private inPath(track: FieldTrack, cars: readonly CarMotion[]): boolean {
+    return cars.some(motion => {
       const line = track.playerLineAt(motion.car.lapDist);
-      if (line === null) continue;
-      known = true;
-      if (Math.abs(line - motion.car.pathLateral) <= ON_LINE_M) return 'in your path';
-    }
-    return known ? 'clear of your line' : null;
+      return line !== null && Math.abs(line - motion.car.pathLateral) <= ON_LINE_M;
+    });
   }
 
   private rejoining(track: FieldTrack, where: (lapDist: number) => string | null, key: (event: string) => string): LiveCall[] {

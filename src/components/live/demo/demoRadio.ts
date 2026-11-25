@@ -33,10 +33,10 @@ export const DEMO_RADIO_CALLS: readonly DemoRadioGroup[] = [
     call(1, 'Penalty. No service on this stop.'),
   ] },
   { group: 'Incidents and flags', calls: [
-    call(1, 'Turn 6. Car stopped on track, left, in your path.'),
-    call(1, 'Yellow, Turn 6. Two cars stopped on track, right, clear of your line.'),
-    call(1, 'Yellow, Turn 11. Car stopped on track, right, in your path.'),
-    call(1, 'Turn 6. Slow car on track, left.'),
+    call(1, 'Turn 6. Car stopped, left. In your path.'),
+    call(1, 'Yellow, Turn 6. Two cars stopped, right.'),
+    call(1, 'Yellow, Turn 11. Car stopped, right. In your path.'),
+    call(1, 'Turn 6. Slow car, left.'),
     call(2, 'Turn 6. Car off right.'),
     call(1, 'Turn 6. Car rejoining, careful.'),
     call(2, 'Turn 6 clear.'),
@@ -44,9 +44,9 @@ export const DEMO_RADIO_CALLS: readonly DemoRadioGroup[] = [
     call(2, 'Green, sector 2.'),
   ] },
   { group: 'Traffic', calls: [
-    call(2, 'Hyper Porsche behind, catching. Passes in 6 seconds.'),
+    call(2, 'Hyper Porsche behind.'),
     call(2, 'Two Hypers behind.'),
-    call(3, 'GT3 Lexus ahead. 4 seconds.'),
+    call(3, 'GT3 Lexus ahead. 3 seconds.'),
   ] },
   { group: 'Clock', calls: [
     call(3, 'Ten minutes.'),

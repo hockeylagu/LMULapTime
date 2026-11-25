@@ -40,8 +40,8 @@ describe('prepared engineer clips', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("cuts a call into its sentences and names each clip's file", () => {
-    expect(callSentences('Yellow, Turn 6. Car stopped on track, left, in your path. Set 0.90.'))
-      .toEqual(['Yellow, Turn 6.', 'Car stopped on track, left, in your path.', 'Set 0.90.']);
+    expect(callSentences('Yellow, Turn 6. Car stopped, left. In your path. Set 0.90.'))
+      .toEqual(['Yellow, Turn 6.', 'Car stopped, left.', 'In your path.', 'Set 0.90.']);
     expect(clipFile('Turn 6.')).toBe('turn-6-stop.wav');
     expect(clipFile('?')).toBe('blank.wav');
   });

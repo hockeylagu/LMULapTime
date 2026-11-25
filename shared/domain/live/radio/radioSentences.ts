@@ -19,7 +19,7 @@ const SECTORS = [1, 2, 3];
 /** Counts said in a group of cars: two to six. */
 const GROUPS = range(2, 6).map(countWord);
 /** Seconds to a pass, as the traffic calls round them. */
-const PASS_SECONDS = range(1, 6);
+const PASS_SECONDS = range(1, 3);
 /** Hybrid deployment settings in kW across the data package's cars, and the game's map positions. */
 const DEPLOYMENT_KW = [...range(0, 50, 10), ...range(60, 200, 20)];
 const DEPLOYMENT_MAPS = range(0, 10);
@@ -47,13 +47,12 @@ function fixed(): string[] {
   ];
 }
 
-/** What is on the track and where: "Car stopped on track, left, in your path." */
+/** What is on the track and which side: "Car stopped, left." and "In your path." */
 function incidents(): string[] {
-  const lines = ['', ', in your path', ', clear of your line'];
-  const one = ['Car stopped', 'Slow car'].flatMap(what => ['left', 'right'].map(side => `${what} on track, ${side}`));
+  const one = ['Car stopped', 'Slow car'].flatMap(what => ['left', 'right'].map(side => `${what}, ${side}.`));
   const several = GROUPS.flatMap(count => ['stopped', 'slow'].flatMap(state =>
-    ['left', 'right', 'both sides'].map(side => `${capital(count)} cars ${state} on track, ${side}`)));
-  return [...one, ...several].flatMap(text => lines.map(line => `${text}${line}.`));
+    ['left', 'right', 'both sides'].map(side => `${capital(count)} cars ${state}, ${side}.`)));
+  return [...one, ...several, 'In your path.'];
 }
 
 /** Every turn the layouts' lists name, as the incident calls place it. */
@@ -80,8 +79,8 @@ function traffic(): string[] {
   const named = cars();
   const words = groups();
   return [
-    ...PASS_SECONDS.flatMap(seconds => [`Passes in ${passSeconds(seconds)}.`, `${passSeconds(seconds)}.`]),
-    ...named.map(car => `${car} behind, catching.`),
+    ...PASS_SECONDS.map(seconds => `${passSeconds(seconds)}.`),
+    ...named.map(car => `${car} behind.`),
     ...GROUPS.flatMap(count => words.map(word => `${capital(count)} ${word} behind.`)),
     ...named.map(car => `${car} ahead.`),
   ];

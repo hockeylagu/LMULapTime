@@ -86,7 +86,7 @@ describe('field calls', () => {
     radio.step(4);
     expect(radio.texts()).toEqual([]);
     radio.step(3);
-    expect(radio.texts()).toEqual([expect.stringMatching(/Slow car on track/)]);
+    expect(radio.texts()).toEqual([expect.stringMatching(/Slow car, /)]);
   });
 
   it('starts a call with a capital where no turn is named and no yellow is out', () => {
@@ -102,7 +102,7 @@ describe('field calls', () => {
     radio.step(3);
     stopped = false;
     radio.step(2);
-    expect(radio.texts()).toEqual(['Sector 1. Car stopped on track, left, in your path.', 'Sector 1 clear.']);
+    expect(radio.texts()).toEqual(['Sector 1. Car stopped, left. In your path.', 'Sector 1 clear.']);
   });
 
   it('names a car stopped on the player\'s line within 15 s, once, then the turn clearing', () => {
@@ -120,11 +120,11 @@ describe('field calls', () => {
     radio.step(1);
     expect(radio.texts()).toEqual([]);
     radio.step(2);
-    expect(radio.heard).toMatchObject([{ text: 'Turn 6. Car stopped on track, left, in your path.', priority: 1, family: 'incident' }]);
+    expect(radio.heard).toMatchObject([{ text: 'Turn 6. Car stopped, left. In your path.', priority: 1, family: 'incident' }]);
     // The car drives off before the player gets there.
     stopped = false;
     radio.step(2);
-    expect(radio.texts()).toEqual(['Turn 6. Car stopped on track, left, in your path.', 'Turn 6 clear.']);
+    expect(radio.texts()).toEqual(['Turn 6. Car stopped, left. In your path.', 'Turn 6 clear.']);
   });
 
   it('says cars stopped together as one call', () => {
@@ -138,7 +138,7 @@ describe('field calls', () => {
     victims.forEach((victim, index) => { victim.car = { ...victim.car, lapDist: 1530 - index * 30 }; });
     player.car = { ...player.car, lapDist: 1000 };
     radio.step(3);
-    expect(radio.texts()).toEqual(['Turn 6. Two cars stopped on track, left, in your path.']);
+    expect(radio.texts()).toEqual(['Turn 6. Two cars stopped, left. In your path.']);
   });
 
   it('says cars off track as a P2, and the cars rejoining slowly close ahead as one P1', () => {
@@ -226,20 +226,42 @@ describe('field calls', () => {
     const cars = [player, ...Array.from({ length: 10 }, (_, index): Driven => ({ car: car(10 + index, index * 300), speed: pace }))];
     const radio = race(cars);
     radio.step(130);
-    // 150 m behind, 25 m/s faster: the pass lands in the slow half, six seconds on.
     const until = (from: number) => { while (!(player.car.lapDist >= from && player.car.lapDist < from + 20)) radio.step(0.2); };
+    // 150 m behind, 25 m/s faster: six seconds out is too soon to say.
     until(1260);
     cars.push({ car: car(40, player.car.lapDist - 150, PORSCHE), speed: steady(75) });
     radio.step(0.4);
-    expect(radio.heard).toMatchObject([{ text: 'Hyper Porsche behind, catching. Passes in 6 seconds.', priority: 2, family: 'traffic', immediate: true }]);
-    // Next lap, two of them together are one call.
+    expect(radio.heard).toEqual([]);
+    // Three seconds out, the pass lands in the slow half: the car alone.
+    radio.step(2.6);
+    expect(radio.heard).toMatchObject([{ text: 'Hyper Porsche behind.', priority: 2, family: 'traffic', immediate: true }]);
+    // Next lap, two of them together are one call, and a third joining the train says nothing new.
     cars.pop();
     radio.step(20);
-    until(1260);
-    cars.push({ car: car(41, player.car.lapDist - 150, PORSCHE), speed: steady(75) }, { car: car(42, player.car.lapDist - 170, GENESIS), speed: steady(80) });
+    until(1400);
+    cars.push({ car: car(41, player.car.lapDist - 70, PORSCHE), speed: steady(75) }, { car: car(42, player.car.lapDist - 85, GENESIS), speed: steady(80) });
     radio.step(0.4);
     expect(radio.texts().at(-1)).toBe('Two Hypers behind.');
+    const heard = radio.heard.length;
+    cars.push({ car: car(43, player.car.lapDist - 90, PORSCHE), speed: steady(80) });
+    radio.step(3);
+    expect(radio.heard).toHaveLength(heard);
     expect(spokenCar(car(40, 0, PORSCHE), 'GT3')).toBe('Hyper Porsche');
+  });
+
+  it('says nothing behind while the player crawls, as the faster cars lap them', () => {
+    // Sebring race 2026-11-25: a puncture on the way to the pits, and 20 calls in 23 s as the P2s came by.
+    let crawl = false;
+    const pace = (target: LiveFieldCar) => (target.lapDist < 1500 ? 50 : 25);
+    const player: Driven = { car: car(1, 0, { isPlayer: true }), speed: target => (crawl ? 10 : pace(target)) };
+    const cars = [player, ...Array.from({ length: 10 }, (_, index): Driven => ({ car: car(10 + index, index * 300), speed: pace }))];
+    const radio = race(cars);
+    radio.step(130);
+    crawl = true;
+    while (!(player.car.lapDist >= 1600 && player.car.lapDist < 1620)) radio.step(0.2);
+    cars.push({ car: car(40, player.car.lapDist - 60, PORSCHE), speed: steady(40) }, { car: car(41, player.car.lapDist - 80, GENESIS), speed: steady(45) });
+    radio.step(3);
+    expect(radio.heard.filter(call => call.family === 'traffic')).toEqual([]);
     expect(spokenCar(car(40, 0, PORSCHE), 'Hyper')).toBe('Porsche');
   });
 

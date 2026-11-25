@@ -345,7 +345,7 @@ describe('LiveService', () => {
         { t, throttle: 0.5, brake: 0.2 });
     }
     expect(sink.data(sink.events().indexOf('call'))).toMatchObject({ priority: 1 });
-    expect((sink.data(sink.events().indexOf('call')) as { text: string }).text).toMatch(/^Yellow, sector 2\. Car stopped on track/);
+    expect((sink.data(sink.events().indexOf('call')) as { text: string }).text).toMatch(/^Yellow, sector 2\. Car stopped, (left|right)\./);
     void service.stop();
   });
 
