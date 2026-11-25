@@ -51,22 +51,27 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   speed over 1 s, the field's speed profile (20 m bins) and the player's line, lap time and sectors.
   - Incidents (P1, never repeated): a car slower than 3 m/s or half the field's speed there for 1.5 s (4.5 s for a
     car that froze and jumped on), within 15 s at the player's pace; cars within 150 m are one call, a spot stays
-    one incident for 60 s. "Turn 6. Car stopped on track, left, in your path.", "Yellow, " in front when the game's
+    one incident for 60 s. "Turn 6. Car stopped, left. In your path." ("In your path." only when it is; Sebring race
+    2026-11-25: "on track" and "clear of your line" made it 3.6-3.8 s), "Yellow, " in front when the game's
     sector yellow covers it, "Turn 6 clear." on the same approach. A car more than 3 m off: "Turn 6. Car off right."
-    (P2); back on slowly within 6 s ahead after 2 s off: "Turn 6. Car rejoining, careful." A spot is said once:
+    (P2); back on slowly within 6 s ahead after 2 s off: "Turn 6. Car rejoining, careful." (not also said as stopped). A spot is said once:
     a car said off is not said again as it comes back on track or rejoins (Le Mans 2026-11-24: one car said three
     times in 4 s), and a call is made only if it ends a second before the car is reached, at 16 characters a second
     ("Michelin Chicane. Slow car on track, right, clear of your line." took 3.9 s and ended after the pass). The game's sector yellow
     with no slow car to explain it after 2 s: "Yellow, sector 2.", green once it holds 10 s. Turns are named from
     the layout's placed turns (`server/live/radio/layoutTurns.ts`), else the sector.
-  - Traffic (said at once, not slotted): a faster class closing within 6 s with the pass landing in a corner
-    ("Hyper Porsche behind, catching. Passes in 6 seconds.", "Two Hypers behind.") as a P2, a slower class ahead
+  - Traffic (said at once, not slotted): a faster class closing within 3 s with the pass landing in a corner
+    ("Hyper Porsche behind.", "Two Hypers behind.") as a P2, one call per train (the cars it named keep its key
+    until they pass; Sebring race 2026-11-25: 6 s out with "catching. Passes in 6 seconds." came too soon and ran
+    3.5 s, a train of P2s got 7 calls in 23 s, and 4 s out was still too far), nothing behind while the player
+    is under half the field's usual speed there (crawling with a puncture or to the pits: being lapped is expected;
+    the same race said 20 in 23 s after a lap 3 puncture), a slower class ahead
     as a P3 inside the lap budget; none on the race's first lap. Names from `resolveVehicle` + the manufacturer,
     the class word only when it differs from the player's.
   - Rejoin, on the box call: "Rejoin P4. Behind the Genesis. Ahead of two GT3s." from the stored pit lane loss plus
     the planned service, the gaps from progress times the player's median lap.
-  - Clock and penalties: "Ten minutes.", "Last lap.", in qualifying "Time for one more lap." or "No time for another
-    lap.", and "Penalty pending." (P1, once per penalty count).
+  - Clock and penalties: "Ten minutes to go.", "Last lap.", in qualifying "One more lap after this." or "Last lap, push." (was "No time for another
+    lap."), and "Penalty pending." (P1, once per penalty count).
 - Checked off the car on five online races' diagnostics sidecars (2026-11-22, `.tmp/voice-sim/field.ts`): Portimão
   1.83 calls a lap, Silverstone 10-29 1.31, Daytona 4.1 and 5.2 (GT3s ahead about 1.4 a lap, 44-58 more dropped
   by the budget); "Rejoin P11." heard at Daytona 10-16. The parked car at Daytona T12 is said once, not every lap.
@@ -79,7 +84,7 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   cache below.
 - Driver picked George at 1.2x with pauses cut to 80 ms (2026-11-22); synthesis during a race is out (3-10 s a call,
   CPU the game needs). Prepared clips instead: `tools/dev/prepareVoiceClips.ts` synthesizes, with the game closed,
-  every demo call (`demoRadio.ts`, 34) whole and in its sentences (`callSentences`), 66 clips, into
+  every demo call (`demoRadio.ts`, 35) whole and in its sentences (`callSentences`), 66 clips, into
   `public/voice/george/` (not committed) with a manifest; clips already made are kept, unused ones removed. The demo
   sampler plays them whole or joined by sentence with a 0-120 ms join gap (`voice/clipVoice.ts`): no synthesis, no
   CPU. Decided (driver, 2026-11-22): join at full stops only. Joined at commas too, each piece kept a sentence's own
@@ -92,11 +97,11 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   and `prepareVoiceClips.ts` makes them (the manifest is written as it goes, so a stopped run keeps its clips). A
   sentence with a number or a name needs one clip per value, so each value is a sentence of its own and never paired
   with another: the stop's load and its tyres ("Energy 38 percent. No tyre change."), a car ahead and its seconds
-  ("GT3 Lexus ahead. 4 seconds."); pit laps 1-200, percents, litres, fuel ratios 0.50-1.50 and 37 turn names x 3
-  remain the bulk: 1,406 sentences (2,793 while pairs had a clip each). No browser voice is the aim (driver,
+  ("GT3 Lexus ahead. 3 seconds."); pit laps 1-200, percents, litres, fuel ratios 0.50-1.50 and 37 turn names x 3
+  remain the bulk: 1,396 sentences (2,793 while pairs had a clip each). No browser voice is the aim (driver,
   2026-11-23), so the calls with open-ended values were reworded into short sentences of their own (driver's choices):
   fuel in whole litres rounded up ("Fuel 46 litres. New medium.", "Set 46."); the rejoin as "Rejoin P4. Behind the
-  Genesis. Ahead of two GT3s."; the damage as "Repair 30 seconds. Costs 45 to the flag.", to the nearest
+  Genesis. Ahead of two GT3s."; the damage as "Repair 30 seconds. Costs 45 seconds to the flag.", to the nearest
   5 s up to 5 minutes, "over 5 minutes" past that; cars off and rejoining with the turn first ("Turn 2. Two cars
   off right.", "Turn 6. Car rejoining, careful."), as the stopped-car call. Only a value past the library's ranges
   still falls to the browser voice: more than six cars in a group, a pit lap past 200, a load past 120 litres, a
@@ -157,20 +162,20 @@ would ask it? Silence is an answer too: no call means "on plan", so nothing conf
 
 | Question while driving | Answer | When |
 |---|---|---|
-| Will my energy/fuel last to the stop or the flag? | Silence = yes; "Energy use too high. Save to hold lap 18." | After the line, when the plan breaks |
+| Will my energy/fuel last to the stop or the flag? | Silence = yes; "Energy use too high. Save to pit on lap 18." | After the line, when the plan breaks |
 | When do I pit, and what do I set? | "Box in 2 laps." "Box this lap. Energy 62 percent. New medium." | After the line; last straight before pit entry |
 | Hypercar: should I change the deployment? | Silence = keep it; "Set deployment 40." | Next straight, when the advice changes |
 | Is my pit menu right? | "Pit menu energy too low. Set 62." | When a stop is planned and the MFD is wrong |
 | Puncture, wheel gone? | "Front right puncture. Box this lap." | At once |
 | Where do I rejoin after the stop? | "Rejoin P6, behind the BMW, ahead of two Hypers." | With "Box in 2 laps" and on the box lap |
-| Is the damage worth fixing? | "Repair 30 seconds. Costs 12 to the flag. Stay out." | First straight after the damage read |
+| Is the damage worth fixing? | "Repair 30 seconds. Costs 12 seconds to the flag. Stay out." | First straight after the damage read |
 | Will my tyres last? | "Tyres won't reach the flag. Plan a change." | After the line, once |
 | Wets or slicks? | "Box this lap for wets." "Box this lap for slicks." | When the track reaches Slightly wet / Dry |
 | Is rain coming, is the track changing? | "Rain expected around lap 14." "Track now damp." | When it changes |
-| What is that yellow, is my line blocked? | "Yellow, Turn 6. Car stopped, left, in your path." | Within ~15 s of reaching it |
-| Who is coming, when do they pass? | "Hyper Ferrari behind. Passes in 6 seconds." | Before the pass |
+| What is that yellow, is my line blocked? | "Yellow, Turn 6. Car stopped, left. In your path." | Within ~15 s of reaching it |
+| Who is coming, when do they pass? | "Hyper Ferrari behind." | Before the pass |
 | Am I catching / being caught? | "Gap to P4 1.2, closing." (normal level only) | After the line |
-| How long is left? Time for another quali lap? | "Ten minutes." "Last lap." "Time for one more lap." | At those moments |
+| How long is left? Time for another quali lap? | "Ten minutes to go." "Last lap." "One more lap after this." | At those moments |
 | Penalty? | "Penalty pending." ("Drive-through" / "Stop and go" if type is verified) | At once |
 | Am I on pace? | Not spoken: the dashboard delta | — |
 
@@ -360,7 +365,7 @@ adds P3.
 | "Pit menu energy too low. Set 62." | MFD read below the needed amount while a stop is planned | P2 |
 | "Fuel ratio too low. Set 0.88." | MFD ratio below recommendation | P2 |
 | "Save 3 percent to skip the stop." | Saving target becomes reachable | P3 |
-| "Energy use too high. Save to hold lap 18." | Spare per lap below zero for 2 laps running | P3 |
+| "Energy use too high. Save to pit on lap 18." | Spare per lap below zero for 2 laps running | P3 |
 | "Set deployment 40." | Hypercar deployment advice moves to a new target (race and practice) | P2 |
 | "Penalty. No service on this stop." | Penalty outstanding while in the pit lane ("Stop and go" if penalty type is verified) | P1 |
 | "Rejoin P6, behind the BMW, ahead of two Hypers." | Joined to "Box in 2 laps" and the box-lap call: the field's race-time positions, plus the pit lane loss (`livePitLane.ts`) and the service time, give the place and the cars around the exit. Same-class place; other-class cars named only when they arrive at the exit within ~3 s. P5+ or no car within 3 s: the place alone | P2 |
@@ -370,7 +375,8 @@ adds P3.
 | Call | Trigger | P |
 |---|---|---|
 | "Front left puncture. Box this lap." | Wheel `flat` or `detached` (shared memory, already decoded in `rf2Decode.ts`); once per wheel | P1 |
-| "Suspension damage. Repair 30 seconds. Costs 12 to the flag. Stay out." | Significant damage with repair and projected loss known | P2 |
+| "Suspension damage. Repair 30 seconds. Costs 12 seconds to the flag. Stay out." | Significant damage with repair and projected loss known | P2 |
+| "Damage. Stop 85 seconds." | Significant damage with a repair, before the pace loss is known (two laps after the impact): the game's stop estimate as the MFD is set, once per repair figure (Sebring race 2026-11-25: 87 s known 10 s after the crash, the pits 3 minutes later, nothing said) | P2 |
 | "Tyres won't reach the flag. Plan a change." | Projected tread below the floor | P3 |
 
 Repair seconds are LMU's estimate and the pace loss is our median measure; the call says which wins.
@@ -435,8 +441,8 @@ Labels, from the 2026-10-27 sessions (see the grip mapping notes):
 | "Green, sector 2." | That sector's `sectorFlag` clears after a yellow call | P2 |
 | "Yellow, sector 2." | `sectorFlag` ahead of the player turns yellow | P1 |
 | "Penalty pending." | `penalties` increases (name "Drive-through" / "Stop and go" only if `penaltySeconds` reliably distinguishes them) | P1 |
-| "Ten minutes." / "Last lap." | Race clock crossings and flag projection | P3 |
-| Quali: "Time for one more lap." / "No time for another lap." | Remaining time versus current pace at the line | P2 |
+| "Ten minutes to go." / "Last lap." | Race clock crossings and flag projection | P3 |
+| Quali: "One more lap after this." / "Last lap, push." | Remaining time versus current pace at the line; kept through a pit request (a misclick at Portimão 2026-11-25 lost it), not in the pit lane ("No time for another lap." was too flat, driver 2026-11-25) | P2 |
 
 ### Incident ahead (our own detection, richer than the game's flag)
 
@@ -461,7 +467,7 @@ by the sector's distance.
 
 | Call | Detection | P |
 |---|---|---|
-| "Yellow, Turn 6. Car stopped on track, left, in your path." | Car below ~40-50 % of the reference speed at its lap distance (or stopped), not in pits, within ~15 s ahead | P1 |
+| "Yellow, Turn 6. Car stopped, left. In your path." | Car below ~40-50 % of the reference speed at its lap distance (or stopped), not in pits, within ~15 s ahead | P1 |
 | "Yellow, Turn 1. Two cars off right. Track clear." | Several slow cars within ~150 m, all more than ~3 m beyond `trackEdge`, within ~15 s | P2 |
 | "Slow car ahead, 6 seconds. Off your line, right." | Same, before any yellow, within ~10 s | P1 |
 | "Turn 9. Car rejoining, careful." | A car that was off track moves back inside the edge, within ~15 s ahead | P1 |
@@ -473,8 +479,8 @@ by the sector's distance.
 - On or off track: `|pathLateral|` against `trackEdge` on that side; later the plugin boundaries
   (white line) for a sharper test.
 - Your line: the player's own `pathLateral` by lap distance from their last clean laps, compared in
-  the same frame as the stopped car's; within ~2.5 m is "in your path", otherwise "clear of your line, left
-  / right". No geometry needed.
+  the same frame as the stopped car's; within ~2.5 m adds "In your path.", otherwise nothing
+  (the side is said anyway). No geometry needed.
 - Multiple cars: cluster slow cars by lap distance; say the count. At the start, one call per pile-up
   and the nearest first: a newer, closer incident replaces one still waiting (driver, 2026-11-21).
 - Exclusions: pit lane, garage stall, grid/formation. LMU has local yellows only (no full course
@@ -503,9 +509,9 @@ by the sector's distance.
 
 | Call | Trigger | P |
 |---|---|---|
-| "Hyper Ferrari behind, catching. Passes in 6 seconds." | Faster-class car within ~4 s and closing, pass in a braking zone or corner (~0.9 per lap measured with the groups) | P2 |
+| "Hyper Ferrari behind." | Faster-class car within ~4 s and closing, pass within 3 s in a braking zone or corner (~0.9 per lap measured with the groups) | P2 |
 | "Two Hypers behind." | Group of faster cars arriving together (2+ within 6 s), one call for the group (~0.2 per lap measured) | P2 |
-| "GT3 Aston ahead. 3 seconds." (prototype drivers) | Slower class ahead within reach before the next braking zone (Daytona: 2.3 such passes per lap in all, 0.9-1.3 in braking zones and corners) | P3 |
+| "GT3 Aston ahead. 3 seconds." (prototype drivers) | Slower class ahead within 3 s before the next braking zone (Daytona: 2.3 such passes per lap in all, 0.9-1.3 in braking zones and corners) | P3 |
 | "The Porsche behind, 0.6, closing." | Same-class car within 1 s and gaining over two laps | P3 |
 | "Gap to P4 1.2, closing." | Once per lap after the line, only while the gap changes by more than 0.2 s/lap | P3 |
 
@@ -519,8 +525,7 @@ cars (3 of 19 at Portimão), so the model comes from the car's `mVehFilename` th
 When the brand does not tell cars apart (LMP2 is all Oreca; two Ferraris together), say the position
 instead ("P5 behind"). Unknown cars fall back to the class, then to "car".
 
-"Passes in 6 seconds" can become "in 2 corners" from the official turns placed on the layout
-(`circuitTurns/placeTurns.ts`).
+The call behind names no time: said up to 3 s before the pass, the call itself is the timing.
 
 ### Not proposed for now
 
@@ -556,10 +561,10 @@ the text, so a call to refine is traced to its rule. Adding a call means adding 
 document then keeps only the phrasing rules below.
 
 Phrasing rules (consistent wording):
-- Order: what, where, side, line, action. "Yellow, Turn 6. Car stopped, left, in your path."
+- Order: what, where, side, line, action. "Yellow, Turn 6. Car stopped, left. In your path."
 - One verb for one action: "Box" (never "pit"), "Save", "Set", "Stay out", "Careful".
 - Places: "Turn 6" from the placed official turns, else "sector 2" or "{n} seconds"; never metres.
-- Sides: "left" / "right" in the direction of travel; lines: "in your path" / "clear of your line" (driver, 2026-11-22: "on/off your line" sounded alike and was easy to miss).
+- Sides: "left" / "right" in the direction of travel; lines: "In your path." only (driver, 2026-11-22: "on/off your line" sounded alike and was easy to miss; 2026-11-25: "clear of your line" dropped for length).
 - Cars: manufacturer, class word first only when it differs ("Hyper Ferrari"); position when the
   brand does not tell them apart.
 - Numbers: gaps and seconds to one decimal under 10 ("one point two"), whole numbers above; energy in
