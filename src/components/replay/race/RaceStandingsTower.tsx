@@ -34,7 +34,7 @@ interface Props {
   className?: string;
 }
 
-/** The timing screen at the session clock: running order, class places, laps and gaps; a row follows its car. */
+/** The timing screen at the session clock: running order, class places and gaps (a lapped car's gap is in laps); a row follows its car. */
 export const RaceStandingsTower: React.FC<Props> = ({ index, clock, followSlot, onFollow, pittedAt, onTrack, onHover, className = '' }) => {
   // Race gaps to the class leader, or to the car ahead in the class.
   const [toAhead, setToAhead] = useState(false);
@@ -44,8 +44,8 @@ export const RaceStandingsTower: React.FC<Props> = ({ index, clock, followSlot, 
 
   return (
     <section aria-label="Standings" className={`flex min-h-0 flex-col border-l border-lmu-border bg-lmu-strip ${className}`}>
-      <div className="grid grid-cols-[2.25rem_1fr_2.5rem_5.5rem] gap-2 border-b border-lmu-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-lmu-muted">
-        <span>Pos</span><span>Driver</span><span className="text-right">Laps</span>
+      <div className="grid grid-cols-[2.25rem_1fr_5.5rem] gap-2 border-b border-lmu-border px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-lmu-muted">
+        <span>Pos</span><span>Driver</span>
         {index.isRace ? (
           <button type="button" onClick={() => setToAhead(value => !value)} aria-pressed={toAhead}
             title={toAhead ? 'Gap to the car ahead in the class: click for the gap to the class leader' : 'Gap to the class leader: click for the gap to the car ahead'}
@@ -71,7 +71,7 @@ export const RaceStandingsTower: React.FC<Props> = ({ index, clock, followSlot, 
                 title="Click to select, double click to follow on the map"
                 onPointerEnter={() => onHover(row.car.slot)} onPointerLeave={() => onHover(null)}
                 onFocus={() => onHover(row.car.slot)} onBlur={() => onHover(null)}
-                className={`grid w-full grid-cols-[2.25rem_1fr_2.5rem_5.5rem] items-center gap-2 px-3 py-1 text-left text-xs hover:bg-lmu-card ${fill} ${text} ${FOCUS_RING}`}>
+                className={`grid w-full grid-cols-[2.25rem_1fr_5.5rem] items-center gap-2 px-3 py-1 text-left text-xs hover:bg-lmu-card ${fill} ${text} ${FOCUS_RING}`}>
                 <span className="flex items-center gap-1.5 font-mono">
                   <span aria-hidden="true" className={`h-3.5 w-1 rounded-sm ${dimmed ? tone.barFaded : tone.bar}`} />{row.position}
                 </span>
@@ -82,7 +82,6 @@ export const RaceStandingsTower: React.FC<Props> = ({ index, clock, followSlot, 
                   <span className={`truncate ${followed ? 'font-extrabold' : ''}`}>{row.car.name}</span>
                   {you && <span className="shrink-0 rounded bg-lmu-accent/20 px-1.5 text-[11px] font-bold text-lmu-accent-soft">You</span>}
                 </span>
-                <span className="text-right font-mono">{row.lapsDone}</span>
                 <span className={`text-right font-mono ${out ? 'text-lmu-loss-soft' : ''}`}>
                   {index.isRace || out ? formatRaceGap(toAhead ? row.interval : row.gap, true) : row.bestLapSec !== null ? formatTime(row.bestLapSec) : ''}
                 </span>

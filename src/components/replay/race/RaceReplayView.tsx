@@ -164,7 +164,7 @@ const RaceReplayBody: React.FC<RaceReplayViewProps & { overview: RaceReplayOverv
             followSlot={followSlot} hoverSlot={hoverSlot} trackRequest={trackRequest} onFollow={setFollowSlot} onHover={setHoverSlot}
             onToggleView={() => onViewChange('3d')} />
         )}
-        <RaceStandingsTower className="w-[360px] shrink-0" index={index} clock={clock} followSlot={followSlot}
+        <RaceStandingsTower className="w-[320px] shrink-0" index={index} clock={clock} followSlot={followSlot}
           onFollow={setFollowSlot} pittedAt={timeSec => racePitSlots(poses.windowAt(timeSec), timeSec)} onTrack={slot => { setFollowSlot(slot); setTrackRequest(n => n + 1); }} onHover={setHoverSlot} />
       </div>
       <RaceCarHud clock={clock} poses={poses} followSlot={followSlot} car={followSlot === null ? undefined : carsBySlot.get(followSlot)} />
