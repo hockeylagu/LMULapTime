@@ -141,7 +141,7 @@ describe('dashboard radio', () => {
     expect(clips.setOutput).toHaveBeenCalledWith('headset');
     player.play(call(1, 2, 'Box in 2 laps.'));
     player.play(call(2, 2, 'Rejoin P4.'));
-    expect(clips.say).toHaveBeenCalledWith('Box in 2 laps.', false, 40, 60);
+    expect(clips.say).toHaveBeenCalledWith('Box in 2 laps.', false, 50, 60);
     expect(speak).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(0);
     expect(report.mock.calls).toEqual([[1, 'spoken']]);

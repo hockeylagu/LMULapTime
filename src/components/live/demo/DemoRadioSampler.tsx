@@ -15,7 +15,7 @@ const OPTIONS = DEMO_RADIO_CALLS.map(({ group, calls }) => ({
 const VOICE_OPTIONS = [{ value: 'browser', label: 'Browser voice' }, ...KOKORO_VOICES.map(voice => ({ value: voice.id, label: `Kokoro · ${voice.label}` })),
   { value: 'clips-sentence', label: 'George clips · by sentence' }, { value: 'clips-whole', label: 'George clips · whole' }];
 /** Silence added where prepared pieces join, on top of the 20 ms each clip keeps at its ends. */
-const GAP_OPTIONS = ['0', '40', '80', '120'].map(value => ({ value, label: `${value} ms` }));
+const GAP_OPTIONS = ['0', '40', '50', '80', '120'].map(value => ({ value, label: `${value} ms` }));
 const SPEED_OPTIONS = ['0.9', '1', '1.1', '1.2', '1.3', '1.4'].map(value => ({ value, label: `${value}×` }));
 /** The longest pause kept inside a call: race radio is quick, no full-stop breath. */
 const PAUSE_OPTIONS = [{ value: 'natural', label: 'Natural' }, ...['150', '80', '40'].map(value => ({ value, label: `${value} ms` }))];
@@ -36,7 +36,7 @@ export function DemoRadioSampler({ volume, output = null }: { volume: number; ou
   const [status, setStatus] = useState<KokoroStatus>({ state: 'idle' });
   const [kokoro] = useState(() => new KokoroVoice(setStatus));
   const [clips] = useState(() => new ClipVoice());
-  const [gap, setGap] = useState('40');
+  const [gap, setGap] = useState('50');
   const [clipNote, setClipNote] = useState('');
   const [selected, setSelected] = useState('0');
   const [voice, setVoice] = useState('browser');

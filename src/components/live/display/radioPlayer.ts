@@ -15,8 +15,8 @@ const CUT_GAP_MS = 50;
 const START_LIMIT_MS = 2000;
 /** The longest a started call may take: the slowest voice measured needs 150 ms a character. */
 const speakLimitMs = (text: string): number => 3000 + text.length * 200;
-/** Silence where two sentence clips join: with the 20 ms each clip keeps at its ends, the 80 ms pause the driver chose. */
-const CLIP_GAP_MS = 40;
+/** Silence where two sentence clips join: with the 20 ms each clip keeps at its ends, a 90 ms pause (driver, 2026-11-24: 80 a little short). */
+const CLIP_GAP_MS = 50;
 
 /** The call being said: its time limit, and its utterance held so the browser keeps its events alive. */
 interface Playing { call: LiveRadioCallEvent; timer?: ReturnType<typeof setTimeout>; utterance?: SpeechSynthesisUtterance }
