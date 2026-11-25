@@ -10,7 +10,7 @@ afterEach(() => { cleanup(); clearCachedVehicleLogos(); });
 
 /** Two cars a lap: a Ferrari, and a car whose make is unknown. */
 const index = indexRaceStandings({
-  replayName: 'R1.Vcr', sessionType: 'Race', daylight: { raceStartMinute: null, cloudCover: null, cloudField: null, cloudVariants: null },
+  replayName: 'R1.Vcr', sessionType: 'Race', daylight: { sessionStartMinute: null, cloudCover: null, cloudField: null, cloudVariants: null },
   startSec: 0, endSec: 200, windowSec: 60,
   cars: [{ slot: 1, name: 'Ann', carClass: 'GT3', carNumber: '51', carType: 'Ferrari 296 LMGT3' }, { slot: 2, name: 'Bea', carClass: 'GT3', carNumber: '8' }],
   laps: [1, 2].map(slot => ({ slot, lapNumber: 1, startSec: 0, endSec: 100 + slot, lapTimeSec: 100 + slot, isValid: true })),

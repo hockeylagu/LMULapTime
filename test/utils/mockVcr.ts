@@ -29,7 +29,7 @@ export interface MockSlice {
   poseWheels?: Array<{ speed: number; deflection: number }>;
   standings?: number[];
   /** `cloudCells`: the 16-byte cloud field (two 4-bit cells per byte, 0xff = clear); clear when omitted. */
-  weather?: { ambientTemp?: number; rainIntensity?: number; cloudCells?: number[]; cloudDrift?: [number, number]; cloudVariants?: string[] };
+  weather?: { ambientTemp?: number; rainIntensity?: number; cloudCells?: number[]; cloudDrift?: [number, number]; cloudVariants?: string[]; timeOfDayQuarter?: number };
   // Extra events appended to the slice as-is (opcode, slot, payload, time offset byte, session code).
   rawEvents?: Array<{ opcode: number; slot: number; payload: Buffer; timeOffset?: number; sessionCode?: number }>;
 }
@@ -204,6 +204,7 @@ export function createSliceVcrBuffer(options?: {
       wData.writeFloatLE(sl.sTime, 0);
       wData.writeFloatLE(sl.weather.cloudDrift?.[0] ?? 0, 6); wData.writeFloatLE(sl.weather.cloudDrift?.[1] ?? 0, 10);
       Buffer.from(sl.weather.cloudCells ?? new Array<number>(16).fill(0xff)).copy(wData, 18);
+      wData[78] = sl.weather.timeOfDayQuarter ?? 0;
       const temp = sl.weather.ambientTemp ?? 25.0;
       const rawTemp = Math.round((temp - 5.9) * 8);
       wData[38] = Math.max(0, Math.min(255, rawTemp));

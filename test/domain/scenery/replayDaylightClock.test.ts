@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { replayDaylightClock } from '../../../shared/domain/scenery/replayDaylightClock.js';
 
 describe('replayDaylightClock', () => {
-  it('starts the race and online practice at the race start, qualifying 15 minutes before', () => {
+  it("starts every session at the replay's session start time of day", () => {
     expect(replayDaylightClock('Race', 1260, 30)).toEqual({session: 'race', startMinute: 1260, sessionTimeSec: 30});
-    expect(replayDaylightClock('Qualifying', 1260, 234)).toEqual({session: 'qualify', startMinute: 1245, sessionTimeSec: 234});
+    expect(replayDaylightClock('Qualifying', 1245, 234)).toEqual({session: 'qualify', startMinute: 1245, sessionTimeSec: 234});
     expect(replayDaylightClock('Practice', 780, 0)).toEqual({session: 'practice1', startMinute: 780, sessionTimeSec: 0});
+    expect(replayDaylightClock('Unknown', 840, 10)).toEqual({session: 'race', startMinute: 840, sessionTimeSec: 10});
   });
 
-  it("leaves the start to the track's session default offline, before the race start was read, or for other sessions", () => {
+  it("leaves the start to the track's session default without a session start (no weather packet)", () => {
     expect(replayDaylightClock('Practice', null, 407)).toEqual({session: 'practice1', startMinute: null, sessionTimeSec: 407});
     expect(replayDaylightClock('Qualifying', undefined, 10)).toEqual({session: 'qualify', startMinute: null, sessionTimeSec: 10});
-    expect(replayDaylightClock('Unknown', 840, 10)).toEqual({session: 'race', startMinute: null, sessionTimeSec: 10});
   });
 
   it("takes the replay's cloud cover nearest the lap's session time", () => {

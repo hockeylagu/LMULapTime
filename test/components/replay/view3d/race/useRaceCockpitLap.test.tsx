@@ -10,7 +10,7 @@ vi.mock('../../../../../src/components/replay/inspector/readoutLapLoader.js', ()
 const { useRaceCockpitLap } = await import('../../../../../src/components/replay/view3d/race/useRaceCockpitLap.js');
 
 const overview = {
-  replayName: 'r', startSec: 0, endSec: 300, windowSec: 10, runningOrder: [], events: [], daylight: { raceStartMinute: null, cloudCover: null },
+  replayName: 'r', startSec: 0, endSec: 300, windowSec: 10, runningOrder: [], events: [], daylight: { sessionStartMinute: null, cloudCover: null },
   cars: [{ slot: 3, name: 'A', sessionDriverOrdinal: 1, sessionLapOrdinals: { '1': 10, '2': 11 } }, { slot: 4, name: 'B' }],
   laps: [
     { slot: 3, lapNumber: 1, startSec: 0, endSec: 100, lapTimeSec: 100, isValid: true },

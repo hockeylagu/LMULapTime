@@ -43,7 +43,7 @@ describe('RaceReplayService', () => {
   it('describes the session on one clock: cars, timed laps and running order', () => {
     const overview = new RaceReplayService(store(), inProcess).getOverview({
       replayName: 'R1.Vcr', sessionType: 'Race', trackVenue: 'LeMans_2023', trackCourse: 'Circuit de la Sarthe', sceneDesc: 'LEMANSWEC', cars: [{ slot: 1, name: 'A' }],
-      daylight: { raceStartMinute: 840, cloudCover: [[0, 0.2]], cloudField: null, cloudVariants: null },
+      daylight: { sessionStartMinute: 840, cloudCover: [[0, 0.2]], cloudField: null, cloudVariants: null },
     });
 
     expect(overview).toMatchObject({ startSec: 0, endSec: 100, windowSec: 60, sessionType: 'Race', cars: [{ slot: 1, name: 'A' }] });
@@ -52,7 +52,7 @@ describe('RaceReplayService', () => {
     expect(overview.laps.map(lap => lap.slot)).toEqual([1, 1]);
     expect(overview.runningOrder).toEqual([{ timeSec: 0, order: [1] }]);
     // The race start and weather come along, for the in-game clock at any replay time.
-    expect(overview.daylight).toEqual({ raceStartMinute: 840, cloudCover: [[0, 0.2]], cloudField: null, cloudVariants: null });
+    expect(overview.daylight).toEqual({ sessionStartMinute: 840, cloudCover: [[0, 0.2]], cloudField: null, cloudVariants: null });
   });
 
   it('builds a window from the laps it overlaps and reuses them for the next window', async () => {

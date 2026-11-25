@@ -46,7 +46,7 @@ describe('replayParser - extended format & pit info', () => {
         expect(meta.trackPath).toBe('C:\\Tracks\\Test');
       });
 
-      it.each([[1260, 1260], [0xffff, null]])('decodes sessionType, privateSession and the race start (%i) from the session block', (rawMinute, raceStartMinute) => {
+      it('decodes sessionType and privateSession from the session block', () => {
         // Construct VCR with session configuration byte: 133 (0x85 -> private=true, code=5 -> Qualifying)
         const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
         const headerBuf = Buffer.from(headerText, 'ascii');
@@ -74,9 +74,7 @@ describe('replayParser - extended format & pit info', () => {
         ];
 
         // Environment block + numDrivers (0) + trailer
-        const environment = Buffer.alloc(67); // 67-byte env block, opening with the race start minute
-        environment.writeUInt16LE(rawMinute, 0);
-        metaParts.push(environment);
+        metaParts.push(Buffer.alloc(67)); // 67-byte env block
         const nDrvBuf = Buffer.alloc(4);
         nDrvBuf.writeInt32LE(0, 0); // 0 drivers
         metaParts.push(nDrvBuf);
@@ -94,7 +92,6 @@ describe('replayParser - extended format & pit info', () => {
 
         expect(meta.sessionType).toBe('Qualifying');
         expect(meta.privateSession).toBe(true);
-        expect(meta.raceStartMinute).toBe(raceStartMinute);
         expect(meta.modUid).toBe('uid_456');
         expect(meta.trackPath).toBe('C:\\Tracks\\Portimao');
       });

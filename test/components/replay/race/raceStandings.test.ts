@@ -9,7 +9,7 @@ function overview(sessionType = 'Race'): RaceReplayOverview {
     slot, lapNumber: i + 1, startSec: i * lapTime, endSec: (i + 1) * lapTime, lapTimeSec: lapTime + (i === 0 ? 1 : 0), isValid: i !== 2,
   }));
   return {
-    replayName: 'R1.Vcr', sessionType, daylight: { raceStartMinute: null, cloudCover: null, cloudField: null, cloudVariants: null }, startSec: 0, endSec: 600, windowSec: 60,
+    replayName: 'R1.Vcr', sessionType, daylight: { sessionStartMinute: null, cloudCover: null, cloudField: null, cloudVariants: null }, startSec: 0, endSec: 600, windowSec: 60,
     cars: [
       { slot: 1, name: 'Ann', carClass: 'Hyper', carNumber: '7' },
       { slot: 2, name: 'Bea', carClass: 'Hyper' },

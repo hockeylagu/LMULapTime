@@ -96,12 +96,14 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
   cloudField: ReplayCloudFieldSample[];
   /** The variant id of each cloud cell code 0..14 from the first sky setup packet found (replayCloudVariants); null without one. */
   cloudVariants: string[] | null;
+  /** The in-game time of day at session time 0, minutes past local midnight, from the first weather packet found; null without one. */
+  sessionStartMinute: number | null;
 } {
   const SAMPLES = 30;
   const WINDOW_SIZE = 65536;
   const streamBytes = Math.max(0, frameStreamEnd - 61);
   if (streamBytes <= 0) {
-    return { hasRain: false, maxRainIntensity: 0, weatherCondition: 'Dry', cloudCover: [], cloudField: [], cloudVariants: null };
+    return { hasRain: false, maxRainIntensity: 0, weatherCondition: 'Dry', cloudCover: [], cloudField: [], cloudVariants: null, sessionStartMinute: null };
   }
 
   let maxRain = 0;
@@ -109,6 +111,7 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
   const cloudCover = new Map<number, number>();
   const cloudField = new Map<number, ReplayCloudFieldSample>();
   let cloudVariants: string[] | null = null;
+  let sessionStartMinute: number | null = null;
   // A sky setup packet (opcode 68, slot 255) or a weather packet (opcode 138, size 80, slot 255) at p.
   const inspectPacket = (buf: Buffer, p: number) => {
     const h = buf.readUInt32LE(p), sz = (h >>> 8) & 0x1ff;
@@ -135,6 +138,8 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
     const timeSec = buf.readFloatLE(p + 5);
     if (!Number.isFinite(timeSec)) return;
     const at = Math.round(timeSec * 10) / 10, cells = buf.subarray(p + 5 + 18, p + 5 + 34);
+    // Byte 78: the time of day at session time 0 in quarter hours (docs/VCR_FORMAT.md §4.10), the same in every packet.
+    sessionStartMinute ??= (buf[p + 5 + 78] & 0x7f) * 15;
     cloudCover.set(at, replayCloudCover(cells));
     cloudField.set(at, [at, buf.readFloatLE(p + 5 + 6), buf.readFloatLE(p + 5 + 10), replayCloudCells(cells)]);
   };
@@ -171,6 +176,7 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
     cloudCover: [...cloudCover].sort((a, b) => a[0] - b[0]),
     cloudField: [...cloudField.values()].sort((a, b) => a[0] - b[0]),
     cloudVariants,
+    sessionStartMinute,
   };
 }
 
@@ -278,12 +284,6 @@ export function parseReplayMetadata(
     // Decode session info configuration byte (if available right after trackPath)
     let sessionType: string | undefined = undefined;
     let privateSession: boolean | undefined = undefined;
-    // The event's race start, minutes past local midnight (docs/VCR_FORMAT.md §2.2); 0xFFFF in offline sessions.
-    let raceStartMinute: number | null = null;
-    if (off + 4 <= meta.length) {
-      const minute = meta.readUInt16LE(off + 2);
-      raceStartMinute = minute === 0xffff ? null : minute;
-    }
     if (off + 2 <= meta.length) {
       const sessionByte = meta[off + 1];
       const sessionCode = sessionByte & 0x0f;
@@ -489,7 +489,7 @@ export function parseReplayMetadata(
       eventInfo,
       sessionType,
       privateSession,
-      raceStartMinute,
+      sessionStartMinute: weather ? weather.sessionStartMinute : null,
       scn: scn || undefined,
       sceneDesc: scn ? scn.replace(/\.scn$/i, '').trim() : eventScene,
       aiw: aiw || undefined,

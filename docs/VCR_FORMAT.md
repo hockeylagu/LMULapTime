@@ -62,21 +62,12 @@ Immediately following String 6 (`trackPath`):
     - `9`: Warmup
     - `10` - `13`: Race (R1, R2, R3, R4)
   - `(sessionInfo >> 7) & 0x01`: Private / Dedicated session flag (`true` / `false`).
-- **Bytes 2..3 (`raceStartMinute`, UInt16LE)**: The event's race start as minutes past local midnight, the same in
-  every session of the event (Le Mans `0x04EC` = 21:00, Fuji `0x030C` = 13:00, Daytona `0x0348` = 14:00). `0xFFFF` in
-  offline sessions, which start at the track's default time for that session. The in-game clock at session time
-  `t` (seconds) is the session start plus `t` at 1× time scale; the session starts at:
-
-  | Session | Start of day |
-  | :--- | :--- |
-  | Race | `raceStartMinute` |
-  | Qualifying | `raceStartMinute − 15` |
-  | Practice (online) | `raceStartMinute` |
-  | Any, `0xFFFF` | the track's default time for the session (Daytona practice 10:05, Silverstone practice 11:00) |
-
-  Checked against the native telemetry's `metadata.SessionTime` minus the session time of its first sample on 33
-  recordings (Le Mans, Fuji, Daytona, Silverstone; race, qualifying, online and offline practice): every start
-  agrees to within 2 s, and the clock advances at 1× (no other time scale was observed).
+- **Bytes 2..3 (`raceStartMinute`, UInt16LE)**: The event's race start as minutes past local midnight (Le Mans
+  `0x04EC` = 21:00, Fuji `0x030C` = 13:00, Daytona `0x0348` = 14:00); `0xFFFF` in offline sessions. An online practice
+  whose event info has no `splitNo` carries `630` (10:30) whatever the event. The session's own start time of day is
+  the weather packet's byte 78 (§4.10). Online, on 57 replays: race = race start, qualifying and split practice =
+  race start − 15, unsplit practice = race start; each agrees with the native telemetry's `metadata.SessionTime` less
+  its first sample's session time where both exist.
 - **Next 67 bytes**: Session rules and game settings block (mirrors XML results flags):
   - `+8` (4 bytes, UInt32LE): `DamageMult` (e.g. `100` = `0x64`).
   - `+16` (4 bytes, UInt32LE): `FuelMult` (e.g. `1` = `0x01`).

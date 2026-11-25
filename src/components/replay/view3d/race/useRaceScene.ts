@@ -53,8 +53,8 @@ export function trackStation(progress: RaceReplayProgress | null, slot: number |
 
 /** The in-game clock at replay time `timeSec` (replay time is session time). */
 export function raceDaylightClock(overview: RaceReplayOverview, timeSec: number): ReplayDaylightClock {
-  const {raceStartMinute, cloudCover, cloudField, cloudVariants} = overview.daylight;
-  return replayDaylightClock(overview.sessionType, raceStartMinute, timeSec, cloudCover, cloudField, cloudVariants);
+  const {sessionStartMinute, cloudCover, cloudField, cloudVariants} = overview.daylight;
+  return replayDaylightClock(overview.sessionType, sessionStartMinute, timeSec, cloudCover, cloudField, cloudVariants);
 }
 
 /** How often the sun follows the session clock, ms of wall time: a light change redraws every shadow cascade. */

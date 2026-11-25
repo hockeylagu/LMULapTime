@@ -170,6 +170,16 @@ describe('replayWeather - Class 1 Type 10 meteorology decoding', () => {
     expect(replayCloudCells(Buffer.from([0x01, 0xf7]))).toBe('107f');
   });
 
+  it("reads the session's start time of day from the first weather packet (byte 78, quarter hours), and none without a packet", () => {
+    const write = (name: string, weather?: { timeOfDayQuarter: number }) => {
+      const filePath = path.join(tempDir, name);
+      fs.writeFileSync(filePath, createSliceVcrBuffer({ trackName: 'Sebring_Dusk', slices: [{ sTime: 5.0, driverSlot: 1, x: 0, y: 0, z: 0, throttle: 100, brake: 0, weather }] }));
+      return parseReplayMetadata(filePath).sessionStartMinute;
+    };
+    expect(write('dusk_session.vcr', { timeOfDayQuarter: 76 })).toBe(19 * 60);
+    expect(write('no_weather_session.vcr')).toBeNull();
+  });
+
   it('reads the cloud variant of each cell code from the sky setup packet, and none from a replay without one', () => {
     const variants = ['01', '01', '01', '01', '01', '01', '02', '01', '01', '03', '02', '03', '02', '01', '02'];
     const write = (name: string, cloudVariants?: string[]) => {

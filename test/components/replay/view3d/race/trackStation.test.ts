@@ -24,7 +24,7 @@ describe('trackStation', () => {
 
 describe('raceDaylightClock', () => {
   it('is the in-game clock at the replay time, with the weather sample nearest it', () => {
-    const overview = {sessionType: 'Race', daylight: {raceStartMinute: 900, cloudCover: [[0, 0.1], [3000, 0.6]], cloudField: null, cloudVariants: null}} as unknown as RaceReplayOverview;
+    const overview = {sessionType: 'Race', daylight: {sessionStartMinute: 900, cloudCover: [[0, 0.1], [3000, 0.6]], cloudField: null, cloudVariants: null}} as unknown as RaceReplayOverview;
     expect(raceDaylightClock(overview, 3600)).toEqual({session: 'race', startMinute: 900, sessionTimeSec: 3600, cloudCover: 0.6});
     expect(raceDaylightClock(overview, 600).cloudCover).toBe(0.1);
   });

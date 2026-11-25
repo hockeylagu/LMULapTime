@@ -25,7 +25,7 @@ describe('raceLapTimingAt', () => {
 
 describe('raceLapCount', () => {
   it("counts the results' laps, else the replay's", () => {
-    const overview: RaceReplayOverview = { replayName: 'R.Vcr', daylight: { raceStartMinute: null, cloudCover: null, cloudField: null, cloudVariants: null }, startSec: 0, endSec: 300, windowSec: 60, runningOrder: [], events: [],
+    const overview: RaceReplayOverview = { replayName: 'R.Vcr', daylight: { sessionStartMinute: null, cloudCover: null, cloudField: null, cloudVariants: null }, startSec: 0, endSec: 300, windowSec: 60, runningOrder: [], events: [],
       cars: [{ slot: 1, name: 'Ann', sessionLapOrdinals: { '1': 0 } }, { slot: 2, name: 'Bea' }],
       laps: [...laps, { ...laps[1], slot: 2, lapNumber: 3 }] };
     expect(raceLapCount(overview)).toBe(1);

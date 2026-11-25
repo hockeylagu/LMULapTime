@@ -38,8 +38,8 @@ export interface ReplayMetadata {
   eventInfo?: ReplayEventInfo | null;
   sessionType?: string;
   privateSession?: boolean;
-  /** The event's race start, minutes past local midnight; null offline (the track's default session time). Absent in metadata cached before it was read. */
-  raceStartMinute?: number | null;
+  /** The in-game time of day at session time 0, minutes past local midnight, from the weather packets; null without one (and for replays deleted before it was read). */
+  sessionStartMinute?: number | null;
   /** [session time s, cloud cover 0 clear..1 overcast] from the sampled weather packets; null when not scanned, absent in metadata cached before it was read. */
   cloudCover?: Array<[number, number]> | null;
   /** The cloud field of the sampled weather packets, in time order; null when not scanned, absent in metadata cached before it was read. */
@@ -469,9 +469,9 @@ export interface RaceReplayOverview {
   daylight: RaceReplayDaylight;
 }
 
-/** The replay's race start and sampled weather, null where the replay's metadata does not carry them. */
+/** The replay's session start time of day and sampled weather, null where the replay's metadata does not carry them. */
 export interface RaceReplayDaylight {
-  raceStartMinute: number | null;
+  sessionStartMinute: number | null;
   cloudCover: Array<[number, number]> | null;
   cloudField: ReplayCloudFieldSample[] | null;
   cloudVariants: string[] | null;
