@@ -31,12 +31,23 @@ const GREEN = 11;
 
 /** A sentence starts with a capital: "sector 1." without a yellow is "Sector 1." (Sebring practice 2026-11-22). */
 const sentence = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+/** Characters the engineer says a second: "Michelin Chicane. Slow car on track, right, clear of your line." took 3.9 s. */
+const SPOKEN_CHARS_PER_S = 16;
+/**
+ * How long a call about a car `seconds` ahead may wait and still end a second before the car is reached; null when it
+ * cannot (the driver passed the car before the call ended, Le Mans 2026-11-24).
+ */
+const inTime = (text: string, seconds: number): number | null => {
+  const wait = seconds - 1 - text.length / SPOKEN_CHARS_PER_S;
+  return wait > 0 ? wait : null;
+};
 
 /** Names a lap distance: "Turn 6" from the layout's placed turns; null where none is placed. */
 export type TurnNamer = (lapDist: number) => string | null;
 
 interface Incident { cars: CarMotion[]; anchor: CarMotion; lapDist: number; ahead: number }
-interface Announced { key: string; lapDist: number; where: string; at: number; cleared: boolean }
+/** A spot said once: a car off, then back on track or rejoining there, is the same call (Le Mans 2026-11-24 said it 3 times). */
+interface Announced { key: string; lapDist: number; where: string; at: number; cleared: boolean; onTrack: boolean }
 interface SectorYellow { since: number; greenSince: number | null; called: boolean }
 
 /** Metres between two lap distances, either way round. */
@@ -92,21 +103,25 @@ export class IncidentWatch {
       const near = (entry: Announced) => now - entry.at <= SPOT_S && apart(entry.lapDist, incident.lapDist, track.length) <= CLUSTER_M;
       const spot = this.announced.find(entry => !entry.cleared && near(entry));
       if (spot) spot.at = now;
+      const event = spot?.key ?? `${onTrack.length > 0 ? 'incident' : 'off'}-${spotKey}`;
+      let text: string;
       if (onTrack.length > 0) {
         const stopped = onTrack.every(motion => motion.speed < STOPPED_MS);
         const what = onTrack.length === 1 ? (stopped ? 'Car stopped' : 'Slow car')
           : `${countWord(onTrack.length)} cars ${stopped ? 'stopped' : 'slow'}`;
         const line = this.line(track, onTrack);
-        const event = spot?.key ?? `incident-${spotKey}`;
-        const text = sentence(`${yellowAt(incident.lapDist) ? 'Yellow, ' : ''}${place}.`) + ` ${sentence(what)} on track, ${sideOf(onTrack)}${line ? `, ${line}` : ''}.`;
-        // Said before the car is reached, or not at all.
-        calls.push({ key: key(event), text, priority: 1, family: 'incident', waitSeconds: Math.max(2, seconds - 1) });
-        if (!spot) this.announced.push({ key: event, lapDist: incident.lapDist, where: place, at: now, cleared: false });
-      } else if (!this.announced.some(near)) {
+        text = sentence(`${yellowAt(incident.lapDist) ? 'Yellow, ' : ''}${place}.`) + ` ${sentence(what)} on track, ${sideOf(onTrack)}${line ? `, ${line}` : ''}.`;
+        if (spot) spot.onTrack = true;
+      } else {
         const count = incident.cars.length;
-        const text = `${sentence(place)}. ${count === 1 ? 'Car' : `${sentence(countWord(count))} cars`} off ${sideOf(incident.cars)}.`;
-        calls.push({ key: key(`off-${spotKey}`), text, priority: 2, family: 'incident', waitSeconds: Math.max(1, seconds - 1) });
+        text = `${sentence(place)}. ${count === 1 ? 'Car' : `${sentence(countWord(count))} cars`} off ${sideOf(incident.cars)}.`;
       }
+      // Said so that it ends before the car is reached, or not at all; a spot already said keeps its key, so the
+      // scheduler says it once however the car moves.
+      const waitSeconds = inTime(text, seconds);
+      if (waitSeconds === null) continue;
+      calls.push({ key: key(event), text, priority: onTrack.length > 0 ? 1 : 2, family: 'incident', waitSeconds });
+      if (!spot) this.announced.push({ key: event, lapDist: incident.lapDist, where: place, at: now, cleared: false, onTrack: onTrack.length > 0 });
     }
     calls.push(...this.rejoining(track, where, key), ...this.cleared(track, key), ...this.sectors(track, sectorFlags, key));
     return calls;
@@ -152,15 +167,18 @@ export class IncidentWatch {
       const ahead = aheadOf(track.player!.car.lapDist, motion.car.lapDist, track.length);
       const place = where(motion.car.lapDist);
       if (!place || ahead > track.length - 50 || track.secondsAhead(ahead) > REJOIN_NEAR_S) continue;
+      // A car already said at this spot (off, slow, stopped) is not said again as it rejoins.
+      if (this.announced.some(entry => track.now - entry.at <= SPOT_S && apart(entry.lapDist, motion.car.lapDist, track.length) <= CLUSTER_M)) continue;
       this.rejoins = this.rejoins.filter(entry => track.now - entry.at <= REJOIN_GROUP_S);
       let group = this.rejoins.find(entry => apart(entry.lapDist, motion.car.lapDist, track.length) <= CLUSTER_M);
       if (!group) {
         group = { event: `rejoin-${motion.car.id}-${Math.round(motion.rejoinedAt)}`, lapDist: motion.car.lapDist, at: track.now };
         this.rejoins.push(group);
       }
-      if (!calls.some(call => call.key === key(group.event))) {
-        calls.push({ key: key(group.event), text: `${sentence(place)}. Car rejoining, careful.`, priority: 1, family: 'incident',
-          waitSeconds: Math.max(2, track.secondsAhead(ahead) - 1) });
+      const text = `${sentence(place)}. Car rejoining, careful.`;
+      const waitSeconds = inTime(text, track.secondsAhead(ahead));
+      if (waitSeconds !== null && !calls.some(call => call.key === key(group.event))) {
+        calls.push({ key: key(group.event), text, priority: 1, family: 'incident', waitSeconds });
       }
     }
     return calls;
@@ -174,6 +192,8 @@ export class IncidentWatch {
     this.announced = this.announced.filter(entry => track.now - entry.at < 180
       && aheadOf(player.car.lapDist, entry.lapDist, track.length) < track.length / 2);
     for (const entry of this.announced) {
+      // Only a car said on track gets its "clear": a car off was never in the way.
+      if (!entry.onTrack) continue;
       const ahead = aheadOf(player.car.lapDist, entry.lapDist, track.length);
       if (track.secondsAhead(ahead) > NEAR_S) continue;
       const blocked = [...track.cars.values()].some(motion => !motion.car.isPlayer && motion.slowSince !== null && motion.offSince === null

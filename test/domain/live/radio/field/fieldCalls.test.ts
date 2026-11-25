@@ -156,6 +156,27 @@ describe('field calls', () => {
     state = 'back';
     for (const victim of victims) victim.car = { ...victim.car, pathLateral: 3 };
     radio.step(0.4);
+    // The same cars coming back are not said again (Le Mans 2026-11-24: one car off, then on track, then rejoining).
+    expect(radio.texts().filter(text => text.includes('Turn 6'))).toEqual(['Turn 6. Two cars off right.']);
+  });
+
+  it('says cars rejoining slowly close ahead as one P1 when they went off unsaid', () => {
+    let state: 'racing' | 'off' | 'back' = 'racing';
+    const player: Driven = { car: car(1, 100, { isPlayer: true }), speed: steady(50) };
+    const others = Array.from({ length: 10 }, (_, index): Driven => ({ car: car(10 + index, index * 300), speed: steady(50) }));
+    const victims = [30, 31].map((id): Driven => ({ car: car(id, 700), speed: () => ({ racing: 50, off: 0, back: 10 })[state] }));
+    const radio = race([player, ...others, ...victims]);
+    radio.step(130);
+    // Off 27 s ahead: too far to say.
+    player.car = { ...player.car, lapDist: 100 };
+    victims.forEach((victim, index) => { victim.car = { ...victim.car, lapDist: 1450 + index * 30, pathLateral: 10, trackEdge: 6 }; });
+    state = 'off';
+    radio.step(3);
+    expect(radio.texts()).toEqual([]);
+    player.car = { ...player.car, lapDist: 1200 };
+    state = 'back';
+    for (const victim of victims) victim.car = { ...victim.car, pathLateral: 3 };
+    radio.step(0.4);
     expect(radio.heard.filter(call => call.text.includes('rejoining'))).toMatchObject([{ text: 'Turn 6. Car rejoining, careful.', priority: 1 }]);
   });
 
