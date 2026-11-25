@@ -3,7 +3,7 @@ import type { LiveCorner, LiveDeployment } from '../../../types/liveStrategy.js'
 import { LIVE_TYRE_CHANGE_TREAD } from '../liveInsights.js';
 import { racePlanMode } from './racePlanMode.js';
 
-/** P1 interrupts at once; P2 and P3 wait for a slot after the line or on a straight, and P3 has a budget per lap. */
+/** P1 interrupts at once; P2 and P3 wait for a straight; only incidents in the first 4 s after the line; P3 has a budget per lap. */
 export type LiveCallPriority = 1 | 2 | 3;
 export type LiveCallFamily = 'strategy' | 'damage' | 'deployment' | 'incident' | 'traffic' | 'clock';
 

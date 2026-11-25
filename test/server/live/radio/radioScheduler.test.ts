@@ -52,26 +52,21 @@ describe('radio scheduler', () => {
     expect([...radio.outcomes.values()]).toEqual(['sent', 'sent']);
   });
 
-  it('opens a slot right at the line for 3 s, one call per slot', () => {
+  it("keeps the first 4 s after the line for the game's lap time: a P1 follows, a P2 waits for a straight past it", () => {
     const radio = setup();
     radio.propose(call('a', 2));
     radio.line();
-    radio.drive(0.1, false);
-    expect(radio.said()).toEqual(['a.']);
-    // The slot is used: the next call waits for the next line, or a straight.
-    radio.propose(call('b', 2));
-    radio.drive(2, false);
-    expect(radio.said()).toEqual(['a.']);
+    radio.propose([call('a', 2), call('box', 1)]);
+    radio.drive(3.8, true);
+    expect(radio.said()).toEqual([]);
+    radio.drive(0.3, true);
+    expect(radio.said()).toEqual(['box.']);
+    radio.drive(1, true);
+    expect(radio.said()).toEqual(['box.', 'a.']);
+    // An incident is never held.
     radio.line();
-    radio.drive(0.1, false);
-    expect(radio.said()).toEqual(['a.', 'b.']);
-    // 3 s after the line the slot is closed.
-    radio.drive(3.5, false);
-    radio.propose(call('c', 2));
-    radio.drive(1, false);
-    expect(radio.said()).toEqual(['a.', 'b.']);
-    radio.drive(1.2, true);
-    expect(radio.said()).toEqual(['a.', 'b.', 'c.']);
+    radio.propose({ ...call('stopped', 1), family: 'incident' });
+    expect(radio.said()).toEqual(['box.', 'a.', 'stopped.']);
   });
 
   it('says several calls one per slot, in order, the next one following the one heard', () => {
@@ -187,8 +182,8 @@ describe('radio scheduler', () => {
     radio.drive(1.2, true);
     expect(radio.said()).toEqual(['a.']);
     // The next slot opens while "a" is still being said: "b" would queue on the page and come out in a corner.
-    radio.line();
     radio.drive(0.5, false);
+    radio.drive(1.2, true);
     expect(radio.said()).toEqual(['a.']);
     radio.propose([call('a', 2), call('b', 2), call('box', 1)]);
     expect(radio.said()).toEqual(['a.', 'box.']);
@@ -196,7 +191,7 @@ describe('radio scheduler', () => {
     radio.drive(0.2, false);
     expect(radio.said()).toEqual(['a.', 'box.']);
     radio.scheduler.observeOutcome(3, 'spoken');
-    radio.drive(0.3, false);
+    radio.drive(1.2, true);
     expect(radio.said()).toEqual(['a.', 'box.', 'b.']);
     // A page that never answers (closed while speaking) holds the next call 20 s, no longer.
     radio.propose({ ...call('c', 2), waitSeconds: 60 });

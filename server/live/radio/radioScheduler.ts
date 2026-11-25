@@ -11,8 +11,11 @@ const P1_REPEAT_SECONDS = 60;
 const WAIT_SECONDS = 120;
 /** A straight: this long flat out on the pedals. */
 const STRAIGHT_SECONDS = 1;
-/** The after-the-line slot: right at the line, for 3 s; later it would land in the first corner (driver, 2026-11-22). */
-const LINE_SLOT = { from: 0, to: 3 } as const;
+/**
+ * Nothing but an incident is said this long after the line: the game gives the lap's time there (driver, 2026-11-24, 2 s too short:
+ * a call right after the line talked over it). A P1 follows once it ends, a P2/P3 on a straight after it.
+ */
+const LINE_QUIET_SECONDS = 4;
 /** At most this many P3 calls per lap; the rest are dropped. */
 const P3_PER_LAP = 2;
 /** A call the page has not started this long after it was sent is dropped there (`late`), unless the call says. */
@@ -48,7 +51,7 @@ interface Waiting { id: number; call: LiveCall; since: number }
 
 /**
  * Decides when each proposed call is said (`docs/plans/proposed/LIVE_VOICE_CALLS.md`, Timing): P1 at once; P2 and P3
- * in a slot (just after the line, or a straight, one call per slot), P3 within a budget per lap, dropped when stale.
+ * in a slot (a straight, one call per slot); only incidents in the first 4 s after the line, P3 within a budget per lap, dropped when stale.
  * Runs on the game clock of the pedal samples, so a pause or a slow page changes nothing. Every call is logged, said
  * or not.
  */
@@ -166,8 +169,11 @@ export class RadioScheduler {
     const now = this.clock;
     if (now === null) return;
     const candidates = this.candidates().filter(candidate => this.fresh(candidate, now));
+    const quiet = this.lineQuiet(now);
     for (const call of candidates) {
       if (call.priority !== 1 && !call.immediate) continue;
+      // Held, not dropped: proposed again on the first pedal sample after the quiet ends.
+      if (quiet && call.family !== 'incident') continue;
       const id = this.log(call, now);
       if (call.priority === 3 && this.p3ThisLap >= P3_PER_LAP) {
         this.said.set(call.key, now);
@@ -188,7 +194,9 @@ export class RadioScheduler {
   public observePedal(sample: LivePedalSample): void {
     if (this.clock !== null && sample.t < this.clock - 1) this.flatSince = null;
     const first = this.clock === null;
+    const quietEnds = this.clock !== null && this.lineQuiet(this.clock) && !this.lineQuiet(sample.t);
     this.clock = sample.t;
+    if (quietEnds) this.select();
     // A snapshot that came before the first clock is proposed now; it may not change again for a while.
     if (first && this.snapshot) this.observeSnapshot(this.snapshot);
     const flat = sample.throttle >= 0.98 && sample.brake <= 0.05;
@@ -197,10 +205,13 @@ export class RadioScheduler {
     this.tryDeliver(sample.t);
   }
 
+  private lineQuiet(now: number): boolean {
+    return this.lineAt !== null && now >= this.lineAt && now - this.lineAt < LINE_QUIET_SECONDS;
+  }
+
   private slot(now: number): string | null {
-    if (this.flatSince !== null && now - this.flatSince >= STRAIGHT_SECONDS) return `straight@${this.flatSince}`;
-    if (this.lineAt !== null && now - this.lineAt >= LINE_SLOT.from && now - this.lineAt <= LINE_SLOT.to) return `line@${this.lineAt}`;
-    return null;
+    if (this.lineQuiet(now)) return null;
+    return this.flatSince !== null && now - this.flatSince >= STRAIGHT_SECONDS ? `straight@${this.flatSince}` : null;
   }
 
   private tryDeliver(now: number): void {
