@@ -47,6 +47,14 @@ describe('terrain layers', () => {
     expect(uniform).not.toContain('diffuseColor.rgb *= ground.rgb * diffuse;');
     expect(shaderParts(config, {uniforms: false}).albedo).toContain('ground.rgb * vec3(0.50000000,0.75000000,1.00000000) * vec3(0.50000000,0.75000000,1.00000000)');
   });
+  it('multiplies the albedo by a decal after the layers and takes its alpha as the surface alpha, for a MASK cut', () => {
+    const maps = { layerA: map('A', true), decal: map('SKIDMARKS', true) };
+    const albedo = shaderParts(surface('terrain', { maps, flags: { layers: '1', decal: 'albedoMultiply' } })).albedo;
+    expect(albedo).toMatch(/diffuseColor\.rgb \*?= ground\.rgb[^;]*;\s*vec4 terrainDecal=[^;]*; diffuseColor\.rgb\*=terrainDecal\.rgb; diffuseColor\.a=terrainDecal\.a;/);
+    expect(shaderParts(surface('terrain', { maps: { layerA: map('A', true) }, flags: { layers: '1' } })).albedo).not.toContain('terrainDecal');
+    expect(() => shaderParts(surface('terrain', { maps: { layerA: map('A', true) }, flags: { layers: '1', decal: 'albedoMultiply' } }))).toThrow('Unsupported terrain decal');
+    expect(() => shaderParts(surface('terrain', { maps, flags: { layers: '1', decal: 'splatter' } }))).toThrow('Unsupported terrain decal');
+  });
 });
 
 describe('texture resolution', () => {

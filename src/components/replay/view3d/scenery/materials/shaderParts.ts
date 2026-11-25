@@ -42,6 +42,10 @@ function terrainParts(config: SurfaceConfig, context: ShaderContext): ExtendedPa
   const bias = f.mixBias === 'vertexAlpha' ? `max(0.01,${mixBias}*vSurfaceColour.a)` : mixBias;
   const high = sample('mix', 'vec4(0.5)'), low = maps.mix ? sample('mix', 'vec4(0.5)', list(p.uvScale, 'mixLow')) : 'vec4(0.5)';
   const overlayFactor = num(value(terrain, 'splatterOverlay'), 'surface_splatterOverlayFactor');
+  // A decal (the grass tyre marks) multiplies the albedo after the layers, and its alpha is the surface's: a MASK material cuts by
+  // it (layer A's alpha is roughness).
+  if (f.decal !== undefined && (f.decal !== 'albedoMultiply' || !maps.decal)) throw Error(`Unsupported terrain decal: ${config.name ?? '?'}`);
+  const decal = f.decal ? `vec4 terrainDecal=${sample('decal')}; diffuseColor.rgb*=terrainDecal.rgb; diffuseColor.a=terrainDecal.a;` : '';
   const albedo = `
       vec4 splatter = ${sample('splatter')};
       vec4 mixHigh=${high},mixLow=${low};
@@ -58,6 +62,7 @@ function terrainParts(config: SurfaceConfig, context: ShaderContext): ExtendedPa
       float patternStrength = ${f.patternLayers ? `dot(surfaceWeights, ${vec(LAYER_KEYS.map(k => value(terrain, `pattern${k}`)))})` : '1.0'} * ${num(value(terrain, 'patternStrength'), 'surface_patternStrength')};
       ground.rgb = surfaceOverlay(ground.rgb,vec3(mix(0.5,patternValue,patternStrength)));` : ''}
       diffuseColor.rgb ${uniforms ? '=' : '*='} ${uniforms ? 'ground.rgb * diffuse' : `ground.rgb * ${tint} * ${tint}`};
+      ${decal}
       surfaceRoughness = surfaceAdjust(ground.a, ${rough});
       surfaceSpecular = mixData.g * ${num(value(adjust, 'specular'), 'surface_specular')};
       float splatterOcclusion=splatter.a;
