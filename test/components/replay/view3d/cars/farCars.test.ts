@@ -19,7 +19,7 @@ class BlobFileReader {
  * A mesh of two triangles per option value (0 always, 1 wing_a, 2 wing_b), its material carrying the role; a primitive that is
  * neither paint nor a lamp carries its surface per vertex unless `surface` is off, and is marked glass when `glass` says so.
  */
-function primitive(role: Role | undefined, materialName: string, surface: boolean, glass: boolean): Mesh {
+function primitive(role: Role | undefined, materialName: string, surface: boolean, glass: boolean, sortOffset?: number): Mesh {
   const geometry = new BufferGeometry(), options = [0, 1, 2], position: number[] = [], option: number[] = [], index: number[] = [];
   options.forEach((value, triangle) => {
     for (let corner = 0; corner < 3; corner++) { position.push(triangle, corner, 0); option.push(value); index.push(triangle * 3 + corner); }
@@ -30,13 +30,15 @@ function primitive(role: Role | undefined, materialName: string, surface: boolea
   geometry.setIndex(new BufferAttribute(new Uint16Array(index), 1));
   const material = new MeshStandardMaterial({name: materialName});
   material.userData = role === 'lamp' ? {lmuFar: role, lamp: 1} : role ? {lmuFar: role, materialName, ...(glass ? {glass: true} : {})} : {materialName};
+  // A blended primitive with its draw order (the game's sortOffset) in its extras.
+  if (sortOffset !== undefined) { material.transparent = true; material.userData.sortOffset = sortOffset; }
   return new Mesh(geometry, material);
 }
 
-async function glb(roles: Array<Role | undefined>, surface = true, glass: readonly number[] = []): Promise<ArrayBuffer> {
+async function glb(roles: Array<Role | undefined>, surface = true, glass: readonly number[] = [], sortOffsets: Record<number, number> = {}): Promise<ArrayBuffer> {
   const scene = new Scene(), far = new Group();
   far.name = 'far'; far.userData.lmuFar = {fromM: 60, optionNodes: ['wing_a', 'wing_b']};
-  roles.forEach((role, at) => far.add(primitive(role, `mat${at}`, surface, glass.includes(at))));
+  roles.forEach((role, at) => far.add(primitive(role, `mat${at}`, surface, glass.includes(at), sortOffsets[at])));
   scene.add(far);
   return await new GLTFExporter().parseAsync(scene, {binary: true}) as ArrayBuffer;
 }
@@ -85,6 +87,13 @@ describe('createFarCarLoader', () => {
     expect(Array.from(geometry.index!.array)).toEqual([0, 1, 2, 6, 7, 8]);
     expect(geometry.getAttribute('_lmu_option')).toBeUndefined();
     expect(geometry.getAttribute('position')).toBeDefined();
+  });
+
+  it("draws blended primitives in the game's order (their extras' sortOffset), the others at 0", async () => {
+    const {carTextures} = textures();
+    const file = await glb(['vertexColour', 'vertexColour', 'appearance', 'vertexColour'], true, [1], {1: 5, 2: 3, 3: 0});
+    const model = await createFarCarLoader(carTextures).model(body(file, {materialTextures: {mat2: 'livery.ktx2'}}));
+    expect((model.children as Mesh[]).map(part => part.renderOrder)).toEqual([0, 5, 3, 0]);
   });
 
   it('textures paint and retextured appearance primitives and leaves the others on the template material', async () => {

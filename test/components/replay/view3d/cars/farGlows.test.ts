@@ -8,7 +8,8 @@ const emission = { scale: 1, vertexColour: false, viewBoost: null, ambientScaled
 const descriptor = {
   optionNodes: ['option_Lights'],
   appearances: [{ alias: 'A', optionNodes: ['option_Lights'] }, { alias: 'B', optionNodes: [] }],
-  materials: [],
+  // The headlight's material draws later among the blended parts (the game's sortOffset).
+  materials: [{ id: 'h', name: 'hlglo', paint: false, surface: { sortOffset: 2 } }],
   lamps: [
     // A brake lamp under an option part, and a headlight; a tail lamp without states never glows far.
     { role: 'brake', nodes: ['rear'], material: 'blglo', frames: ['textures/off.ktx2.zst', 'textures/brake.ktx2.zst'], states: { off: 0, on: null, brake: 1 }, emission, blend: 'alpha' },
@@ -66,6 +67,8 @@ describe('createFarGlows', () => {
     expect([placed(brake, 0).toArray(), placed(brake, 1).toArray(), placed(head, 0).toArray()]).toEqual([[10, 0, 0], [20, 0, 0], [20, 0, 0]]);
     const centreZ = (mesh: InstancedMesh) => { mesh.geometry.computeBoundingBox(); return mesh.geometry.boundingBox!.getCenter(new Vector3()).z; };
     expect([Math.round(centreZ(brake) * 1e3), Math.round(centreZ(head) * 1e3)]).toEqual([-2000, 2000]);
+    // In the game's order among blended parts, as on the full model.
+    expect([brake.renderOrder, head.renderOrder]).toEqual([0, 2]);
     // Drawn with the mesh's vertices, without the option attribute.
     expect([brake.geometry.getAttribute('_lmu_option'), brake.geometry.index!.count]).toEqual([undefined, 36]);
   });

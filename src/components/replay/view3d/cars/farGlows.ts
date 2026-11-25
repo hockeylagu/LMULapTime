@@ -2,6 +2,7 @@ import { BufferGeometry, Group, InstancedMesh, type Matrix4, type Material, type
 import { normalizeVehicleId, type CarLamp } from '../../../../../shared/packageContract/index.js';
 import { appearanceOf, startFileOf, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createLampMaterial, lampGlow } from '../car/carLamps.js';
+import { carSortOffset } from '../car/carMaterials.js';
 import { lampStateFrame } from '../car/lampStates.js';
 import type { CarTextures } from './carModels.js';
 import type { FarLamps } from './farCars.js';
@@ -123,6 +124,8 @@ export function createFarGlows(parent: Group, carTextures: CarTextures, warm: (o
             // Visible with no instances while it compiles (the compile walks visible objects only); `draw` shows it with its cars.
             drawn.name = `far-glow-${lamp.material}`; drawn.count = 0; drawn.frustumCulled = false;
             drawn.castShadow = false; drawn.receiveShadow = false;
+            // The game's order among blended parts, as on the full model: the outside windscreen draws over the glow.
+            if (material.transparent) drawn.renderOrder = carSortOffset(materials.find(recipe => recipe.name === lamp.material));
             frames.push({lamp, frame, options: part.options, mesh: drawn});
           }
           if (!parts.length) material.dispose();

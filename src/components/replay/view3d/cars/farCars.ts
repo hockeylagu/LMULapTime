@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
 import type { CarAppearance } from '../../../../../shared/types/scenes/car.js';
 import { appearanceOf, startFileOf, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import { carPartOrder } from '../car/carMaterials.js';
 import { PAINT_LAYERS, PAINT_MAPS, paintLayers } from '../car/paintLayers.js';
 import type { CarTextures } from './carModels.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
@@ -237,6 +238,8 @@ export function createFarCarLoader(carTextures: CarTextures) {
         const part = new Mesh(geometries[index], materials.get(mesh));
         // A far car casts the sun's shadow and takes it as its full model does: turning near or far, its shadow stays.
         part.castShadow = true; part.receiveShadow = true; part.name = `far ${mesh.material.name}`;
+        // A blended part draws in the game's order, as on the full model: its material's `sortOffset` (glTF extras), 0 without one.
+        part.renderOrder = carPartOrder([part.material]);
         model.add(part);
       });
       return model;
