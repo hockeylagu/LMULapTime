@@ -17,6 +17,8 @@ race replay steps 1–3, fidelity audits) are in Git history before this file.
 - **Look:** freeze-v18 accepted by the user 2026-11-15 (61 views, mean dE 8.07, brightness ratio f 1.02, 54/61 in band; run,
   scores and review sheets in `docs/local/replay-3d-reference/FREEZE.md`). Later work keeps this picture. It includes the road
   groove at `ASSUMED_RUBBER` 51 drawn whole (groove 0.20): meant to be 13, the user kept the darker road as accepted.
+  Refreshed 2026-11-24 as freeze-v26 on personal-v26 and `b62cff6eb` (mean dE 7.94, f 1.01, 54/61 in band): slightly closer to
+  the game than v18 at every circuit; accepted by the user 2026-11-24. Later work keeps the freeze-v26 picture.
 - **Performance:** the user declared the goal met 2026-11-15 (table below).
 
 ## Targets and current numbers
@@ -24,15 +26,18 @@ race replay steps 1–3, fidelity audits) are in Git history before this file.
 Production build, headless Edge, 1920×1080, cold (fresh profile, no browser cache), this machine (RTX 5070 Ti). Machine load
 moves these by several ms: compare only interleaved A/B runs taken back to back, never during a build or export.
 
-| Measure | Target (user) | freeze-v18 tree | personal-v20 tree (2026-11-16) |
-|---|---|---|---|
-| Lap first frame | < 5 s (2026-11-11) | Fuji 4.1 s, Silverstone 4.7 s | Fuji 4.6 s, Silverstone 5.1 s |
-| Lap playable, not stuck | < 7 s | met | met |
-| Lap frame p50 / p99 after 7 s | < 10 / < 30 ms (2026-11-11); p99 ≤ 16.7 ms kept as the v2 aim | Fuji 2.8 / 16.5 ms, Silverstone 3.2 / 20.2 ms | Fuji 3.0 / 18.1 ms, Silverstone 3.2 / 15.0 ms |
-| Le Mans race start shown | < 5 s | 5.0–5.3 s | 5.4–5.8 s |
-| Le Mans race start p50 / p95 / p99 | ≤ 10 / ≤ 16.7 ms (2026-11-14); p99 < 30 | 8.1–8.8 ms / 14.7–16 ms / 26.5–28.7 ms | 9.6–9.8 ms / 15.2–15.8 ms / 27–30 ms |
-| Draws per frame | < 1,000 in every frame (a guide only) | ~750 at the race start | — |
-| JS heap, disk | no higher than before each change; the package must not grow without an offsetting saving | — | — |
+| Measure | Target (user) | freeze-v18 tree | personal-v20 tree (2026-11-16) | freeze-v26 tree (2026-11-24) |
+|---|---|---|---|---|
+| Lap first frame | < 5 s (2026-11-11) | Fuji 4.1 s, Silverstone 4.7 s | Fuji 4.6 s, Silverstone 5.1 s | Fuji 4.9 s, Silverstone 5.7 s |
+| Lap playable, not stuck | < 7 s | met | met | met |
+| Lap frame p50 / p99 after 7 s | < 10 / < 30 ms (2026-11-11); p99 ≤ 16.7 ms kept as the v2 aim | Fuji 2.8 / 16.5 ms, Silverstone 3.2 / 20.2 ms | Fuji 3.0 / 18.1 ms, Silverstone 3.2 / 15.0 ms | Fuji 5.2 / 24.6 ms, Silverstone 5.8 / 16.4 ms |
+| Le Mans race start shown | < 5 s | 5.0–5.3 s | 5.4–5.8 s | — |
+| Le Mans race start p50 / p95 / p99 | ≤ 10 / ≤ 16.7 ms (2026-11-14); p99 < 30 | 8.1–8.8 ms / 14.7–16 ms / 26.5–28.7 ms | 9.6–9.8 ms / 15.2–15.8 ms / 27–30 ms | — |
+| Draws per frame | < 1,000 in every frame (a guide only) | ~750 at the race start | — | — |
+| JS heap, disk | no higher than before each change; the package must not grow without an offsetting saving | — | — | Fuji 337 MiB, Silverstone 325 MiB |
+
+freeze-v26 timing: the lap first frame and p50 drifted up since v18 (p50 varies 3–6 ms between runs on 2026-11-24; the readout
+on/off A/B shows no readout cost); the cause is not measured yet.
 
 Tools: `npm run benchmark:replay3d:suite -- --package personal-v18 --runs 2 --seconds 20` with
 `PLAYWRIGHT_NODE_MODULES=C:/Documents/LMUTrackPipeline` ([harness](../../../tools/benchmarks/replay3d/README.md)); `--package`
