@@ -17,6 +17,9 @@ import { windowPoints } from './racePosePoints.js';
 import { createRaceField, type RaceField } from './raceField.js';
 import { createStandInCars, type StandInCars } from './standInCars.js';
 import { carSpans, carsUnder, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
+import { createReadoutStates, type ReadoutStates } from '../car/readoutCanvas.js';
+import { playbackIndexAt, playbackSampleFraction } from '../../inspector/replayPlaybackClock.js';
+import type { RaceCockpitLap } from './useRaceCockpitLap.js';
 
 export interface RaceSceneHandle {
   /**
@@ -38,6 +41,8 @@ export interface RaceSceneHandle {
   pick(x: number, y: number): Promise<number | null>;
   /** Lights the scene by the in-game clock (`SceneShell.setDaylight`: a small move of the sun changes nothing). */
   daylight(clock: ReplayDaylightClock | undefined): void;
+  /** The followed car's lap its wheel and dash screens read (`useRaceCockpitLap`); null leaves them as last drawn. */
+  cockpitLap(lap: RaceCockpitLap | null): void;
   dispose(): void;
 }
 
@@ -198,8 +203,20 @@ export async function createRaceScene(
       root.removeFromParent(); keptRaceCars.set(shell, raceCars);
     },
   });
+  /** The followed car's lap for its screens, and the readouts built on its model from it. */
+  let cockpitLap: RaceCockpitLap | null = null, readouts: {lap: RaceCockpitLap; car: Group; states: ReadoutStates | null} | null = null;
+  /** Draws the followed car's screens at session time `at` from its lap's samples, as the lap view draws them at its cursor. */
+  const drawReadouts = (car: Group, slot: number, placed: RenderPose, at: number) => {
+    const lap = cockpitLap;
+    if (lap?.slot !== slot) return;
+    if (readouts?.lap !== lap || readouts.car !== car) readouts = {lap, car, states: createReadoutStates(car, lap.trajectory.points, lap.trajectory)};
+    if (!readouts.states) return;
+    const {points, timeReference} = lap.trajectory, lapClock = timeReference === 'lap' ? at - lap.startSec : at;
+    const index = playbackIndexAt(points, lapClock);
+    readouts.states.update({...placed, index, fraction: playbackSampleFraction(points, {timeSec: lapClock, index})});
+  };
   const setFollowed = (next: FollowedCar | null) => {
-    followed?.dispose(); followed = next;
+    followed?.dispose(); followed = next; readouts = null;
     if (next?.lent) field.lend(next.slot);
     pointsOf = null; points = []; distances = [];
     rig.setLayer(rigCar());
@@ -309,6 +326,7 @@ export async function createRaceScene(
           const motion = followed!.motion;
           motion?.setTrack(samples, () => ({points: windowPoints(samples, carIndex), handlingCalibration: handlingOf.get(slot)}));
           shell.placeCar(model, placed, motion);
+          drawReadouts(model, slot, placed, at);
         }
       }
       // After its model is placed: the driver cameras sit on the car's body as it is this frame, not as it was the last one.
@@ -383,6 +401,10 @@ export async function createRaceScene(
       return shell.surfaceWithin(x, y, spans.map(span => [span.enter, span.leave] as const)).then(index => spans[index]?.car.slot ?? null);
     }),
     daylight: clock => shell.setDaylight(clock),
+    cockpitLap(lap) {
+      if (lap === cockpitLap) return;
+      cockpitLap = lap; draw();
+    },
     dispose() {
       disposed = true;
       shell.detach(host); content().dispose();

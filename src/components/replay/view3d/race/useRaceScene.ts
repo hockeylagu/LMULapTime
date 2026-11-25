@@ -13,6 +13,7 @@ import { NO_LOAD_PROGRESS } from '../scene/loadProgress.js';
 import { useSceneHost, type SceneCreateContext } from '../scene/useSceneHost.js';
 import { useSceneShells } from '../scene/sceneShells.js';
 import { createRaceScene, type RaceSceneHandle } from './raceScene.js';
+import type { RaceCockpitLap } from './useRaceCockpitLap.js';
 
 interface Options {
   host: RefObject<HTMLDivElement | null>;
@@ -24,6 +25,8 @@ interface Options {
   progress: RaceReplayProgress | null;
   mode: CameraMode;
   retry: number;
+  /** The followed car's lap its wheel and dash screens read (`useRaceCockpitLap`). */
+  cockpitLap: RaceCockpitLap | null;
 }
 /**
  * Where a car is at `timeSec` (native x and z): on the track, else where it next appears (waiting in its garage), else where the
@@ -64,7 +67,7 @@ function drawScene(handle: RaceSceneHandle, clock: RaceClock, poses: RacePoseCac
 }
 
 /** The race replay's 3D scene for a layout: every car on the session clock, the followed one as its full model. */
-export function useRaceScene({host, overview, clock, poses, followSlot, progress, mode, retry}: Options) {
+export function useRaceScene({host, overview, clock, poses, followSlot, progress, mode, retry, cockpitLap}: Options) {
   const key = `${overview.replayName}:${overview.layoutKey ?? ''}:${retry}`;
   const shells = useSceneShells();
   const window = poses.windowAt(clock.getState().timeSec);
@@ -146,5 +149,6 @@ export function useRaceScene({host, overview, clock, poses, followSlot, progress
   useEffect(() => clock.subscribe(() => drawAt()), [clock]);
   useEffect(() => { drawAt(); }, [window, state?.ready, progress]);
   useEffect(() => { scene.current?.mode(mode); drawAt(); }, [mode, scene]);
+  useEffect(() => { scene.current?.cockpitLap(cockpitLap); }, [cockpitLap, scene, state?.ready]);
   return {scene, state};
 }

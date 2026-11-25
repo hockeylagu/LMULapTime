@@ -152,7 +152,8 @@ export interface ReadoutStates { update(pose: RenderPose): void }
 
 /**
  * Draws the readouts of `car` (the canvases its screen meshes name, `userData.readoutCanvas`) from its lap's samples. Null when the
- * car has none, or the track carries no engine rpm (the race's samples: readouts are drawn in the lap view only).
+ * car has none, or the track carries no engine rpm (the race's pose samples: the race draws the followed car's from its lap,
+ * `useRaceCockpitLap`).
  */
 export function createReadoutStates(car: Object3D, points: ReplayTrajectoryPoint[], lap: ReadoutLapContext = {}): ReadoutStates | null {
   const canvases = new Set<ReadoutCanvas>();

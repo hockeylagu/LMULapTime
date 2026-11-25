@@ -3,6 +3,7 @@ import type { RaceReplayCar, RaceReplayOverview, RaceReplayProgress } from '../.
 import { type CameraMode } from '../view3d/camera/cameraModes.js';
 import { cameraActions, NARROW_SCENE_BESIDE_CONTROLS, Scene3DFrame } from '../view3d/scene/Scene3DFrame.js';
 import { useRaceScene } from '../view3d/race/useRaceScene.js';
+import { useRaceCockpitLap } from '../view3d/race/useRaceCockpitLap.js';
 import { RaceCarHover } from '../view3d/race/RaceCarHover.js';
 import { RaceLapTiming } from './RaceLapTiming.js';
 import { RaceMinimap } from './RaceMinimap.js';
@@ -34,7 +35,9 @@ interface Props {
 export default function Race3DView({ sessionId, overview, index, clock, poses, followSlot, progress, onToggleView, className = '', active = true }: Props) {
   const map = useRef<HTMLDivElement>(null), host = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<CameraMode>('chase'), [retry, setRetry] = useState(0);
-  const { scene, state } = useRaceScene({ host, overview, clock, poses, followSlot, progress, mode, retry });
+  // The wheel and dash screens show only from the cockpit: their lap loads only then.
+  const cockpitLap = useRaceCockpitLap(active && mode === 'cockpit', sessionId, overview, clock, followSlot);
+  const { scene, state } = useRaceScene({ host, overview, clock, poses, followSlot, progress, mode, retry, cockpitLap });
   const cars = useMemo(() => new Map<number, RaceReplayCar>(overview.cars.map(car => [car.slot, car])), [overview.cars]);
   const totalLaps = useMemo(() => raceLapCount(overview), [overview]);
   // The race map's keys move the camera: a pan hands a camera locked on the car over to free orbit, as in the lap view.
