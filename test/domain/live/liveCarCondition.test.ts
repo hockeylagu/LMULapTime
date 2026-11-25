@@ -101,7 +101,7 @@ describe('LiveTyreTracker', () => {
     expect(tyres.tyres('Medium', [0.944, 0.887, 0.944, 0.946], 54)).toEqual({
       compound: 'Medium', worst: 0.887, worstCorner: 'FR', wearPerLap: 0.008, newSets: 54,
       wheels: [
-        { corner: 'FL', tread: 0.944, wearPerLap: 0.003 }, { corner: 'FR', tread: 0.887, wearPerLap: 0.0065 },
+        { corner: 'FL', tread: 0.944, wearPerLap: 0.003 }, { corner: 'FR', tread: 0.887, wearPerLap: 0.006 },
         { corner: 'RL', tread: 0.944, wearPerLap: 0.008 }, { corner: 'RR', tread: 0.946, wearPerLap: 0.002 },
       ],
     });
@@ -114,6 +114,15 @@ describe('LiveTyreTracker', () => {
     const tyres = new LiveTyreTracker();
     for (const rl of [0.998, 0.995, 0.992, 0.989, 0.982, 0.997, 0.994, 0.884, 0.881, 0.878]) tyres.lapCompleted([1, 1, rl, 1]);
     expect(tyres.tyres('Medium', undefined, null).wheels?.[2].wearPerLap).toBe(0.003);
+  });
+
+  it('does not project a crash lap from two laps of a stint (Sebring race 2026-11-25)', () => {
+    // RR at the crossings of laps 1-3: the crash on lap 3 took 7 points, then 0.8 a lap after the repair stop.
+    const tyres = new LiveTyreTracker();
+    for (const rr of [0.9916, 0.985, 0.912]) tyres.lapCompleted([1, 1, 1, rr]);
+    expect(tyres.tyres('Medium', undefined, null).wheels?.[3].wearPerLap).toBe(0.0066);
+    tyres.lapCompleted([1, 1, 1, 0.904]);
+    expect(tyres.tyres('Medium', undefined, null).wheels?.[3].wearPerLap).toBe(0.008);
   });
 
   it('takes a puncture on one wheel for damage, not wear, and keeps measuring the other wheels', () => {

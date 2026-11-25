@@ -207,6 +207,8 @@ export class LiveDamageTracker {
 /**
  * Tyre state per wheel: compound, the most worn tyre, and each wheel's wear per lap: the median lap of its own stint, so
  * a spin or lockup lap (11% off one tyre in a lap, Silverstone 2026-10-25), already in the tread, is not projected again.
+ * From two laps the median would be their mean, so the smaller one counts: a crash lap took 7 points off RR and its
+ * 4 % a lap read "Tyres won't reach the flag" for tyres that ended at 85 % (Sebring race 2026-11-25).
  */
 export class LiveTyreTracker {
   private stints: number[][] = [[], [], [], []];
@@ -236,7 +238,8 @@ export class LiveTyreTracker {
     const wheels = CORNERS.map((corner, i) => {
       const stint = this.stints[i];
       const losses = stint.slice(1).map((value, lap) => stint[lap] - value);
-      return { corner, tread: known ? round(known[i], 3) : null, wearPerLap: losses.length >= 2 ? round(median(losses), 4) : null };
+      const rate = losses.length === 2 ? Math.min(...losses) : losses.length > 2 ? median(losses) : null;
+      return { corner, tread: known ? round(known[i], 3) : null, wearPerLap: rate === null ? null : round(rate, 4) };
     });
     const rates = wheels.flatMap(wheel => (wheel.wearPerLap === null ? [] : [wheel.wearPerLap]));
     return {
