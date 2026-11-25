@@ -98,15 +98,24 @@ function waterParts(config: SurfaceConfig, { sample, uv, number, uniforms }: Sha
 }
 
 /**
+ * The power of a bright luminous panel's facing term (a sun-bright panel narrowly, a trackside one broadly); null for other kinds.
+ * Its cosine, N.V, is taken per vertex and blended across the panel (`vSurfaceFacing`), as the game's program does: taken per
+ * pixel, a flat panel's middle faces the eye squarely and its glow peaks far higher than the game's.
+ */
+export function luminousFacingPower(config: SurfaceConfig): string | null {
+  return config.kind === 'highLumSun' ? '64.0' : config.kind === 'highLumTrackside' ? '8.0' : null;
+}
+
+/**
  * Luminous kinds: the albedo texture is emission only. The bright panels glow most toward the eye, up to three times head-on, by
- * 1 + 2 (N.V)^n: a sun-bright panel narrowly (n 64), a trackside one broadly (n 8). The texture times its strength is written
- * straight to the image as a game light value, converted to the scene by GAME_LIGHT_UNIT as the car lamps are.
+ * 1 + 2 (N.V)^n (`luminousFacingPower`). The texture times its strength is written straight to the image as a game light value,
+ * converted to the scene by GAME_LIGHT_UNIT as the car lamps are.
  */
 function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): ExtendedParts {
   const kind = config.kind;
   const mult = glslNumber((kind === 'highLumSun' ? 500 : kind === 'highLumTrackside' ? 100 : 20) * GAME_LIGHT_UNIT);
-  const facing = kind === 'highLumSun' ? '64.0' : kind === 'highLumTrackside' ? '8.0' : null;
-  const view = facing ? `*(1.0+2.0*pow(clamp(dot(normal,normalize(vViewPosition)),0.0,1.0),${facing}))` : '';
+  const facing = luminousFacingPower(config);
+  const view = facing ? `*(1.0+2.0*pow(clamp(vSurfaceFacing,0.0,1.0),${facing}))` : '';
   return {
     albedo: `vec4 lum=${sample('albedo')}; diffuseColor.rgb=vec3(0.0); diffuseColor.a*=lum.a; surfaceSpecular=0.0;`,
     normals: '', physical: '', occlusion: '',
@@ -214,7 +223,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
     + (maps[key]!.uvAnimation ? `\nuniform vec2 surface_shift_${key};` : '')).join('\n');
   return {
     declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '') + (readsDayLight(config) ? '\nuniform float surface_dayLight;' : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
-      + (readsRealRoad(config) ? '\nvarying vec2 vSurfaceRealRoad;' : '') + (readsTrackRubber(config) ? '\nuniform float surface_realRoadMedian;' : '')
+      + (readsRealRoad(config) ? '\nvarying vec2 vSurfaceRealRoad;' : '') + (luminousFacingPower(config) ? '\nvarying float vSurfaceFacing;' : '') + (readsTrackRubber(config) ? '\nuniform float surface_realRoadMedian;' : '')
       + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);
