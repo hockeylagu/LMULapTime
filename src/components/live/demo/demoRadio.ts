@@ -18,7 +18,7 @@ export const DEMO_RADIO_CALLS: readonly DemoRadioGroup[] = [
     call(2, 'Fuel ratio too low. Set 0.90.'),
     call(2, 'Pit menu has no tyre change. Set new tyres.'),
     call(2, 'Rejoin P4. Behind the Genesis. Ahead of two GT3s.'),
-    call(3, 'Energy use too high. Save to hold lap 19.'),
+    call(3, 'Energy use too high. Save to pit on lap 19.'),
     call(3, 'Save 4 percent to finish.'),
     call(3, "Tyres won't reach the stop. Plan a change."),
     call(2, 'Fuel runs out before energy. Check your fuel ratio.'),
@@ -27,8 +27,9 @@ export const DEMO_RADIO_CALLS: readonly DemoRadioGroup[] = [
   { group: 'Damage and penalties', calls: [
     call(1, 'Front right puncture. Box this lap.'),
     call(1, 'Rear left wheel lost. Box this lap.'),
-    call(2, 'Damage. Repair 30 seconds. Costs 45 to the flag.'),
-    call(2, 'Suspension damage. Repair 50 seconds. Costs 45 to the flag. Stay out.'),
+    call(2, 'Damage. Stop 85 seconds.'),
+    call(2, 'Damage. Repair 30 seconds. Costs 45 seconds to the flag.'),
+    call(2, 'Suspension damage. Repair 50 seconds. Costs 45 seconds to the flag. Stay out.'),
     call(1, 'Penalty pending.'),
     call(1, 'Penalty. No service on this stop.'),
   ] },
@@ -49,9 +50,9 @@ export const DEMO_RADIO_CALLS: readonly DemoRadioGroup[] = [
     call(3, 'GT3 Lexus ahead. 3 seconds.'),
   ] },
   { group: 'Clock', calls: [
-    call(3, 'Ten minutes.'),
+    call(3, 'Ten minutes to go.'),
     call(3, 'Last lap.'),
-    call(2, 'Time for one more lap.'),
-    call(2, 'No time for another lap.'),
+    call(2, 'One more lap after this.'),
+    call(2, 'Last lap, push.'),
   ] },
 ];

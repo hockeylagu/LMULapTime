@@ -15,10 +15,10 @@ describe("the engineer's clip library", () => {
   it('starts with the calls that matter most and gives each sentence its own file', () => {
     expect(library[0]).toBe('Box this lap.');
     expect(new Set(library.map(clipFile)).size).toBe(library.length);
-    for (const sentence of ['Front left puncture.', 'Yellow, Turn 10A.', 'Tertre Rouge clear.', 'Energy 0 percent.', 'New wet.', 'Save to hold lap 200.',
+    for (const sentence of ['Front left puncture.', 'Yellow, Turn 10A.', 'Tertre Rouge clear.', 'Energy 0 percent.', 'New wet.', 'Save to pit on lap 200.',
       'Six GT3s behind.', 'Hyper Aston ahead.', '1 second.', '3 seconds.', 'P2 Oreca behind.', 'Three cars off both sides.', 'Car rejoining, careful.', 'Set 1.50.',
       'Set deployment 200.', 'Rejoin P60.', 'Behind the Genesis.', 'Ahead of the Hyper Porsche.', 'Behind the car.', 'Ahead of two GT3s.', 'Ahead of six cars.',
-      'Repair 125 seconds.', 'Costs 300 to the flag.', 'Repair over 5 minutes.', 'No tyre change.', 'Fuel 46 litres.', 'Set 120.']) {
+      'Repair 125 seconds.', 'Costs 300 seconds to the flag.', 'Repair over 5 minutes.', 'No tyre change.', 'Fuel 46 litres.', 'Set 120.']) {
       expect(known.has(sentence), sentence).toBe(true);
     }
   });

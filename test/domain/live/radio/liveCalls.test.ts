@@ -36,7 +36,7 @@ describe('radio calls', () => {
     const over = snapshot();
     over.strategy!.resource!.race!.sparePerLap = -0.3;
     const [call] = liveCalls(over);
-    expect(call).toMatchObject({ text: 'Energy use too high. Save to hold lap 19.', priority: 3 });
+    expect(call).toMatchObject({ text: 'Energy use too high. Save to pit on lap 19.', priority: 3 });
     over.strategy!.resource!.race!.pitLap = 20;
     expect(liveCalls(over)[0].key).toBe(call.key);
     over.strategy!.resource!.race!.stopsAfterNext = 1;
@@ -59,10 +59,10 @@ describe('radio calls', () => {
     const damaged = snapshot();
     damaged.strategy!.damage = { wheel: null, body: 0.4, suspension: null, partsDetached: false,
       impactLap: 10, lapsSinceImpact: 2, paceLossPerLap: 1, lossToFinish: 45, repairSeconds: 30, significant: true };
-    expect(texts(damaged)).toEqual(['Damage. Repair 30 seconds. Costs 45 to the flag.']);
+    expect(texts(damaged)).toEqual(['Damage. Repair 30 seconds. Costs 45 seconds to the flag.']);
     damaged.strategy!.damage.repairSeconds = 50;
     damaged.strategy!.damage.suspension = 0.7;
-    expect(texts(damaged)).toEqual(['Suspension damage. Repair 50 seconds. Costs 45 to the flag. Stay out.']);
+    expect(texts(damaged)).toEqual(['Suspension damage. Repair 50 seconds. Costs 45 seconds to the flag. Stay out.']);
     // Past a minute to the nearest 5 seconds, so every value has a clip; said again only when the said repair changes.
     damaged.strategy!.damage.repairSeconds = 127;
     damaged.strategy!.damage.lossToFinish = 412;
@@ -72,9 +72,21 @@ describe('radio calls', () => {
     expect(liveCalls(damaged)[0].key).toBe(long.key);
     damaged.strategy!.damage.repairSeconds = 400;
     damaged.strategy!.damage.lossToFinish = 90;
-    expect(texts(damaged)).toEqual(['Suspension damage. Repair over 5 minutes. Costs 90 to the flag. Stay out.']);
+    expect(texts(damaged)).toEqual(['Suspension damage. Repair over 5 minutes. Costs 90 seconds to the flag. Stay out.']);
     damaged.strategy!.damage.repairSeconds = 50;
     damaged.strategy!.damage.wheel = { problem: 'flat', corner: 'FR' };
+    // Right after the impact, before the pace loss is known: how long the stop stands, from the game's estimate.
+    const fresh = snapshot();
+    fresh.strategy!.damage = { ...damaged.strategy!.damage, repairSeconds: 79, lossToFinish: null, paceLossPerLap: null };
+    fresh.strategy!.pit = { ...fresh.strategy!.pit!, serviceSeconds: 87 };
+    expect(texts(fresh)).toEqual(['Front right puncture. Box this lap.', 'Damage. Stop 85 seconds.']);
+    const stop = liveCalls(fresh)[1];
+    expect(stop).toMatchObject({ priority: 2, family: 'damage' });
+    // The total creeps with the fuel; the call stays the same one.
+    fresh.strategy!.pit.serviceSeconds = 89;
+    expect(liveCalls(fresh)[1].key).toBe(stop.key);
+    fresh.strategy!.pit.serviceSeconds = null;
+    expect(texts(fresh)).toEqual(['Front right puncture. Box this lap.']);
     expect(liveCalls(damaged)[0]).toMatchObject({ text: 'Front right puncture. Box this lap.', priority: 1, family: 'damage' });
   });
 
@@ -148,15 +160,15 @@ describe('radio calls', () => {
     value.strategy!.pit!.penalties = 2;
     expect(liveCalls(value)[0].key).toContain('penalty-2');
     const clock = (patch: Partial<LiveSnapshot>) => texts({ ...snapshot(), ...patch });
-    expect(clock({ session: liveSession({ elapsedSeconds: 610, endSeconds: 1200 }) })).toEqual(['Ten minutes.']);
+    expect(clock({ session: liveSession({ elapsedSeconds: 610, endSeconds: 1200 }) })).toEqual(['Ten minutes to go.']);
     expect(clock({ session: liveSession({ elapsedSeconds: 500, endSeconds: 1200 }) })).toEqual([]);
     expect(clock({ lapsLeft: { laps: 1, estimated: false } })).toEqual(['Last lap.']);
     const quali = (left: number) => clock({
       session: liveSession({ kind: 'qualifying', elapsedSeconds: 1000 - left, endSeconds: 1000, playerLapsCompleted: 3 }),
       sessionBest: { lapSeconds: 100, lapSectors: [null, null, null], bestSectors: [null, null, null], bestPossibleSeconds: null },
     });
-    expect(quali(150)).toEqual(['Time for one more lap.']);
-    expect(quali(80)).toEqual(['No time for another lap.']);
+    expect(quali(150)).toEqual(['One more lap after this.']);
+    expect(quali(80)).toEqual(['Last lap, push.']);
     expect(quali(300)).toEqual([]);
     // What was left at the line decides: 150 s left 70 s into the lap was 220 s at the line, two laps and more.
     const midLap = (left: number, sinceLine: number) => clock({
@@ -164,8 +176,18 @@ describe('radio calls', () => {
       sessionBest: { lapSeconds: 100, lapSectors: [null, null, null], bestSectors: [null, null, null], bestPossibleSeconds: null },
     });
     expect(midLap(150, 70)).toEqual([]);
-    expect(midLap(80, 70)).toEqual(['Time for one more lap.']);
-    expect(midLap(20, 70)).toEqual(['No time for another lap.']);
+    expect(midLap(80, 70)).toEqual(['One more lap after this.']);
+    expect(midLap(20, 70)).toEqual(['Last lap, push.']);
+    // A pit request (a misclick, Portimão 2026-11-25) keeps the call; the pit lane ends it.
+    const pitting = (state: 'request' | 'entering') => {
+      const value = snapshot();
+      value.session = liveSession({ kind: 'qualifying', elapsedSeconds: 920, endSeconds: 1000, playerLapsCompleted: 3 });
+      value.sessionBest = { lapSeconds: 100, lapSectors: [null, null, null], bestSectors: [null, null, null], bestPossibleSeconds: null };
+      value.strategy!.pit!.state = state;
+      return texts(value);
+    };
+    expect(pitting('request')).toEqual(['Last lap, push.']);
+    expect(pitting('entering')).toEqual([]);
   });
 
   it('keeps only P1 calls on the race\'s first lap', () => {

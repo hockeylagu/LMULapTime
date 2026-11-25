@@ -129,6 +129,14 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
       call(`tyre-coverage-${coverage.target}-${stop}`, `Tyres won't reach the ${coverage.target === 'finish' ? 'flag' : 'stop'}. Plan a change.`, 3);
     }
   }
+  const stopSeconds = spokenSeconds(pit?.serviceSeconds ?? 0);
+  if (damage?.significant && damage.lossToFinish === null && damage.repairSeconds !== null && pit?.serviceSeconds != null) {
+    // Before the pace loss is known (two laps after the impact): how long the stop stands, from the game's estimate as
+    // the MFD is set (Sebring race 2026-11-25: 87 s known 10 s after the crash, the pits 3 minutes later, nothing said).
+    // Keyed by the repair, which settles within seconds of the impact while the total creeps with the fuel.
+    call(`damage-stop-${spokenSeconds(damage.repairSeconds) ?? 'long'}`,
+      `Damage. Stop ${stopSeconds === null ? 'over 5 minutes' : `${stopSeconds} seconds`}.`, 2, 'damage');
+  }
   if (damage?.significant && damage.lossToFinish !== null && damage.repairSeconds !== null) {
     // LMU's repair estimate against our measured loss to the flag; staying out is said only when the repair alone costs more.
     const what = damage.suspension ? 'Suspension damage' : 'Damage';
@@ -136,14 +144,14 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
     const repair = spokenSeconds(damage.repairSeconds);
     const cost = spokenSeconds(damage.lossToFinish);
     call(`damage-${repair ?? 'long'}`,
-      `${what}. Repair ${repair === null ? 'over 5 minutes' : `${repair} seconds`}. Costs ${cost ?? 'over 5 minutes'} to the flag.${verdict}`, 2, 'damage');
+      `${what}. Repair ${repair === null ? 'over 5 minutes' : `${repair} seconds`}. Costs ${cost === null ? 'over 5 minutes' : `${cost} seconds`} to the flag.${verdict}`, 2, 'damage');
   }
   if (mode === 'saving' && resource?.saving) {
     call(`saving-to-finish-${stop}`, `Save ${Math.max(1, Math.ceil(resource.saving.savePercent))} percent to finish.`, 3);
   }
   // Not on the box lap: holding the pit lap means nothing once the stop is now (Le Mans 2026-10-22, 10-23).
   if (mode !== 'sprint' && race?.sparePerLap != null && race.sparePerLap < 0 && race.pitInLaps !== 0) {
-    const hold = race.pitLap != null ? `Save to hold lap ${race.pitLap}.` : 'Save to hold our pit lap.';
+    const hold = race.pitLap != null ? `Save to pit on lap ${race.pitLap}.` : 'Save to keep our pit lap.';
     call(`over-budget-${stop}`, `${resource?.kind === 'fuel' ? 'Fuel' : 'Energy'} use too high. ${hold}`, 3);
   }
   return firstLap(session, calls);
@@ -153,27 +161,31 @@ export function liveCalls(snapshot: LiveSnapshot | null): LiveCall[] {
 const TEN_MINUTES = 600;
 
 /**
- * The session clock: "Ten minutes." and "Last lap." in a race (P3); in qualifying, once a lap, whether the lap
- * started leaves time for one more (P2), from the player's session best.
+ * The session clock: "Ten minutes to go." and "Last lap." in a race (P3); in qualifying, once a lap, whether the lap
+ * started leaves time for one more (P2), from the player's session best: "Last lap, push." when it is the last (driver,
+ * 2026-11-25: "No time for another lap." was too flat). A pit request does not silence it, only the pit lane: a
+ * request can be a misclick (Portimão qualifying 2026-11-25, pressed 1.6 s after the line, and the call was lost).
  */
 function clockCalls(snapshot: LiveSnapshot, call: (event: string, text: string, priority: LiveCallPriority, family: LiveCallFamily) => void): void {
   const session = snapshot.session!;
   const left = session.endSeconds === null ? null : session.endSeconds - session.elapsedSeconds;
   if (session.kind === 'race') {
-    if (left !== null && left <= TEN_MINUTES && left > TEN_MINUTES - 60) call('ten-minutes', 'Ten minutes.', 3, 'clock');
+    if (left !== null && left <= TEN_MINUTES && left > TEN_MINUTES - 60) call('ten-minutes', 'Ten minutes to go.', 3, 'clock');
     if (snapshot.lapsLeft?.laps === 1) call('last-lap', 'Last lap.', 3, 'clock');
     return;
   }
   const pace = snapshot.sessionBest?.lapSeconds ?? null;
   const lap = session.playerLapsCompleted;
-  if (session.kind !== 'qualifying' || left === null || pace === null || !lap || snapshot.strategy?.pit?.state !== 'none') return;
+  if (session.kind !== 'qualifying' || left === null || pace === null || !lap) return;
+  const pitState = snapshot.strategy?.pit?.state;
+  if (pitState !== 'none' && pitState !== 'request') return;
   // A lap started before the clock runs out still counts; only the next one would not start. What was left at the
   // line decides, wherever in the lap the call is made: judged on the clock now, "one more lap" came twice, the first
   // a lap early (Sebring qualifying 2026-11-22).
   const start = session.playerLapStartSeconds ?? session.elapsedSeconds;
   const atLine = left + Math.max(0, session.elapsedSeconds - start);
-  if (atLine < pace) call(`quali-lap-${lap}`, 'No time for another lap.', 2, 'clock');
-  else if (atLine < 2 * pace) call(`quali-lap-${lap}`, 'Time for one more lap.', 2, 'clock');
+  if (atLine < pace) call(`quali-lap-${lap}`, 'Last lap, push.', 2, 'clock');
+  else if (atLine < 2 * pace) call(`quali-lap-${lap}`, 'One more lap after this.', 2, 'clock');
 }
 
 /** On the race's first lap only P1 calls speak; then the most urgent first, keeping the order within a priority. */

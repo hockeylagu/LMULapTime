@@ -53,7 +53,7 @@ describe('strategy voice POC', () => {
     expect(speak).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Enable strategy voice' }));
     expect(speak).toHaveBeenCalledTimes(1);
-    expect(speak.mock.calls[0][0].text).toBe('Energy use too high. Save to hold lap 19.');
+    expect(speak.mock.calls[0][0].text).toBe('Energy use too high. Save to pit on lap 19.');
     rerender(<LiveStrategySpeech snapshot={warningSnapshot()} connection="live" buffer={empty} />);
     expect(speak).toHaveBeenCalledTimes(1);
     rerender(<LiveStrategySpeech snapshot={{ ...warningSnapshot(), session: liveSession({ playerLapsCompleted: 13 }) }} connection="live" buffer={empty} />);
@@ -120,7 +120,7 @@ describe('strategy voice POC', () => {
     pedals(buffer, 10.5, 0.5, 1, 0);
     expect(speak).toHaveBeenCalledTimes(1);
     pedals(buffer, 11.2, 0.7, 1, 0);
-    expect(speak.mock.calls[1][0].text).toBe('Energy use too high. Save to hold lap 19.');
+    expect(speak.mock.calls[1][0].text).toBe('Energy use too high. Save to pit on lap 19.');
     pedals(buffer, 12, 0.8, 0.1, 1);
     const box = snapshot();
     box.strategy!.resource!.race!.pitInLaps = 0;

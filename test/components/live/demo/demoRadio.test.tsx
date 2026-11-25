@@ -42,7 +42,7 @@ describe('demo radio sampler', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'Speed' }));
     fireEvent.click(document.querySelector<HTMLElement>('[role="option"][data-value="0.9"]')!);
     fireEvent.click(screen.getByRole('button', { name: 'Play all' }));
-    await waitFor(() => expect(kokoro.say.mock.calls.at(-1)).toEqual(["No time for another lap.", "bm_george", 0.9, 70, 80]));
+    await waitFor(() => expect(kokoro.say.mock.calls.at(-1)).toEqual(["Last lap, push.", "bm_george", 0.9, 70, 80]));
     expect(kokoro.say).toHaveBeenNthCalledWith(1, 'Box in 2 laps.', 'bm_george', 0.9, 70, 80);
     expect(screen.getByRole('status')).toHaveTextContent('900 ms to speak');
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
