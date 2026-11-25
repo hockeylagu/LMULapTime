@@ -8,7 +8,7 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   with its repair and loss ("Stay out." only when the repair costs more), the deployment target in races and practice
   (P2, waits 30 s), and on the race's first lap only P1 calls. No over-budget call on the box lap.
 - Scheduler: `server/live/radio/radioScheduler.ts` in the live service, on the game clock of the pedal samples: P1 at
-  once; P2/P3 in a slot (the first 3 s after the line, or 1 s flat out), one call per slot, 2 P3 a lap, dropped after 120 s
+  once; P2/P3 in a slot (1 s flat out), nothing but an incident in the first 4 s after the line, one call per slot, 2 P3 a lap, dropped after 120 s
   or when the call no longer applies, replaced by a newer one. A P2/P3 key is said once a run; a P1 may come back
   after 60 s (a stop not taken). Reset on a new run or session.
 - Log: every proposed call in SQLite `live_radio_calls` (`server/core/live/dbRadioLogStore.ts`) with the recording,
@@ -53,7 +53,10 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
     car that froze and jumped on), within 15 s at the player's pace; cars within 150 m are one call, a spot stays
     one incident for 60 s. "Turn 6. Car stopped on track, left, in your path.", "Yellow, " in front when the game's
     sector yellow covers it, "Turn 6 clear." on the same approach. A car more than 3 m off: "Turn 6. Car off right."
-    (P2); back on slowly within 6 s ahead after 2 s off: "Turn 6. Car rejoining, careful." The game's sector yellow
+    (P2); back on slowly within 6 s ahead after 2 s off: "Turn 6. Car rejoining, careful." A spot is said once:
+    a car said off is not said again as it comes back on track or rejoins (Le Mans 2026-11-24: one car said three
+    times in 4 s), and a call is made only if it ends a second before the car is reached, at 16 characters a second
+    ("Michelin Chicane. Slow car on track, right, clear of your line." took 3.9 s and ended after the pass). The game's sector yellow
     with no slow car to explain it after 2 s: "Yellow, sector 2.", green once it holds 10 s. Turns are named from
     the layout's placed turns (`server/live/radio/layoutTurns.ts`), else the sector.
   - Traffic (said at once, not slotted): a faster class closing within 6 s with the pass landing in a corner
@@ -83,7 +86,7 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
   end tone and sounded off against the whole call; by sentence is fine. So the live library is sentence variants:
   turn sentences ("Turn 6.", "Yellow, Turn 6.") plus a shared set for the rest of each call.
 - George on the live dashboard (driver, 2026-11-23: the demo was to find the voice, the races use it). The page's
-  `RadioPlayer` plays a call from the clips, joined by sentence with a 40 ms gap, at the Settings volume on the radio
+  `RadioPlayer` plays a call from the clips, joined by sentence with a 50 ms gap, at the Settings volume on the radio
   output, when every sentence of the call has a clip; else the whole call is said in the browser voice, on the same
   time limits. `shared/domain/live/radio/radioSentences.ts` lists every sentence a clip can cover, most useful first,
   and `prepareVoiceClips.ts` makes them (the manifest is written as it goes, so a stopped run keeps its clips). A
@@ -129,8 +132,9 @@ in the post-race debrief so the wording and timing can be refined.
 ## Driver decisions (2026-10-26)
 
 - No Crew Chief: nothing else talks except LMU's own radio, which calls the lap time at the line.
-  The after-line slot is right at the line, not after LMU's lap-time call: waiting 3 s puts the call in
-  the first corner (driver, 2026-11-22), so no setting for the game's call.
+  Nothing but an incident is said in the first 4 s after the line, so the engineer never talks over it (driver,
+  2026-11-24: the slot right at the line, chosen 2026-11-22, conflicted with the game's lap time; 2 s was still too short). A P1 such as "Box
+  this lap." follows once the 4 s end, a P2/P3 waits for a straight.
 - Chrome, with a natural-sounding voice (see Voice).
 - Other cars: manufacturer, plus the class when it differs from the player's ("the Porsche", "Hyper Ferrari").
 - Quiet by default: decisions and safety only.
@@ -567,9 +571,8 @@ Phrasing rules (consistent wording):
 ## Timing: not distracting
 
 1. One fact per call, number first, at most about 8 words; P1 may repeat once ("Box, box").
-2. Two slots for P2/P3: right at the line, for 3 s (any later lands in the first corner, driver 2026-11-22),
-   or any straight (1 s flat out on the pedals; the placed turns give the next straight ahead of time).
-   Strategy calls prefer the after-the-line slot.
+2. One slot for P2/P3: any straight (1 s flat out on the pedals; the placed turns give the next straight ahead of
+   time), never in the first 4 s after the line, where the game gives the lap time (driver, 2026-11-24).
 3. Budget: at most 2 P3 calls per lap and 1 per straight; the rest drop.
 4. Hysteresis: a call key repeats only after its state really changes (existing 60 s guard plus
    per-call thresholds, e.g. gaps move 0.2 s/lap).
