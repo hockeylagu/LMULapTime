@@ -62,6 +62,26 @@ describe('completed capture filenames', () => {
     expect((await store().catalog()).recordings[0].manifest).toMatchObject({ sessionId: 'official-xml', gameVersion: '2.0', samples: 2 });
   });
 
+  it('removes a file left with no tables by a server stop before the first write committed', async () => {
+    const name = makeManifest().filename;
+    (await DuckDBInstance.create(path.join(directory, name))).closeSync();
+    expect(await fs.readdir(directory)).toEqual([name]);
+    expect(await store().catalog()).toEqual({ recordings: [], errors: [] });
+    expect(await fs.readdir(directory)).toEqual([]);
+  });
+
+  it('catalogs a recording that ended in the garage before any sample', async () => {
+    const writer = store();
+    const manifest = makeManifest();
+    const empty = { samples: new Float64Array(), observations: [] };
+    await writer.write(makeBatch(0, { manifest, ...empty }));
+    const result = await writer.write(makeBatch(1, { manifest: { ...manifest, status: 'completed', endedAt: manifest.updatedAt }, ...empty }));
+    await writer.close();
+    const catalog = await store().catalog();
+    expect(catalog.errors).toEqual([]);
+    expect(catalog.recordings.map(recording => recording.manifest)).toEqual([{ ...result.manifest, samples: 0 }]);
+  });
+
   it('keeps the unresolved name when the completion rename fails, then discovery repairs it', async () => {
     const writer = store();
     const manifest = unresolved({ layoutKey: 'bahrain:gp' });

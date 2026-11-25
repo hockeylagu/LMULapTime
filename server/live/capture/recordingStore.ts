@@ -279,6 +279,12 @@ export class LiveCaptureRecordingStore {
         const stat = await fs.promises.lstat(target);
         if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('Catalog path is not a regular file');
         const stored = await this.readCatalogFile(target, filename);
+        if (!stored) {
+          // The server stopped before the recording's first write committed: the file holds nothing.
+          await fs.promises.rm(target);
+          await fs.promises.rm(`${target}.wal`, { force: true });
+          return {};
+        }
         const manifest = await finalizeCaptureFilename(this.directory, stored, filename);
         const finalTarget = path.resolve(this.directory, manifest.filename);
         let bytes = (await fs.promises.stat(finalTarget)).size;
@@ -303,7 +309,8 @@ export class LiveCaptureRecordingStore {
     return { recordings, errors };
   }
 
-  private async readCatalogFile(target: string, filename: string): Promise<LiveCaptureManifest> {
+  /** Null for a database with no tables at all. */
+  private async readCatalogFile(target: string, filename: string): Promise<LiveCaptureManifest | null> {
     const database = await createDatabase(target, { access_mode: 'READ_ONLY' });
     let connection: DuckDBConnection;
     try { connection = await database.connect(); }
@@ -318,45 +325,10 @@ export class LiveCaptureRecordingStore {
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name"))
         .map(row => rowString(row, 'table_name'));
       const tableSet = new Set(existingTables.map(name => name.toLowerCase()));
-      if (!EXPECTED_TABLES.every(table => tableSet.has(table))) throw new Error('Not a compatible live capture schema');
-      const sizeRows = await all(connection,
-        'SELECT COALESCE(SUM(octet_length(CAST(value AS BLOB))), 0) AS metadata_bytes FROM capture_metadata');
-      const metadataBytes = sizeRows[0]?.metadata_bytes;
-      if ((typeof metadataBytes !== 'number' && typeof metadataBytes !== 'bigint')
-        || Number(metadataBytes) > MAX_CATALOG_METADATA_BYTES) {
-        throw new Error(`Live capture metadata exceeds the ${MAX_CATALOG_METADATA_BYTES}-byte catalog limit`);
+      if (existingTables.length > 0) {
+        if (!EXPECTED_TABLES.every(table => tableSet.has(table))) throw new Error('Not a compatible live capture schema');
+        result = await this.readCatalogManifest(connection, filename);
       }
-      const signatureRows = await all(connection,
-        "SELECT key, value FROM capture_metadata WHERE key IN ('source', 'schema_version')");
-      const signature = new Map(signatureRows.map(row => [rowString(row, 'key'), rowString(row, 'value')]));
-      if (signature.get('source') !== LIVE_CAPTURE_SOURCE
-        || signature.get('schema_version') !== String(LIVE_CAPTURE_SCHEMA_VERSION)) {
-        throw new Error('Live capture source or schema signature mismatch');
-      }
-      const manifestRows = await all(connection,
-        'SELECT recording_id, manifest_json FROM capture_manifest WHERE singleton = TRUE');
-      if (manifestRows.length !== 1) throw new Error('Live capture manifest is missing or ambiguous');
-      const json = rowString(manifestRows[0], 'manifest_json');
-      if (Buffer.byteLength(json, 'utf8') > MAX_CATALOG_METADATA_BYTES) throw new Error('Live capture manifest exceeds the catalog size limit');
-      let parsed: unknown;
-      try { parsed = JSON.parse(json) as unknown; }
-      catch { throw new Error('Live capture manifest JSON is corrupt'); }
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Live capture manifest JSON is invalid');
-      const manifest = parsed as LiveCaptureManifest;
-      if (manifest.recordingId !== manifestRows[0].recording_id) throw new Error('Live capture manifest recording ID mismatch');
-      validateManifest(manifest);
-      // Recover a process exit between the physical rename and its metadata transaction.
-      if (manifest.filename !== filename && resolvedCaptureFilename(manifest) !== filename) {
-        throw new Error('Live capture manifest filename does not match its file');
-      }
-      await this.verifyCatalog(connection, manifest);
-      const counts = await all(connection,
-        'SELECT count(*) AS sample_count FROM capture_samples');
-      const sampleCount = counts[0]?.sample_count;
-      if ((typeof sampleCount !== 'number' && typeof sampleCount !== 'bigint') || Number(sampleCount) !== manifest.samples) {
-        throw new Error('Live capture manifest sample count does not match stored samples');
-      }
-      result = manifest;
     } catch (error: unknown) {
       failure = error;
     }
@@ -365,8 +337,49 @@ export class LiveCaptureRecordingStore {
     try { database.closeSync(); }
     catch (error: unknown) { failure ??= error; }
     // A read failure wins over a close failure; a clean read still surfaces a failed close.
-    if (failure || !result) throw failure;
+    if (failure) throw failure instanceof Error ? failure : new Error(errorText(failure));
     return result;
+  }
+
+  private async readCatalogManifest(connection: DuckDBConnection, filename: string): Promise<LiveCaptureManifest> {
+    const sizeRows = await all(connection,
+      'SELECT COALESCE(SUM(octet_length(CAST(value AS BLOB))), 0) AS metadata_bytes FROM capture_metadata');
+    const metadataBytes = sizeRows[0]?.metadata_bytes;
+    if ((typeof metadataBytes !== 'number' && typeof metadataBytes !== 'bigint')
+      || Number(metadataBytes) > MAX_CATALOG_METADATA_BYTES) {
+      throw new Error(`Live capture metadata exceeds the ${MAX_CATALOG_METADATA_BYTES}-byte catalog limit`);
+    }
+    const signatureRows = await all(connection,
+      "SELECT key, value FROM capture_metadata WHERE key IN ('source', 'schema_version')");
+    const signature = new Map(signatureRows.map(row => [rowString(row, 'key'), rowString(row, 'value')]));
+    if (signature.get('source') !== LIVE_CAPTURE_SOURCE
+      || signature.get('schema_version') !== String(LIVE_CAPTURE_SCHEMA_VERSION)) {
+      throw new Error('Live capture source or schema signature mismatch');
+    }
+    const manifestRows = await all(connection,
+      'SELECT recording_id, manifest_json FROM capture_manifest WHERE singleton = TRUE');
+    if (manifestRows.length !== 1) throw new Error('Live capture manifest is missing or ambiguous');
+    const json = rowString(manifestRows[0], 'manifest_json');
+    if (Buffer.byteLength(json, 'utf8') > MAX_CATALOG_METADATA_BYTES) throw new Error('Live capture manifest exceeds the catalog size limit');
+    let parsed: unknown;
+    try { parsed = JSON.parse(json) as unknown; }
+    catch { throw new Error('Live capture manifest JSON is corrupt'); }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Live capture manifest JSON is invalid');
+    const manifest = parsed as LiveCaptureManifest;
+    if (manifest.recordingId !== manifestRows[0].recording_id) throw new Error('Live capture manifest recording ID mismatch');
+    validateManifest(manifest);
+    // Recover a process exit between the physical rename and its metadata transaction.
+    if (manifest.filename !== filename && resolvedCaptureFilename(manifest) !== filename) {
+      throw new Error('Live capture manifest filename does not match its file');
+    }
+    await this.verifyCatalog(connection, manifest);
+    const counts = await all(connection,
+      'SELECT count(*) AS sample_count FROM capture_samples');
+    const sampleCount = counts[0]?.sample_count;
+    if ((typeof sampleCount !== 'number' && typeof sampleCount !== 'bigint') || Number(sampleCount) !== manifest.samples) {
+      throw new Error('Live capture manifest sample count does not match stored samples');
+    }
+    return manifest;
   }
 
   public async link(filename: string, recordingId: string, sessionId: string | null, gameVersion: string | null): Promise<void> {

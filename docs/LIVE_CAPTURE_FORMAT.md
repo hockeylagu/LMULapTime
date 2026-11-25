@@ -23,7 +23,8 @@ metadata before acknowledging the new name to the SQLite index; recording ID and
 If that rename fails (for example a locked file), the completed attempt keeps its `unresolved_` name.
 Idle catalog discovery applies the same repair to existing completed files and recovers a process exit
 between the physical rename and metadata update. Unknown layouts and resumable interrupted attempts
-keep their existing filenames. Compressed diagnostic sidecars follow the completed name (see below).
+keep their existing filenames. Discovery deletes a file with no tables at all: the server stopped
+before that recording's first write committed, so it holds nothing. Compressed diagnostic sidecars follow the completed name (see below).
 An interrupted attempt resumes only with unambiguous continuity proof. If the exact layout is
 temporarily unknown, recovery waits up to 10 s for it, then records a new file; samples during that
 wait remain a coverage gap.
