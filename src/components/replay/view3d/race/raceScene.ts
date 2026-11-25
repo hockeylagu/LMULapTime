@@ -345,7 +345,11 @@ export async function createRaceScene(
       if (slot === followed?.slot && (followed.car || !body)) return true;
       // The camera goes to the car at once, the field drawing it until its own model is ready (2 to 4 s to build, compile and
       // upload, 2026-11-16); a driver camera needs that model's cameras and stays on the car it follows until then.
-      if (slot !== null && slot !== followed?.slot && !isDriverCamera(rig.mode)) { setFollowed(bare(slot)); shell.show(content()); draw(); }
+      if (slot !== null && slot !== followed?.slot && !isDriverCamera(rig.mode)) {
+        // The chase camera starts again behind the new car: a car near the old one would read as the same car moving on.
+        if (rig.mode === 'chase') rig.unplace();
+        setFollowed(bare(slot)); shell.show(content()); draw();
+      }
       const next = await buildFollowed(slot, body);
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
       // Its lit materials take the probe's prefiltered cube before they compile: warmed with the venue's (another size, a program
