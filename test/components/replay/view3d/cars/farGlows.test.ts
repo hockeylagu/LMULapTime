@@ -49,15 +49,18 @@ async function loadedGlows(far = farLamps()) {
 describe('createFarGlows', () => {
   it('draws a far car brake light while it brakes and its headlights while they are on, on its body frame', async () => {
     const { glows, at, meshes, byName, textures } = await loadedGlows();
-    // The brake and headlight lit frames only: no off frame, and no lamp without states.
-    expect(meshes().map(mesh => mesh.name).sort()).toEqual(['far-glow-blglo', 'far-glow-hlglo']);
-    expect(textures.load.mock.calls.map(call => String(call[0])).sort((a, b) => a.localeCompare(b))).toEqual(['textures/brake-start.ktx2.zst', 'textures/hon.ktx2.zst']);
-    // Dark: nothing draws.
-    expect(meshes().map(mesh => [mesh.visible, mesh.count])).toEqual([[false, 0], [false, 0]]);
+    // Every state frame of the brake and headlight lamps, the off frames included (the game draws them dark); no lamp without states.
+    expect(meshes().map(mesh => mesh.name).sort()).toEqual(['far-glow-blglo', 'far-glow-blglo', 'far-glow-hlglo', 'far-glow-hlglo']);
+    expect(textures.load.mock.calls.map(call => String(call[0])).sort((a, b) => a.localeCompare(b))).toEqual(['textures/brake-start.ktx2.zst', 'textures/hoff.ktx2.zst', 'textures/hon.ktx2.zst', 'textures/off.ktx2.zst']);
+    // Asked for while its glows were loading: nothing draws yet.
+    expect(meshes().map(mesh => [mesh.visible, mesh.count])).toEqual([[false, 0], [false, 0], [false, 0], [false, 0]]);
+    const [brakeOff, brake] = byName('blglo'), [headOff, head] = byName('hlglo');
+    // Dark: the off frames.
+    glows.draw([{ body: body('A'), frame: at(0), braking: false, headlights: false }]);
+    expect([brakeOff.count, brake.count, headOff.count, head.count]).toEqual([1, 0, 1, 0]);
 
     glows.draw([{ body: body('A'), frame: at(10), braking: true, headlights: false }, { body: body('A'), frame: at(20), braking: true, headlights: true }]);
-    const [brake] = byName('blglo'), [head] = byName('hlglo');
-    expect([brake.visible, brake.count, head.visible, head.count]).toEqual([true, 2, true, 1]);
+    expect([brakeOff.visible, brake.visible, brake.count, headOff.count, head.visible, head.count]).toEqual([false, true, 2, 1, true, 1]);
     // The far model's mesh is in the body's frame already: each instance sits on its car's frame.
     const placed = (mesh: InstancedMesh, index: number) => { const m = new Matrix4(); mesh.getMatrixAt(index, m); return new Vector3().setFromMatrixPosition(m); };
     expect([placed(brake, 0).toArray(), placed(brake, 1).toArray(), placed(head, 0).toArray()]).toEqual([[10, 0, 0], [20, 0, 0], [20, 0, 0]]);
@@ -70,15 +73,16 @@ describe('createFarGlows', () => {
   it("leaves out a lamp under an option part the car's livery does not show", async () => {
     const { glows, at, byName } = await loadedGlows();
     glows.draw([{ body: body('B'), frame: at(0), braking: true, headlights: true }]);
-    expect(byName('blglo')[0].count).toBe(0);
-    expect(byName('hlglo')[0].count).toBe(1);
+    expect(byName('blglo').map(mesh => mesh.count)).toEqual([0, 0]);
+    expect(byName('hlglo').map(mesh => mesh.count)).toEqual([0, 1]);
   });
 
   it('draws the parts of one lamp under different option parts apart, each for the liveries that show it', async () => {
     // The brake glow's first face belongs to no option part, the other five to the option.
     const { glows, at, byName } = await loadedGlows(farLamps([0, 1, 1, 1, 1, 1]));
-    const parts = byName('blglo');
-    expect(parts.map(mesh => mesh.geometry.index!.count)).toEqual([6, 30]);
+    // The off frame's two parts, then the brake frame's.
+    expect(byName('blglo').map(mesh => mesh.geometry.index!.count)).toEqual([6, 30, 6, 30]);
+    const parts = byName('blglo').slice(2);
     expect(parts[0].material).toBe(parts[1].material);
     expect(parts[0].geometry.getAttribute('position')).toBe(parts[1].geometry.getAttribute('position'));
     glows.draw([{ body: body('B'), frame: at(0), braking: true, headlights: false }]);
@@ -90,7 +94,7 @@ describe('createFarGlows', () => {
   it('builds a body once and frees its glows on dispose', async () => {
     const { glows, at, meshes, textures } = await loadedGlows();
     glows.draw([{ body: body('A'), frame: at(0), braking: true, headlights: false }]);
-    expect(textures.load).toHaveBeenCalledTimes(2);
+    expect(textures.load).toHaveBeenCalledTimes(4);
     const [mesh] = meshes(), dispose = vi.spyOn(mesh.geometry, 'dispose'), material = vi.spyOn(mesh.material as Material, 'dispose');
     glows.dispose();
     expect(dispose).toHaveBeenCalled(); expect(material).toHaveBeenCalled();
@@ -107,8 +111,8 @@ describe('createFarGlows', () => {
     glows.lamps(body('A'), farLamps());
     glows.draw([{ body: body('A'), frame: new Matrix4(), braking: true, headlights: true }]);
     await compiled;
-    // The brake and headlight lit frames were built, then freed.
-    await vi.waitFor(() => expect(freed).toHaveBeenCalledTimes(2));
+    // The brake and headlight frames (off ones included) were built, then freed.
+    await vi.waitFor(() => expect(freed).toHaveBeenCalledTimes(4));
     expect(parent.getObjectsByProperty('isInstancedMesh', true)).toEqual([]);
     freed.mockRestore();
   });
@@ -121,6 +125,6 @@ describe('createFarGlows', () => {
     await vi.waitFor(() => expect(textures.load).toHaveBeenCalled());
     await new Promise(resolve => { setTimeout(resolve); });
     glows.draw([{ body: body('A'), frame: new Matrix4(), braking: true, headlights: true }]);
-    expect([parent.getObjectsByProperty('isInstancedMesh', true), changed.mock.calls.length, textures.load.mock.calls.length]).toEqual([[], 0, 2]);
+    expect([parent.getObjectsByProperty('isInstancedMesh', true), changed.mock.calls.length, textures.load.mock.calls.length]).toEqual([[], 0, 4]);
   });
 });

@@ -36,11 +36,14 @@ interface GlowFrame {
   mesh: InstancedMesh;
 }
 
-/** The headlight and brake lamps, the ones a far car's state switches, with their lit frames that have a texture. */
+/**
+ * The headlight and brake lamps, the ones a far car's state switches, with every state's frame that has a texture: the off frame
+ * too, which the game draws while the lamp is dark (on many bodies it is the lit tail light, as on a near car).
+ */
 const litFrames = (lamp: CarLamp): number[] => {
   if ((lamp.role !== 'headlight' && lamp.role !== 'brake') || !lamp.states) return [];
   const {off, on, brake} = lamp.states;
-  return [...new Set([on, brake])].filter((frame): frame is number => frame !== null && frame !== off && lamp.frames[frame] !== null);
+  return [...new Set([off, on, brake])].filter((frame): frame is number => frame !== null && lamp.frames[frame] !== null);
 };
 
 /**
