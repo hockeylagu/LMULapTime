@@ -283,6 +283,8 @@ export interface ReplayDaylightClock {
    * cell code 0..14, absent when the replay has none.
    */
   cloudField?: { cells: string; upperDrift: number; lowerDrift: number; startUpperDrift: number; startLowerDrift: number; variants?: string[] };
+  /** The replay's scene (sceneDesc, lower case): which of the layout's night scenes it ran on. Absent when the replay names none. */
+  scene?: string;
 }
 
 export interface ReplayTrajectoryData {

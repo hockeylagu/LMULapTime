@@ -3,27 +3,18 @@
  * twilight's scattered light, the moon's light and its scattered share, the ambient as the game maps it, the fog and the light level that
  * switches the track lights. Every number comes from the package; the moon and the fog are fitted on the night captures there.
  */
+import type { ScenerySkyNight } from '../../../../../shared/packageContract/index.js';
 import type { SkyBodies } from './skyBodies.js';
 
 type Rgb = [number, number, number];
 type Rows = readonly [Rgb, Rgb, Rgb];
-
-/** The package's night model (the rendering file's `sky.night`, ScenerySkyNight in the package contract from schema 23). */
-export interface NightModel {
-  twilight: {sunElevationDeg: readonly number[]; illuminance: readonly number[]; scale: number; chromaticity: readonly [number, number]; sunScatteringScale: number; hdrScale: number; blendBelowDeg: number};
-  sunDirect: {zeroDeg: number; exponent: number};
-  ambientMapping: {lightColorToAmbient: number; useIntensity: boolean};
-  lightLevel: {base: number; sinScale: number; stepS: number};
-  moon: {reference: {rgb: Rgb; elevationDeg: number; phaseAngleDeg: number}; opticalDepth: number; scatterShare: number; scatterColour: Rgb; zenithShare: number};
-  fog: {twilightShare: number; hue: Rgb};
-}
 
 const RAD = Math.PI / 180;
 const luminance = (c: Rgb) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 const times = (rows: Rows, v: readonly number[]) => rows.map(row => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]) as Rgb;
 
 /** The twilight's luminance (CIE Y, before the ambient mapping) at a refracted sun elevation: the table's lerp, ends held. */
-export function twilightLuminance(model: NightModel, sunElevationDeg: number): number {
+export function twilightLuminance(model: ScenerySkyNight, sunElevationDeg: number): number {
   const {sunElevationDeg: degrees, illuminance, scale, sunScatteringScale, hdrScale} = model.twilight, last = degrees.length - 1;
   const e = Math.min(degrees[last], Math.max(degrees[0], sunElevationDeg));
   let i = 0;
@@ -33,19 +24,19 @@ export function twilightLuminance(model: NightModel, sunElevationDeg: number): n
 }
 
 /** The twilight's linear RGB before the mapping, at its chromaticity, through the sky's XYZ to RGB rows. */
-function twilightColour(model: NightModel, xyzToRgb: Rows, sunElevationDeg: number): Rgb {
+function twilightColour(model: ScenerySkyNight, xyzToRgb: Rows, sunElevationDeg: number): Rgb {
   const Y = twilightLuminance(model, sunElevationDeg), [x, y] = model.twilight.chromaticity;
   return times(xyzToRgb, [x * Y / y, Y, (1 - x - y) * Y / y]);
 }
 
 /** The game's ambient mapping of a light colour: lightColorToAmbient · c + (1 − it) · its length (the green where `useIntensity` is off). */
-export function mapAmbient(model: NightModel, colour: Rgb): Rgb {
+export function mapAmbient(model: ScenerySkyNight, colour: Rgb): Rgb {
   const {lightColorToAmbient: k, useIntensity} = model.ambientMapping, length = useIntensity ? Math.hypot(...colour) : colour[1];
   return colour.map(c => k * c + (1 - k) * length) as Rgb;
 }
 
 /** The share of the sun's direct light left at a refracted elevation: clamp(e − zeroDeg, 0, 1)^exponent. At zero the moon is the light. */
-export function sunDirectShare(model: NightModel, sunElevationDeg: number): number {
+export function sunDirectShare(model: ScenerySkyNight, sunElevationDeg: number): number {
   return Math.min(1, Math.max(0, sunElevationDeg - model.sunDirect.zeroDeg)) ** model.sunDirect.exponent;
 }
 
@@ -70,7 +61,7 @@ export interface NightLight {
 }
 
 /** The night light of a moment; `xyzToRgb` is the sky's (the package's `sky.hosek.xyzToRgb`). */
-export function nightLight(model: NightModel, xyzToRgb: Rows, bodies: SkyBodies): NightLight {
+export function nightLight(model: ScenerySkyNight, xyzToRgb: Rows, bodies: SkyBodies): NightLight {
   const {moon} = model, {reference} = moon, sunDeg = bodies.sun.elevationDeg;
   const moonScale = transmission(moon.opticalDepth, bodies.moon.elevationDeg) / transmission(moon.opticalDepth, reference.elevationDeg)
     * phaseBrightness(bodies.moon.phaseAngleDeg) / phaseBrightness(reference.phaseAngleDeg);
@@ -95,11 +86,16 @@ function inverseRows([a, b, c]: Rows): Rows {
   return [0, 1, 2].map(i => [bc[i] / det, ca[i] / det, ab[i] / det]) as unknown as Rows;
 }
 
-/** The local clock second at which the game last sampled the light level (every `stepS` of the day). */
-export const lightLevelSecond = (model: NightModel, localSeconds: number): number => Math.floor(localSeconds / model.lightLevel.stepS) * model.lightLevel.stepS;
-
-/** Whether the track lights are on: the scene's threshold above the light level at the sampled moment's refracted sun elevation. */
-export function trackLightsOn(model: NightModel, threshold: number, sampledSunElevationDeg: number): boolean {
-  const {base, sinScale} = model.lightLevel;
-  return threshold > Math.min(1, Math.max(0, base + sinScale * Math.sin(sampledSunElevationDeg * RAD)));
+/**
+ * The game's light level at a local clock second: clamp(base + sinScale · sin e, 0, 1) at the half-hourly samples around it (e the refracted
+ * sun elevation then, from `sunAt`), linear between them. The game also darkens it by the clouds by a rule not traced; this leaves that out.
+ */
+export function lightLevel(model: ScenerySkyNight, localSeconds: number, sunAt: (localSeconds: number) => number): number {
+  const {base, sinScale, stepS} = model.lightLevel, before = Math.floor(localSeconds / stepS) * stepS, f = (localSeconds - before) / stepS;
+  const at = (second: number) => Math.min(1, Math.max(0, base + sinScale * Math.sin(sunAt(second) * RAD)));
+  return f === 0 ? at(before) : (1 - f) * at(before) + f * at(before + stepS);
 }
+
+/** Whether the track lights are on: the scene's threshold above the light level. */
+export const trackLightsOn = (threshold: number, level: number): boolean => threshold > level;
+

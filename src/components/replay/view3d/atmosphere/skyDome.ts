@@ -97,13 +97,14 @@ export function skyHazeDepth(sky: ScenerySky, daylight: SceneryDaylight | undefi
 
 /**
  * The night sky of a moment, once the sun's direct light is gone: the twilight's chromaticity and the night model's zenith luminance
- * (the package's `sky.night.twilight.chromaticity`, nightLight.ts `zenithLuminance`). The dome then draws the game's Perez branch.
+ * (the package's `sky.night.twilight.chromaticity`, nightLight.ts `zenithLuminance`). The dome draws the game's Perez branch by `weight`
+ * (nightMoment.ts `domeWeight`), mixed with the day's Hosek-Wilkie by radiance (XYZ) in between: our mix, the game's is not traced.
  */
-export interface NightSky {chromaticity: readonly [number, number]; zenithLuminance: number}
+export interface NightSky {chromaticity: readonly [number, number]; zenithLuminance: number; weight: number}
 
 /** The sky for one sun: the cooked Hosek-Wilkie state, the night dome in its place at night, and everything the dome applies after it. */
 interface SkyModel {
-  state: HosekSkyState; night: NightDome | null; sun: Vector3; isothermal: number;
+  state: HosekSkyState; night: NightDome | null; nightWeight: number; sun: Vector3; isothermal: number;
   xyzToRgb: ScenerySky['hosek']['xyzToRgb']; look: SkyColourLook; sunElevationDeg: number;
 }
 
@@ -111,10 +112,10 @@ function skyModel(sky: ScenerySky, sunDirection: Vector3, weather: SkyConditions
   const sun = sunDirection.clone().normalize(), elevation = Math.asin(MathUtils.clamp(sun.y, -1, 1)), sunElevationDeg = MathUtils.radToDeg(elevation);
   const {hosek} = sky, turbidity = skyTurbidity(sky, weather), state = hosekSkyState(hosek, turbidity, hosek.albedo, elevation);
   // At night there is no direct sun: the sun's elevation alone places the colour look between its profiles.
-  const look = skyColourLook(sky, night ? new Color(0, 0, 0) : sunRadiance(sky.sun, sunElevationDeg, weather.cloudCover), sunElevationDeg, weather);
+  const look = skyColourLook(sky, night && night.weight >= 1 ? new Color(0, 0, 0) : sunRadiance(sky.sun, sunElevationDeg, weather.cloudCover), sunElevationDeg, weather);
   const isothermal = Math.exp(-hosek.altitudeM / hosek.scaleHeightM);
-  const dome = night ? nightDome(sky, turbidity, sunElevationDeg, night.chromaticity, night.zenithLuminance) : null;
-  return {state, night: dome, sun, isothermal, xyzToRgb: hosek.xyzToRgb, look, sunElevationDeg};
+  const dome = night && night.weight > 0 ? nightDome(sky, turbidity, sunElevationDeg, night.chromaticity, night.zenithLuminance) : null;
+  return {state, night: dome, nightWeight: dome ? night!.weight : 0, sun, isothermal, xyzToRgb: hosek.xyzToRgb, look, sunElevationDeg};
 }
 
 /**
@@ -123,16 +124,19 @@ function skyModel(sky: ScenerySky, sunDirection: Vector3, weather: SkyConditions
  * lifted out of a negative channel, then each channel scaled toward the look's gain by the saturation, in scene units.
  */
 const SKY_RGB_GLSL = `${HOSEK_GLSL}${NIGHT_DOME_GLSL}
-      uniform float nightOn;
+      uniform float nightWeight;
       vec3 skyRgb(vec3 dir) {
         float cosTheta = max(dir.y, 0.0) + 0.001, cosGamma = clamp(dot(dir, sunDirection) * sunProximity, -1.0, 1.0), gamma = acos(cosGamma);
-        vec3 xyY;
-        if (nightOn > 0.5) xyY = nightXyY(cosTheta, gamma, cosGamma);
-        else {
-          vec3 XYZ = vec3(hosek(coefficientsX, cosTheta, gamma, cosGamma), hosek(coefficientsY, cosTheta, gamma, cosGamma), hosek(coefficientsZ, cosTheta, gamma, cosGamma)) * radiances;
-          xyY = vec3(XYZ.xy / (XYZ.x + XYZ.y + XYZ.z), XYZ.y * isothermal);
+        vec3 XYZ = vec3(0.0);
+        if (nightWeight < 1.0) {
+          vec3 day = vec3(hosek(coefficientsX, cosTheta, gamma, cosGamma), hosek(coefficientsY, cosTheta, gamma, cosGamma), hosek(coefficientsZ, cosTheta, gamma, cosGamma)) * radiances;
+          XYZ = day * isothermal * (1.0 - nightWeight);
         }
-        vec3 rgb = xyzToRgb * vec3(xyY.x * xyY.z / xyY.y, xyY.z, (1.0 - xyY.x - xyY.y) * xyY.z / xyY.y);
+        if (nightWeight > 0.0) {
+          vec3 xyY = nightXyY(cosTheta, gamma, cosGamma);
+          XYZ += vec3(xyY.x * xyY.z / xyY.y, xyY.z, (1.0 - xyY.x - xyY.y) * xyY.z / xyY.y) * nightWeight;
+        }
+        vec3 rgb = xyzToRgb * XYZ;
         rgb -= min(0.0, min(rgb.r, min(rgb.g, rgb.b)));
         float high = max(max(rgb.r, max(rgb.g, rgb.b)), 1e-5), saturation = (high - min(rgb.r, min(rgb.g, rgb.b))) / high;
         return rgb * mix(vec3(1.0), gain, saturation) * ${GAME_LIGHT_UNIT.toFixed(6)};
@@ -171,7 +175,7 @@ export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, da
       radiances: {value: new Vector3(...model.state.radiances)}, isothermal: {value: model.isothermal},
       sunProximity: {value: model.look.sunProximity}, gain: {value: new Vector3(...model.look.gain)},
       xyzToRgb: {value: new Matrix3().set(...model.xyzToRgb[0], ...model.xyzToRgb[1], ...model.xyzToRgb[2])},
-      ...nightUniforms(model.night),
+      ...nightUniforms(model.night, model.nightWeight),
     },
     vertexShader: `
       varying vec3 vWorld;
@@ -188,17 +192,21 @@ export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, da
   });
 }
 
-/** The day dome's xyY, its luminance dimmed by the altitude. */
-function hosekXyY(model: SkyModel, cosTheta: number, cosGamma: number): [number, number, number] {
-  const [X0, Y0, Z0] = hosekXyz(model.state, cosTheta, cosGamma), sum = X0 + Y0 + Z0;
-  return [X0 / sum, Y0 / sum, Y0 * model.isothermal];
+/** The dome's XYZ toward a view: the day's Hosek-Wilkie (its luminance dimmed by the altitude) and the night's Perez by the night weight. */
+function domeXyz(model: SkyModel, cosTheta: number, cosGamma: number): [number, number, number] {
+  const w = model.nightWeight, out: [number, number, number] = [0, 0, 0];
+  if (w < 1) hosekXyz(model.state, cosTheta, cosGamma).forEach((value, i) => { out[i] = value * model.isothermal * (1 - w); });
+  if (model.night && w > 0) {
+    const [x, y, Y] = nightXyY(model.night, cosTheta, Math.acos(cosGamma), cosGamma);
+    [x * Y / y, Y, (1 - x - y) * Y / y].forEach((value, i) => { out[i] += value * w; });
+  }
+  return out;
 }
 
 /** The dome's radiance without haze, as skyRgb draws it (the haze colours are sampled from it). */
 function radiance(model: SkyModel, direction: Vector3, target: Color): Color {
   const cosTheta = Math.max(direction.y, 0) + 0.001, cosGamma = MathUtils.clamp(direction.dot(model.sun) * model.look.sunProximity, -1, 1);
-  const [x, y, Y] = model.night ? nightXyY(model.night, cosTheta, Math.acos(cosGamma), cosGamma) : hosekXyY(model, cosTheta, cosGamma);
-  const xyz = [x * Y / y, Y, (1 - x - y) * Y / y], rgb = model.xyzToRgb.map(row => row[0] * xyz[0] + row[1] * xyz[1] + row[2] * xyz[2]);
+  const xyz = domeXyz(model, cosTheta, cosGamma), rgb = model.xyzToRgb.map(row => row[0] * xyz[0] + row[1] * xyz[1] + row[2] * xyz[2]);
   const lift = Math.min(0, ...rgb), lifted = rgb.map(value => value - lift), high = Math.max(...lifted, 1e-5), saturation = (high - Math.min(...lifted)) / high;
   const channel = (i: number) => lifted[i] * MathUtils.lerp(1, model.look.gain[i], saturation) * GAME_LIGHT_UNIT;
   return target.setRGB(channel(0), channel(1), channel(2));

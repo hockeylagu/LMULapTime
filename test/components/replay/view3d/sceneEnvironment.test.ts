@@ -1,10 +1,12 @@
+import { skyBodies } from '../../../../src/components/replay/view3d/night/skyBodies.js';
 import { expect, it, vi } from 'vitest';
 import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
-import { addSceneEnvironment, sceneLighting, sceneSun, solarPosition, sunSeenFrom, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { sceneEmission } from '../../../../src/components/replay/view3d/scene/dayLight.js';
+import { addSceneEnvironment, sceneLighting, sceneSun, sunSeenFrom, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { hazeProgram } from '../../../../src/components/replay/view3d/atmosphere/haze.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { GAME_LIGHT_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
-import { TEST_HAZE_WEIGHTS, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
+import { TEST_HAZE_WEIGHTS, testLayoutNight, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
 import { cascadeShadowUniforms } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { crownSun } from '../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 
@@ -22,7 +24,12 @@ vi.mock('three', async importOriginal => {
 });
 const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), setScissorTest: vi.fn(), getScissorTest: () => false, copyTextureToTexture: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
 /** A venue without daylight unless given one (the scene code keeps its default midday sun for it, though a package always states daylight): the synthetic sky, the probe at the scene origin. */
-const venue = (daylight?: SceneVenue['daylight'], position: [number, number, number] = [0, 0, 0]): SceneVenue => ({daylight: daylight as SceneVenue['daylight'], sky: testSky(), environmentProbe: {position}, shading: testShading()});
+/** A venue whose one night scene is at its daylight's place and date. */
+const venue = (daylight?: SceneVenue['daylight'], position: [number, number, number] = [0, 0, 0]): SceneVenue => {
+  const night = testLayoutNight();
+  if (daylight) night.scenes = [{...night.scenes[0], date: daylight.date, latitudeDeg: daylight.latitudeDeg, longitudeDeg: daylight.longitudeDeg, timezoneHours: daylight.utcOffsetHours, utcOffsetHours: daylight.utcOffsetHours}];
+  return {daylight: daylight as SceneVenue['daylight'], sky: testSky(), environmentProbe: {position}, shading: testShading(), night};
+};
 const skyMaterial = (scene: Scene) => (scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>).material;
 
 it('uses the analytic sky, PMREM and a sun light without three shadow maps, keeping the shared lighting chunks', () => {
@@ -84,20 +91,22 @@ it("places the sun at the replay's clock: session start plus session time at the
   const sessions = [{id: 'race' as const, localTime: '13:00', sunElevationDeg: 50}, {id: 'qualify' as const, localTime: '12:45', sunElevationDeg: 46.1},
     {id: 'practice1' as const, localTime: '11:00', sunElevationDeg: 51.88}, {id: 'practice2' as const, localTime: '15:30', sunElevationDeg: 40.89}];
   const located = {date: '2023-09-10', sessions, airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9};
+  const fuji = {latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9};
   const height = (lighting: {sunDirection: {y: number}}) => Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
   // An online event's start (here 15:30 qualifying, 120 s in) wins over the session default.
   expect(height(sceneLighting(located, {session: 'qualify', startMinute: 930, sessionTimeSec: 120})))
-    .toBeCloseTo(solarPosition(35.37, 138.93, '2023-09-10', 932, 9).elevationDeg, 6);
+    .toBeCloseTo(skyBodies(fuji, '2023-09-10', 932 * 60).sun.elevationDeg, 6);
   // Offline, the session's default time, plus the session time.
   expect(height(sceneLighting(located, {session: 'practice1', startMinute: null, sessionTimeSec: 3600})))
-    .toBeCloseTo(solarPosition(35.37, 138.93, '2023-09-10', 720, 9).elevationDeg, 6);
+    .toBeCloseTo(skyBodies(fuji, '2023-09-10', 720 * 60).sun.elevationDeg, 6);
   // Without a clock, the race session's published sun.
   expect(height(sceneLighting(located))).toBeCloseTo(50, 6);
 });
 
-it('computes the sun position: overhead at the equator at solar noon on the equinox, east in the morning, west in the afternoon', () => {
-  expect(solarPosition(0, 0, '2026-03-20', 12 * 60 + 7, 0).elevationDeg).toBeGreaterThan(89);
-  const morning = solarPosition(48, 0, '2026-06-21', 9 * 60, 0), afternoon = solarPosition(48, 0, '2026-06-21', 15 * 60 + 4, 0);
+it('places the sun as the sky middleware does: overhead at the equator at solar noon on the equinox, east in the morning, west in the afternoon', () => {
+  const sun = (latitudeDeg: number, date: string, minute: number) => skyBodies({latitudeDeg, longitudeDeg: 0, utcOffsetHours: 0}, date, minute * 60).sun;
+  expect(sun(0, '2026-03-20', 12 * 60 + 7).elevationDeg).toBeGreaterThan(89);
+  const morning = sun(48, '2026-06-21', 9 * 60), afternoon = sun(48, '2026-06-21', 15 * 60 + 4);
   expect(morning.bearingDeg).toBeGreaterThan(90); expect(morning.bearingDeg).toBeLessThan(135);
   expect(afternoon.bearingDeg).toBeGreaterThan(225); expect(afternoon.bearingDeg).toBeLessThan(270);
   expect(morning.elevationDeg).toBeCloseTo(afternoon.elevationDeg, 0);
@@ -120,7 +129,7 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
   const clock = {session: 'qualify' as const, startMinute: null, sessionTimeSec: 0, cloudCover: 0.62};
   const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', null, sceneSun(venue(daylight), 0, clock)), fog = scene.fog as FogExp2;
   try {
-    const sun = sceneLighting(daylight, clock).sunDirection, sunElevationDeg = Math.asin(sun.y) * 180 / Math.PI, weather = skyConditions(daylight, 0.62);
+    const sun = sceneLighting(daylight, clock, venue(daylight)).sunDirection, sunElevationDeg = Math.asin(sun.y) * 180 / Math.PI, weather = skyConditions(daylight, 0.62);
     expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, weather, sunElevationDeg), 12);
     const horizon = hazeColour(testSky(), sun, weather);
     expect((scene.getObjectByName('sun') as DirectionalLight).color.toArray()).toEqual(sunColour(testSun(), sunElevationDeg, 0.62).toArray());
@@ -143,9 +152,9 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
 it("captures the venue at the package's probe without the cars, twice, and lights the scene with the second capture", () => {
   const render = vi.fn<(scene: Scene, camera: Camera) => void>(), scene = new Scene(), renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
   const car = new Mesh(new BoxGeometry(), new MeshBasicMaterial()); scene.add(car);
-  const seen: {at: number[]; car: boolean; lit: boolean; environment: Texture | null}[] = [];
+  const seen: {at: number[]; car: boolean; lit: boolean; environment: Texture | null; emission: number}[] = [];
   render.mockImplementation((_scene, camera) => {
-    if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environmentIntensity > 0, environment: scene.environment});
+    if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environmentIntensity > 0, environment: scene.environment, emission: sceneEmission.value});
   });
   const environment = addSceneEnvironment(scene, renderer, venue(undefined, [110, 7, -40]), new Vector3(100, 5, 20), 'chase', null);
   environment.setDynamic([car]);
@@ -155,6 +164,8 @@ it("captures the venue at the package's probe without the cars, twice, and light
     expect(probe.cubemaps - cubemaps).toBe(2); expect(seen).toHaveLength(12);
     // LMU local (110, 7, -40) against the origin (100, 5, 20): scene x right, y up, z mirrored.
     expect(seen.every(face => face.at.join() === '10,2,60' && !face.car)).toBe(true);
+    // Unlit like the game's probe: no emission while it is captured, back on after.
+    expect(seen.every(face => face.emission === 0) && sceneEmission.value === 1).toBe(true);
     expect(seen.slice(0, 6).every(face => !face.lit) && seen.slice(6).every(face => face.lit)).toBe(true);
     // The sun-only pass keeps the first environment bound (at zero intensity), so no material needs a second program.
     expect(seen.slice(0, 6).every(face => face.environment === first)).toBe(true); expect(scene.environmentIntensity).toBe(1);

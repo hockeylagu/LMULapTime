@@ -51,10 +51,10 @@ export const NIGHT_DOME_GLSL = `
         return nightZenith * vec3(nightPerez(nightX, cosTheta, gamma, cosGamma), nightPerez(nightY, cosTheta, gamma, cosGamma), nightPerez(nightLum, cosTheta, gamma, cosGamma));
       }`;
 
-/** The night dome's uniforms; a dome program without a night dome draws its day branch (`nightOn` 0). */
-export function nightUniforms(dome: NightDome | null): Record<'nightOn' | 'nightX' | 'nightY' | 'nightLum' | 'nightZenith', {value: unknown}> {
+/** The night dome's uniforms at a night weight (skyDome.ts); without a night dome the program draws its day branch alone. */
+export function nightUniforms(dome: NightDome | null, weight = dome ? 1 : 0): Record<'nightWeight' | 'nightX' | 'nightY' | 'nightLum' | 'nightZenith', {value: unknown}> {
   return {
-    nightOn: {value: dome ? 1 : 0},
+    nightWeight: {value: dome ? weight : 0},
     nightX: {value: dome?.coefficients.x ?? [0, 0, 0, 0, 0]}, nightY: {value: dome?.coefficients.y ?? [0, 0, 0, 0, 0]}, nightLum: {value: dome?.coefficients.Y ?? [0, 0, 0, 0, 0]},
     nightZenith: {value: dome ? [...dome.zenithOverSun] : [0, 0, 0]},
   };

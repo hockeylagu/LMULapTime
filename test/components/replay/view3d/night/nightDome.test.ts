@@ -4,7 +4,7 @@ import { nightDome, nightXyY } from '../../../../../src/components/replay/view3d
 import { createSkyDomeMaterial, hazeColour, skyConditions, skyRadiance, skyTurbidity } from '../../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
 
-const clear = skyConditions(undefined, 0), night = {chromaticity: [0.25, 0.25] as const, zenithLuminance: 0.001};
+const clear = skyConditions(undefined, 0), night = {chromaticity: [0.25, 0.25] as const, zenithLuminance: 0.001, weight: 1};
 // The sun 12° below the horizon, toward +x.
 const below = new Vector3(Math.cos(-12 * Math.PI / 180), Math.sin(-12 * Math.PI / 180), 0);
 
@@ -25,9 +25,13 @@ it('draws the night dome in place of the day sky, its light following the zenith
   expect(dark.equals(day)).toBe(false);
 });
 
-it('switches the dome program between day and night by a uniform, one program for both', () => {
-  const day = createSkyDomeMaterial(below, testSky(), undefined, clear), dark = createSkyDomeMaterial(below, testSky(), undefined, clear, night);
-  expect([day.uniforms.nightOn.value, dark.uniforms.nightOn.value]).toEqual([0, 1]);
-  expect(dark.fragmentShader).toBe(day.fragmentShader);
-  expect(day.fragmentShader).toContain('if (nightOn > 0.5) xyY = nightXyY(cosTheta, gamma, cosGamma);');
+it('mixes the day and night domes by the night weight, one program for both', () => {
+  const sky = testSky(), up = new Vector3(0, 1, 0), at = (weight: number) => skyRadiance(sky, below, clear, up, new Color(), {...night, weight});
+  const day = skyRadiance(sky, below, clear, up), full = at(1), half = at(0.5);
+  // By radiance: halfway between the two at a weight of 0.5 (before the colour look's gain, which a grey-ish zenith barely moves).
+  expect(at(0).equals(day)).toBe(true);
+  expect(half.g).toBeGreaterThan(Math.min(day.g, full.g)); expect(half.g).toBeLessThan(Math.max(day.g, full.g));
+  const plain = createSkyDomeMaterial(below, sky, undefined, clear), dark = createSkyDomeMaterial(below, sky, undefined, clear, {...night, weight: 0.25});
+  expect([plain.uniforms.nightWeight.value, dark.uniforms.nightWeight.value]).toEqual([0, 0.25]);
+  expect(dark.fragmentShader).toBe(plain.fragmentShader);
 });

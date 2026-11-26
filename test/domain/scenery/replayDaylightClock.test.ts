@@ -30,5 +30,6 @@ describe('replayDaylightClock', () => {
     expect(replayDaylightClock('Race', 840, 25, null, [field[0]]).cloudField).toEqual({cells: 'a', upperDrift: 1, lowerDrift: 2, ...start});
     expect(replayDaylightClock('Race', 840, 25, null, []).cloudField).toBeUndefined();
     expect(replayDaylightClock('Race', 840, 25, null, [field[0]], ['01', '03']).cloudField?.variants).toEqual(['01', '03']);
+    expect(replayDaylightClock('Race', 840, 25, null, null, null, 'SEBRINGWEC').scene).toBe('sebringwec');
   });
 });

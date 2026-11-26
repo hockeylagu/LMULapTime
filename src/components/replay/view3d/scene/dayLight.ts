@@ -9,6 +9,13 @@ import type { SurfaceConfig } from '../scenery/materials/surfaceConfig.js';
 export const sceneDayLight = { value: 1 };
 
 /**
+ * Whether the scenery's own light (emission: glow, screens, lamps, glow cards) draws: 1, or 0 while the venue is captured. The game's
+ * ambient probe is an unlit G-buffer relit by the sun or the moon alone (the pipeline's shader reading, 2026-11-25), so at night the
+ * capture must not take the venue's glowing panels for light.
+ */
+export const sceneEmission = { value: 1 };
+
+/**
  * The day share under a sun of green radiance `sunGreen` (the package's light unit, before GAME_LIGHT_UNIT): the ambient's red is the sun's
  * green × `perSunGreen[0]`. The package fits that share for a sun above `fit.minSunElevationDeg` and light cloud; lower, the sun's
  * green still falls toward zero and the share with it.

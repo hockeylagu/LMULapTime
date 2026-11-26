@@ -2,7 +2,7 @@ import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type W
 import { patchTextureFocus } from '../textureFocus.js';
 import { tyreReadsAxle } from '../../car/tyreSurface.js';
 import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
-import { readsDayLight, sceneDayLight } from '../../scene/dayLight.js';
+import { readsDayLight, sceneDayLight, sceneEmission } from '../../scene/dayLight.js';
 import { sceneryClock, uvShiftUniform } from './surfaceAnimation.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
 import { glslNumber, list, surfaceAlphaCut, value } from './shaderContext.js';
@@ -136,7 +136,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   // The family's values, four to a vec4 (the last one padded).
   if (code.constants.length) tunables.surface_constants = { value: Float32Array.from({ length: Math.ceil(code.constants.length / 4) * 4 }, (_, i) => code.constants[i] ?? 0) };
   Object.assign(shader.uniforms, tunables, {
-    surface_alphaCut: surfaceAlphaCut,
+    surface_alphaCut: surfaceAlphaCut, surface_emission: sceneEmission,
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
   }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_time: sceneryClock } : {},
     readsDayLight(config) ? { surface_dayLight: sceneDayLight } : {},
@@ -184,7 +184,10 @@ ${shader.fragmentShader}`;
   if (code.coatNormals) shader.fragmentShader = shader.fragmentShader.replace('#include <clearcoat_normal_fragment_maps>', `#include <clearcoat_normal_fragment_maps>\n${code.coatNormals}`);
   if (code.finish) shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `${code.finish}\n#include <opaque_fragment>`);
   if (code.absorption) shader.fragmentShader = shader.fragmentShader.replace('outgoingLight = outgoingLight * ( 1.0 - material.clearcoat * Fcc )', `outgoingLight = outgoingLight * (${code.absorption}) * ( 1.0 - material.clearcoat * Fcc )`);
-  if (code.emissive) shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance=${code.emissive};`);
+  // The family's emission, off while the venue is captured (dayLight.ts `sceneEmission`).
+  shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>',
+    `#include <emissivemap_fragment>\n${code.emissive ? `totalEmissiveRadiance=${code.emissive};` : ''}totalEmissiveRadiance*=surface_emission;`)
+    .replace('#include <common>', '#include <common>\nuniform float surface_emission;');
   // The light loop takes the place of the include, so the reflection inputs go in with it.
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_begin>',
     `${REFLECTING_KINDS.has(config.kind) ? `${SCENERY_REFLECTION_INPUTS}\n` : ''}${ShaderChunk.lights_fragment_begin}`);

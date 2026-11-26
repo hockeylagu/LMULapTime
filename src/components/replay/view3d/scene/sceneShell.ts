@@ -25,7 +25,7 @@ import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
 import { createSceneryBatches, reflects } from '../scenery/sceneryBatches.js';
-import { createNightSwitch } from '../night/nightSwitch.js';
+import { createNightSwitch, DAY_STATE, type NightState } from '../night/nightSwitch.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
@@ -166,6 +166,9 @@ export const SUN_STEP_DEG = 0.25;
 /** How far the cloud cover or the sun's visibility through the clouds moves before `setDaylight` lights the scene again. */
 const WEATHER_STEP = 0.01;
 
+/** The scenery's switches at a moment (nightMoment.ts): day without the night model. */
+const nightState = ({lighting: {night}}: SceneSun): NightState => night ? {night: night.night, lightsOn: night.lightsOn} : DAY_STATE;
+
 /** Each car's body and pose marker, which `placeCar` switches by whether the pose has a heading. */
 const poseShapes = new WeakMap<Object3D, {body: Object3D; marker: Object3D}>();
 
@@ -199,8 +202,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     .translate(new Vector3(-origin.x, -origin.y, origin.z));
   // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
   const batches = createSceneryBatches(sceneryRoot, layout.materials, renderer.capabilities.maxTextures);
-  // The scenery the game switches between day and night keeps its own draws: drawn by day until the night model sets the state.
-  const nightSwitch = createNightSwitch();
+  // The scenery the game switches between day and night keeps its own draws, drawn for the moment's night state.
+  const nightSwitch = createNightSwitch(nightState(sun));
   // The scenery's own draws (out of the batches) that the car's reflection leaves out, chunk by chunk.
   const ownNotReflected: Object3D[] = [];
   let content: SceneContent | null = null;
@@ -504,7 +507,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       const turnedDeg = MathUtils.radToDeg(next.lighting.sunDirection.angleTo(sun.lighting.sunDirection));
       const [cover, seen] = weather(next), [shownCover, shownSeen] = weather(sun);
       if (turnedDeg < SUN_STEP_DEG && Math.abs(cover - shownCover) < WEATHER_STEP && Math.abs(seen - shownSeen) < WEATHER_STEP) return;
-      sun = next; meter = sunMeter(sun, eye);
+      sun = next; meter = sunMeter(sun, eye); nightSwitch.set(nightState(sun));
       exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
       // Before the environment exists, it is made from this sun.
       if (environment) { environment.setSun(sun); invalidate(); }
