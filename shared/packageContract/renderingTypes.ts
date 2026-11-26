@@ -97,6 +97,41 @@ export interface ScenerySky {
   /** The cloud field the replay's cloud cells and drifts place. */
   clouds: SceneryClouds;
   sunDisc: ScenerySunDisc;
+  /** The night model's inputs: twilight, moon, fog and the night switches (docs/SCENE_PACKAGE.md "Night"). */
+  night: ScenerySkyNight;
+}
+
+/**
+ * The night model's inputs. Twilight CIE Y at refracted sun elevation e = lerp of `illuminance` by `sunElevationDeg` (ends held) × scale / π ×
+ * sunScatteringScale × hdrScale, at xy `chromaticity`; it replaces the sun's scattered light below `blendBelowDeg` (weight clamp(e / blendBelowDeg, 0, 1)).
+ * The sun's direct light is × clamp(e − sunDirect.zeroDeg, 0, 1)^exponent; at zero the moon is the light. The ambient (the game's lightColor[0]) is
+ * lightColorToAmbient · rgb + (1 − lightColorToAmbient) · |rgb|; its red against `shading.ambient.nightLevel` is the night switch. `moon` and `fog`
+ * are fitted on the night captures.
+ */
+export interface ScenerySkyNight {
+  twilight: {sunElevationDeg: number[]; illuminance: number[]; scale: number; chromaticity: [number, number]; sunScatteringScale: number; hdrScale: number; blendBelowDeg: number};
+  sunDirect: {zeroDeg: number; exponent: number};
+  ambientMapping: {lightColorToAmbient: number; useIntensity: boolean};
+  /**
+   * The light level: clamp(base + sinScale · sin e, 0, 1) sampled every stepS seconds of the day (48 half-hourly samples), interpolated linearly at the
+   * time of day, times a cloud-darkness blend that is not traced. Track lights are on while the scene's nightLightThreshold exceeds it (its default
+   * where the GDB has none is not traced), automatic headlights while it is below nightLightThreshold − headlightMargin.
+   */
+  lightLevel: {base: number; sinScale: number; stepS: number; headlightMargin: number};
+  nightLightPollutionDefault: number;
+  /**
+   * The moon's light: `reference.rgb` at `reference.elevationDeg` (refracted) and `phaseAngleDeg`, scaled by exp(−opticalDepth · (m − 1)) between
+   * Kasten-Young air masses m and by the phase brightness; its scattered light (before the ambient mapping) is scatterShare × its luminance ×
+   * scatterColour, and the night sky zenith adds zenithShare of that scattered luminance.
+   */
+  moon: {reference: {rgb: Vec3; elevationDeg: number; phaseAngleDeg: number}; opticalDepth: number; scatterShare: number; scatterColour: Vec3; zenithShare: number};
+  /** Fog colour = hue × twilightShare × the mapped twilight ambient's luminance. */
+  fog: {twilightShare: number; hue: Vec3};
+  /**
+   * Observed in the night captures: the sky dome's Perez branch replaces its Hosek-Wilkie branch with weight 0 at `perezWeightZeroAboveDeg` of refracted
+   * sun elevation and 1 from `perezWeightOneBelowDeg` down; the weight's shape between them is not traced.
+   */
+  dome: {perezWeightZeroAboveDeg: number; perezWeightOneBelowDeg: number};
 }
 
 /**

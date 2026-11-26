@@ -1,4 +1,4 @@
-import { Box3, Group, MathUtils, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type Ray } from 'three';
+import { Box3, Group, MathUtils, Mesh, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type Ray } from 'three';
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
@@ -24,13 +24,12 @@ import { linkUnderCarBake } from '../car/underCarBake.js';
 import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
-import { createSceneryBatches } from '../scenery/sceneryBatches.js';
+import { createSceneryBatches, reflects } from '../scenery/sceneryBatches.js';
 import { createNightSwitch } from '../night/nightSwitch.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
 import { createSceneryStream } from '../scenery/sceneryStream.js';
-import { createReflectionSet } from '../scenery/reflectionSet.js';
 import { createSceneWarmup } from '../scenery/sceneWarmup.js';
 import { startStreaming } from '../scenery/materials/mipStreaming.js';
 import { focusing } from '../scenery/textureFocus.js';
@@ -202,8 +201,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const batches = createSceneryBatches(sceneryRoot, layout.materials, renderer.capabilities.maxTextures);
   // The scenery the game switches between day and night keeps its own draws: drawn by day until the night model sets the state.
   const nightSwitch = createNightSwitch();
-  // What the car's probe draws in place of the scenery, chunk by chunk with it.
-  const reflectionSet = createReflectionSet(layout, loader, origin);
+  // The scenery's own draws (out of the batches) that the car's reflection leaves out, chunk by chunk.
+  const ownNotReflected: Object3D[] = [];
   let content: SceneContent | null = null;
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {}, schedule: () => void = () => {};
   /** Something besides the exposure asked for a frame since the last one drew (or a resize drew it). */
@@ -258,8 +257,6 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       // chunk waits its turn to compile and upload (warm-ups stay one at a time). A chunk that fails leaves what it built (its ray
       // tree, its hidden batch instances) to the shell's disposal: the failure breaks the shell, and the next view makes a new one.
       let grounded: Promise<void> = Promise.resolve();
-      const reflected = reflectionSet.load(chunk.id, signal);
-      reflected.catch(() => {}); // Awaited below; the scenery's own failure may reject the load first.
       const root = await loader.load(chunk, signal, parsed => {
         grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
         grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
@@ -267,14 +264,14 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       realRoad.prepare(root);
       const created = batches.add(root);
       nightSwitch.add(root);
+      // The parts left out of the batches that the car's reflection does not draw either.
+      root.traverse(object => { if ((object as Partial<Mesh>).isMesh === true && object.layers.mask !== 0 && !reflects(object)) ownNotReflected.push(object); });
       await lit; // A chunk's programs depend on the scene's environment.
-      const reflection = await reflected;
-      await Promise.all([warmup.queue(reflection ? [root, ...created, reflection] : [root, ...created], signal, worldBox(chunk.bounds)), grounded]);
+      await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), grounded]);
       signal.throwIfAborted();
-      if (reflection) reflectionSet.join(root, reflection);
       return root;
     },
-    changed: () => { batches.sync(); reflectionSet.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
+    changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
@@ -306,13 +303,13 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const convolution = linkConvolution(renderer, layout.shading.convolution.kernels);
   lit = Promise.resolve().then(() => {
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null, sun);
-    reflection = createCarReflection(renderer, scene, layout.shading, {set: reflectionSet.root, scenery: sceneryRoot});
+    reflection = createCarReflection(renderer, scene, layout.shading,
+      {notReflected: () => [...batches.notReflected(), ...ownNotReflected], clipM: layout.reflection.observedClipM});
   });
   lit.then(() => report({lighting: 1}), () => {}); // Awaited by the content.
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(sceneryRoot);
-  world.add(reflectionSet.root);
   const route = layout.routeLengthM;
   /** Stream scenery around the car (lap distance, plus what is near the camera) or, for the panned orbit and overhead cameras, around the camera. */
   const updateStream = () => {

@@ -130,6 +130,33 @@ export interface CarLamp {
   brakeGlowRange?: [number, number] | null;
 }
 
+/**
+ * One of the car's spot lights from its GEN `Light=` block, in the native car frame of the GLB (docs/PACKAGE_FORMAT.md#car-lights). Per pixel the
+ * game adds `colour · saturate(coeff / (a0 + d·(a1 + d·a2))) · (1 − d / rangeM) · smoothstep(−0.05, 0.2, N·−direction)` to the diffuse light, `coeff`
+ * 1 inside the inner cone and `((ρ − cos(outer/2)) / (cos(inner/2) − cos(outer/2)))^falloff` in the penumbra.
+ */
+export interface CarSpotLight {
+  name: 'headlightLeft' | 'headlightRight' | 'tail';
+  position: Vec3;
+  /** As authored (`Dir`); not normalised. */
+  direction: Vec3;
+  rangeM: number;
+  /** `Attenuate`: constant, linear and quadratic coefficients. */
+  attenuation: Vec3;
+  /** `Hotspots`: the full inner and outer cone angles in degrees. */
+  innerConeDeg: number;
+  outerConeDeg: number;
+  falloff: number;
+  /** Color / 255 × Intensity. */
+  colour: Vec3;
+}
+
+/** The GEN `CockpitLight` omni, in the native car frame: `colour` is Color / 255; the cockpit materials carry their own copy (`cockpitLight`). */
+export interface CarCockpitLight {position: Vec3; rangeM: number; colour: Vec3; intensity: number}
+
+/** The car's own lights: the two headlights and the tail light, in that order (the game's spot table order), and the cockpit light or null. */
+export interface CarLights {spots: CarSpotLight[]; cockpit: CarCockpitLight | null}
+
 export interface BodyDescriptor {
   /** GLB nodes that are alternatives between entries: `option_<mesh stem>`, mesh-only. Sorted, unique. */
   optionNodes: string[];
@@ -143,6 +170,7 @@ export interface BodyDescriptor {
   cameras: {frame: string; cockpitViewRule: string; list: CarCamera[]; chase: {lodMultiplier: number}};
   /** The distinct readouts of the body's entries, each used by at least one appearance (`readout`); empty when no entry draws one. */
   readouts: CarReadout[];
+  lights: CarLights;
 }
 
 /**
@@ -266,7 +294,9 @@ export interface CarReadoutFont {
   advances: number[];
 }
 
-export const BODY_DESCRIPTOR_KEYS = ['optionNodes', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras', 'readouts'] as const;
+export const BODY_DESCRIPTOR_KEYS = ['optionNodes', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras', 'readouts', 'lights'] as const;
+export const CAR_SPOT_LIGHTS = ['headlightLeft', 'headlightRight', 'tail'] as const;
+const SPOT_KEYS = ['name', 'position', 'direction', 'rangeM', 'attenuation', 'innerConeDeg', 'outerConeDeg', 'falloff', 'colour'] as const;
 const APPEARANCE_KEYS = ['alias', 'number', 'albedo', 'paint', 'optionNodes', 'readout'];
 const READOUT_KEYS = ['material', 'rpm', 'revLimitRpm', 'canvasSize', 'elements', 'texts', 'fonts'] as const;
 const READOUT_TEXT_KEYS = ['name', 'font', 'scale', 'offset', 'alignW', 'alignH', 'alphaColor', 'units', 'defaultValue'] as const;
@@ -293,6 +323,35 @@ function parseReflectionOcclusion(value: unknown, what: string, volumes: Readonl
   if (vec3(occlusion.size, `${what}.size`, 20).some(metres => !(metres > 0))) throw Error(`${what}.size: expected positive edge lengths`);
   vec3(occlusion.offset, `${what}.offset`, 20);
   return volume;
+}
+
+/** The body's lights: the three spots in order and the cockpit light or null, each value finite and in range. */
+function parseLights(value: unknown, what: string): void {
+  const lights = record(value, what);
+  orderedKeys(lights, ['spots', 'cockpit'], what);
+  const nonNegative = (v: unknown, at: string) => { const n = finite(v, at); if (n < 0) throw Error(`${at}: negative`); return n; };
+  const names = array(lights.spots, `${what}.spots`, 3).map((item, i) => {
+    const at = `${what}.spots[${i}]`, spot = record(item, at);
+    orderedKeys(spot, SPOT_KEYS, at);
+    vec3(spot.position, `${at}.position`, 20);
+    if (vec3(spot.direction, `${at}.direction`, 10).every(n => n === 0)) throw Error(`${at}.direction: zero vector`);
+    if (!(finite(spot.rangeM, `${at}.rangeM`) > 0 && (spot.rangeM as number) <= 5000)) throw Error(`${at}.rangeM: expected 0 to 5000 m`);
+    vec3(spot.attenuation, `${at}.attenuation`, 1000).forEach(n => nonNegative(n, `${at}.attenuation`));
+    const inner = finite(spot.innerConeDeg, `${at}.innerConeDeg`), outer = finite(spot.outerConeDeg, `${at}.outerConeDeg`);
+    if (!(inner > 0 && outer >= inner && outer < 360)) throw Error(`${at}: expected 0 < innerConeDeg <= outerConeDeg < 360`);
+    nonNegative(spot.falloff, `${at}.falloff`);
+    vec3(spot.colour, `${at}.colour`, 1000).forEach(n => nonNegative(n, `${at}.colour`));
+    return text(spot.name, `${at}.name`, 32);
+  });
+  if (names.join() !== CAR_SPOT_LIGHTS.join()) throw Error(`${what}.spots: expected ${CAR_SPOT_LIGHTS.join(", ")}`);
+  if (lights.cockpit !== null) {
+    const at = `${what}.cockpit`, cockpit = record(lights.cockpit, at);
+    orderedKeys(cockpit, ['position', 'rangeM', 'colour', 'intensity'], at);
+    vec3(cockpit.position, `${at}.position`, 20);
+    if (!(finite(cockpit.rangeM, `${at}.rangeM`) > 0)) throw Error(`${at}.rangeM: must be positive`);
+    vec3(cockpit.colour, `${at}.colour`, 1).forEach(n => nonNegative(n, `${at}.colour`));
+    nonNegative(cockpit.intensity, `${at}.intensity`);
+  }
 }
 
 function nullableFlag(value: unknown, what: string): void {
@@ -532,6 +591,7 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
     return text(camera.name, `${at}.name`, 64);
   });
   if (!sameList(names, ['cockpit', 'hood', 'roof'])) throw Error(`${what}.cameras.list: expected exactly the cockpit, hood and roof cameras`);
+  parseLights(descriptor.lights, `${what}.lights`);
   const readouts = array(descriptor.readouts, `${what}.readouts`, 64);
   readouts.forEach((readout, i) => parseReadout(readout, `${what}.readouts[${i}]`, declared, materialNames));
   if (new Set(readouts.map(readout => JSON.stringify(readout))).size !== readouts.length) throw Error(`${what}.readouts: a readout is listed twice`);

@@ -57,8 +57,8 @@ function stubRenderer() {
   return {renderer: renderer as unknown as WebGLRenderer, faces, eyes, ranges, cars, target: () => target};
 }
 
-/** What the faces draw: an empty reflection set, and the scenery it stands for. */
-const setFaces = () => ({set: new Group(), scenery: new Group()});
+/** What the faces leave out: nothing. */
+const setFaces = () => ({notReflected: () => [], clipM: 150});
 
 it('renders the probe three faces a frame from the roof without the cars, then gives the car its reflection', () => {
   const {renderer, faces, eyes, ranges, cars, target} = stubRenderer();
@@ -196,13 +196,13 @@ it("corrects either of the car's surface reads for the scenery overhead, in a pr
   expect(cabin.key).toBe('standard_x-car-plain');
 });
 
-it('draws the reflection set in place of the scenery three faces a frame, a conversion step riding with them', () => {
+it('leaves the scenery the game does not reflect out of its faces, three faces a frame, a conversion step riding with them', () => {
   const {renderer, faces} = stubRenderer();
-  const set = new Group(), scenery = new Group(), seen: Array<[boolean, boolean]> = [];
-  set.visible = false;
+  // A reflected part, a part left out, and one left out that another rule already hides.
+  const reflected = new Group(), left = new Group(), hiddenAnyway = Object.assign(new Group(), {visible: false}), seen: Array<[boolean, boolean, boolean]> = [];
   const render = renderer.render.bind(renderer);
-  renderer.render = (scene, camera) => { seen.push([set.visible, scenery.visible]); render(scene, camera); };
-  const reflection = createCarReflection(renderer, new Scene(), testShading(), {set, scenery}), centre = new Vector3();
+  renderer.render = (scene, camera) => { seen.push([reflected.visible, left.visible, hiddenAnyway.visible]); render(scene, camera); };
+  const reflection = createCarReflection(renderer, new Scene(), testShading(), {notReflected: () => [left, hiddenAnyway], clipM: 150}), centre = new Vector3();
   reflection.setCar(new Mesh(new BoxGeometry(), new MeshPhysicalMaterial()), new Group());
   const conversions = pmrem.conversions, convolutions = pmrem.convolutions;
   // The first cube: three faces, then three more with the prefilter, then the convolution alone (the car has not moved).
@@ -211,9 +211,9 @@ it('draws the reflection set in place of the scenery three faces a frame, a conv
   expect(pmrem.conversions - conversions).toBe(1); expect(pmrem.convolutions - convolutions).toBe(0);
   expect(reflection.update(centre)).toBe(true); expect(pmrem.convolutions - convolutions).toBe(1); expect(faces).toHaveLength(6);
   expect(reflection.update(centre)).toBe(false);
-  // Only the set draws into the faces; outside them the scenery shows and the set hides.
-  expect(seen.every(([setShown, sceneryShown]) => setShown && !sceneryShown)).toBe(true);
-  expect(set.visible).toBe(false); expect(scenery.visible).toBe(true);
+  // Only the reflected part draws into the faces; outside them every part is as it was.
+  expect(seen.every(([shown, leftShown, other]) => shown && !leftShown && !other)).toBe(true);
+  expect([reflected.visible, left.visible, hiddenAnyway.visible]).toEqual([true, true, false]);
   // A moving car: a new cube every two frames, the convolution of the last sharing a frame with the first faces of the next.
   for (let x = 1; x <= 4; x++) reflection.update(new Vector3(x, 0, 0));
   expect(faces).toHaveLength(6 + 12); expect(pmrem.conversions - conversions).toBe(3); expect(pmrem.convolutions - convolutions).toBe(2);

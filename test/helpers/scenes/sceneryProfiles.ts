@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { resolveShadowSplits } from '../../../shared/packageContract/index.js';
+import { resolveShadowSplits, type SceneryNight, type ScenerySkyNight } from '../../../shared/packageContract/index.js';
 import type { SceneryClouds, SceneryCloudsFile } from '../../../shared/types/scenes/clouds.js';
 import type { SceneryCamera, SceneryCameraTypeProfile, SceneryHosekSky, SceneryShading, ScenerySky, ScenerySun } from '../../../shared/types/scenes/scenery.js';
 
@@ -140,6 +140,33 @@ export function testSky(): ScenerySky {
     },
     clouds: testClouds(),
     sunDisc: { sun: { widthDeg: 0.5, diskIntensity: 0.075, scatterColour: true, glow: { enabled: true, sizeDeg: 25, intensity: 0.001 } }, moon: { widthDeg: 0.5, brightnessScale: 1, scatterColour: false, glow: { enabled: true, sizeDeg: 15, intensity: 0.02 } }, drawBelowHorizon: false },
+    night: testNight(),
+  };
+}
+
+const TWILIGHT: [number, number][] = [[-16, 0.0018], [-15, 0.0018], [-14, 0.0019], [-13, 0.0022], [-12, 0.0031], [-11, 0.0092], [-10, 0.021], [-9, 0.047], [-8, 0.11],
+  [-7, 0.3], [-6, 0.9], [-5, 2.9], [-4, 9.4], [-3, 28], [-2, 77], [-1, 190], [0, 400], [1, 710], [2, 1200], [3, 1400], [4, 1800], [5, 2200]];
+
+/** The package's night model as the pipeline builds it from the game files (personal-v30, schema 23). */
+export function testNight(): ScenerySkyNight {
+  return {
+    twilight: {sunElevationDeg: TWILIGHT.map(row => row[0]), illuminance: TWILIGHT.map(row => row[1]), scale: 5, chromaticity: [0.25, 0.25], sunScatteringScale: 1, hdrScale: 0.001, blendBelowDeg: 2},
+    sunDirect: {zeroDeg: -1, exponent: 2},
+    ambientMapping: {lightColorToAmbient: 0.8, useIntensity: true},
+    lightLevel: {base: 0.4, sinScale: 0.8, stepS: 1800, headlightMargin: 0.05},
+    nightLightPollutionDefault: 0.001,
+    moon: {reference: {rgb: [0.08309, 0.07865, 0.06008], elevationDeg: 21.29, phaseAngleDeg: 16.4}, opticalDepth: 0.2, scatterShare: 0.0175, scatterColour: [-0.223, 1.399, 0.652], zenithShare: 0.515},
+    fog: {twilightShare: 0.727, hue: [1, 1, 1.05]},
+    dome: {perezWeightZeroAboveDeg: 2.9, perezWeightOneBelowDeg: -0.83},
+  };
+}
+
+/** A layout's night data: one scene with no threshold, one track light, no capped lists. */
+export function testLayoutNight(): SceneryNight {
+  return {
+    scenes: [{sceneDesc: 'test', date: '2023-09-10', latitudeDeg: 35.37, longitudeDeg: 138.93, timezoneHours: 9, dstRange: null, utcOffsetHours: 9, nightLightThreshold: null, nightLightPollution: 0.001}],
+    lights: [{position: [0, 10, 0], rangeM: 50, colour: [1, 0.9, 0.8]}],
+    lightLists: [],
   };
 }
 

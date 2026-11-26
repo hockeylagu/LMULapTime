@@ -19,8 +19,13 @@ export interface SceneryBatches {
    * distance scale follows the zoom, and the free views. `lodMultiplier` scales every range (the view's, `CameraRig.lodMultiplier`).
    */
   cull(eye: Vector3 | null, lodMultiplier?: number): void;
+  /** The batches of parts the car's reflection does not draw (`reflects`): it hides them while its faces render. */
+  notReflected(): readonly BatchedMesh[];
   dispose(): void;
 }
+
+/** Whether the car's reflection draws a scenery part: the package's node flag (`extras.lmuReflect`, on the mesh or its group). */
+export const reflects = (object: Object3D): boolean => (object.userData.lmuReflect ?? object.parent?.userData.lmuReflect) === true;
 
 /** An instance and its node's distance range (squared, metres), against its box in the batch's space. */
 interface Ranged { instance: number; box: Box3; inSq: number; outSq: number; inRange: boolean; drawn: boolean }
@@ -67,13 +72,15 @@ function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, maxTexture
  * A chunk's instances stay in their batches until the scene goes (chunks never unload): a hidden chunk only hides them.
  * `maxTextures` is the renderer's `capabilities.maxTextures`. Instances are neither frustum culled nor sorted one by one: that per-pass
  * work cost more than the draws it saved. They are culled by distance once per step of the eye (`cull`), within the package's per-node draw distances.
+ * A material is split by whether the car's reflection draws it too (`reflects`), as by its shadow flags.
  */
 export function createSceneryBatches(parent: Object3D, materials: readonly SceneryMaterialTotals[], maxTextures: number): SceneryBatches {
   const totals = new Map(materials.map(row => [row.key, row]));
   const batches = new Map<string, Batch>(), byKey = new Map<string, Batch[]>(), used = new Map<string, Used>();
   const chunks = new Map<Object3D, {placed: Placed[]; shown: boolean}>();
+  const hiddenInReflection: BatchedMesh[] = [];
   const batchFor = (key: string, mesh: Mesh<BufferGeometry, Material>, layout: string, fresh: BatchedMesh[]): Batch => {
-    const id = `${key}|${mesh.castShadow}|${mesh.receiveShadow}`, existing = batches.get(id);
+    const reflected = reflects(mesh), id = `${key}|${mesh.castShadow}|${mesh.receiveShadow}|${reflected}`, existing = batches.get(id);
     if (existing) {
       if (existing.mesh.material !== mesh.material) throw Error(`Scenery material ${key} draws with two materials (${mesh.name})`);
       if (existing.layout !== layout) throw Error(`Scenery material ${key} has primitives with different attributes (${mesh.name})`);
@@ -87,6 +94,7 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
     // with no instance to draw, so a batch in the scene before its chunk's warm-up would link its program on the main thread.
     const batch = {mesh: made, layout};
     batches.set(id, batch); fresh.push(made);
+    if (!reflected) hiddenInReflection.push(made);
     byKey.set(key, [...byKey.get(key) ?? [], batch]);
     return batch;
   };
@@ -126,10 +134,19 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
       root.updateWorldMatrix(true, true);
       const fresh: BatchedMesh[] = [], byBatch = new Map<BatchedMesh, Placed>(), moved: Mesh[] = [], keys = new Set<string>();
       // A geometry several nodes use is stored once in its batch.
-      const stored = new Map<BufferGeometry, number>();
+      const stored = new Map<BufferGeometry, number>(), switchedGeometry = new Set<BufferGeometry>();
       root.traverse(object => {
         if (!(object instanceof Mesh)) return;
         const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
+        const ownKey: unknown = mesh.userData.lmuMaterial;
+        // A switched part keeps its own draw but counts toward its material's totals: the batches free their arrays once every part arrived.
+        if (sceneVisibility(mesh) && typeof ownKey === 'string' && totals.has(ownKey)) {
+          const count = used.get(ownKey) ?? {primitives: 0, draws: 0};
+          used.set(ownKey, count); keys.add(ownKey);
+          if (!switchedGeometry.has(mesh.geometry)) { switchedGeometry.add(mesh.geometry); count.primitives++; }
+          count.draws++;
+          return;
+        }
         if (!batchable(mesh, maxTextures)) return;
         const key: unknown = mesh.userData.lmuMaterial;
         if (typeof key !== 'string') throw Error(`Scenery material without its package key (${mesh.name})`);
@@ -159,8 +176,9 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
       for (const mesh of moved) { mesh.geometry.dispose(); mesh.geometry = MOVED; mesh.visible = false; mesh.layers.disableAll(); }
       // A batch's bounds (its frustum culling) cover the instances it had when first computed: they grow with each chunk.
       for (const batch of byBatch.keys()) computeBatchBounds(batch);
-      // The last primitive of a material fills its batches: they keep no CPU copy past their next upload.
-      for (const key of keys) if (used.get(key)!.primitives === totals.get(key)!.primitives) for (const {mesh} of byKey.get(key)!) releaseBatchOnUpload(mesh);
+      // The last primitive of a material fills its batches: they keep no CPU copy past their next upload. A material only switched parts
+      // draw has none.
+      for (const key of keys) if (used.get(key)!.primitives === totals.get(key)!.primitives) for (const {mesh} of byKey.get(key) ?? []) releaseBatchOnUpload(mesh);
       chunks.set(root, {placed: [...byBatch.values()], shown: false});
       return fresh;
     },
@@ -185,9 +203,10 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
       culledAt = (culledAt ?? new Vector3()).copy(local);
       placeAll(culledAt);
     },
+    notReflected: () => hiddenInReflection,
     dispose() {
       for (const {mesh} of batches.values()) { mesh.removeFromParent(); mesh.dispose(); }
-      batches.clear(); byKey.clear(); counts.clear(); chunks.clear(); used.clear();
+      batches.clear(); hiddenInReflection.length = 0; byKey.clear(); counts.clear(); chunks.clear(); used.clear();
     },
   };
 }

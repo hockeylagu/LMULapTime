@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { syntheticTrack } from '../syntheticTrack.js';
-import { catalogSky, packageClouds, packageShadows, TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from './sceneryProfiles.js';
+import { catalogSky, packageClouds, packageShadows, TEST_HAZE_WEIGHTS, testCamera, testLayoutNight, testShading, testSky } from './sceneryProfiles.js';
 import { bodyDescriptorPath, bodyGlbPath, bodyTexturePath, descriptorTexturePath, PACKAGE_SCHEMA, renderingBinPath, sceneryChunkPath, sceneryHeightPath, sceneryRealRoadPath, sceneryTexturePath, TRACK_LAYOUT_KEYS } from '../../../shared/packageContract/index.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 
@@ -33,7 +33,7 @@ export interface VehicleSpec { id: string; vehicleIds: string[]; extra?: Record<
 /** A compact chunk row of `scenery/index.json`: no `asset` (derived from `sha256`), `textures` are indices into its layout row's texture list. */
 export interface ChunkRow {
   id: string; kind: string; bounds: { min: number[]; max: number[] }; sha256: string; byteLength: number;
-  triangles: number; vertices: number; drawCalls: number; shadowDrawCalls: number; shadowTriangles: number; geometryBytes: number; meshes: number; materials: number; textures: number[];
+  triangles: number; vertices: number; drawCalls: number; shadowDrawCalls: number; shadowTriangles: number; reflectDrawCalls: number; reflectTriangles: number; geometryBytes: number; meshes: number; materials: number; textures: number[];
   lapStartM?: number; lapEndM?: number;
 }
 
@@ -67,7 +67,7 @@ export function syntheticPackage() {
   const sceneryTexture = store(sceneryTexturePath, zstdCompressSync(ktx2('scenery texture')));
   const chunk = (id: string, marker: string, extra: Partial<ChunkRow>): ChunkRow => ({
     id, kind: 'main', ...extra, bounds: { min: [-10, 0, -10], max: [10, 5, 10] }, ...rowOf(store(sceneryChunkPath, glb(marker))),
-    triangles: 10, vertices: 30, drawCalls: 2, shadowDrawCalls: 1, shadowTriangles: 4, geometryBytes: 100, meshes: 2, materials: 1, textures: [0],
+    triangles: 10, vertices: 30, drawCalls: 2, shadowDrawCalls: 1, shadowTriangles: 4, reflectDrawCalls: 1, reflectTriangles: 4, geometryBytes: 100, meshes: 2, materials: 1, textures: [0],
   });
   /** The catalog's shared parameters and its texture table: one entry per distinct texture file. */
   const sceneryShared = {
@@ -85,16 +85,14 @@ export function syntheticPackage() {
   const scenery = {
     layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750, environmentProbe: { position: [10, 2, -20] }, irradianceProbes: [], roadHeight, realRoad,
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
+    night: testLayoutNight(),
     horizon: chunk('horizon', 'horizon', { kind: 'horizon' }),
     sectors: [
       chunk('s0', 'sector 0', { kind: 'main', lapStartM: 0, lapEndM: L / 2 }),
       chunk('s1', 'sector 1', { kind: 'main', lapStartM: L / 2, lapEndM: L }),
     ],
-    // The car reflection set: one chunk, for the first sector only (sectors may have none).
-    reflection: { name: 'REFMAP0', textureSize: 1024, updateRate: 100, staticSwitchM: 300, observedClipM: 150, blockLengthM: 150, chunks: [{
-      id: 's0', kind: 'main', lapStartM: 0, lapEndM: L / 2, bounds: { min: [-10, 0, -10], max: [10, 5, 10] }, ...rowOf(store(sceneryChunkPath, glb('reflection 0'))),
-      triangles: 4, vertices: 12, drawCalls: 1, blocks: 1, geometryBytes: 40, textures: [0],
-    }] },
+    // The car reflection cube: it draws the chunks' own nodes flagged as reflected.
+    reflection: { name: 'REFMAP0', textureSize: 1024, updateRate: 100, staticSwitchM: 300, observedClipM: 150 },
     textures: [{ texture: 0 }] as Array<Record<string, unknown>>,
     // One material over the three chunks: 2 draw calls, 30 vertices and 10 triangles each.
     materials: [{ key: '0123456789abcdef', vertices: 90, indices: 90, primitives: 6, draws: 6 }] as Array<Record<string, unknown>>,

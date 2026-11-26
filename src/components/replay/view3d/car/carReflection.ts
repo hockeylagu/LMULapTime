@@ -6,14 +6,12 @@ import { isCarPaint, setPaintReflection } from './carPaint.js';
 import { createOverheadMap, OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
 
 /**
- * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. How far each face sees: beyond 150 m the sky shows,
- * the range the reference reflections reach.
+ * Face size as the reference frames' reflections (2026-11-09): 1024 px a face, the package's `reflection.textureSize` at every venue.
  */
 export const CAR_REFLECTION_PX = 1024;
-const NEAR_M = 0.1, FAR_M = 150;
+const NEAR_M = 0.1;
 /**
- * The probe draws the game's reflection set (scenery/reflectionSet.ts), a face a few draws of few triangles, three faces a frame:
- * a cube every two frames, as a capture of the game's own car cube shows (2026-11-16). The conversions ride with the faces: three's
+ * The probe draws the scenery parts the game reflects in its car cube (the package's `lmuReflect` nodes, out to its clip distance), three faces a frame: a cube every two frames, as a capture of the game's own car cube shows (2026-11-16). The conversions ride with the faces: three's
  * prefilter with the last three, the paint's convolution with the next cube's first three, so every frame carries one step.
  */
 const FACES_PER_FRAME = 3;
@@ -24,8 +22,11 @@ const MOVED_M = 0.5;
 /** The probe's eye above the centre of the car's bounding box: roof height, as the reference frames place it (0.72 m on a GT3). */
 const EYE_ABOVE_CENTRE_M = 0.72;
 
-/** What the faces draw in place of the scenery (`scenery`, shown outside the faces): the game's reflection set (`set`, hidden outside them). */
-export interface ReflectionFaces { set: Object3D; scenery: Object3D }
+/**
+ * The scenery the faces leave out: the parts the game does not reflect (their batches and own draws), hidden while the faces render;
+ * and how far a face sees, the package's `reflection.observedClipM` (beyond it the sky shows).
+ */
+export interface ReflectionFaces { notReflected(): Iterable<Object3D>; clipM: number }
 
 export interface CarReflection {
   /** The car that takes the reflection: its materials sample the probe, which is empty until the first one is complete (the scene
@@ -131,7 +132,7 @@ function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null,
 
 /**
  * Reflects the scenery in the cars, in place of the sky environment the scenery uses: a cube camera at the car, rendering the
- * game's reflection set (`faces`) without the cars. When the sixth face completes, the cube is prefiltered by three (PMREM) for the
+ * scenery the game reflects (all but `faces.notReflected`) without the cars. When the sixth face completes, the cube is prefiltered by three (PMREM) for the
  * car's other lit materials and, the next frame, convolved with the package's kernels for the car paint (which reads the sharp
  * cube and the convolved one by its own rule). Faces render after the frame, against its current shadow cascades. Both
  * conversions run here, between frames: given the cube itself, three converts it in the middle of drawing the car, and that nested
@@ -145,7 +146,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   const targets = [cube(), cube()];
   /** The cube the faces draw into; the other one is shown. */
   let target = targets[0];
-  const camera = new CubeCamera(NEAR_M, FAR_M, target);
+  const camera = new CubeCamera(NEAR_M, faces.clipM, target);
   // The prefiltered target exists from the start, converted from the empty cube: its size is a program define, so a car's
   // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
   const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
@@ -221,9 +222,10 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       camera.position.copy(at); camera.position.y += eyeAbove; camera.updateMatrixWorld();
       for (let each = face; each < face + FACES_PER_FRAME; each++) camera.position.toArray(drawnEyes, each * 3);
       const previous = renderer.getRenderTarget(), shown = hidden?.visible ?? false;
+      const left = [...faces.notReflected()].filter(object => object.visible);
       try {
         if (hidden) hidden.visible = false;
-        faces.scenery.visible = false; faces.set.visible = true;
+        for (const object of left) object.visible = false;
         for (const last = face + FACES_PER_FRAME; face < last; face++) {
           target.texture.generateMipmaps = face === 5;
           renderer.setRenderTarget(target, face);
@@ -231,7 +233,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         }
       } finally {
         if (hidden) hidden.visible = shown;
-        faces.scenery.visible = true; faces.set.visible = false;
+        for (const object of left) object.visible = true;
         renderer.setRenderTarget(previous);
       }
       face %= 6;

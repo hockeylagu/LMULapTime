@@ -8,11 +8,11 @@ import type { SceneryCamera, SceneryChunkingParameters, SceneryHorizonChunk, Sce
 import type { SceneryClouds, SceneryCloudsFile } from './clouds.js';
 
 export type { SceneryBounds, SceneryCamera, SceneryCameraLook, SceneryCameraProfile, SceneryCameraType, SceneryCameraTypeProfile, SceneryChunkingParameters, SceneryConvolutionKernel,
-  SceneryDaylight, SceneryFog, SceneryHorizonChunk, SceneryReflectionChunk, SceneryReflectionLod, ScenerySectorChunk, ScenerySessionDaylight, ScenerySessionId, SceneryShading, SceneryShadowCamera, SceneryShadows,
+  SceneryDaylight, SceneryFog, SceneryHorizonChunk, SceneryReflectionLod, ScenerySectorChunk, ScenerySessionDaylight, ScenerySessionId, SceneryShading, SceneryShadowCamera, SceneryShadows,
   ScenerySkyColourLook, ScenerySkyColourProfiles, ScenerySkyHaze, SceneryStreaming, SceneryTexture, SceneryToneCurve, TextureStart, Vec3 } from '../../packageContract/index.js';
 
 export type SceneryChunk = SceneryHorizonChunk | ScenerySectorChunk;
-/** What fetching a chunk file needs: a scenery chunk or a car reflection chunk. */
+/** What fetching a chunk file needs. */
 export type SceneryChunkFile = Pick<SceneryChunk, 'id' | 'sha256' | 'byteLength'>;
 
 /** The direct sun's radiance of a layout: the catalog's `layouts` map is narrowed to the layout's own `grid`. */

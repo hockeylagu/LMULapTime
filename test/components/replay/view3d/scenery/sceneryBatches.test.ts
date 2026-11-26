@@ -91,6 +91,12 @@ it('keeps its own draw for a node the night switch shows and hides', () => {
   expect([batch.instanceCount, root.children[1].visible]).toEqual([1, true]);
 });
 
+it('takes a material that only switched nodes draw, with no batch for it', () => {
+  const batches = createSceneryBatches(new Group(), [totals('a', 1, 1)], 16), root = chunk([new BoxGeometry(), material('a')]);
+  root.children[0].userData.lmuVisibility = 'night';
+  expect(batches.add(root)).toEqual([]);
+});
+
 it('goes by each mesh\'s own key when two package materials share one configured material', () => {
   const concrete = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 1, 1), totals('b', 1, 1)], 16);
   const root = chunk([new BoxGeometry(), concrete], [new BoxGeometry(), concrete]);

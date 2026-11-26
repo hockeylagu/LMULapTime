@@ -317,12 +317,57 @@ function parseSunDisc(value: unknown, what: string): void {
   }
 }
 
+/** The night model's inputs (ScenerySkyNight): an ascending twilight table of positive illuminances, positive scales and the fitted moon and fog. */
+function parseSkyNight(value: unknown, what: string): void {
+  const row = record(value, what);
+  exactKeys(row, ['twilight', 'sunDirect', 'ambientMapping', 'lightLevel', 'nightLightPollutionDefault', 'moon', 'fog', 'dome'], what);
+  const twilight = record(row.twilight, `${what}.twilight`);
+  exactKeys(twilight, ['sunElevationDeg', 'illuminance', 'scale', 'chromaticity', 'sunScatteringScale', 'hdrScale', 'blendBelowDeg'], `${what}.twilight`);
+  const degrees = ascendingNumbers(twilight.sunElevationDeg, `${what}.twilight.sunElevationDeg`, 64, -90, 90);
+  const illuminance = array(twilight.illuminance, `${what}.twilight.illuminance`, degrees.length);
+  if (illuminance.length !== degrees.length) throw Error(`${what}.twilight.illuminance: expected one value per elevation`);
+  illuminance.forEach((n, i) => positive(n, `${what}.twilight.illuminance[${i}]`));
+  for (const key of ['scale', 'sunScatteringScale', 'hdrScale', 'blendBelowDeg']) positive(twilight[key], `${what}.twilight.${key}`);
+  const xy = array(twilight.chromaticity, `${what}.twilight.chromaticity`, 2);
+  if (xy.length !== 2 || xy.some((n, i) => !(finite(n, `${what}.twilight.chromaticity[${i}]`) > 0 && (n as number) < 1))) throw Error(`${what}.twilight.chromaticity: expected x and y between 0 and 1`);
+  const sunDirect = record(row.sunDirect, `${what}.sunDirect`);
+  exactKeys(sunDirect, ['zeroDeg', 'exponent'], `${what}.sunDirect`);
+  finite(sunDirect.zeroDeg, `${what}.sunDirect.zeroDeg`);
+  positive(sunDirect.exponent, `${what}.sunDirect.exponent`);
+  const mapping = record(row.ambientMapping, `${what}.ambientMapping`);
+  exactKeys(mapping, ['lightColorToAmbient', 'useIntensity'], `${what}.ambientMapping`);
+  const share = finite(mapping.lightColorToAmbient, `${what}.ambientMapping.lightColorToAmbient`);
+  if (share < 0 || share > 1) throw Error(`${what}.ambientMapping.lightColorToAmbient: expected 0 to 1`);
+  flag(mapping.useIntensity, `${what}.ambientMapping.useIntensity`);
+  range(row.lightLevel, ['base', 'sinScale', 'stepS', 'headlightMargin'], `${what}.lightLevel`);
+  positive((row.lightLevel as Record<string, number>).stepS, `${what}.lightLevel.stepS`);
+  nonNegative(row.nightLightPollutionDefault, `${what}.nightLightPollutionDefault`);
+  const moon = record(row.moon, `${what}.moon`);
+  exactKeys(moon, ['reference', 'opticalDepth', 'scatterShare', 'scatterColour', 'zenithShare'], `${what}.moon`);
+  const reference = record(moon.reference, `${what}.moon.reference`);
+  exactKeys(reference, ['rgb', 'elevationDeg', 'phaseAngleDeg'], `${what}.moon.reference`);
+  vec3(reference.rgb, `${what}.moon.reference.rgb`).forEach((n, i) => nonNegative(n, `${what}.moon.reference.rgb[${i}]`));
+  if (!(finite(reference.elevationDeg, `${what}.moon.reference.elevationDeg`) > 0)) throw Error(`${what}.moon.reference.elevationDeg: must be above the horizon`);
+  finite(reference.phaseAngleDeg, `${what}.moon.reference.phaseAngleDeg`);
+  for (const key of ['opticalDepth', 'scatterShare', 'zenithShare']) nonNegative(moon[key], `${what}.moon.${key}`);
+  vec3(moon.scatterColour, `${what}.moon.scatterColour`);
+  const fog = record(row.fog, `${what}.fog`);
+  exactKeys(fog, ['twilightShare', 'hue'], `${what}.fog`);
+  nonNegative(fog.twilightShare, `${what}.fog.twilightShare`);
+  vec3(fog.hue, `${what}.fog.hue`).forEach((n, i) => nonNegative(n, `${what}.fog.hue[${i}]`));
+  const dome = record(row.dome, `${what}.dome`);
+  exactKeys(dome, ['perezWeightZeroAboveDeg', 'perezWeightOneBelowDeg'], `${what}.dome`);
+  if (!(finite(dome.perezWeightZeroAboveDeg, `${what}.dome.perezWeightZeroAboveDeg`) > finite(dome.perezWeightOneBelowDeg, `${what}.dome.perezWeightOneBelowDeg`)))
+    throw Error(`${what}.dome: perezWeightZeroAboveDeg must be above perezWeightOneBelowDeg`);
+}
+
 /** The catalog's sky (ScenerySky): five Perez scales, ascending multiplier rows of four, the turbidity, air mass, haze model, sun grids, the sky model's inputs and its colour profiles. */
 /** Validates the sky; returns the layout keys of its per-layout parts (`sun.layouts`, `hosek.layoutAltitudeM`). */
 function parseSky(value: unknown, what: string): {sunLayouts: string[]; altitudeLayouts: string[]} {
   const row = record(value, what);
-  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog', 'sun', 'hosek', 'haze', 'colourProfiles', 'clouds', 'sunDisc'], what);
+  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog', 'sun', 'hosek', 'haze', 'colourProfiles', 'clouds', 'sunDisc', 'night'], what);
   parseSunDisc(row.sunDisc, `${what}.sunDisc`);
+  parseSkyNight(row.night, `${what}.night`);
   const sunLayouts = parseSun(row.sun, `${what}.sun`);
   range(row.pollution, ['cloudyDamping'], `${what}.pollution`);
   if (range(row.turbidity, ['base', 'overcast', 'storm', 'pollution', 'min', 'max'], `${what}.turbidity`).min <= 0) throw Error(`${what}.turbidity.min: must be positive`);
