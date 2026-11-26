@@ -1,4 +1,4 @@
-import { Box3, Group, MathUtils, Mesh, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type Ray } from 'three';
+import { Box3, Group, MathUtils, Matrix4, Mesh, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type Ray } from 'three';
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
@@ -29,6 +29,7 @@ import { createNightSwitch, DAY_STATE, type NightState, type NightSwitch } from 
 import { createNearTrackLights, switchTrackLights } from '../night/trackLightProgram.js';
 import { createTrackLighting } from '../night/trackLights.js';
 import { createCarSpots, type SpotCar } from '../night/carSpots.js';
+import { setCockpitFrame } from '../night/cockpitLight.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
@@ -219,6 +220,14 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     ({...light, position: [light.position[0] - origin.x, light.position[1] - origin.y, origin.z - light.position[2]] as const})));
   // The cars' headlight beams, the nearest the camera, from the cars the content draws with their headlights on.
   const carSpots = createCarSpots(), spotCars: SpotCar[] = [];
+  // The cockpit light rides in the followed car (the one the probe reflects), whose cabin the cameras sit in.
+  const cockpitFrame = new Matrix4();
+  const placeCockpitLight = (car: Object3D | null) => {
+    const envelope = car?.visible ? car.getObjectByName('body-envelope') : undefined;
+    if (!car || !envelope) { setCockpitFrame(null); return; }
+    envelope.updateMatrix();
+    setCockpitFrame(cockpitFrame.multiplyMatrices(car.matrixWorld, envelope.matrix));
+  };
   // The scenery's own draws (out of the batches) that the car's reflection leaves out, chunk by chunk.
   const ownNotReflected: Object3D[] = [];
   let content: SceneContent | null = null;
@@ -296,7 +305,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const cleanup = () => {
     disposed = true; for (const waiting of afterFrames.splice(0)) waiting.fail(new Error('The scene was disposed.'));
     window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose(); pointer.dispose();
-    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); nearTrackLights.dispose(); carSpots.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); nearTrackLights.dispose(); carSpots.dispose(); setCockpitFrame(null); renderer.dispose(); renderer.forceContextLoss();
   };
   // The interior's own copies stay on their reduced levels until a driver camera is used: only there is their full size seen.
   let driverCameraUsed = false;
@@ -376,6 +385,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       nearTrackLights.update(camera.position);
       spotCars.length = 0; content?.headlights(spotCars);
       carSpots.update(spotCars, camera.position);
+      placeCockpitLight(content?.reflected ?? null);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);
       // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.

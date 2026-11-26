@@ -193,7 +193,7 @@ ${shader.fragmentShader}`;
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_begin>',
     `${REFLECTING_KINDS.has(config.kind) ? `${SCENERY_REFLECTION_INPUTS}\n` : ''}${ShaderChunk.lights_fragment_begin}`);
   // The track lights: the scenery's own vertex sums, or the lights nearest the camera on a car.
-  patchTrackLights(shader, trackLights);
+  patchTrackLights(shader, trackLights, code.lamps);
   patchCascadeShadow(shader, config.normalShadowInfluence, sunShade(config.kind));
   patchAmbientLookup(shader);
   if (REFLECTING_KINDS.has(config.kind)) {

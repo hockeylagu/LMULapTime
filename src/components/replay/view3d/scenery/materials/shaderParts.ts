@@ -11,6 +11,7 @@ import { glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type E
 import { standardShaderParts } from './standardSurface.js';
 import { TERRAIN_WEIGHTS, terrainLayerCount, type SurfaceConfig } from './surfaceConfig.js';
 import { vegetationShaderParts } from './vegetationSurface.js';
+import { lampShares, type LampShares } from '../../night/cockpitLight.js';
 /** The GLSL a surface config contributes: declarations plus one chunk per patched `MeshStandardMaterial` include. */
 export interface ShaderParts {
   declarations: string;
@@ -23,6 +24,8 @@ export interface ShaderParts {
   finish: string;
   absorption: string;
   occlusion: string;
+  /** Its shares of the track lights and headlight beams, and its cockpit light (night/cockpitLight.ts). */
+  lamps: LampShares;
   /** The values of `surface_constants`, four to a vec4 (with `uniforms`; empty otherwise): not part of the program's source. */
   constants: number[];
 }
@@ -217,7 +220,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => maps[key] ? `texture2D(surface_${key}, ${uv(key, scale)})` : fallback;
   const context: ShaderContext = { sample, uv, number, vec, uniforms: useUniforms };
   const tint = useUniforms ? 'diffuse' : glslVec(list(config.parameters.adjust, 'tint'));
-  const parts = familyParts(config, context, tint);
+  const parts = familyParts(config, context, tint), lamps = lampShares(config, context);
   const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`
     + (maps[key]!.uvAnimation ? `\nuniform vec2 surface_shift_${key};` : '')).join('\n');
   return {
@@ -234,6 +237,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
     finish: parts.finish ?? '',
     absorption: parts.absorption ?? '',
     occlusion: parts.occlusion,
+    lamps,
     constants,
   };
 }
