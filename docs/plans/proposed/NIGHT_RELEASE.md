@@ -98,7 +98,9 @@ Then export `personal-v30` (schema bump) and sync `shared/packageContract`.
   11 m tall), so its source is not the body mesh: trace it (first guess: the union of every GMT's header bounds in the
   GEN) and carry it per body in the package. The lamp order is done; the driver near planes already come from the
   game cameras.
-- Cockpit materials take no lamps or spots, only the car's cockpit light at night; driver camera near plane 0.075 m.
+- Cockpit materials take no lamps or spots, only the car's cockpit light at night; driver camera near plane 0.075 m. The cockpit
+  light is each material's own `parameters.cockpitLight` (intensity 0 = none), not the body's GEN `lights.cockpit`: the files
+  often differ and whether the game copies the GEN's over the material's is not traced (user, 2026-11-25).
 
 ### 7. Bloom (viewer: `nightBloom.ts`, the chain from capture 135627, after the tone curve)
 In scope (user, 2026-11-25). It also changes the day picture: the day set's crops go to the user. Its values are game
