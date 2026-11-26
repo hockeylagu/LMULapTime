@@ -53,6 +53,13 @@ export function lampTexturePaths(lamp: CarLamp, rainFlashes: boolean, glow: Lamp
 }
 
 /**
+ * The lamp's texture coordinate, read at the multisample centroid: a pixel that a thin glow strip (a badge outline) only partly
+ * covers is otherwise shaded at its centre, outside the triangle, and the extrapolated coordinate reads a neighbouring lamp's
+ * texels on the atlas (a tail lamp's red on a white outline seen from afar).
+ */
+const LAMP_UV = 'centroid varying vec2 vUv';
+
+/**
  * A lamp's glow, unlit, in the package's light unit and blended with its alpha when `blend` is alpha. A lamp emission gives
  * rgb = tex.rgb · scale · tex.a · (1 + gain · (N·V)^power), alpha tex.a; a display glow gives rgb = tex.rgb · colour.rgb · intensity,
  * alpha tex.a · colour.a (colour: the vertex colour, white without `vertexColour`). A lamp with states takes `switching`, its own texture per frame, which its car
@@ -78,7 +85,7 @@ export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Textu
     },
     vertexShader: `
       ${display ? `${vertexColour ? 'attribute vec4 _lmu_colour;' : 'const vec4 _lmu_colour = vec4(1.0);'} varying vec4 vColour;` : ''}
-      varying vec2 vUv; varying vec3 vNormal, vView;
+      ${LAMP_UV}; varying vec3 vNormal, vView;
       void main() {
         // An instanced lamp (a far car's glow, \`farGlows\`) places each car's copy by its instance matrix.
         vec4 local = vec4(position, 1.0); vec3 facing = normal;
@@ -93,7 +100,7 @@ export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Textu
     fragmentShader: `
       uniform sampler2D map; uniform float scale, boostGain, boostPower, opacity;
       ${display ? 'varying vec4 vColour;' : ''}
-      varying vec2 vUv; varying vec3 vNormal, vView;
+      ${LAMP_UV}; varying vec3 vNormal, vView;
       void main() {
         vec4 tex = texture2D(map, vUv);
         ${display
