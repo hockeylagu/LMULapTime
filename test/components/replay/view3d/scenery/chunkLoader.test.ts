@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { Mesh, MeshBasicMaterial, BufferGeometry } from 'three';
+import { Group, Mesh, MeshBasicMaterial, BufferGeometry } from 'three';
 import type { GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import { prepareSceneryMesh, skipSurfaceTextures } from '../../../../../src/components/replay/view3d/scenery/chunkLoader.js';
 
@@ -37,6 +37,15 @@ it('hides the virtual screen framebuffer', () => {
   const screen = mesh('SURFACE_SCREENFRAMEBUFFER__M_HASH__OPAQUE', {lmuCastShadow: false});
   prepareSceneryMesh(screen);
   expect(screen.visible).toBe(false);
+});
+
+it("draws a switched node by day only as its day state: the night state and the track lights' glow card stay hidden", () => {
+  const states = ['day', 'night', 'lightsOn'].map(lmuVisibility => mesh('FERRISWHEEL', {lmuVisibility}));
+  // A node of several primitives carries the flag on its group.
+  const card = mesh('NIGHTLIGHT001GLOW', {});
+  new Group().add(card).userData.lmuVisibility = 'lightsOn';
+  [...states, card].forEach(prepareSceneryMesh);
+  expect([...states, card].map(part => part.visible)).toEqual([true, false, false, false]);
 });
 
 it('skips the glTF texture slots of materials with a surface description, and keeps them on the others', async () => {

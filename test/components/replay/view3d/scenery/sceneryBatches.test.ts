@@ -83,6 +83,14 @@ it('keeps its own draw for a glTF material, a camera-facing or hooked mesh', () 
   expect([batch.sortObjects, glass.sortObjects]).toEqual([false, true]);
 });
 
+it('keeps its own draw for a node the night switch shows and hides', () => {
+  const batches = createSceneryBatches(new Group(), [totals('a', 2, 2)], 16), asphalt = material('a');
+  const root = chunk([new BoxGeometry(), asphalt], [new BoxGeometry(), asphalt]);
+  root.children[1].userData.lmuVisibility = 'day';
+  const [batch] = batches.add(root);
+  expect([batch.instanceCount, root.children[1].visible]).toEqual([1, true]);
+});
+
 it('goes by each mesh\'s own key when two package materials share one configured material', () => {
   const concrete = material('a'), batches = createSceneryBatches(new Group(), [totals('a', 1, 1), totals('b', 1, 1)], 16);
   const root = chunk([new BoxGeometry(), concrete], [new BoxGeometry(), concrete]);

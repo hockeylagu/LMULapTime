@@ -1,6 +1,7 @@
 import { Box3, BufferGeometry, Mesh, Object3D, Vector3, type BatchedMesh, type Material } from 'three';
 import type { SceneryMaterialTotals } from '../../../../../shared/packageContract/index.js';
 import { BATCH_VERTEX_TEXTURES } from './materials/shaderParts.js';
+import { sceneVisibility } from '../night/nightSwitch.js';
 import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, layoutOf, releaseBatchOnUpload } from '../batching/batchedParts.js';
 
 export interface SceneryBatches {
@@ -49,10 +50,10 @@ function rangeOf(mesh: Mesh): {inSq: number; outSq: number} {
  * description keeps its chunk's own glTF material). A camera-facing card has its own shadow material, and a mesh with a per-draw
  * hook must keep its own draw. A see-through surface (fences, glass, decals) batches too, its batch sorting its instances back to
  * front in each pass. A program whose samplers plus the batch's vertex textures pass `maxTextures` (three's limit on texture units
- * across both stages) keeps its mesh's own draw.
+ * across both stages) keeps its mesh's own draw, and so does a node the night switch shows and hides (night/nightSwitch.ts).
  */
 function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, maxTextures: number): mesh is Mesh<BufferGeometry, Material> {
-  if (!mesh.visible || Array.isArray(mesh.material) || mesh.material.userData.surfaceConfigured !== true) return false;
+  if (!mesh.visible || sceneVisibility(mesh) || Array.isArray(mesh.material) || mesh.material.userData.surfaceConfigured !== true) return false;
   const units: unknown = mesh.material.userData.surfaceTextureUnits;
   if (typeof units !== 'number') throw Error(`Configured scenery material without its texture unit count (${mesh.name})`);
   return units + BATCH_VERTEX_TEXTURES <= maxTextures && !mesh.customDepthMaterial && mesh.onBeforeRender === Object3D.prototype.onBeforeRender;

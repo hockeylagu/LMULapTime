@@ -7,6 +7,7 @@ import { disposeObjects } from '../scene/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
 import { configureSurfaceMaterial, createSharedSurfaceMaterials } from './materials/configureSurfaceMaterial.js';
 import { createSurfaceTexturePool, imageUriMap } from './materials/textureSource.js';
+import { DAY_STATE, drawnIn, sceneVisibility } from '../night/nightSwitch.js';
 
 export interface ChunkLoader {
   /** `onParsed` gets the root once its meshes exist, before their textures load: work that needs only geometry starts there. */
@@ -20,11 +21,14 @@ export interface ChunkLoader {
  * node's `extras.lmuCastShadow`, the scene's ShadowCaster: road, terrain and ground never cast). Everything receives but the
  * filler ground: it sits just under the road, so a car shadow on it would show through from below road level. The mesh keeps its
  * GLB material's package key (`extras.lmuMaterial`): materials that draw alike share one configured material, which keeps the key of
- * the first, and the batches go by each mesh's own key.
+ * the first, and the batches go by each mesh's own key. A node the game switches (`extras.lmuVisibility`) draws by day until the scene's
+ * night switch takes it (night/nightSwitch.ts): only its `day` state.
  */
 export function prepareSceneryMesh(mesh: Mesh): void {
   mesh.receiveShadow = !mesh.name.startsWith('FILLER_GROUND');
   if (mesh.name.toLowerCase().includes('screenframebuffer')) mesh.visible = false;
+  const visibility = sceneVisibility(mesh);
+  if (visibility && !drawnIn(visibility, DAY_STATE)) mesh.visible = false;
   mesh.castShadow = mesh.userData.lmuCastShadow === true;
   const packageKey: unknown = Array.isArray(mesh.material) ? undefined : mesh.material.userData.lmuMaterial;
   if (typeof packageKey === 'string') mesh.userData.lmuMaterial = packageKey;

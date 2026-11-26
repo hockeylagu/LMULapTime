@@ -25,6 +25,7 @@ import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
 import { createSceneryBatches } from '../scenery/sceneryBatches.js';
+import { createNightSwitch } from '../night/nightSwitch.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
@@ -199,6 +200,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     .translate(new Vector3(-origin.x, -origin.y, origin.z));
   // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
   const batches = createSceneryBatches(sceneryRoot, layout.materials, renderer.capabilities.maxTextures);
+  // The scenery the game switches between day and night keeps its own draws: drawn by day until the night model sets the state.
+  const nightSwitch = createNightSwitch();
   // What the car's probe draws in place of the scenery, chunk by chunk with it.
   const reflectionSet = createReflectionSet(layout, loader, origin);
   let content: SceneContent | null = null;
@@ -263,6 +266,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       });
       realRoad.prepare(root);
       const created = batches.add(root);
+      nightSwitch.add(root);
       await lit; // A chunk's programs depend on the scene's environment.
       const reflection = await reflected;
       await Promise.all([warmup.queue(reflection ? [root, ...created, reflection] : [root, ...created], signal, worldBox(chunk.bounds)), grounded]);
