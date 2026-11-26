@@ -9,6 +9,7 @@ import { Vector4, type Vector3, type WebGLProgramParametersWithUniforms } from '
 import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
 import { sceneEmission } from '../scene/dayLight.js';
 import { BELOW_STRETCH, TRACK_LIGHT_ATTRIBUTE, TRACK_LIGHT_DECODE_GLSL, type TrackLight } from './trackLights.js';
+import { CAR_SPOT_DECLARATIONS, CAR_SPOT_TERM, carSpotUniforms } from './carSpots.js';
 
 /** The lights a car's vertices sum: the nearest the camera (ours; the game's per-draw list holds 20). */
 export const NEAR_TRACK_LIGHTS = 32;
@@ -50,8 +51,9 @@ export function createNearTrackLights(lights: readonly TrackLight[]): NearTrackL
   };
 }
 
-/** The fragment's share, before the occlusion: the lit diffuse of the vertices' light. */
-export const TRACK_LIGHT_FRAGMENT = 'reflectedLight.indirectDiffuse+=vTrackLight*BRDF_Lambert(material.diffuseColor);';
+/** The fragment's share, before the occlusion: the lit diffuse of the vertices' track light and the pixel's headlight beams (carSpots.ts). */
+export const TRACK_LIGHT_FRAGMENT = `{vec3 lampPoint=(vec4(-vViewPosition,0.0)*viewMatrix).xyz+cameraPosition;vec3 lampNormal=inverseTransformDirection(normal,viewMatrix);
+reflectedLight.indirectDiffuse+=(vTrackLight+${CAR_SPOT_TERM})*BRDF_Lambert(material.diffuseColor);}`;
 
 const NEAR_MAIN = `vTrackLight = vec3(0.0);
   if (trackLight_scale > 0.0) {
@@ -88,6 +90,8 @@ export function patchTrackLights(shader: WebGLProgramParametersWithUniforms, sou
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', `#include <common>\n${declarations}\nuniform float trackLight_scale;\nvarying vec3 vTrackLight;`)
     .replace('#include <worldpos_vertex>', `${main}#include <worldpos_vertex>`);
-  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vTrackLight;')
+  Object.assign(shader.uniforms, carSpotUniforms);
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>\nvarying vec3 vTrackLight;\n${CAR_SPOT_DECLARATIONS}`)
     .replace('#include <aomap_fragment>', `${TRACK_LIGHT_FRAGMENT}\n#include <aomap_fragment>`);
 }

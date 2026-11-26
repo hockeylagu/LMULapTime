@@ -1,4 +1,5 @@
-import { Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Matrix4, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import type { SpotCar } from '../night/carSpots.js';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
@@ -77,9 +78,12 @@ export async function createReplayScene(
   });
   carsWarm.catch(() => {}); // A failure here surfaces from the load or the scene's warm-up below.
   const ghostCentre = new Vector3(), primaryCentre = new Vector3();
+  /** The lap sample the primary car was last placed at (its headlight bit). */
+  let primaryIndex = 0;
   /** The shell's content for a lap layer: the cars and lines, with the ghost's parts following the camera's distance. */
   const contentOf = (lap: LapLayer): SceneContent => {
     const fadeGhost = ghostFader(lap.ghost);
+    const envelope = lap.primary.getObjectByName('body-envelope')!, beams: SpotCar = {lights: lap.lights, frame: new Matrix4()};
     return {
       root: lap.root, reflected: lap.primary,
       beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
@@ -93,6 +97,12 @@ export async function createReplayScene(
       },
       // The compared car casts none (`drawnCar`).
       casters: () => [lap.primary.getWorldPosition(primaryCentre)],
+      headlights(out) {
+        if (!lap.primary.visible || lap.trajectory.points[primaryIndex]?.headlights !== true) return;
+        envelope.updateMatrix();
+        beams.frame.multiplyMatrices(lap.primary.matrixWorld, envelope.matrix);
+        out.push(beams);
+      },
       refreshHeights: () => lap.refreshHeights(),
       dispose: () => lap.dispose(),
     };
@@ -150,6 +160,7 @@ export async function createReplayScene(
       primary.visible = pose !== null;
       if (!pose) { shell.invalidate(); return; }
       shell.placeCar(primary, pose, primaryMotion);
+      primaryIndex = pose.index;
       const sample = trajectory.points[pose.index], nextSample = trajectory.points[pose.index + 1];
       const timeSec = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
 

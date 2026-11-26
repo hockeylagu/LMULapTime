@@ -28,6 +28,7 @@ import { createSceneryBatches, reflects } from '../scenery/sceneryBatches.js';
 import { createNightSwitch, DAY_STATE, type NightState, type NightSwitch } from '../night/nightSwitch.js';
 import { createNearTrackLights, switchTrackLights } from '../night/trackLightProgram.js';
 import { createTrackLighting } from '../night/trackLights.js';
+import { createCarSpots, type SpotCar } from '../night/carSpots.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
@@ -52,6 +53,8 @@ export interface SceneContent {
   beforeDraw(camera: PerspectiveCamera | OrthographicCamera): void;
   /** Where the cars that cast the sun's shadow are this frame (world), after `beforeDraw`: the far cascades holding one draw the cars. */
   casters(): readonly Vector3[];
+  /** Adds to `out` the cars whose headlights are on this frame, after `beforeDraw`. */
+  headlights(out: SpotCar[]): void;
   /** The resident road changed: drape what lies on it again. */
   refreshHeights(): void;
   dispose(): void;
@@ -214,6 +217,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // The cars' track lights: the nearest the camera, in the scene's coordinates (native less the origin, z mirrored).
   const nearTrackLights = createNearTrackLights(layout.night.lights.map(light =>
     ({...light, position: [light.position[0] - origin.x, light.position[1] - origin.y, origin.z - light.position[2]] as const})));
+  // The cars' headlight beams, the nearest the camera, from the cars the content draws with their headlights on.
+  const carSpots = createCarSpots(), spotCars: SpotCar[] = [];
   // The scenery's own draws (out of the batches) that the car's reflection leaves out, chunk by chunk.
   const ownNotReflected: Object3D[] = [];
   let content: SceneContent | null = null;
@@ -291,7 +296,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const cleanup = () => {
     disposed = true; for (const waiting of afterFrames.splice(0)) waiting.fail(new Error('The scene was disposed.'));
     window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose(); pointer.dispose();
-    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); nearTrackLights.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); nearTrackLights.dispose(); carSpots.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   // The interior's own copies stay on their reduced levels until a driver camera is used: only there is their full size seen.
   let driverCameraUsed = false;
@@ -369,6 +374,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       readoutPainter.flush(renderer); // Repaints the screen readouts whose lap sample changed them.
       content?.beforeDraw(camera);
       nearTrackLights.update(camera.position);
+      spotCars.length = 0; content?.headlights(spotCars);
+      carSpots.update(spotCars, camera.position);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);
       // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.

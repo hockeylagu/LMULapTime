@@ -15,6 +15,7 @@ import type { CarMotion } from '../cars/carMotion.js';
 import { createCarSets, type Cabin, type CarSets, type DrivenCar } from '../cars/drawnCar.js';
 import { windowPoints } from './racePosePoints.js';
 import { createRaceField, type RaceField } from './raceField.js';
+import { createRaceBeams } from './raceBeams.js';
 import { createStandInCars, type StandInCars } from './standInCars.js';
 import { carSpans, carsUnder, PICK_BOX, placeOnRoad, type DrawnPlace } from './carPick.js';
 import { createReadoutStates, type ReadoutStates } from '../car/readoutCanvas.js';
@@ -135,6 +136,8 @@ export async function createRaceScene(
   /** Stands in for the reflection probe's car while the followed car has no model: never visible, so the probe stays idle. */
   const noCar = new Group(); noCar.visible = false;
   const followedCentre = new Vector3();
+  // The cars' headlight beams: every placed car whose headlights are on.
+  const beams = createRaceBeams(origin, bodyOf);
   let followed: FollowedCar | null = null;
   const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
   // The field's models can be ready before the scene draws (the first followed car's): nothing to redraw until `draw` exists.
@@ -195,6 +198,7 @@ export async function createRaceScene(
       const near = field.casters();
       return followed?.car?.visible ? [...near, followed.car.getWorldPosition(followedCentre)] : near;
     },
+    headlights: out => beams.headlights(root, out),
     refreshHeights() { followed?.motion?.refreshHeights(); field.refreshHeights(); },
     dispose() {
       followed?.dispose();
@@ -303,7 +307,7 @@ export async function createRaceScene(
     if (!window || disposed) return;
     const current = window, places: DrawnPlace[] = [];
     let followedAt: {x: number; z: number} | null = null;
-    standIns.begin();
+    standIns.begin(); beams.begin();
     for (const [ownIndex, slot] of current.slots.entries()) {
       if (!classOf.has(slot)) continue;
       const isFollowed = slot === followed?.slot, model = isFollowed ? followed?.car : null;
@@ -317,7 +321,7 @@ export async function createRaceScene(
       const sample = (at - samples.fromSec) * samples.hz, index = Math.max(0, Math.min(Math.floor(sample), samples.count - 2));
       const fraction = Math.max(0, Math.min(1, sample - index));
       const placed = shown ? renderPose(pose, index, fraction, orientation, euler) : null;
-      if (placed) places.push({slot, x: pose[0], y: pose[1], z: pose[2], rotX: pose[3], rotY: pose[4], rotZ: pose[5]});
+      if (placed) { places.push({slot, x: pose[0], y: pose[1], z: pose[2], rotX: pose[3], rotY: pose[4], rotZ: pose[5]}); beams.place(slot, placed, samples, carIndex); }
       // The field draws every car but a followed one with its own model.
       field.pose(slot, placed && !model ? placed : null, samples, carIndex);
       if (model) {
