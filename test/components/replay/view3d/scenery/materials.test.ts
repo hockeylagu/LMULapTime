@@ -136,6 +136,13 @@ describe('shaderParts', () => {
     // Its strength is a game light value summed with the sun's light before the 1/pi: converted by GAME_LIGHT_UNIT as the sun is.
     expect(glow('always').emissive).toContain(`*diffuseColor.rgb*${(GAME_LIGHT_UNIT / Math.PI).toFixed(8)}*`);
   });
+  it("masks a standard surface's glow by its map's rgb, or its green for rg and for a map named without a mode, and not at all without a map", () => {
+    const mask = (emissiveMask?: string) => shaderParts(surface('standard', { flags: { emissive: 'always', ...(emissiveMask ? { emissiveMask } : {}) }, maps: { albedo: map('A', true), emissive: map('E') } }), { uniforms: false }).emissive;
+    expect(mask('rgb')).toMatch(/\.rgb\*diffuseColor/);
+    expect(mask('rg')).toMatch(/\.g\)\*diffuseColor/);
+    expect(mask('map')).toMatch(/\.g\)\*diffuseColor/);
+    expect(mask()).toContain('*vec3(1.0)*diffuseColor');
+  });
   it('lays the vertex colour on a standard albedo by its mode, a masked one faded by the albedo alpha', () => {
     const parts = (vertexColour: string) => shaderParts(surface('standard', { maps: { albedo: map('A', true) }, flags: { vertexColour, roughnessFromAlbedoAlpha: 'on' } })).albedo;
     expect(parts('albedoMultiply')).toContain('surfaceAlbedo*=vSurfaceColour.rgb;');
