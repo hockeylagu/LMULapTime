@@ -9,6 +9,7 @@ import { PAINT_LAYERS, PAINT_MAPS, paintLayers } from '../car/paintLayers.js';
 import type { CarTextures } from './carModels.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
 import { patchAmbientLookup } from '../scenery/materials/patchSurfaceShader.js';
+import { patchTrackLights } from '../night/trackLightProgram.js';
 import { hazeProgram } from '../atmosphere/haze.js';
 import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
 
@@ -106,6 +107,7 @@ void main() {`)
 function farMaterial(material: MeshStandardMaterial, influence: number, layers?: PaintLayers): MeshStandardMaterial {
   const glass = material.userData.glass === true;
   material.onBeforeCompile = shader => {
+    patchTrackLights(shader, 'near'); // Before the far patches replace the occlusion include.
     if (layers) patchFarPaint(shader, layers); else patchFarSurface(shader, glass);
     patchAmbientLookup(shader); patchCascadeShadow(shader, influence);
   };

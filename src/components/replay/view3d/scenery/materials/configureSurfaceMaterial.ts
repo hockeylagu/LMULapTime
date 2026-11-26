@@ -36,9 +36,11 @@ function ownMaterial(source: MeshStandardMaterial, config: SurfaceConfig): MeshS
 /**
  * Draws `material` with the native surface program of `config`, sampling `loaded` (one texture per map key, its UV scale from the
  * map). The material's own tint, roughness, metalness and normal scale come from the surface's `adjust` group. `vertexColour`:
- * whether its geometry carries the package's vertex colour (without it, white).
+ * whether its geometry carries the package's vertex colour (without it, white); `trackLights`: the scenery's baked vertex sums or,
+ * on a car, the lights nearest the camera (trackLightProgram.ts).
  */
-export function bindSurfaceProgram(material: MeshStandardMaterial, config: SurfaceConfig, loaded: Record<string, Texture>, vertexColour = true): void {
+export function bindSurfaceProgram(material: MeshStandardMaterial, config: SurfaceConfig, loaded: Record<string, Texture>, vertexColour = true,
+  trackLights: 'baked' | 'near' = 'baked'): void {
   const uniforms: Record<string, IUniform> = {};
   for (const [key, texture] of Object.entries(loaded)) {
     uniforms[`surface_${key}`] = { value: texture };
@@ -57,8 +59,8 @@ export function bindSurfaceProgram(material: MeshStandardMaterial, config: Surfa
   // Three retains uniforms per material even when the compiled program is shared. The packed source normals, AO and roughness
   // are decoded by the patched shader exactly once, so the glTF maps are dropped.
   material.normalMap = null; material.aoMap = null; material.roughnessMap = null; material.metalnessMap = null; material.emissiveMap = null;
-  material.onBeforeCompile = shader => { patchSurfaceShader(shader, config, uniforms, vertexColour); };
-  const programKey = `${computeCustomProgramCacheKey(config)}${vertexColour ? '' : '-white'}`;
+  material.onBeforeCompile = shader => { patchSurfaceShader(shader, config, uniforms, vertexColour, trackLights); };
+  const programKey = `${computeCustomProgramCacheKey(config)}${vertexColour ? '' : '-white'}${trackLights === 'baked' ? '' : '-near'}`;
   material.customProgramCacheKey = () => programKey;
   hazeProgram(material);
   material.map = loaded.layerA ?? loaded.albedo ?? loaded.on ?? null;

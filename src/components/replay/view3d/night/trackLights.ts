@@ -1,7 +1,12 @@
 /**
- * The track lights at night (docs/SCENE_PACKAGE.md "Night", track lights and light lists): which of the layout's lights reach a piece of
- * scenery or a car, and what one light adds at a point. The game adds them per vertex, diffuse only, under the ambient occlusion.
+ * The track lights at night (docs/SCENE_PACKAGE.md "Night", track lights and light lists). The game adds them per vertex, diffuse
+ * only, under the ambient occlusion: a vertex of a capped instance (its `NIGHT_LIGHT_LIST_ATTRIBUTE` names a list of the layout) takes
+ * that list, any other vertex every light in reach. Scenery and lights never move, so each chunk vertex's sum is worked out once when
+ * the chunk loads and replaces its light-list id: `TRACK_LIGHT_ATTRIBUTE`, the same four bytes. Every light in reach is found through a
+ * grid of cells over the lights' reach (ours: the game lists the lights per draw).
  */
+import { BufferAttribute, Matrix3, Mesh, Vector3, type BufferGeometry, type Object3D } from 'three';
+import { NIGHT_LIGHT_LIST_ATTRIBUTE, NIGHT_LIGHT_LIST_NONE, type SceneryNight } from '../../../../../shared/packageContract/index.js';
 
 type Vec3 = readonly [number, number, number];
 
@@ -9,34 +14,109 @@ type Vec3 = readonly [number, number, number];
 export interface TrackLight {position: Vec3; rangeM: number; colour: Vec3}
 
 /** The game stretches the vertical distance to a light below the vertex by this factor (the package contract states it). */
-const BELOW_STRETCH = 20;
-
-const distanceSquared = (a: Vec3, b: Vec3) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
-
-/** The lights whose range reaches a bounding sphere, by index, nearest its centre first. */
-export function lightsInReach(lights: readonly TrackLight[], centre: Vec3, radius: number): number[] {
-  return lights.flatMap((light, index) => {
-    const d2 = distanceSquared(light.position, centre), reach = light.rangeM + radius;
-    return d2 < reach * reach ? [{index, d2}] : [];
-  }).sort((a, b) => a.d2 - b.d2).map(entry => entry.index);
-}
+export const BELOW_STRETCH = 20;
 
 /**
- * The lights that light a scenery node: its light list where it carries one (`extras.lmuLightList`) and the layout has an entry for that
- * id, every light in reach of its bounding sphere otherwise (a venue-shared piece capped only in another layout takes them all).
+ * Adds what one track light gives a point with a unit normal to `sum`, before the albedo and the occlusion:
+ * N·L · colour · saturate(1 − d / range).
  */
-export function sceneryNodeLights(lights: readonly TrackLight[], lists: ReadonlyMap<number, readonly number[]>, listId: number | undefined, centre: Vec3, radius: number): readonly number[] {
-  const listed = listId === undefined ? undefined : lists.get(listId);
-  return listed ?? lightsInReach(lights, centre, radius);
+export function addTrackLight(light: TrackLight, px: number, py: number, pz: number, nx: number, ny: number, nz: number, sum: number[]): void {
+  const dx = light.position[0] - px, dz = light.position[2] - pz;
+  // A light below the vertex: its vertical distance counts twenty times.
+  const dy = (light.position[1] - py) * (light.position[1] < py ? BELOW_STRETCH : 1);
+  const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (d === 0 || d >= light.rangeM) return;
+  const lit = Math.max(0, (nx * dx + ny * dy + nz * dz) / d) * (1 - d / light.rangeM);
+  sum[0] += light.colour[0] * lit; sum[1] += light.colour[1] * lit; sum[2] += light.colour[2] * lit;
 }
 
-/** What one track light adds at a point with a unit normal, before the albedo and the occlusion: N·L · colour · saturate(1 − d / range). */
-export function trackLightAt(light: TrackLight, point: Vec3, normal: Vec3): [number, number, number] {
-  const dx = light.position[0] - point[0], dz = light.position[2] - point[2];
-  // A light below the vertex: its vertical distance counts twenty times.
-  const dy = (light.position[1] - point[1]) * (light.position[1] < point[1] ? BELOW_STRETCH : 1);
-  const d = Math.hypot(dx, dy, dz);
-  if (d === 0) return [0, 0, 0];
-  const facing = Math.max(0, (normal[0] * dx + normal[1] * dy + normal[2] * dz) / d), fade = Math.min(1, Math.max(0, 1 - d / light.rangeM));
-  return light.colour.map(c => c * facing * fade) as [number, number, number];
+/** The chunk vertex attribute holding the vertex's track light sum, RGBE in four normalized bytes (`TRACK_LIGHT_DECODE_GLSL`). */
+export const TRACK_LIGHT_ATTRIBUTE = '_lmu_tracklight';
+/** The shared exponent's bias: sums from 2^−EXPONENT_BIAS to 2^(255 − EXPONENT_BIAS) of the brightest channel, all normal floats. */
+const EXPONENT_BIAS = 64;
+export const TRACK_LIGHT_DECODE_GLSL = (rgbe: string) => `(${rgbe}.rgb * exp2(floor(${rgbe}.a * 255.0 + 0.5) - ${EXPONENT_BIAS.toFixed(1)}))`;
+
+/** Writes `sum` as RGBE at `at`: each channel over the power of two above the brightest, in 255ths, and that power. */
+export function encodeTrackLight(sum: readonly number[], out: Uint8Array, at: number): void {
+  const peak = Math.max(sum[0], sum[1], sum[2]);
+  if (!(peak > 0)) { out.fill(0, at, at + 4); return; }
+  const exponent = Math.min(255 - EXPONENT_BIAS, Math.max(-EXPONENT_BIAS, Math.ceil(Math.log2(peak * 255 / 254.5))));
+  const scale = 255 / 2 ** exponent;
+  for (let c = 0; c < 3; c++) out[at + c] = Math.min(255, Math.round(sum[c] * scale));
+  out[at + 3] = exponent + EXPONENT_BIAS;
+}
+
+/** The grid's cell edge, metres. Ours. */
+export const TRACK_LIGHT_CELL_M = 32;
+
+/** The layout's lights by cell: every light whose range reaches a cell, across (a light below a vertex reaches less far). */
+export interface TrackLightGrid {minX: number; minZ: number; columns: number; rows: number; cells: number[][]}
+
+export function trackLightGrid(lights: readonly TrackLight[]): TrackLightGrid {
+  let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+  for (const {position: [x, , z], rangeM} of lights) {
+    minX = Math.min(minX, x - rangeM); maxX = Math.max(maxX, x + rangeM); minZ = Math.min(minZ, z - rangeM); maxZ = Math.max(maxZ, z + rangeM);
+  }
+  if (!lights.length) return {minX: 0, minZ: 0, columns: 0, rows: 0, cells: []};
+  const cell = TRACK_LIGHT_CELL_M, columns = Math.max(1, Math.ceil((maxX - minX) / cell)), rows = Math.max(1, Math.ceil((maxZ - minZ) / cell));
+  const cells: number[][] = Array.from({length: columns * rows}, () => []);
+  const column = (x: number) => Math.min(columns - 1, Math.max(0, Math.floor((x - minX) / cell)));
+  const row = (z: number) => Math.min(rows - 1, Math.max(0, Math.floor((z - minZ) / cell)));
+  lights.forEach(({position: [x, , z], rangeM}, index) => {
+    for (let r = row(z - rangeM); r <= row(z + rangeM); r++) for (let c = column(x - rangeM); c <= column(x + rangeM); c++) {
+      const nx = Math.min(minX + (c + 1) * cell, Math.max(minX + c * cell, x)), nz = Math.min(minZ + (r + 1) * cell, Math.max(minZ + r * cell, z));
+      if ((x - nx) ** 2 + (z - nz) ** 2 < rangeM * rangeM) cells[r * columns + c].push(index);
+    }
+  });
+  return {minX, minZ, columns, rows, cells};
+}
+
+const NO_LIGHTS: readonly number[] = [];
+
+/** The lights a point takes when it has no list: those of its cell. */
+export function cellLights(grid: TrackLightGrid, x: number, z: number): readonly number[] {
+  const c = Math.floor((x - grid.minX) / TRACK_LIGHT_CELL_M), r = Math.floor((z - grid.minZ) / TRACK_LIGHT_CELL_M);
+  return c < 0 || r < 0 || c >= grid.columns || r >= grid.rows ? NO_LIGHTS : grid.cells[r * grid.columns + c];
+}
+
+export interface TrackLighting {
+  /** Gives each mesh under `root` (a chunk in the scenery frame) its track light sums, in place of its light-list ids. Before the chunk is batched. */
+  prepare(root: Object3D): void;
+}
+
+const LIGHT_LIST_ATTRIBUTE = NIGHT_LIGHT_LIST_ATTRIBUTE.toLowerCase(); // three's glTF loader names a custom attribute in lower case.
+
+export function createTrackLighting(night: Pick<SceneryNight, 'lights' | 'lightLists'>): TrackLighting {
+  const lights = night.lights, grid = trackLightGrid(lights), lists = new Map(night.lightLists.map(list => [list.id, list.lights]));
+  const point = new Vector3(), normal = new Vector3(), normalMatrix = new Matrix3(), sum = [0, 0, 0];
+  const light = (geometry: BufferGeometry, matrixWorld: Mesh['matrixWorld']) => {
+    const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), ids = geometry.getAttribute(LIGHT_LIST_ATTRIBUTE);
+    const out = new Uint8Array(positions.count * 4);
+    normalMatrix.getNormalMatrix(matrixWorld);
+    for (let i = 0; lights.length && i < positions.count; i++) {
+      point.fromBufferAttribute(positions, i).applyMatrix4(matrixWorld);
+      if (normals) normal.fromBufferAttribute(normals, i).applyMatrix3(normalMatrix).normalize(); else normal.set(0, 1, 0);
+      const id = ids ? Math.round(ids.getX(i)) : NIGHT_LIGHT_LIST_NONE;
+      const reaching = (id === NIGHT_LIGHT_LIST_NONE ? undefined : lists.get(id)) ?? cellLights(grid, point.x, point.z);
+      sum[0] = sum[1] = sum[2] = 0;
+      for (const index of reaching) addTrackLight(lights[index], point.x, point.y, point.z, normal.x, normal.y, normal.z, sum);
+      encodeTrackLight(sum, out, 4 * i);
+    }
+    return out;
+  };
+  return {
+    prepare(root) {
+      root.updateWorldMatrix(true, true);
+      // Shared geometry takes the sums of its first mesh: the exporter writes one geometry per node.
+      const done = new WeakSet<BufferGeometry>();
+      root.traverse(child => {
+        if (!(child instanceof Mesh)) return;
+        const geometry = (child as Mesh).geometry;
+        if (done.has(geometry) || !geometry.getAttribute('position')) return;
+        done.add(geometry);
+        geometry.setAttribute(TRACK_LIGHT_ATTRIBUTE, new BufferAttribute(light(geometry, child.matrixWorld), 4, true));
+        geometry.deleteAttribute(LIGHT_LIST_ATTRIBUTE);
+      });
+    },
+  };
 }

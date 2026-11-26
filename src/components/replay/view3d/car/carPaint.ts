@@ -5,6 +5,7 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
 import type { ReflectionCubes } from '../reflectionCube.js';
 import { patchAmbientLookup } from '../scenery/materials/patchSurfaceShader.js';
+import { patchTrackLights } from '../night/trackLightProgram.js';
 import { OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
 import { PAINT_LAYERS, paintLayers } from './paintLayers.js';
 
@@ -157,6 +158,7 @@ export function configureCarPaint(material: MeshPhysicalMaterial, paint: CarSurf
   material.clearcoat = 1; // Enables three's coat layer; its strength is set per pixel.
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
+    patchTrackLights(shader, 'near'); // Before the paint replaces the occlusion include.
     const fragment = layers.fragment(shader.fragmentShader.replace('void main() {', `${FRAGMENT.declarations}\nvoid main() {`)
       .replace('#include <lights_fragment_begin>', LIGHTS_WITH_GLINT)
       .replace('#include <map_fragment>', PAINT_LAYERS.albedo).replace('#include <roughnessmap_fragment>', FRAGMENT.roughness)

@@ -4,6 +4,7 @@ import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../.
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { hazeProgram } from '../atmosphere/haze.js';
 import { patchAmbientLookup } from '../scenery/materials/patchSurfaceShader.js';
+import { patchTrackLights } from '../night/trackLightProgram.js';
 import { bindSurfaceProgram } from '../scenery/materials/configureSurfaceMaterial.js';
 import { REFLECTING_KINDS } from '../scenery/materials/sceneryReflection.js';
 import { surfaceTextureUnits } from '../scenery/materials/shaderParts.js';
@@ -165,7 +166,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   if (surface) {
     const loaded: Record<string, Texture> = {};
     for (const [key, map] of Object.entries(surface.maps)) loaded[key] = mapTexture(texture, map!);
-    bindSurfaceProgram(material, surface, loaded, vertexColour);
+    bindSurfaceProgram(material, surface, loaded, vertexColour, 'near');
     // A cabin part with nine maps and the cabin volume has no room left for the overhead correction: past the limit its program
     // fails to link and the part is not drawn.
     const units = surfaceTextureUnits(surface) + (recipe.reflectionOcclusion ? 1 : 0);
@@ -194,6 +195,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   else if (!surface) {
     // Three's own program otherwise: the same ambient lookup as every other surface of the scene.
     material.onBeforeCompile = shader => {
+      patchTrackLights(shader, 'near');
       patchAmbientLookup(shader);
       // Written out: the albedo's lookup fades in as it sharpens.
       shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', ShaderChunk.map_fragment);

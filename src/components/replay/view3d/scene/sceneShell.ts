@@ -25,7 +25,9 @@ import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
 import { createSceneryBatches, reflects } from '../scenery/sceneryBatches.js';
-import { createNightSwitch, DAY_STATE, type NightState } from '../night/nightSwitch.js';
+import { createNightSwitch, DAY_STATE, type NightState, type NightSwitch } from '../night/nightSwitch.js';
+import { createNearTrackLights, switchTrackLights } from '../night/trackLightProgram.js';
+import { createTrackLighting } from '../night/trackLights.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
@@ -168,6 +170,8 @@ const WEATHER_STEP = 0.01;
 
 /** The scenery's switches at a moment (nightMoment.ts): day without the night model. */
 const nightState = ({lighting: {night}}: SceneSun): NightState => night ? {night: night.night, lightsOn: night.lightsOn} : DAY_STATE;
+/** The scene's night switches: the switched scenery and the track lights. */
+const switchNight = (nightSwitch: NightSwitch, state: NightState) => { nightSwitch.set(state); switchTrackLights(state.lightsOn); };
 
 /** Each car's body and pose marker, which `placeCar` switches by whether the pose has a heading. */
 const poseShapes = new WeakMap<Object3D, {body: Object3D; marker: Object3D}>();
@@ -204,6 +208,12 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const batches = createSceneryBatches(sceneryRoot, layout.materials, renderer.capabilities.maxTextures);
   // The scenery the game switches between day and night keeps its own draws, drawn for the moment's night state.
   const nightSwitch = createNightSwitch(nightState(sun));
+  switchTrackLights(nightSwitch.state.lightsOn);
+  // Each chunk vertex's track light sum, worked out as the chunk loads.
+  const trackLighting = createTrackLighting(layout.night);
+  // The cars' track lights: the nearest the camera, in the scene's coordinates (native less the origin, z mirrored).
+  const nearTrackLights = createNearTrackLights(layout.night.lights.map(light =>
+    ({...light, position: [light.position[0] - origin.x, light.position[1] - origin.y, origin.z - light.position[2]] as const})));
   // The scenery's own draws (out of the batches) that the car's reflection leaves out, chunk by chunk.
   const ownNotReflected: Object3D[] = [];
   let content: SceneContent | null = null;
@@ -264,7 +274,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
         grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
         grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
       });
-      realRoad.prepare(root);
+      realRoad.prepare(root); trackLighting.prepare(root);
       const created = batches.add(root);
       nightSwitch.add(root);
       // The parts left out of the batches that the car's reflection does not draw either.
@@ -281,7 +291,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const cleanup = () => {
     disposed = true; for (const waiting of afterFrames.splice(0)) waiting.fail(new Error('The scene was disposed.'));
     window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextureLoader.dispose(); exposure.dispose(); pointer.dispose();
-    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); nearTrackLights.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   // The interior's own copies stay on their reduced levels until a driver camera is used: only there is their full size seen.
   let driverCameraUsed = false;
@@ -358,6 +368,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       underCarBaker.flush(renderer); // Bakes at most one car body's under-car shade per frame; every car of that body then shows it.
       readoutPainter.flush(renderer); // Repaints the screen readouts whose lap sample changed them.
       content?.beforeDraw(camera);
+      nearTrackLights.update(camera.position);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera);
       // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.
@@ -507,7 +518,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       const turnedDeg = MathUtils.radToDeg(next.lighting.sunDirection.angleTo(sun.lighting.sunDirection));
       const [cover, seen] = weather(next), [shownCover, shownSeen] = weather(sun);
       if (turnedDeg < SUN_STEP_DEG && Math.abs(cover - shownCover) < WEATHER_STEP && Math.abs(seen - shownSeen) < WEATHER_STEP) return;
-      sun = next; meter = sunMeter(sun, eye); nightSwitch.set(nightState(sun));
+      sun = next; meter = sunMeter(sun, eye); switchNight(nightSwitch, nightState(sun));
       exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
       // Before the environment exists, it is made from this sun.
       if (environment) { environment.setSun(sun); invalidate(); }

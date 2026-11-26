@@ -11,7 +11,6 @@ import { glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type E
 import { standardShaderParts } from './standardSurface.js';
 import { TERRAIN_WEIGHTS, terrainLayerCount, type SurfaceConfig } from './surfaceConfig.js';
 import { vegetationShaderParts } from './vegetationSurface.js';
-
 /** The GLSL a surface config contributes: declarations plus one chunk per patched `MeshStandardMaterial` include. */
 export interface ShaderParts {
   declarations: string;
@@ -184,8 +183,8 @@ export const BATCH_VERTEX_TEXTURES = 2;
  * Texture units a surface's program samples: its maps (`mapDeclarations`), the reflection cube and integration table of the
  * reflecting kinds (sceneryReflection.ts), the cascade atlas (patchCascadeShadow, every surface), and three's own two for a scene
  * with an environment, no area lights, light probes or glTF maps: `envMap` (scene.environment) and `dfgLUT` (the physical program).
- * The road surface state is a vertex attribute (`realRoad.ts`), no texture. The glTF `map` is declared but unread
- * once `map_fragment` is replaced, so the link drops it. A batch adds `BATCH_VERTEX_TEXTURES` in the vertex stage; three counts both
+ * The road surface state and the track lights' sums are vertex attributes (`realRoad.ts`, trackLights.ts), no texture. The glTF `map`
+ * is declared but unread once `map_fragment` is replaced, so the link drops it. A batch adds `BATCH_VERTEX_TEXTURES` in the vertex stage; three counts both
  * stages against `capabilities.maxTextures`.
  */
 export function surfaceTextureUnits(config: SurfaceConfig): number {

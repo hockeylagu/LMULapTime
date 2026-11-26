@@ -11,6 +11,7 @@ import { cardFacing, shadowEye } from './shadowEye.js';
 import { luminousFacingPower, shaderParts } from './shaderParts.js';
 import { readsRealRoad, readsTrackRubber } from './roadSurface.js';
 import { REALROAD_VERTEX_DECLARATIONS, REALROAD_VERTEX_MAIN, realRoadUniforms } from '../realRoad.js';
+import { patchTrackLights } from '../../night/trackLightProgram.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
 const hasTranslucency = (config: SurfaceConfig) => !!config.flags.translucency;
@@ -93,7 +94,7 @@ ${shader.vertexShader}`; patchBillboardVertex(shader, 'surface_shadowEye'); };
  * serves every material of the same shape), and the albedo, normal, emissive and occlusion includes are replaced by the family's GLSL.
  * `uniforms` carries the per-material sampler and scale uniforms; without `vertexColour` the geometry has none and reads white.
  */
-export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, config: SurfaceConfig, uniforms: Record<string, IUniform>, vertexColour = true): void {
+export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, config: SurfaceConfig, uniforms: Record<string, IUniform>, vertexColour = true, trackLights: 'baked' | 'near' = 'baked'): void {
   const code = shaderParts(config, { uniforms: true });
   const p = config.parameters;
   // Each family reads its own groups: a tunable becomes a uniform only where the surface carries its value.
@@ -191,6 +192,8 @@ ${shader.fragmentShader}`;
   // The light loop takes the place of the include, so the reflection inputs go in with it.
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_begin>',
     `${REFLECTING_KINDS.has(config.kind) ? `${SCENERY_REFLECTION_INPUTS}\n` : ''}${ShaderChunk.lights_fragment_begin}`);
+  // The track lights: the scenery's own vertex sums, or the lights nearest the camera on a car.
+  patchTrackLights(shader, trackLights);
   patchCascadeShadow(shader, config.normalShadowInfluence, sunShade(config.kind));
   patchAmbientLookup(shader);
   if (REFLECTING_KINDS.has(config.kind)) {
