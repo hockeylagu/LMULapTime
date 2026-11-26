@@ -67,8 +67,8 @@ describe('createFarGlows', () => {
     expect([placed(brake, 0).toArray(), placed(brake, 1).toArray(), placed(head, 0).toArray()]).toEqual([[10, 0, 0], [20, 0, 0], [20, 0, 0]]);
     const centreZ = (mesh: InstancedMesh) => { mesh.geometry.computeBoundingBox(); return mesh.geometry.boundingBox!.getCenter(new Vector3()).z; };
     expect([Math.round(centreZ(brake) * 1e3), Math.round(centreZ(head) * 1e3)]).toEqual([-2000, 2000]);
-    // In the game's order among blended parts, as on the full model.
-    expect([brake.renderOrder, head.renderOrder]).toEqual([0, 2]);
+    // In the game's order among blended parts, as on the full model: just before the glass of the lamp's own order.
+    expect([brake.renderOrder, head.renderOrder]).toEqual([-0.5, 1.5]);
     // Drawn with the mesh's vertices, without the option attribute.
     expect([brake.geometry.getAttribute('_lmu_option'), brake.geometry.index!.count]).toEqual([undefined, 36]);
   });

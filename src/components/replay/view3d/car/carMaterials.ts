@@ -69,11 +69,21 @@ export function carSortOffset(recipe: CarMaterialRecipe | undefined): number {
 }
 
 /**
- * The draw order of a car part (three's `renderOrder`): the highest `carSortOffset` of its blended materials, 0 for an opaque part.
- * The blended parts sort by it first, then by distance.
+ * The draw order of a blended lamp glow: just before the other blended parts of its `carSortOffset`. The game draws every lamp
+ * emitter before the car's glass of the same order, so the glass over a lamp (a lens or window, α 0.25–0.45) dims it; sorted by
+ * distance instead, the nearer lamp drew after its glass, undimmed (night captures of 2026-11-24).
+ */
+export function lampSortOffset(recipe: CarMaterialRecipe | undefined): number {
+  return carSortOffset(recipe) - 0.5;
+}
+
+/**
+ * The draw order of a car part (three's `renderOrder`): the highest `carSortOffset` (or `lampSortOffset`) of its blended
+ * materials, 0 for an opaque part. The blended parts sort by it first, then by distance.
  */
 export function carPartOrder(materials: readonly Material[]): number {
-  return Math.max(0, ...materials.map(material => material.transparent && typeof material.userData.sortOffset === 'number' ? material.userData.sortOffset : 0));
+  const orders = materials.flatMap(material => material.transparent && typeof material.userData.sortOffset === 'number' ? [material.userData.sortOffset] : []);
+  return orders.length ? Math.max(...orders) : 0;
 }
 
 /** Every texture path a recipe's material samples for an appearance: its albedo, its surface maps, plus the paint maps for car paint. */

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { FrontSide, NoColorSpace, SRGBColorSpace, Texture, Vector2, type IUniform } from 'three';
-import { carMaterialKey, carPartOrder, carSortOffset, createCarMaterial, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
+import { FrontSide, MeshBasicMaterial, NoColorSpace, SRGBColorSpace, Texture, Vector2, type IUniform } from 'three';
+import { carMaterialKey, carPartOrder, carSortOffset, createCarMaterial, lampSortOffset, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
@@ -106,6 +106,12 @@ it("orders blended parts by the game's sortOffset (the outside windscreen over t
   expect(carPartOrder([blended(), blended(2)])).toBe(2);
   expect(carPartOrder([blended()])).toBe(0);
   expect(carPartOrder([opaque])).toBe(0);
+});
+
+it('draws a blended lamp glow just before the glass of its own order, and after every lower order', () => {
+  const lamp = Object.assign(new MeshBasicMaterial({ transparent: true }), { userData: { sortOffset: lampSortOffset(undefined) } });
+  expect(lampSortOffset({ ...recipe(), surface: { ...recipe().surface, sortOffset: 2 } as CarSurface })).toBe(1.5);
+  expect(carPartOrder([lamp])).toBe(-0.5);
 });
 
 it('draws an alpha-masked part one side, as every car part, its edges by alpha to coverage', () => {
