@@ -19,16 +19,22 @@ const colour = (value: unknown): Vector3 => {
   return new Vector3(...(value.slice(0, 3) as number[]));
 };
 
+/** The maps a paint has besides the albedo, which shape its layers' program: without a region map it is all black region, without an AO/spec mask unoccluded. */
+export interface PaintMaps { region: boolean; aoSpec: boolean }
+
+/** A lookup of a paint sampler at a UV expression (a plain `texture2D`, or one that fades in as its texture sharpens). */
+export type PaintLookup = (sampler: string, uv: string) => string;
+
 /**
  * The paint's layers, as every program that draws car paint reads them (the full models' layered paint, `carPaint`, and the far
- * models' paint, `farCars`). The region map blends five paint setups (square-rooted channels, saturation split into
- * red/green/blue/white, black for the rest; refractive indices blended as square roots): the clear coat's strength, roughness and
- * index, the base coat's roughness, index and specular strength, the lacquer the light passes through. The AO/spec mask gives
- * ambient occlusion (green) and specular occlusion (red, times the albedo alpha on the base coat). Carbon fibre (red region only)
- * darkens the albedo toward the carbon colour and multiplies the weave overlay.
+ * models' paint, `farCars`), on the albedo's coordinates (`vCarMapUv`, carStandardSurface.ts). The region map blends five paint
+ * setups (square-rooted channels, saturation split into red/green/blue/white, black for the rest; refractive indices blended as
+ * square roots): the clear coat's strength, roughness and index, the base coat's roughness, index and specular strength, the lacquer
+ * the light passes through. The AO/spec mask gives ambient occlusion (green) and specular occlusion (red, times the albedo alpha on
+ * the base coat). Carbon fibre (red region only) darkens the albedo toward the carbon colour and multiplies the weave overlay.
  */
 export const PAINT_LAYERS = {
-  /** The layers' uniforms, the values `albedo` leaves for the rest of the program, and the Fresnel the diffuse light loses by. */
+  /** The layers' uniforms, the values `paintAlbedo` leaves for the rest of the program, and the Fresnel the diffuse light loses by. */
   declarations: `
     uniform sampler2D paint_region, paint_aoSpec, paint_carbon;
     uniform vec4 paint_coat[5], paint_base[5]; uniform vec3 paint_lacquer[5];
@@ -40,11 +46,33 @@ export const PAINT_LAYERS = {
       float s = (c - n * t) / (c + n * t + 1e-6), p = (t - n * c) / (t + n * c + 1e-6);
       return 0.5 * (s * s + p * p);
     }`,
-  /** In place of three's `map_fragment`: the albedo, then the layers at this pixel. */
-  albedo: `
-    #include <map_fragment>
+  /**
+   * On the light once it is all in, before it is summed: what the diffuse light loses to the mask and the coats. The sun is the
+   * scene's (`lit_sunDirection`, shaders/sceneLight.ts), turned to view space as the lit template turns it.
+   */
+  diffuse: `
+    reflectedLight.indirectDiffuse *= paintAO;
     {
-      vec3 region = sqrt(texture2D(paint_region, vMapUv).rgb);
+      // The sun's diffuse light loses what the clear coat and the base coat reflect at its incidence.
+      float sunCos = saturate(dot(normal, normalize((viewMatrix * vec4(lit_sunDirection, 0.0)).xyz))), coatReflects = paintFresnelAvg(sunCos, paintCoatIndex);
+      reflectedLight.directDiffuse *= 1.0 - coatReflects - (paintBaseF0 + (1.0 - paintBaseF0) * pow(1.0 - sunCos, 5.0)) * (1.0 - coatReflects);
+    }
+    {
+      // Ambient light loses the base coat's hemispherical reflection (0.16 of the way from none to all, by its Fresnel), and part of
+      // the light inside the coat is reflected back onto the paint (the share beyond the coat's critical angle), tinted by it again.
+      float inside = 2.0 * acos(1.0 / paintCoatIndex) / PI;
+      reflectedLight.indirectDiffuse = (1.0 - mix(0.16, 1.0, paintBaseF0)) * mix(reflectedLight.indirectDiffuse,
+        (reflectedLight.indirectDiffuse + reflectedLight.directDiffuse) * material.diffuseColor, inside);
+    }`,
+  /** What the lacquer lets through of the light leaving the paint under it, over its optical depth at the view angle. */
+  absorption: 'mix(vec3(1.0), pow(paintLacquer, vec3(paint_lacquerThickness / clamp(dot(geometryViewDir, normal) + 0.001, 0.001, 1.0))), paintCoat)',
+};
+
+/** On the albedo once its map is read: the layers at this pixel, by the paint's `maps`, each map read by `lookup`. */
+export function paintAlbedo(maps: PaintMaps, lookup: PaintLookup): string {
+  return `
+    {
+      vec3 region = ${maps.region ? `sqrt(${lookup('paint_region', 'vCarMapUv')}.rgb)` : 'vec3(0.0)'};
       float high = max(max(region.r, region.g), region.b), low = min(min(region.r, region.g), region.b);
       float saturation = clamp((high - low) / max(high, 1e-2), 0.0, 1.0);
       vec3 rgb = clamp(region + (saturation - 1.0), 0.0, 1.0);
@@ -64,33 +92,20 @@ export const PAINT_LAYERS = {
       float carbon = base.w;
       if (carbon > 0.0) {
         diffuseColor.rgb = mix(diffuseColor.rgb, paint_carbonColour * paint_carbonColour, clamp(2.0 * carbon, 0.0, 1.0));
-        diffuseColor.rgb *= mix(vec3(1.0), texture2D(paint_carbon, vMapUv * paint_carbonScale).rgb, carbon);
+        diffuseColor.rgb *= mix(vec3(1.0), ${lookup('paint_carbon', 'vCarMapUv * paint_carbonScale')}.rgb, carbon);
       }
-      vec4 aoSpec = texture2D(paint_aoSpec, vMapUv);
-      paintAO = aoSpec.g; paintCoatOcclusion = aoSpec.r; paintBaseOcclusion = aoSpec.r * diffuseColor.a;
-      diffuseColor.a = 1.0;
-    }`,
-  /** After three's `aomap_fragment`: what the diffuse light loses to the mask and the coats. */
-  diffuse: `
-    reflectedLight.indirectDiffuse *= paintAO;
-    #if NUM_DIR_LIGHTS > 0
-    {
-      // The sun's diffuse light loses what the clear coat and the base coat reflect at its incidence.
-      float sunCos = saturate(dot(normal, directionalLights[0].direction)), coatReflects = paintFresnelAvg(sunCos, paintCoatIndex);
-      reflectedLight.directDiffuse *= 1.0 - coatReflects - (paintBaseF0 + (1.0 - paintBaseF0) * pow(1.0 - sunCos, 5.0)) * (1.0 - coatReflects);
-    }
-    #endif
-    {
-      // Ambient light loses the base coat's hemispherical reflection (0.16 of the way from none to all, by its Fresnel), and part of
-      // the light inside the coat is reflected back onto the paint (the share beyond the coat's critical angle), tinted by it again.
-      float inside = 2.0 * acos(1.0 / paintCoatIndex) / PI;
-      reflectedLight.indirectDiffuse = (1.0 - mix(0.16, 1.0, paintBaseF0)) * mix(reflectedLight.indirectDiffuse,
-        (reflectedLight.indirectDiffuse + reflectedLight.directDiffuse) * material.diffuseColor, inside);
-    }`,
-  /** What the lacquer lets through of the light leaving the paint under it, over its optical depth at the view angle. */
-  absorption: 'mix(vec3(1.0), pow(paintLacquer, vec3(paint_lacquerThickness / clamp(dot(geometryViewDir, normal) + 0.001, 0.001, 1.0))), paintCoat)',
-};
+      vec4 aoSpec = ${maps.aoSpec ? lookup('paint_aoSpec', 'vCarMapUv') : 'vec4(1.0)'};
+      // The albedo's alpha is the base coat's specular mask, not coverage: taken without the material's opacity (a ghost's fade),
+      // and the paint is as opaque as its material (whole unless a ghost fades it).
+      paintAO = aoSpec.g; paintCoatOcclusion = aoSpec.r; paintBaseOcclusion = aoSpec.r * (opacity > 0.0 ? diffuseColor.a / opacity : 0.0);
+      diffuseColor.a = opacity;
+    }`;
+}
 
+/** The paint samplers `paintAlbedo` reads for `maps`, by uniform name. */
+export function paintSamplers(maps: PaintMaps): string[] {
+  return [...(maps.region ? ['paint_region'] : []), 'paint_carbon', ...(maps.aoSpec ? ['paint_aoSpec'] : [])];
+}
 /**
  * A paint map's own texture, sampled on the albedo's UVs with repeat and decoded by the map's colour role (the region map is a
  * colour stage: read through sRGB, then square-rooted in the shader).
@@ -113,9 +128,8 @@ function group(owner: Record<string, unknown> | undefined, name: string): Record
 
 /**
  * The layers of a paint description for a program that carries `PAINT_LAYERS`: its uniforms (`texture` hands each map its own
- * copy; a map the paint does not declare falls back to `albedo` for sampling and is neutralized by `fragment`), the program
- * variant they need, and `fragment`, which fits a patched fragment shader to the maps declared: a paint without a region map is
- * all black region, one without an AO/spec mask is unoccluded. `dispose` frees the maps' copies.
+ * copy; a map the paint does not declare falls back to `albedo` and is not read, `paintAlbedo`), the maps it has, which shape the
+ * program, and the textures the layers own. `dispose` frees the maps' copies.
  */
 export function paintLayers(paint: CarSurface, texture: (path: string) => Texture, albedo: Texture) {
   const parameters = paint.parameters ?? {};
@@ -139,13 +153,7 @@ export function paintLayers(paint: CarSurface, texture: (path: string) => Textur
   };
   return {
     uniforms,
-    variant: `${region ? 'region' : 'black'}-${aoSpec ? 'ao' : 'noao'}`,
-    fragment(shader: string): string {
-      let fitted = shader;
-      if (!region) fitted = fitted.replace('sqrt(texture2D(paint_region, vMapUv).rgb)', 'vec3(0.0)');
-      if (!aoSpec) fitted = fitted.replace('vec4 aoSpec = texture2D(paint_aoSpec, vMapUv);', 'vec4 aoSpec = vec4(1.0);');
-      return fitted;
-    },
+    maps: {region: !!region, aoSpec: !!aoSpec} satisfies PaintMaps,
     dispose: (): void => {
       for (const key of ['paint_region', 'paint_aoSpec', 'paint_carbon']) { const map = uniforms[key].value as Texture; if (map !== albedo) map.dispose(); }
     },

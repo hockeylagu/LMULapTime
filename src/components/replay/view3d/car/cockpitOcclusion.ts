@@ -1,5 +1,6 @@
-import { ClampToEdgeWrapping, Data3DTexture, LinearFilter, RedFormat, UnsignedByteType, Vector3, type IUniform, type MeshStandardMaterial } from 'three';
+import { ClampToEdgeWrapping, Data3DTexture, LinearFilter, RedFormat, UnsignedByteType, Vector3, type IUniform } from 'three';
 import type { CarReflectionOcclusion, VehicleBodyVolume } from '../../../../../shared/types/scenes/car.js';
+import type { ShaderPart } from '../shaders/composer.js';
 
 /**
  * Cockpit reflection occlusion, as the package states it (`reflectionOcclusion` in shared/packageContract/bodyDescriptor.ts): a material
@@ -58,37 +59,28 @@ const FRAGMENT = `
   /** The cube reflection's scale along world direction \`r\`. */
   float cockpitReflectionScale(vec3 r, float occlusion) { return mix(mix(0.2, 0.0, saturate(-r.y)), 1.0, occlusion); }`;
 
-/** Where the scenery's surface program sets its reflection roughness: the occlusion is computed right after. */
-const SURFACE_ROUGHNESS = 'surfaceReflectionRoughness=clamp(surfaceRoughness,0.0,1.0);', LIGHTS_END = '#include <lights_fragment_end>';
-
 /**
- * Occludes the cube reflection of a car material drawn by the scenery's surface program (`surface`) or by three's standard
- * program with the car's prefiltered cube as its environment (`standard`).
+ * Occludes the cube reflection of a car material: one drawn by the scenery's reflection rule (`surface`: the rule's own read, after
+ * the rule's inputs are filled), or by three's environment lookup (`standard`: the environment's reflection once read, after a
+ * car's correction of it). The volume is the material's own texture.
  */
-export function bindCockpitOcclusion(material: MeshStandardMaterial, occlusion: CockpitOcclusion, program: 'surface' | 'standard'): void {
+export function cockpitOcclusionPart(occlusion: CockpitOcclusion, program: 'surface' | 'standard'): ShaderPart {
   const uniforms: Record<string, IUniform> = {
     cockpit_volume: {value: occlusion.volume},
     cockpit_size: {value: new Vector3(...occlusion.box.size)}, cockpit_offset: {value: new Vector3(...occlusion.box.offset)},
   };
-  const own = material.onBeforeCompile.bind(material), key = material.customProgramCacheKey.bind(material);
-  material.onBeforeCompile = (shader, renderer) => {
-    own(shader, renderer);
-    Object.assign(shader.uniforms, uniforms);
-    // After three's common chunk, which declares saturate; before the lights, which call the occlusion.
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vCockpitPosition, vCockpitNormal, vCockpitEye;')
-      .replace('#include <project_vertex>', `#include <project_vertex>\n${VERTEX}`);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${FRAGMENT}`);
-    if (program === 'surface') {
-      if (!shader.fragmentShader.includes(SURFACE_ROUGHNESS)) throw Error(`Car material ${material.name}: the surface program has no reflection to occlude`);
-      shader.fragmentShader = shader.fragmentShader.replace(SURFACE_ROUGHNESS, `${SURFACE_ROUGHNESS} surfaceReflectionOcclusion=cockpitOcclusion(surfaceReflectionRoughness);`);
-    } else {
-      // The environment's radiance, read by the lights' end (the ambient lookup inlines the chunk that reads it).
-      if (!shader.fragmentShader.includes(LIGHTS_END)) throw Error(`Car material ${material.name}: the program has no reflection to occlude`);
-      shader.fragmentShader = shader.fragmentShader.replace(LIGHTS_END, `#if defined( RE_IndirectSpecular )
-          radiance *= cockpitReflectionScale(inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix), cockpitOcclusion(material.roughness));
-        #endif
-        ${LIGHTS_END}`);
-    }
+  return {
+    name: 'cockpitOcclusion',
+    slots: {
+      vertexPars: {at: 30, glsl: 'varying vec3 vCockpitPosition, vCockpitNormal, vCockpitEye;'},
+      vertexProjected: {at: 10, glsl: VERTEX},
+      // Before the reflection rule, which reads the define.
+      fragmentPars: {at: 25, glsl: FRAGMENT},
+      ...(program === 'surface'
+        ? {fragmentMaterial: {at: 60, glsl: '  surfaceReflectionOcclusion=cockpitOcclusion(surfaceReflectionRoughness);'}}
+        : {fragmentReflection: {at: 10, glsl: '  radiance *= cockpitReflectionScale(inverseTransformDirection(reflect(-geometryViewDir, geometryNormal), viewMatrix), cockpitOcclusion(material.roughness));'}}),
+    },
+    uniforms: () => uniforms,
+    ownTextures: ['cockpit_volume'],
   };
-  material.customProgramCacheKey = () => `${key()}|cockpitOcclusion`;
 }

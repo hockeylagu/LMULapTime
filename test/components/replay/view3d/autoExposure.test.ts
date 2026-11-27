@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Color, Scene, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
-import { adaptExposure, createAutoExposure, EXPOSURE_PASS, exposureUniforms, inverseToneCurve, lawExposure, meteredLuminance, meterGrey, meterUnit, profileAt, RESET_METERINGS, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { createAutoExposure, EXPOSURE_PASS, exposureUniforms, inverseToneCurve, lawExposure, meterGrey, meterUnit, profileAt, RESET_METERINGS, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
 import { BLOOM_PASS } from '../../../../src/components/replay/view3d/bloom.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
@@ -57,44 +57,12 @@ describe('autoExposure', () => {
     expect(meterUnit(4.4)).toBeCloseTo(unit / 2, 12); // The package's scale, not a constant of the app.
   });
 
-  it('meters the luminance of the tone-mapped taps\' mean through the curve\'s exponential alone; a sun glint barely counts', () => {
-    const curve = {a: 2.658, b: 0.665}, exposure = 0.5, taps = 128 * 72;
-    const reading = (lights: number[]) => {
-      const mean = lights.reduce((sum, light) => sum + toneCurve(curve, light * exposure), 0) / lights.length;
-      return meteredLuminance([mean, mean, mean], exposure);
-    };
-    // A reference frame's reading: mean displayed luminance 0.1658 reads as 0.1813 exposed (the curve's exact inverse would be 0.2112).
-    expect(Math.exp(meteredLuminance([0.1658, 0.1658, 0.1658], 1))).toBeCloseTo(0.1813, 4);
-    expect(inverseToneCurve(curve, 0.1658)).toBeCloseTo(0.2112, 3);
-    // Rec. 709 weights over the channels' means.
-    expect(meteredLuminance([0.5, 0.1, 0.2], 1)).toBeCloseTo(Math.log(-Math.log(1 - (0.2126 * 0.5 + 0.7152 * 0.1 + 0.0722 * 0.2))), 12);
-    const scene = Array<number>(taps).fill(0.15);
-    const glint = [...scene.slice(1), 6000]; // One tap on glass catching the sun: capped at 1 by the curve.
-    expect(Math.abs(reading(glint) - reading(scene))).toBeLessThan(0.01);
-  });
   it('leaves colours alone at 6500 K and cools them toward a bluer profile white, keeping green', () => {
     const grey = (kelvin: number) => new Vector3(0.5, 0.5, 0.5).applyMatrix3(whiteBalance(kelvin));
     expect(grey(6500).toArray().map(c => Number(c.toFixed(6)))).toEqual([0.5, 0.5, 0.5]);
     const cool = grey(7500); // White shows as the profile's bluer white.
     expect(cool.y).toBeCloseTo(0.5, 6); expect(cool.z).toBeGreaterThan(cool.y); expect(cool.y).toBeGreaterThan(cool.x);
     expect(cool.x / cool.y).toBeCloseTo(0.923, 3); // Capture 21459 (7500 K): the game's white shows red at 0.957 of green after the encode.
-  });
-
-  it('adapts the exposure in stops: a blend fraction per 0.15 s, capped in stops a second, smoothed twice, landing on the target', () => {
-    const external = { sensitivity: 0.25, speedLimit: 1, delayS: 0, darkAdaptation: { scale: -1, sensitivity: -1, speedLimit: -1 } };
-    // One 0.15 s frame toward a target 0.1 stop up: k = 0.25, the step 0.025, smoothed from rest to 0.25 of it.
-    const first = adaptExposure({ log2: 0, step: 0 }, 0.1, 0.15, external);
-    expect(first.log2).toBeCloseTo(0.025 * 0.25, 12); expect(first.step).toBeCloseTo(0.00625, 12);
-    // Far off, the cap holds: at most one stop a second, here 0.15 stop for the frame, whichever way.
-    expect(adaptExposure({ log2: 0, step: 0 }, -10, 0.15, external).log2).toBeGreaterThanOrEqual(-0.15);
-    expect(adaptExposure({ log2: 0, step: 0 }, -10, 0.15, external).log2).toBeLessThan(0);
-    // A step that would pass the target lands on it and stops.
-    expect(adaptExposure({ log2: 0, step: 0 }, 1e-4, 0.15, { ...external, sensitivity: 1, speedLimit: 10000 })).toEqual({ log2: 1e-4, step: 0 });
-    expect(adaptExposure({ log2: 0, step: 0 }, 1, 0, external)).toEqual({ log2: 0, step: 0 });
-    // A darkening scene takes the dark set when it has its own values.
-    const dark = { ...external, darkAdaptation: { scale: 1, sensitivity: 1, speedLimit: 10000 } };
-    expect(adaptExposure({ log2: 0, step: 0 }, 2, 0.15, dark)).toEqual({ log2: 2, step: 0 });
-    expect(adaptExposure({ log2: 0, step: 0 }, -2, 0.15, dark).log2).toBeGreaterThan(-0.15 - 1e-12);
   });
 
   it('links the canvas pass for the canvas and the metering pass for its own target, and leaves the renderer as it was', async () => {

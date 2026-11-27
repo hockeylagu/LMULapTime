@@ -1,14 +1,14 @@
 import { afterEach, expect, it } from 'vitest';
-import { Matrix4, ShaderChunk, type WebGLProgramParametersWithUniforms } from 'three';
+import { Matrix4 } from 'three';
 import { GAME_LIGHT_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
-import { sceneDayLight, sceneEmission } from '../../../../../src/components/replay/view3d/scene/dayLight.js';
-import { cockpitLightUniforms, lampShares, setCockpitFrame } from '../../../../../src/components/replay/view3d/night/cockpitLight.js';
+import { COCKPIT_LIGHT_DECLARATIONS, lampShares, setCockpitFrame } from '../../../../../src/components/replay/view3d/night/cockpitLight.js';
+import { SCENE_BLOCK, sceneBlock, sceneValue } from '../../../../../src/components/replay/view3d/shaders/sceneBlock.js';
 import { CAR_SPOT_TERM } from '../../../../../src/components/replay/view3d/night/carSpots.js';
-import { patchTrackLights } from '../../../../../src/components/replay/view3d/night/trackLightProgram.js';
+import { trackLightPart } from '../../../../../src/components/replay/view3d/night/trackLightProgram.js';
 import type { ShaderContext } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
 import type { SurfaceConfig } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 
-afterEach(() => { setCockpitFrame(null); sceneDayLight.value = 1; });
+afterEach(() => { setCockpitFrame(null); });
 
 const context = {
   sample: (key: string) => `tex(${key})`, number: (n: number) => String(n), vec: (a: readonly number[]) => `vec${a.length}(${a.join(',')})`,
@@ -43,25 +43,22 @@ it('keeps the track lights and the beams off the screens, which show their own g
 });
 
 it('writes only the terms a surface takes', () => {
-  const program = () => ({uniforms: {}, vertexShader: ShaderChunk.meshphysical_vert, fragmentShader: ShaderChunk.meshphysical_frag}) as unknown as WebGLProgramParametersWithUniforms;
-  const cabin = program(), glass = program();
-  patchTrackLights(cabin, 'near', lampShares(surface('standard', 'on'), context));
-  patchTrackLights(glass, 'near', lampShares(surface('glass'), context));
-  expect(cabin.fragmentShader).toContain('indirectDiffuse+=(cockpitLightTerm(');
-  expect(cabin.fragmentShader).not.toContain(CAR_SPOT_TERM);
-  expect(cabin.uniforms.cockpitLight_frame).toBe(cockpitLightUniforms.cockpitLight_frame);
-  expect(glass.fragmentShader).not.toContain(CAR_SPOT_TERM);
-  expect(glass.fragmentShader).not.toContain('cockpitLightTerm');
+  const cabin = trackLightPart('near', lampShares(surface('standard', 'on'), context)), glass = trackLightPart('near', lampShares(surface('glass'), context));
+  const fragment = (part: typeof cabin) => `${part.slots.fragmentPars?.glsl ?? ''}\n${part.slots.fragmentOcclusion?.glsl ?? ''}`;
+  expect(fragment(cabin)).toContain('indirectDiffuse+=(cockpitLightTerm(');
+  expect(fragment(cabin)).not.toContain(CAR_SPOT_TERM);
+  expect(cabin.uniforms).toBeUndefined(); // The frame and its scale are the scene block's.
+  expect(fragment(glass)).not.toContain(CAR_SPOT_TERM);
+  expect(fragment(glass)).not.toContain('cockpitLightTerm');
 });
 
-it('lights at night only, while a cabin car is placed, and not while the venue is captured', () => {
-  sceneDayLight.value = 0.5;
-  expect(cockpitLightUniforms.cockpitLight_scale.value).toBe(0);
+it('lights while a cabin car is placed, at night only and not while the venue is captured', () => {
+  expect(sceneValue('cockpitLight_scale')).toBe(0);
   setCockpitFrame(new Matrix4().makeTranslation(1, 2, 3));
-  expect(cockpitLightUniforms.cockpitLight_frame.value.elements[12]).toBe(1);
-  expect(cockpitLightUniforms.cockpitLight_scale.value).toBe(GAME_LIGHT_UNIT);
-  sceneDayLight.value = 1;
-  expect(cockpitLightUniforms.cockpitLight_scale.value).toBe(0);
-  sceneDayLight.value = 0; sceneEmission.value = 0;
-  try { expect(cockpitLightUniforms.cockpitLight_scale.value).toBe(0); } finally { sceneEmission.value = 1; }
+  expect(sceneBlock[SCENE_BLOCK.offsets.cockpitLight_frame + 12]).toBe(1);
+  expect(sceneValue('cockpitLight_scale')).toBe(Math.fround(GAME_LIGHT_UNIT));
+  setCockpitFrame(null);
+  expect(sceneValue('cockpitLight_scale')).toBe(0);
+  // The day share and the emission switch are read where the term is worked out.
+  expect(COCKPIT_LIGHT_DECLARATIONS).toContain('float scale = lit_dayLight < 1.0 ? cockpitLight_scale * surface_emission : 0.0;');
 });

@@ -1,6 +1,6 @@
 import type { ParameterGroup } from './surfaceConfig.js';
 
-/** GLSL pieces one surface family contributes to the patched `MeshStandardMaterial` program. */
+/** GLSL pieces one surface family contributes to its program (surfaceProgram.ts). */
 export interface SurfaceParts {
   albedo: string;
   normals: string;
@@ -25,12 +25,6 @@ export interface ShaderContext {
   uniforms: boolean;
 }
 
-/**
- * Scales every scenery cut-out's alpha test: 1 cuts at the material's threshold; 0, set around the multisampled scene pass, leaves
- * the cut to alpha to coverage.
- */
-export const surfaceAlphaCut = { value: 1 };
-
 export function glslNumber(n: number): string {
   if (!Number.isFinite(n)) throw Error('Invalid shader constant');
   return Number(n).toFixed(8);
@@ -54,10 +48,23 @@ export function list(group: ParameterGroup | undefined, key: string): readonly n
   return v;
 }
 
+/**
+ * A map's coordinates by its UV set's weights (`surfaceUv`), on the varyings `vSurfaceXZ` (the position's), `vSurfaceUV01` and
+ * `vSurfaceUV23` (the four UV sets) the vertex stage passes (`surfaceVertexMain`); the sun shadow pass's cut-out reads its map by it too
+ * (shaders/depthTemplate.ts).
+ */
+export const SURFACE_UV = `// A map's coordinates by its UV set's weights (uv0..uv3; none, the world XZ): one of them is 1, the others 0, so the sum is that
+// set's coordinates exactly.
+vec2 surfaceUv(vec4 sets) {
+  return sets.x * vSurfaceUV01.xy + sets.y * vSurfaceUV01.zw + sets.z * vSurfaceUV23.xy + sets.w * vSurfaceUV23.zw
+    + (1.0 - (sets.x + sets.y + sets.z + sets.w)) * vSurfaceXZ;
+}`;
+
 export const HELPERS = `
 varying vec2 vSurfaceXZ;
 varying float vSurfaceRandom;
 varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;
+${SURFACE_UV}
 float surfaceLeafMask = 0.0;
 float surfaceBakedShadow = 1.0;
 vec3 surfaceOverlay(vec3 base, vec3 detail) {

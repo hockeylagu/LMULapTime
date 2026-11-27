@@ -1,6 +1,7 @@
 import { Box3, Mesh, Object3D, Vector3, type Material, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
+import { composedTextures } from '../shaders/composer.js';
 import { createGeometryWarmup, type UploadSlice } from './geometryWarmup.js';
-import { surfaceTextureMaps, trackSurfaceTextures } from './materials/configureSurfaceMaterial.js';
+import { trackSurfaceTextures } from './materials/configureSurfaceMaterial.js';
 import { fullPixels, isStreaming, streamTexture, whenUploaded } from './materials/mipStreaming.js';
 
 /** Upload slice while the scene shows (a frame each), and behind the loading screen (a task each). */
@@ -180,9 +181,11 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     for (const root of roots) root.traverse(object => {
       if (!(object instanceof Mesh)) return;
       const mesh = object as Mesh, own = mesh.material, materials: Material[] = Array.isArray(own) ? own : [own];
+      // A composed material holds its textures in uniforms: the composer knows which are its own (not the scene-wide ones). Any
+      // other material (a readout's canvas) holds them in its fields.
       for (const material of materials) {
-        for (const value of Object.values(material as unknown as Record<string, unknown>)) if (value && (value as Texture).isTexture) use(value as Texture, mesh);
-        for (const texture of surfaceTextureMaps.get(material) ?? []) use(texture, mesh);
+        const maps = composedTextures(material) ?? Object.values(material as unknown as Record<string, unknown>).filter((value): value is Texture => !!value && (value as Texture).isTexture);
+        for (const texture of maps) use(texture, mesh);
       }
     });
     const next = slice();

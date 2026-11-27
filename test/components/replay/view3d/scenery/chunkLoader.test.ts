@@ -1,9 +1,17 @@
 import { expect, it } from 'vitest';
-import { Group, Mesh, MeshBasicMaterial, BufferGeometry } from 'three';
+import { BufferAttribute, Group, Mesh, MeshBasicMaterial, BufferGeometry } from 'three';
 import type { GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
+import { TRACK_LIGHT_ATTRIBUTE } from '../../../../../src/components/replay/view3d/night/trackLightProgram.js';
 import { prepareSceneryMesh, skipSurfaceTextures } from '../../../../../src/components/replay/view3d/scenery/chunkLoader.js';
 
-const mesh = (name: string, extras: Record<string, unknown>) => Object.assign(new Mesh(new BufferGeometry(), new MeshBasicMaterial()), {name, userData: extras});
+/** A scenery primitive's geometry: every one carries its track light sum. */
+const geometry = () => new BufferGeometry().setAttribute(TRACK_LIGHT_ATTRIBUTE, new BufferAttribute(new Uint8Array(4), 4, true));
+const mesh = (name: string, extras: Record<string, unknown>) => Object.assign(new Mesh(geometry(), new MeshBasicMaterial()), {name, userData: extras});
+
+it('refuses a primitive without its track light sum, naming it: the surface programs would decode NaN', () => {
+  expect(() => prepareSceneryMesh(Object.assign(new Mesh(new BufferGeometry(), new MeshBasicMaterial()), {name: 'BARRIER_12'})))
+    .toThrow(`Scenery mesh BARRIER_12 has no ${TRACK_LIGHT_ATTRIBUTE} attribute`);
+});
 
 it("casts shadow only where the package's node flag says so; every mesh receives", () => {
   const gantry = mesh('SURFACE_GANTRY__M_HASH__OPAQUE__CAST', {lmuCastShadow: true});
@@ -28,7 +36,7 @@ it("casts shadow only where the package's node flag says so; every mesh receives
 });
 
 it("keeps the GLB material's package key on the mesh", () => {
-  const floor = new Mesh(new BufferGeometry(), Object.assign(new MeshBasicMaterial(), {userData: {lmuMaterial: '00b9c0040da09bea'}}));
+  const floor = new Mesh(geometry(), Object.assign(new MeshBasicMaterial(), {userData: {lmuMaterial: '00b9c0040da09bea'}}));
   prepareSceneryMesh(floor);
   expect(floor.userData.lmuMaterial).toBe('00b9c0040da09bea');
 });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
-import { LAMP_ATTRIBUTE, lampCentres, lampPixel, prepareLampSizes, trackLampPixel } from '../../../../../src/components/replay/view3d/scenery/lampSize.js';
+import { LAMP_ATTRIBUTE, lampCentres, lampSizePart, prepareLampSizes, trackLampPixel } from '../../../../../src/components/replay/view3d/scenery/lampSize.js';
+import { sceneValue } from '../../../../../src/components/replay/view3d/shaders/sceneBlock.js';
 
 /** Two lamps: a square of two triangles split by normal (no shared vertex) about (0, 0, 0), and a triangle about (10, 0, 0). */
 const POSITIONS = [
@@ -35,7 +36,16 @@ describe('lamp sizes', () => {
   });
 
   it('keeps a pixel in clip space for the frame', () => {
-    trackLampPixel(1000); expect(lampPixel.value).toBeCloseTo(0.002);
-    trackLampPixel(0); expect(lampPixel.value).toBe(0);
+    trackLampPixel(1000); expect(sceneValue('surface_lampPixel')).toBeCloseTo(0.002);
+    trackLampPixel(0); expect(sceneValue('surface_lampPixel')).toBe(0);
   });
+});
+
+it('grows a lamp on screen in the slot that moves the drawn position, and passes its light share', () => {
+  const {slots} = lampSizePart;
+  expect(slots.vertexPars?.glsl).toContain(`attribute vec4 ${LAMP_ATTRIBUTE};`);
+  expect(slots.vertexView?.glsl).toContain('gl_Position = projectionMatrix * mvPosition;');
+  expect(slots.vertexView?.glsl).toContain('vSurfaceLampShare = 1.0 / (growth * growth);');
+  // The pixel and the day share are the scene block's.
+  expect(slots.vertexView?.glsl).toContain('growth = mix(growth, 1.0, clamp(lit_dayLight, 0.0, 1.0));'); expect(lampSizePart.uniforms).toBeUndefined();
 });

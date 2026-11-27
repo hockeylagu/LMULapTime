@@ -188,6 +188,8 @@ describe('createRaceField', () => {
     // Its body's bounds, from where it meets the road (its lowest point, no full model built) to its top, for picking.
     const box = field.bounds(0)!;
     expect([box.min.y, box.max.y]).toEqual([expect.closeTo(-0.5), expect.closeTo(0.5)]);
+    // The field's own box, not a copy per call (the beams ask every frame).
+    expect(field.bounds(0)).toBe(box);
     expect(field.bounds(9)).toBeNull();
   });
 

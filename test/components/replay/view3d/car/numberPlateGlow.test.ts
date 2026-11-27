@@ -1,11 +1,9 @@
-import { afterEach, expect, it } from 'vitest';
-import { ShaderChunk, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import { expect, it } from 'vitest';
+import type { IUniform } from 'three';
 import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { GAME_LIGHT_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
-import { sceneDayLight, sceneEmission } from '../../../../../src/components/replay/view3d/scene/dayLight.js';
-import { numberPlateGlow, patchNumberPlateGlow } from '../../../../../src/components/replay/view3d/car/numberPlateGlow.js';
-
-afterEach(() => { sceneDayLight.value = 1; sceneEmission.value = 1; });
+import { glslNumber } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
+import { numberPlateGlow, numberPlateGlowPart } from '../../../../../src/components/replay/view3d/car/numberPlateGlow.js';
 
 const plate = (emissive: string | undefined, parameters: Record<string, unknown> = {emissive: {colour: [1, 0.5, 1], strength: 2, switchU: 0.5}}): CarSurface => ({
   version: 4, kind: 'numberPlate', name: 'WCEXTRA3', flags: {emissive}, parameters, maps: {},
@@ -27,13 +25,13 @@ it('gives no glow to an unlit plate or another kind, and rejects a lit plate wit
 });
 
 it("adds the glow to three's emission in the scene's light unit, by night only and not while the venue is captured", () => {
-  const shader = {uniforms: {} as Record<string, IUniform>, fragmentShader: ShaderChunk.meshphysical_frag} as unknown as WebGLProgramParametersWithUniforms;
-  patchNumberPlateGlow(shader, numberPlateGlow(plate('night'))!);
-  expect(shader.fragmentShader).toContain('totalEmissiveRadiance += plate_colour * step(plate_switchU, vMapUv.x) * diffuseColor.rgb * plate_scale;');
-  const scale = shader.uniforms.plate_scale;
-  expect(scale.value).toBe(0); // Full day.
-  sceneDayLight.value = 0.2;
-  expect(scale.value).toBe(GAME_LIGHT_UNIT);
-  sceneEmission.value = 0;
-  expect(scale.value).toBe(0);
+  const part = numberPlateGlowPart(numberPlateGlow(plate('night'))!, true);
+  // Its scale from the blocks: 0 for a night-only plate at full day (`lit_dayLight`) and while the venue is captured (`surface_emission`).
+  const scale = `* ( plate_nightOnly > 0.5 && lit_dayLight >= 1.0 ? 0.0 : ${glslNumber(GAME_LIGHT_UNIT)} * surface_emission );`;
+  expect(part.slots.fragmentEmission?.glsl.replace(/\s+/g, ' ').trim()).toBe(`totalEmissiveRadiance += plate_colour * step( plate_switchU, vCarMapUv.x ) * diffuseColor.rgb ${scale}`);
+  // Without its albedo map the whole plate glows.
+  expect(numberPlateGlowPart(numberPlateGlow(plate('night'))!, false).slots.fragmentEmission?.glsl.replace(/\s+/g, ' ').trim()).toBe(`totalEmissiveRadiance += plate_colour * diffuseColor.rgb ${scale}`);
+  expect((part.uniforms!().plate_nightOnly as IUniform<number>).value).toBe(1);
+  expect(numberPlateGlowPart(numberPlateGlow(plate('always'))!, true).uniforms?.().plate_nightOnly.value).toBe(0);
+  expect(part.uniforms?.()).not.toHaveProperty('plate_scale');
 });

@@ -1,4 +1,5 @@
 import type { IUniform, Texture } from 'three';
+import type { ShaderPart } from '../shaders/composer.js';
 
 /**
  * A streamed texture that sharpens (`mipStreaming.ts`) comes into focus over this long instead of in one frame: a car's livery
@@ -53,28 +54,30 @@ vec4 focusTexture(sampler2D map2D, float focus, vec2 uv) {
   }
   return sampled;
 }`;
-const COMMON = '#include <common>';
+
+/** A lookup of sampler `name` at `uv` that fades in as its texture sharpens (its `focus_<name>`, `textureFocusUniforms`). */
+export const focusedLookup = (name: string, uv: string): string => `focusTexture(${name}, focus_${name}, ${uv})`;
+
+/** The declarations the lookups of `names` read: each sampler's focus and the sampling function. */
+export function textureFocusDeclarations(names: readonly string[]): string {
+  return `${names.map(name => `uniform float focus_${name};`).join('\n')}\n${FOCUS_GLSL}`;
+}
+
+/** Each sampler's `focus_<name>`, read from the texture it holds at each draw, at the time of the frame (`focusing`). */
+export function textureFocusUniforms(samplers: Readonly<Record<string, IUniform>>): Record<string, IUniform<number>> {
+  return Object.fromEntries(Object.entries(samplers).map(([name, sampler]) =>
+    [`focus_${name}`, {get value() { return frameMs < endMs ? focusOf(sampler.value, frameMs) : 0; }}]));
+}
 
 /**
- * Makes a fragment program's `texture2D` lookups of `samplers` (uniforms of `shader`) fade in as their textures sharpen: each
- * sampler gets a `focus_<name>` uniform read from the texture it holds at each draw. A sampler the program does not read is
- * left as it is; run after the program's own patches, with the lookups written out (not behind an include).
+ * The fade-in of a composed program's lookups written with `focusedLookup`: the sampling function and each sampler's focus, for the
+ * samplers given (the material's own uniforms), declared ahead of the parts' own functions.
  */
-export function patchTextureFocus(shader: {fragmentShader: string; uniforms: Record<string, IUniform>}, samplers: readonly string[]): void {
-  const read = new Set<string>();
-  const wanted = new Set(samplers.filter(name => shader.uniforms[name] !== undefined));
-  shader.fragmentShader = shader.fragmentShader.replace(/texture2D\(\s*(\w+)\s*,/g, (lookup, name: string) => {
-    if (!wanted.has(name)) return lookup;
-    read.add(name);
-    return `focusTexture(${name}, focus_${name},`;
-  });
-  if (!read.size) return;
-  // With three's common declarations, ahead of the program's own functions (a lookup can sit in one of them).
-  if (!shader.fragmentShader.includes(COMMON)) throw Error('A program to fade in has no common include');
-  const declarations = [...read].map(name => `uniform float focus_${name};`).join('\n');
-  shader.fragmentShader = shader.fragmentShader.replace(COMMON, () => `${COMMON}\n${declarations}\n${FOCUS_GLSL}`);
-  for (const name of read) {
-    const sampler = shader.uniforms[name];
-    shader.uniforms[`focus_${name}`] = {get value() { return frameMs < endMs ? focusOf(sampler.value, frameMs) : 0; }};
-  }
+export function textureFocusPart(samplers: Readonly<Record<string, IUniform>>): ShaderPart {
+  const names = Object.keys(samplers).sort();
+  return {
+    name: 'textureFocus',
+    slots: {fragmentPars: {at: -100, glsl: textureFocusDeclarations(names)}},
+    uniforms: () => textureFocusUniforms(samplers),
+  };
 }

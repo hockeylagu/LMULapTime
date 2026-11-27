@@ -1,5 +1,5 @@
-import { BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Vector3, type Group, type Object3D } from 'three';
-import { hazeProgram } from '../atmosphere/haze.js';
+import { BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, Mesh, Vector3, type Group, type Object3D } from 'three';
+import { plainSurfaceMaterial } from '../shaders/plainSurface.js';
 import { createBlobShadows } from './blobShadows.js';
 
 /** A stand-in's colour: plain grey, no livery, so it does not pass for the car it stands in for. */
@@ -55,8 +55,7 @@ export function standInGeometry(car: Group): BufferGeometry {
 
 /** `capacity` is the field's car count (every car could wait at once); `warm` compiles a stand-in before it joins `root`. */
 export function createStandInCars(root: Object3D, capacity: number, warm: (object: Object3D) => Promise<void>): StandInCars {
-  const material = new MeshStandardMaterial({color: STAND_IN_GREY, roughness: 0.6, metalness: 0.1});
-  hazeProgram(material);
+  const material = plainSurfaceMaterial({colour: STAND_IN_GREY, roughness: 0.6, metalness: 0.1, environment: 1});
   const blobs = createBlobShadows(root, capacity, warm);
   const byClass = new Map<string, {mesh: InstancedMesh; ready: boolean}>();
   /** The first stand-in compiled: a class without its own yet borrows it. */

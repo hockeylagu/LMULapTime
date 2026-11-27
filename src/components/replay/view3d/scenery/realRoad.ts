@@ -1,5 +1,6 @@
-import { BufferAttribute, Mesh, type IUniform, type Object3D } from 'three';
+import { BufferAttribute, Mesh, type Object3D } from 'three';
 import { REALROAD_NONE } from '../../../../../shared/packageContract/scenery.js';
+import type { ShaderPart } from '../shaders/composer.js';
 
 /**
  * The track surface state the road and kerb surfaces draw (docs/SCENE_PACKAGE.md#realroad-elements): each vertex names a venue point
@@ -17,27 +18,24 @@ export const REALROAD_STATE_ATTRIBUTE = 'surfaceRealRoad';
 /** Bytes per element of a replay surface state: rubber laid, loose material, surface water, surface temperature. */
 const SURFACE_STATE_CHANNELS = 4;
 /**
- * The rubber drawn on every element: a fifth of full, the look accepted with freeze-v18. The game frames of the reference views
+ * The rubber drawn on every element: a fifth of full, the look accepted with freeze-v18. It is also the track's median rubber, which
+ * surfaces that draw the track average instead of their own vertices' read (`flags.groove: 'trackAverage'`; the scene block's
+ * `surface_realRoadMedian`, every element having it). The game frames of the reference views
  * were nearly bare (the captures' road state held rubber on 0–10 % of the visible road), so the road draws darker than them.
  */
 export const ASSUMED_RUBBER = 51;
 
 /**
- * The track's median rubber, for surfaces that draw the track average instead of their own vertices' (`flags.groove: 'trackAverage'`):
- * the assumed rubber, every element having it.
+ * The vertex's rubber and loose material (0 to 1) passed on to a road or kerb surface that reads them (`vSurfaceRealRoad`, declared
+ * by the surface for its fragment stage); a geometry without the attribute reads none.
  */
-export const realRoadUniforms: {surface_realRoadMedian: IUniform<number>} = {surface_realRoadMedian: {value: ASSUMED_RUBBER / 255}};
-
-/** Vertex declarations of a surface that reads the state. */
-export const REALROAD_VERTEX_DECLARATIONS = `
-    attribute vec2 ${REALROAD_STATE_ATTRIBUTE};
-    varying vec2 vSurfaceRealRoad;
-`;
-
-/** The vertex's rubber and loose material (0 to 1); a geometry without the attribute reads none. */
-export const REALROAD_VERTEX_MAIN = `
-    vSurfaceRealRoad = ${REALROAD_STATE_ATTRIBUTE};
-`;
+export const realRoadPart: ShaderPart = {
+  name: 'realRoad',
+  slots: {
+    vertexPars: {at: 30, glsl: `attribute vec2 ${REALROAD_STATE_ATTRIBUTE};\nvarying vec2 vSurfaceRealRoad;`},
+    vertexPosition: {at: 20, glsl: `  vSurfaceRealRoad = ${REALROAD_STATE_ATTRIBUTE};`},
+  },
+};
 
 /** Writes each point's rubber and loose material from `state` (elements x 4 bytes) through `table`; a point without an element reads none. */
 export function gatherPointStates(table: Uint32Array, state: Uint8Array, out: Uint8Array): void {

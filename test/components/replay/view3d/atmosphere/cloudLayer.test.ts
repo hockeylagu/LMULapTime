@@ -1,21 +1,17 @@
-import { DataTexture, RedFormat, RGBAFormat, Vector3, type Mesh, type MeshStandardMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
+import { DataTexture, DoubleSide, RedFormat, RGBAFormat, Vector3, type Mesh, type ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { cloudSheets, type CloudMoment } from '../../../../../src/components/replay/view3d/atmosphere/clouds.js';
 import { createCloudLayer } from '../../../../../src/components/replay/view3d/atmosphere/cloudLayer.js';
-import { isHazed } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { hazePart } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { composedParts, composedTextures, composeShader } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { litTemplate } from '../../../../../src/components/replay/view3d/shaders/litTemplate.js';
+import { sceneEnvironmentMap } from '../../../../../src/components/replay/view3d/shaders/sceneLight.js';
 import { testClouds } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const moment = (cells: string): CloudMoment => ({cells, upperDrift: 0, lowerDrift: 0, startUpperDrift: -10, startLowerDrift: -10});
 const light = {sunDirection: new Vector3(0.6, 0.8, 0), sunGreen: 10, cloudCover: 0.25}, AT_ORIGIN = new Vector3();
-const program = () => ({
-  uniforms: {}, vertexShader: '#include <common>\n#include <fog_pars_vertex>\n#include <fog_vertex>',
-  fragmentShader: '#include <common>\n#include <fog_pars_fragment>\n#include <opaque_fragment>\n#include <fog_fragment>',
-});
-const uniformsOf = (mesh: Mesh) => {
-  const shader = program();
-  (mesh.material as MeshStandardMaterial).onBeforeCompile(shader as unknown as WebGLProgramParametersWithUniforms, null as unknown as WebGLRenderer);
-  return shader.uniforms as Record<string, {value: unknown}>;
-};
+const materialOf = (mesh: Mesh) => mesh.material as ShaderMaterial;
+const uniformsOf = (mesh: Mesh) => materialOf(mesh).uniforms as Record<string, {value: unknown}>;
 
 describe('cloud layer', () => {
   it('draws one mesh per sheet, far to near from the camera, behind everything and blended over the sky', () => {
@@ -28,8 +24,11 @@ describe('cloud layer', () => {
     expect(meshes[1].renderOrder).toBeLessThan(meshes[0].renderOrder); expect(meshes[0].renderOrder).toBeLessThan(0);
     layer.order(new Vector3(500, 3900, -500));
     expect(meshes[0].renderOrder).toBeLessThan(meshes[1].renderOrder); expect(meshes[1].renderOrder).toBeLessThan(0);
-    const material = meshes[0].material as MeshStandardMaterial;
+    const material = materialOf(meshes[0]);
     expect(material.transparent).toBe(true); expect(material.depthWrite).toBe(false); expect(material.forceSinglePass).toBe(true); expect(meshes[0].frustumCulled).toBe(false);
+    expect(material.side).toBe(DoubleSide);
+    // A sheet has no normal attribute: the light model the cloud overwrites takes the face normal, never a NaN one.
+    expect(meshes[0].geometry.getAttribute('normal')).toBeUndefined(); expect((material as typeof material & {flatShading?: boolean}).flatShading).toBe(true);
     // Both sheets have the same cloud material: one material, one set of textures.
     expect(meshes[1].material).toBe(material);
     layer.dispose();
@@ -72,16 +71,22 @@ describe('cloud layer', () => {
     expect([...((uniforms.cloudEndMap.value as DataTexture).image.data as Uint8Array)]).toEqual([32, 128, 255, 255]);
   });
 
-  it('patches the program: the cloud\'s colour and alpha, drawn at the far limit, under half the haze distance', () => {
-    const shader = program(), clouds = testClouds(), layer = createCloudLayer(clouds, cloudSheets(clouds, moment('0fff0'), 0), light, AT_ORIGIN);
-    const material = (layer.group.children[0] as Mesh).material as MeshStandardMaterial;
-    material.onBeforeCompile(shader as unknown as WebGLProgramParametersWithUniforms, null as unknown as WebGLRenderer);
+  it('composes the program: the lit template with the cloud\'s own light and alpha, drawn at the far limit, under half the haze distance', () => {
+    const clouds = testClouds(), layer = createCloudLayer(clouds, cloudSheets(clouds, moment('0fff0'), 0), light, AT_ORIGIN);
+    const material = materialOf(layer.group.children[0] as Mesh), parts = composedParts(material) ?? [], [cloud] = parts;
+    expect(parts.map(part => part.name)).toEqual(['cloud', 'haze']); expect(parts[1]).toBe(hazePart);
+    // The far limit moves the drawn position; the ray and the frame are passed on; the cloud's light replaces the template's.
+    expect(cloud.slots.vertexView?.glsl).toContain('gl_Position.z = gl_Position.w;');
+    expect(cloud.slots.vertexOutputs?.glsl).toContain('( modelMatrix * vec4( transformed, 1.0 ) ).xyz - cameraPosition;');
+    expect(cloud.slots.fragmentLight?.glsl).toContain('outgoingLight = ( vec3( cloudSunLight * lit ) + ambient ) * albedo * albedo;');
+    expect(cloud.slots.fragmentLight?.glsl).toContain('getIBLIrradiance( normalize( ( viewMatrix * vec4( openWorld.x, openWorld.y, - openWorld.z, 0.0 ) ).xyz ) )');
+    expect(Object.keys(cloud.slots)).toEqual(['vertexPars', 'vertexView', 'vertexOutputs', 'fragmentPars', 'fragmentLight']);
+    // Half the haze's distance, as a value: every sheet's material shares one program.
+    expect(material.uniforms.HAZE_DISTANCE_SCALE.value).toBe(0.5);
+    expect(material.customProgramCacheKey()).toBe(composeShader(litTemplate, parts).key);
+    expect(material.uniforms.envMap).toBe(sceneEnvironmentMap); expect(material.lights).toBe(false); expect(material.fog).toBe(false);
+    // The warm-up uploads its maps with the layer.
+    expect(composedTextures(material)).toEqual(['cloudAlphaMap', 'cloudDensityMap', 'cloudSideMap', 'cloudEndMap'].map(name => uniformsOf(layer.group.children[0] as Mesh)[name].value));
     layer.dispose();
-    expect(isHazed(material)).toBe(true);
-    expect(shader.vertexShader).toContain('gl_Position.z = gl_Position.w;');
-    expect(shader.vertexShader).toContain('( modelMatrix * vec4( transformed, 1.0 ) ).xyz - cameraPosition;');
-    expect(shader.fragmentShader.indexOf('outgoingLight = (')).toBeLessThan(shader.fragmentShader.indexOf('#include <opaque_fragment>'));
-    expect(shader.fragmentShader).toContain('exp( - 0.5 * fogDensity * vFogDepth )');
-    expect(shader.fragmentShader).not.toContain('#include <fog_fragment>');
   });
 });

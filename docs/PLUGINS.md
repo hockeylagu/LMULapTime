@@ -172,7 +172,7 @@ luminance y of the window's mean tone-mapped colour read as −ln(1 − y) over 
 same way), `adaptation`
 {`sensitivity`, `speedLimit`, `delayS`, `darkAdaptation`} (the exposure moves toward the law's in stops: a blend fraction `sensitivity` per
 0.15 s, capped at `speedLimit` stops a second and smoothed twice; a darkening scene takes `darkAdaptation`'s non-negative values;
-`autoExposure.ts` `adaptExposure`; on the wall clock, so it runs on while the replay is paused; it starts at the target when the
+`autoExposure.ts` `ADAPT_SHADER`; on the wall clock, so it runs on while the replay is paused; it starts at the target when the
 scene loads and carries over camera cuts, seeks and type changes; the delay is 0 everywhere and not applied), `tv` a `lodMultiplier` (below), a positive `weatherBlendRate` (per second, the rate of the clear to overcast profile blend), `ambientOcclusion` and
 `profiles` ascending by `sunElevationDeg`, each with a positive `targetExposure` (T), a positive `lightDarkBorder` (B), `minExposure` and `maxExposure`
 (0 ≤ min ≤ max, max > 0), `whiteBalanceK` and a `toneCurve` {`a` > 0, `b`} (the clear values), a positive `weatherLerpPower` and

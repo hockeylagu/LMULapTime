@@ -1,4 +1,4 @@
-import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, LinearSRGBColorSpace, Mesh, MeshBasicMaterial, type Vector3 } from 'three';
+import { BufferGeometry, Color, DoubleSide, Float32BufferAttribute, LinearSRGBColorSpace, Mesh, type ShaderMaterial, type Vector3 } from 'three';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { computeBaselineDeltaByIdx, computeGainLossByIdx, getHeatmapColor, type MapColorMode } from '../../map/replayMapUtils.js';
 import { computeLapComparisons } from '../../../../utils/replayComparison.js';
@@ -6,7 +6,9 @@ import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../.
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import { EXPOSURE_GLSL, exposureUniforms, inverseToneCurve, type DisplayTransform } from '../autoExposure.js';
-import { hazeProgram } from '../atmosphere/haze.js';
+import { hazePart } from '../atmosphere/haze.js';
+import { composedMaterial, type ShaderPart } from '../shaders/composer.js';
+import { unlitTemplate } from '../shaders/unlitTemplate.js';
 
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
 export const RACING_LINE_WIDTH_M = 0.6;
@@ -66,7 +68,7 @@ function fillHeights(heights: Array<number | null>, lap: ReplayTrajectoryData, s
   return found;
 }
 
-export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, display: () => DisplayTransform, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): Mesh<BufferGeometry, MeshBasicMaterial> {
+export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, display: () => DisplayTransform, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): Mesh<BufferGeometry, ShaderMaterial> {
   const heights: Array<number | null> = lap.points.map(() => null);
   fillHeights(heights, lap, surfaceHeight);
   const line = makeDataMesh(racingLineGeometry(lap, origin, heights, widthM, liftM), colors, display, liftM > LIFT_M ? 3 : 2);
@@ -76,22 +78,27 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
 }
 
 /**
+ * Data, not lit scenery: a data mesh's vertex colours are what the display transform shows as the 2D map's colours (colorRacingLine),
+ * and exposure is a linear scale before the curve, so dividing the GPU's adapted exposure out keeps those pixels whatever auto-exposure
+ * picks. A camera type with another curve re-bakes the colours (syncRacingLine). The exposure state is scene-wide, not the line's own.
+ */
+export const exposureDivide: ShaderPart = {
+  name: 'exposureDivide',
+  slots: {
+    fragmentPars: {at: 0, glsl: EXPOSURE_GLSL},
+    fragmentColour: {at: 10, glsl: '  diffuseColor.rgb /= displayExposure();'},
+  },
+  uniforms: () => exposureUniforms,
+};
+
+/**
  * A mesh drawn in the 2D map's colours on the road (the racing lines, the driving marks): `geometry` has a `color` attribute with
  * two vertices per entry of `colors`. `colorRacingLine` and `syncRacingLine` keep its colours.
  */
-export function makeDataMesh(geometry: BufferGeometry, colors: string[], display: () => DisplayTransform, renderOrder: number): Mesh<BufferGeometry, MeshBasicMaterial> {
+export function makeDataMesh(geometry: BufferGeometry, colors: string[], display: () => DisplayTransform, renderOrder: number): Mesh<BufferGeometry, ShaderMaterial> {
   // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
-  const material = new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
-  // Data, not lit scenery: its vertex colours are what the display transform shows as the 2D map's colours (colorRacingLine), and
-  // exposure is a linear scale before the curve, so dividing the GPU's adapted exposure out keeps those pixels whatever auto-exposure
-  // picks. A camera type with another curve re-bakes the colours (syncRacingLine).
-  material.onBeforeCompile = shader => {
-    shader.uniforms.exposure_state = exposureUniforms.exposure_state;
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${EXPOSURE_GLSL}`)
-      .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb /= displayExposure();');
-  };
-  hazeProgram(material);
+  const material = composedMaterial(unlitTemplate, [exposureDivide, hazePart],
+    {vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
   const mesh = new Mesh(geometry, material);
   mesh.renderOrder = renderOrder;
   lineColours.set(mesh, {display, colors, baked: null});
@@ -100,7 +107,7 @@ export function makeDataMesh(geometry: BufferGeometry, colors: string[], display
 }
 
 /** Inverts each colour through the output encode and the tone curve: the exposed value the display shows as that colour. */
-function bakeColours(line: Mesh<BufferGeometry, MeshBasicMaterial>, state: {display: () => DisplayTransform; colors: string[]; baked: DisplayTransform | null}): void {
+function bakeColours(line: Mesh<BufferGeometry, ShaderMaterial>, state: {display: () => DisplayTransform; colors: string[]; baked: DisplayTransform | null}): void {
   const display = state.display(), {toneCurve: curve, outputGamma} = display;
   const attribute = line.geometry.getAttribute('color') as Float32BufferAttribute, color = new Color();
   const exposed = (encoded: number) => inverseToneCurve(curve, encoded ** outputGamma);
@@ -115,7 +122,7 @@ function bakeColours(line: Mesh<BufferGeometry, MeshBasicMaterial>, state: {disp
 
 const colors = (state: {colors: string[]}, i: number) => state.colors[i] ?? TELEMETRY_COLORS.primary;
 
-export function colorRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, colors: string[]): void {
+export function colorRacingLine(line: Mesh<BufferGeometry, ShaderMaterial>, colors: string[]): void {
   const state = lineColours.get(line);
   if (!state) throw Error('Racing line was not built by makeRacingLine');
   state.colors = colors;
@@ -126,14 +133,14 @@ export function colorRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, c
  * Re-bakes the colours when the display transform changed (another camera type). Call before the frame renders: three uploads
  * the vertex colours before `onBeforeRender`, so a bake there would show one frame late.
  */
-export function syncRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>): void {
+export function syncRacingLine(line: Mesh<BufferGeometry, ShaderMaterial>): void {
   const state = lineColours.get(line);
   if (!state) throw Error('Racing line was not built by makeRacingLine');
   if (state.baked !== state.display()) bakeColours(line, state);
 }
 
 /** Re-drapes the ribbon on the road now resident (scenery streams in after the line was built), keeping its colours. */
-export function refreshRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): void {
+export function refreshRacingLine(line: Mesh<BufferGeometry, ShaderMaterial>, lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): void {
   const heights = lineHeights.get(line);
   if (!heights) throw Error('Racing line was not built by makeRacingLine');
   if (!fillHeights(heights, lap, surfaceHeight)) return;

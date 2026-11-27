@@ -19,7 +19,9 @@ const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveC
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
 /** Car texture reads with the start file each was read from, and the textures read from one. */
 const carTextureLoads = vi.hoisted(() => ({paths: [] as string[], started: new WeakSet<object>()}));
-import { hazeProgram } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { hazePart } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { composedMaterial } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { unlitTemplate } from '../../../../../src/components/replay/view3d/shaders/unlitTemplate.js';
 vi.mock('three-mesh-bvh/worker', async () => {
   const {MeshBVH} = await import('three-mesh-bvh');
   return {GenerateMeshBVHWorker: class {async generate(geometry: BufferGeometry) { return new MeshBVH(geometry, {indirect: true}); } dispose() {}}};
@@ -27,9 +29,11 @@ vi.mock('three-mesh-bvh/worker', async () => {
 vi.mock('../../../../../src/components/replay/view3d/scenery/geometryWarmup.js', () => ({createGeometryWarmup: () => ({upload: gpu.upload, dispose() {}})}));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
+  // A PMREM as three's generator makes one: its levels.
+  const pmrem = () => ({texture: Object.assign(new actual.Texture(), {isPMREMTexture: true, mipmaps: Array.from({length: 5}, () => ({}))}), dispose() {}});
   return {...actual, PMREMGenerator: class {
-    fromScene() { return {texture: new actual.Texture(), dispose() {}}; }
-    fromCubemap() { return {texture: new actual.Texture(), dispose() {}}; }
+    fromScene() { return pmrem(); }
+    fromCubemap() { return pmrem(); }
     compileCubemapShader() {}
     dispose() {}
   }, WebGLRenderer: class {
@@ -102,9 +106,9 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
   }};
 });
 /** One shared material per package material key, as the loader shares them. */
-const keyed = new Map<string, MeshBasicMaterial>();
+const keyed = new Map<string, ShaderMaterial>();
 // Configured as the chunk loader configures its surfaces, haze included.
-const materialOf = (key: string) => { let made = keyed.get(key); if (!made) { made = new MeshBasicMaterial(); made.userData = {lmuMaterial: key, surfaceConfigured: true, surfaceTextureUnits: 1}; hazeProgram(made); keyed.set(key, made); } return made; };
+const materialOf = (key: string) => { let made = keyed.get(key); if (!made) { made = composedMaterial(unlitTemplate, [hazePart]); made.userData = {lmuMaterial: key, surfaceConfigured: true, surfaceTextureUnits: 1}; keyed.set(key, made); } return made; };
 vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', () => ({createChunkLoader: () => ({
   async load(chunk: SceneryChunk, _signal: AbortSignal, onParsed?: (root: Object3D) => void) {
     chunks.loads.push(chunk.id);
@@ -151,7 +155,7 @@ const layout = {
   layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
   camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]}, roadHeightAt: () => null, realRoad: {sha256: 'r', byteLength: 8, points: 2, elements: 2}, realRoadTable: Uint32Array.of(0, 1),
-  daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
+  daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88, sunBearingDeg: 136.26 },{ id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [], reflection: {name: 'REFMAP0', textureSize: 1024, updateRate: 100, staticSwitchM: 300, observedClipM: 150}, night: testLayoutNight(),
   // A box has 24 vertices and 36 indices: the horizon's ground, and a road and an obstacle in each sector (up to eight).
   materials: [['ground', 1], ['road', 8], ['obstacle', 8]].map(([key, count]) => ({key, vertices: 24 * +count, indices: 36 * +count, primitives: +count, draws: +count})),
@@ -319,7 +323,7 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   expect(lastSceneRender()[1]).toBe(camera); expect(camera.position).toEqual(eye); expect(camera.zoom).toBe(zoom);
   const layer = world.children.at(-1)!;
   expect(layer.children[0].position.x).toBeCloseTo(7); expect(layer.children[1].visible).toBe(true);
-  expect((layer.children[2] as Mesh<BufferGeometry, MeshBasicMaterial>).material.opacity).toBe(0.12);
+  expect((layer.children[2] as Mesh<BufferGeometry, ShaderMaterial>).material.opacity).toBe(0.12);
   expect(await handle.updateLaps(next, null, assets)).toBe(true); handle.cursor(2, 0);
   expect(world.children.at(-1)!.children).toHaveLength(3);
   expect(world.children.at(-1)!.children[1].visible).toBe(false);
@@ -436,7 +440,7 @@ it("reads car textures from their start files, the interior's like the body's", 
   // The seat is interior only; the trim is also on an outside part. The paint has no start file.
   expect(carTextureLoads.paths).toEqual(expect.arrayContaining([
     `${hashOf('seat')}.ktx2.zst from ${hashOf('seat-start')}.ktx2.zst`, `${hashOf('trim')}.ktx2.zst from ${hashOf('trim-start')}.ktx2.zst`, 'a.ktx2']));
-  const [scene] = lastSceneRender(), map = (name: string) => (scene.getObjectByName(name) as Mesh<BufferGeometry, MeshBasicMaterial>).material.map!;
+  const [scene] = lastSceneRender(), map = (name: string) => (scene.getObjectByName(name) as Mesh<BufferGeometry, ShaderMaterial>).material.uniforms.map.value as Texture;
   // Each map's own copy draws from the 512 start file and waits to sharpen.
   expect([isStreaming(map('seat')), map('seat').mipmaps.map(level => level.width), isStreaming(map('dash'))]).toEqual([true, [512], true]);
   handle.mode('cockpit'); draw();

@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial, NoColorSpace, RepeatWrapping, Scene, ShaderLib, SRGBColorSpace, Texture, UniformsUtils, type WebGLProgramParametersWithUniforms } from 'three';
+import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial, NoColorSpace, RepeatWrapping, Scene, SRGBColorSpace, Texture, type ShaderMaterial } from 'three';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createFarCarLoader } from '../../../../../src/components/replay/view3d/cars/farCars.js';
+import { composedTextures } from '../../../../../src/components/replay/view3d/shaders/composer.js';
 import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
 import type { CarTextures } from '../../../../../src/components/replay/view3d/cars/carModels.js';
 
@@ -51,13 +53,8 @@ const paint = (maps: Record<string, [string, boolean]> = {}) => ({
   parameters: { regions: { black: region, red: region, green: region, blue: region, white: region }, clearCoatStrength: 0.5, lacquerThickness: 0.3,
     carbonFibreAlbedoColour: [0.4, 0.4, 0.4, 0], metallicFlakeColour: [1, 1, 1], uvScale: { carbonFibre: [125, 125] } },
 });
-/** A far material's program as three compiles it: the standard program's own uniforms, then the material's hook. */
-function compile(material: MeshStandardMaterial): WebGLProgramParametersWithUniforms {
-  const shader = { uniforms: UniformsUtils.clone(ShaderLib.standard.uniforms), vertexShader: ShaderLib.standard.vertexShader, fragmentShader: ShaderLib.standard.fragmentShader } as unknown as WebGLProgramParametersWithUniforms;
-  material.onBeforeCompile(shader, null as never);
-  return shader;
-}
-
+/** A far material: composed on the lit template (farCars.ts). */
+const composed = (part: Mesh) => part.material as ShaderMaterial;
 let sha = 0;
 const reads: string[] = [];
 function body(file: ArrayBuffer, appearance: Record<string, unknown>, vehicleId = 'CAR_A', farSha = `sha${sha++}`): LoadedBody {
@@ -100,14 +97,15 @@ describe('createFarCarLoader', () => {
     const {carTextures, load} = textures();
     const file = await glb(['paint', 'appearance', 'appearance', 'vertexColour']);
     const model = await createFarCarLoader(carTextures).model(body(file, {materialTextures: {mat1: 'livery.ktx2'}}));
-    const parts = model.children as Mesh[], materials = parts.map(part => part.material as MeshStandardMaterial);
+    const parts = model.children as Mesh[], materials = parts.map(composed), map = (material: ShaderMaterial) => material.uniforms.map?.value as Texture | undefined;
     expect(parts).toHaveLength(4);
     expect(load.mock.calls.map(call => call[0]).sort()).toEqual(['livery.ktx2', 'paint.ktx2']);
-    expect(materials[0].map).toBeInstanceOf(Texture);
-    expect([materials[0].map?.wrapS, materials[0].map?.wrapT, materials[0].map?.channel]).toEqual([RepeatWrapping, RepeatWrapping, 0]);
-    expect(materials[1].map).toBeInstanceOf(Texture);
-    expect(materials[2].map).toBeNull();
-    expect(materials[3].map).toBeNull();
+    expect(map(materials[0])).toBeInstanceOf(Texture);
+    expect([map(materials[0])?.wrapS, map(materials[0])?.wrapT, map(materials[0])?.channel]).toEqual([RepeatWrapping, RepeatWrapping, 0]);
+    expect(map(materials[1])).toBeInstanceOf(Texture);
+    expect(composedTextures(materials[1])).toEqual([map(materials[1])]);
+    expect(map(materials[2])).toBeUndefined();
+    expect(map(materials[3])).toBeUndefined();
     expect(materials[2].userData).toMatchObject({lmuFar: 'appearance', materialName: 'mat2'});
     expect(materials[3]).not.toBe(materials[0]);
     for (const part of parts) expect([part.castShadow, part.receiveShadow]).toEqual([true, true]);
@@ -116,31 +114,33 @@ describe('createFarCarLoader', () => {
   it("draws the paint with the livery's paint layers, as the full model's paint takes its diffuse light", async () => {
     const {carTextures, load} = textures(), loader = createFarCarLoader(carTextures);
     const layered = body(await glb(['paint', 'vertexColour']), {paint: paint({region: ['region.ktx2', true], aoSpec: ['ao.ktx2', true], carbon: ['carbon.ktx2', false]})});
-    const [painted, shell] = ((await loader.model(layered)).children as Mesh[]).map(part => part.material as MeshStandardMaterial);
+    const [painted, shell] = ((await loader.model(layered)).children as Mesh[]).map(composed);
     // The layers' maps load beside the albedo, each the material's own copy decoded by its role.
     expect(load.mock.calls.map(call => call[0]).sort()).toEqual(['ao.ktx2', 'carbon.ktx2', 'paint.ktx2', 'region.ktx2']);
-    const shader = compile(painted), maps = ['paint_region', 'paint_aoSpec', 'paint_carbon'].map(key => shader.uniforms[key].value as Texture);
+    const shader = painted, maps = ['paint_region', 'paint_aoSpec', 'paint_carbon'].map(key => shader.uniforms[key].value as Texture);
     expect(maps.map(map => map.colorSpace)).toEqual([SRGBColorSpace, SRGBColorSpace, NoColorSpace]);
-    expect(new Set([painted.map, ...maps]).size).toBe(4);
-    // The region block, the diffuse light's losses and the lacquer; the sun's shadow and ambient lookup stay (and the haze, in the key).
+    expect(new Set([painted.uniforms.map.value, ...maps]).size).toBe(4);
+    // The region block, the diffuse light's losses and the lacquer; the sun's shadow, the ambient lookup and the haze stay.
     for (const marker of ['paintCoat = clamp(coat.x * paint_coatStrength', 'reflectedLight.indirectDiffuse *= paintAO;', 'paintFresnelAvg(sunCos, paintCoatIndex)',
       'surfaceCascadeShadow', 'vec3( 1.0, 0.5, 1.0 )',
       // Both coats reflect the environment: the base coat at its own roughness and strength, the clear coat over everything under it.
       'roughnessFactor = clamp(paintBaseRoughness, 0.0, 1.0);', 'material.specularColor = vec3(paintBaseF0 * paintBaseSpecular);',
       'reflectedLight.indirectSpecular = radiance * paintBaseSpecular * (paintBaseF0 + (1.0 - paintBaseF0) * grazing);',
       'farCoatLight = getIBLRadiance(geometryViewDir, normal, paintCoatRoughness) * paintCoatOcclusion;',
-      'vec3 outgoingLight = (totalDiffuse + totalSpecular) * mix(vec3(1.0), pow(paintLacquer', '* (1.0 - farCoatFresnel) + farCoatLight * farCoatFresnel + totalEmissiveRadiance;']) expect(shader.fragmentShader).toContain(marker);
-    expect([painted.customProgramCacheKey(), shell.customProgramCacheKey()]).toEqual(['lmu-far-car-paint-region-ao|haze1', 'lmu-far-car-surface|haze1']);
-    expect(compile(shell).fragmentShader).not.toContain('paintAO');
+      'outgoingLight = (totalDiffuse + totalSpecular) * mix(vec3(1.0), pow(paintLacquer', 'lit_sunDirection', 'HAZE_DISTANCE_SCALE', '* (1.0 - farCoatFresnel) + farCoatLight * farCoatFresnel + totalEmissiveRadiance;']) expect(shader.fragmentShader).toContain(marker);
+    expect(painted.customProgramCacheKey()).not.toBe(shell.customProgramCacheKey());
+    expect(shell.fragmentShader).not.toContain('paintAO');
     expect(shader.fragmentShader).not.toContain('vFarSurface');
+    // The warm-up uploads the layers' maps with the albedo.
+    expect(composedTextures(painted)).toEqual(expect.arrayContaining([painted.uniforms.map.value, ...maps]));
     const freed = maps.map(map => vi.spyOn(map, 'dispose'));
     painted.dispose();
     for (const dispose of freed) expect(dispose).toHaveBeenCalledOnce();
 
     // A paint without a region map or an AO mask is all black region and unoccluded: its own program.
-    const plain = (await loader.model(body(await glb(['paint']), {}))).children[0] as Mesh, bare = plain.material as MeshStandardMaterial;
-    expect(bare.customProgramCacheKey()).toBe('lmu-far-car-paint-black-noao|haze1');
-    const fragment = compile(bare).fragmentShader;
+    const bare = composed((await loader.model(body(await glb(['paint']), {}))).children[0] as Mesh);
+    expect(bare.customProgramCacheKey()).not.toBe(painted.customProgramCacheKey());
+    const fragment = bare.fragmentShader;
     expect(fragment).toContain('vec3 region = vec3(0.0);'); expect(fragment).toContain('vec4 aoSpec = vec4(1.0);');
   });
 
@@ -150,20 +150,41 @@ describe('createFarCarLoader', () => {
     for (const part of parts) {
       const surface = part.geometry.getAttribute('_lmu_surface');
       expect([surface.itemSize, surface.normalized, surface.getX(0), surface.getY(0)]).toEqual([4, true, 128 / 255, 64 / 255]);
-      const shader = compile(part.material as MeshStandardMaterial);
+      const shader = composed(part);
       expect(shader.vertexShader).toContain('vFarSurface = _lmu_surface;');
       for (const marker of ['metalnessFactor = vFarSurface.x;', 'roughnessFactor = clamp(vFarSurface.y, 0.045, 1.0);',
         'reflectedLight.indirectDiffuse *= vFarSurface.z; reflectedLight.indirectSpecular *= vFarSurface.w;', 'surfaceCascadeShadow']) expect(shader.fragmentShader).toContain(marker);
-      expect((part.material as MeshStandardMaterial).customProgramCacheKey()).toBe('lmu-far-car-surface|haze1');
+      // The glTF material's own values, as uniforms: its colour, finish and emission.
+      expect([shader.uniforms.roughness.value, shader.uniforms.metalness.value]).toEqual([1, 0]);
     }
     // Glass (a retextured windscreen, a vertex-coloured pane) adds its reflections at whole strength, in a program of its own.
     const glazed = (await loader.model(body(await glb(['appearance', 'vertexColour', 'vertexColour'], true, [0, 1]), {materialTextures: {mat0: 'livery.ktx2'}}))).children as Mesh[];
-    const [screen, pane, shell] = glazed.map(part => part.material as MeshStandardMaterial), wholeStrength = 'totalSpecular / clamp(diffuseColor.a + 0.001, 0.001, 1.0)';
-    expect([screen, pane, shell].map(material => material.customProgramCacheKey())).toEqual(['lmu-far-car-glass|haze1', 'lmu-far-car-glass|haze1', 'lmu-far-car-surface|haze1']);
-    for (const material of [screen, pane]) expect(compile(material).fragmentShader).toContain(wholeStrength);
-    expect(compile(shell).fragmentShader).not.toContain(wholeStrength);
+    const [screen, pane, shell] = glazed.map(composed), wholeStrength = 'totalSpecular / clamp(diffuseColor.a + 0.001, 0.001, 1.0)';
+    expect(pane.customProgramCacheKey()).not.toBe(shell.customProgramCacheKey());
+    for (const material of [screen, pane]) expect(material.fragmentShader).toContain(wholeStrength);
+    expect(shell.fragmentShader).not.toContain(wholeStrength);
     // A package whose far shell carries no surface is not drawn as if it were all bare diffuse.
     await expect(loader.model(body(await glb(['paint', 'vertexColour'], false), {}))).rejects.toThrow('far primitive has no _LMU_SURFACE');
+  });
+
+  it("frees a far material's own glTF map with it, never a shared asset", async () => {
+    const {carTextures} = textures(), own = new Texture(), shared = new Texture();
+    shared.userData.sharedAsset = true;
+    // The exporter writes no texture without an image: the parsed materials take theirs here (the parse inside is the spy's second
+    // call, three's own).
+    const parse = vi.spyOn(GLTFLoader.prototype, 'parseAsync');
+    parse.mockImplementationOnce(async function (this: GLTFLoader, ...args: Parameters<GLTFLoader['parseAsync']>) {
+      const gltf = await this.parseAsync(...args);
+      const [first, second] = gltf.scene.getObjectByName('far')!.children as Mesh<BufferGeometry, MeshStandardMaterial>[];
+      first.material.map = own; second.material.map = shared;
+      return gltf;
+    });
+    const [mapped, sharing] = ((await createFarCarLoader(carTextures).model(body(await glb(['vertexColour', 'vertexColour']), {}))).children as Mesh[]).map(composed);
+    expect([mapped.uniforms.map.value, sharing.uniforms.map.value]).toEqual([own, shared]);
+    const freedOwn = vi.spyOn(own, 'dispose'), freedShared = vi.spyOn(shared, 'dispose');
+    mapped.dispose(); sharing.dispose();
+    expect(freedOwn).toHaveBeenCalledOnce(); expect(freedShared).not.toHaveBeenCalled();
+    parse.mockRestore();
   });
 
   it('shares materials and geometries between cars of a livery and parses the far file once', async () => {

@@ -85,28 +85,21 @@ export interface SceneryNightScene {
 export interface SceneryNightLight {position: Vec3; rangeM: number; colour: Vec3}
 
 /**
- * One scene node's bounds in the scenery frame, `[id, x, y, z, radius, meshX, meshY, meshZ, meshRadius]` (docs/SCENE_PACKAGE.md#night). The first
- * sphere is the node's SCN instance, as the game's per-node pick of car spot lights reads it: the centre of the instance block's box (the GMT
- * header boxes of every mesh file of the block, merged) and the distance from it to the box's farthest corner. The second is the node's own mesh
- * file's GMT bounding sphere, which the game's pick of track lights reads. Centres to 1 mm, radii rounded up to 1 mm. The package fixes no light
- * count: the app picks.
+ * The layout's night data (docs/SCENE_PACKAGE.md#night). `scenes`: one per accepted scene, ordered by `sceneDesc`. `lights`: the SCN track lights
+ * (their sum on the scenery is baked per vertex, `TRACK_LIGHT_ATTRIBUTE`; the cars light themselves from this list).
  */
-export type SceneryNode = [id: number, x: number, y: number, z: number, radius: number, meshX: number, meshY: number, meshZ: number, meshRadius: number];
-
+export interface SceneryNight {scenes: SceneryNightScene[]; lights: SceneryNightLight[]}
 /**
- * The layout's night data (docs/SCENE_PACKAGE.md#night). `scenes`: one per accepted scene, ordered by `sceneDesc`. `lights`: the SCN track lights.
- * `nodes`: by ascending id, the bounds of every node a chunk vertex of the layout names.
+ * The chunk vertex attribute holding the sum of the layout's track lights at the vertex (docs/SCENE_PACKAGE.md#night), before the albedo and
+ * the occlusion: VEC4 unsigned byte normalized, RGBE. Decoded: rgb × 2^(round(a × 255) − `TRACK_LIGHT_EXPONENT_BIAS`), with rgb and a the
+ * normalized bytes; all four zero is no light. Every scenery chunk primitive has it, so a material keeps one vertex layout.
  */
-export interface SceneryNight {scenes: SceneryNightScene[]; lights: SceneryNightLight[]; nodes: SceneryNode[]}
-/**
- * The chunk vertex attribute naming the scene node a vertex comes from: SCALAR float32, an exact integer id of `nodes` (venue-wide, the index of
- * the instance's `name|mesh` among the venue's, so a venue-shared piece keeps one id), or `SCENE_NODE_NONE` for
- * geometry the pipeline makes (filler ground) and moving instances, which the per-node spot pick does not filter by reach. Every scenery chunk
- * primitive has it, so a material keeps one vertex layout.
- */
-export const SCENE_NODE_ATTRIBUTE = '_LMU_NODE';
-export const SCENE_NODE_NONE = -1;
-const MAX_NIGHT_LIGHTS = 1024, MAX_SCENE_NODES = 65536;
+export const TRACK_LIGHT_ATTRIBUTE = '_LMU_TRACKLIGHT';
+/** The bias of the shared exponent in the alpha byte: sums from 2^−64 to 2^191 of the brightest channel. */
+export const TRACK_LIGHT_EXPONENT_BIAS = 64;
+/** The game stretches the vertical distance to a track light below the vertex by this factor (the cars' lighting needs it too). */
+export const TRACK_LIGHT_BELOW_STRETCH = 20;
+const MAX_NIGHT_LIGHTS = 1024;
 
 /** A texture file of the catalog table (one entry per distinct file, the same for every layout). */
 export interface SceneryTextureFile {
@@ -375,7 +368,7 @@ function parseDaylight(value: unknown, what: string): SceneryDaylight {
 
 function parseNight(value: unknown, what: string): SceneryNight {
   const row = record(value, what);
-  exactKeys(row, ['scenes', 'lights', 'nodes'], what);
+  exactKeys(row, ['scenes', 'lights'], what);
   const scenes = array(row.scenes, `${what}.scenes`, 16);
   if (!scenes.length) throw Error(`${what}.scenes: empty`);
   scenes.forEach((item, i) => {
@@ -403,15 +396,6 @@ function parseNight(value: unknown, what: string): SceneryNight {
     vec3(light.position, `${at}.position`);
     positive(light.rangeM, `${at}.rangeM`);
     vec3(light.colour, `${at}.colour`).forEach((n, k) => nonNegative(n, `${at}.colour[${k}]`));
-  });
-  const nodes = array(row.nodes, `${what}.nodes`, MAX_SCENE_NODES);
-  nodes.forEach((item, i) => {
-    const at = `${what}.nodes[${i}]`, node = array(item, at, 9);
-    if (node.length !== 9) throw Error(`${at}: expected [id, x, y, z, radius, meshX, meshY, meshZ, meshRadius]`);
-    const id = count(node[0], `${at}[0]`);
-    if (i && id <= ((nodes[i - 1] as unknown[])[0] as number)) throw Error(`${what}.nodes: ids must ascend`);
-    for (const k of [1, 2, 3, 5, 6, 7]) finite(node[k], `${at}[${k}]`);
-    for (const k of [4, 8]) nonNegative(node[k], `${at}[${k}]`);
   });
   return value as SceneryNight;
 }

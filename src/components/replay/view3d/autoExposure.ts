@@ -1,6 +1,6 @@
 import { type Color, DepthTexture, FloatType, HalfFloatType, Matrix3, Mesh, NearestFilter, OrthographicCamera, PlaneGeometry, Scene, ShaderMaterial, Vector2, Vector3, Vector4, WebGLRenderTarget, type Camera, type IUniform, type Object3D, type Texture, type WebGLRenderer } from 'three';
 import { GAME_LIGHT_UNIT } from './atmosphere/sunSamples.js';
-import { surfaceAlphaCut } from './scenery/materials/shaderContext.js';
+import { withPass } from './shaders/sceneBlock.js';
 import { profilesAt, timeOfDayPosition, weatherWeight } from './atmosphere/timeOfDay.js';
 import { bloomParameters, createBloom, type BloomParameters } from './bloom.js';
 import type { SceneryCamera, SceneryCameraLook, SceneryCameraProfile, SceneryCameraType, SceneryCameraTypeProfile, SceneryToneCurve } from '../../../../shared/types/scenes/scenery.js';
@@ -17,7 +17,7 @@ const NEUTRAL_KELVIN = 6500;
 /**
  * The exposure law, exposure = U · clamp((B · T)^(1 - s) · (G / (U · L))^s, min, max): T the profile's target, B its light/dark
  * border, min and max its limits, s the type's adaptation scale (all from the package), L the metered luminance of the type's
- * metering window (everything in it, the cockpit included; `meteredLuminance`), G the target on the meter's scale
+ * metering window (everything in it, the cockpit included; `ADAPT_SHADER`), G the target on the meter's scale
  * (−ln(1 − T), `meterGrey`) and U what one unit of the scene's light measures on the camera's own scale. No constant of the app's.
  */
 /** U: what one unit of the scene's light measures on a camera of the package's luminance scale. */
@@ -123,27 +123,6 @@ export function whiteBalance(kelvin: number): Matrix3 {
   return m.multiplyScalar(1 / (e[1] + e[4] + e[7]));
 }
 
-/** The adapting exposure: its log2 (stops) and the smoothed step it is moving by. */
-export interface AdaptedExposure { log2: number; step: number }
-
-/**
- * One frame of the eye adaptation (`ADAPT_SHADER` runs it on the GPU), in stops of exposure after the law, as the reference adapts: with k = 1 − (1 − sensitivity)^(dt / 0.15),
- * the step toward the law's target is (target − current) · k capped at speedLimit stops a second, then smoothed again by k and kept
- * between 0 and that step; reaching or passing the target lands on it. A rising exposure (the scene darkening) takes the dark set,
- * whose negative values stand for the light ones. The delay is 0 in every published type and is not applied.
- */
-export function adaptExposure(current: AdaptedExposure, target: number, seconds: number, adaptation: SceneryCameraTypeProfile['adaptation']): AdaptedExposure {
-  const dark = target > current.log2 ? adaptation.darkAdaptation : null;
-  const sensitivity = dark && dark.sensitivity >= 0 ? dark.sensitivity : adaptation.sensitivity;
-  const speedLimit = dark && dark.speedLimit >= 0 ? dark.speedLimit : adaptation.speedLimit;
-  const k = 1 - (1 - Math.min(1, Math.max(0, sensitivity))) ** (seconds / ADAPT_PERIOD_S), cap = speedLimit * seconds;
-  const step = Math.min(cap, Math.max(-cap, (target - current.log2) * k));
-  const smoothed = current.step + (step - current.step) * k;
-  const kept = step >= 0 ? Math.min(step, Math.max(0, smoothed)) : Math.max(step, Math.min(0, smoothed));
-  const log2 = current.log2 + kept;
-  return (target - log2) * (target - current.log2) <= 0 ? {log2: target, step: 0} : {log2, step: kept};
-}
-
 /** The name of the full-screen exposure and metering scenes, which are not the replay scene. */
 export const EXPOSURE_PASS = 'exposure-pass';
 /** The meterings a `reset` lands on (METER_PERIOD_MS apart): enough for a frame exposed for night to read day unclipped. Ours. */
@@ -219,7 +198,7 @@ export const EXPOSURE_GLSL = 'uniform sampler2D exposure_state;\nfloat displayEx
 /**
  * The meter, as the reference meters: each tap is exposed and put through the type's tone curve per channel (no white balance), so a
  * tap counts at most 1 however bright (a sun glint on glass moves the mean by its share of the window); the pass writes each cell's
- * mean, and meteredLuminance reads the window's mean as a luminance (`ADAPT_SHADER` on the GPU).
+ * mean, and `ADAPT_SHADER` reads the window's mean as a luminance.
  */
 const METER_SHADER = {
   vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -240,9 +219,17 @@ const METER_SHADER = {
 
 /**
  * One frame of the exposure on the GPU, from the state (`exposureUniforms`) into the other state target: a metering this frame
- * (`fresh`), its mean read as `meteredLuminance` reads it over the exposure the taps were taken at, else the state's; then the law's target (`lawExposure` in stops:
- * logUnit + clamp((1 − s) · log2(B · T) + s · (log2 G − logUnit − L / ln 2), log2 min, log2 max)), landed on at the first metering
- * and adapted toward after (`adaptExposure`).
+ * (`fresh`), else the state's; then the law's target (`lawExposure` in stops: logUnit + clamp((1 − s) · log2(B · T) + s · (log2 G −
+ * logUnit − L / ln 2), log2 min, log2 max)), landed on at the first metering and adapted toward after.
+ *
+ * The metering, as the reference reads it: the luminance (natural log) of the Rec. 709 luminance of the window's mean displayed
+ * colour, through the curve's exponential alone (−ln(1 − y), the curve's own gain and shoulder left out) and over the exposure the
+ * taps were taken at. The law's middle grey is read the same way (`meterGrey`).
+ *
+ * The eye adaptation, in stops of exposure after the law, as the reference adapts: with k = 1 − (1 − sensitivity)^(dt / 0.15), the
+ * step toward the law's target is (target − current) · k capped at speedLimit stops a second, then smoothed again by k and kept
+ * between 0 and that step; reaching or passing the target lands on it. A rising exposure (the scene darkening) takes the dark set,
+ * whose negative values stand for the light ones. The delay is 0 in every published type and is not applied.
  */
 const ADAPT_SHADER = {
   vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
@@ -274,15 +261,6 @@ const ADAPT_SHADER = {
     }`,
 };
 
-/**
- * The luminance (natural log) a meter reading stands for, as the reference reads it: the Rec. 709 luminance of the window's mean
- * displayed colour, through the curve's exponential alone (−ln(1 − y), the curve's own gain and shoulder left out) and over the
- * exposure the taps were taken at. The law's middle grey is read the same way (`meterGrey`).
- */
-export function meteredLuminance(mean: readonly [number, number, number], exposure: number): number {
-  const [r, g, b] = mean;
-  return Math.log(Math.max(METER_FLOOR, meterInverse(0.2126 * r + 0.7152 * g + 0.0722 * b) / exposure));
-}
 /**
  * Metered auto-exposure: the frame renders to a half-float target; a small pass meters the active camera type's window a few times a
  * second and every frame a 1 × 1 pass adapts the exposure toward the law's value, both on the GPU (`ADAPT_SHADER`), which the canvas pass applies. Rendering is on demand, so `invalidate` keeps frames coming until a state read back on a quiet frame shows the
@@ -439,7 +417,8 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       if (!quiet) { settled = false; epoch++; }
       exposureUniforms.exposure_state.value = states[current].texture;
       renderer.setRenderTarget(hdr);
-      surfaceAlphaCut.value = 0; renderer.render(scene, camera); surfaceAlphaCut.value = 1;
+      // Multisampled: the cut-outs cut by their coverage (the pass block's alpha cut).
+      withPass({surface_alphaCut: 0}, () => renderer.render(scene, camera));
       outputMaterial.uniforms.glare.value = bloom.render(renderer, hdr.texture, hdr.width, hdr.height);
       renderer.setRenderTarget(null);
       renderer.render(output, quadCamera);

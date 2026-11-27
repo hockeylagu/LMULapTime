@@ -1,5 +1,9 @@
-import { BackSide, BatchedMesh, BoxGeometry, DoubleSide, FrontSide, Mesh, MeshDepthMaterial, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector4, WebGLRenderTarget, type Material, type WebGLRenderer } from 'three';
+import { BackSide, BatchedMesh, BoxGeometry, DoubleSide, FrontSide, Mesh, MeshDepthMaterial, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector2, Vector4, WebGLRenderTarget, type IUniform, type Material, type ShaderMaterial, type Side, type WebGLRenderer } from 'three';
 import { expect, it, vi } from 'vitest';
+import { billboardShadowMaterial, billboardShadowPart } from '../../../../../src/components/replay/view3d/scenery/materials/billboardCard.js';
+import { composedCutOut, composedMaterial, composedParts, composedTemplate, cutOutOf } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { depthTemplate } from '../../../../../src/components/replay/view3d/shaders/depthTemplate.js';
+import { litTemplate } from '../../../../../src/components/replay/view3d/shaders/litTemplate.js';
 import { createShadowCasterPass } from '../../../../../src/components/replay/view3d/shadows/shadowCasterPass.js';
 
 const noBias = {slope: 0, units: 0};
@@ -91,6 +95,18 @@ it("sizes a batch by its instances' bounds, not by its reserved buffer", () => {
   expect([drawn, batch.geometry.boundingSphere]).toEqual([false, null]);
 });
 
+it('draws every caster without a size floor, measuring none', () => {
+  const scene = new Scene(), tiny = new Mesh(new BoxGeometry(0.01, 0.01, 0.01), new MeshStandardMaterial());
+  tiny.castShadow = true; scene.add(tiny); scene.updateMatrixWorld(true);
+  let drawn: Material | undefined;
+  const renderer = {
+    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
+    render() { drawn = tiny.material; },
+  } as unknown as WebGLRenderer;
+  createShadowCasterPass(renderer, scene).drawRoots(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}], new PerspectiveCamera(), [scene]);
+  expect([drawn instanceof MeshDepthMaterial, tiny.geometry.boundingSphere]).toEqual([true, null]);
+});
+
 it('walks the scene and swaps materials once for several layers, each rendered with its own camera and viewport', () => {
   const scene = new Scene();
   const body = new Mesh(new BoxGeometry(), new MeshStandardMaterial()), glass = new Mesh(new BoxGeometry(), new MeshStandardMaterial({transparent: true}));
@@ -113,6 +129,44 @@ it('walks the scene and swaps materials once for several layers, each rendered w
   expect(calls.map(call => call.camera)).toEqual(lights);
   expect(calls.map(call => call.viewport.x)).toEqual([0, 2, 4]);
   expect(calls.every(call => call.depth && call.blind)).toBe(true);
+});
+
+it("cuts a composed surface by its cut-out where it reads it, and draws a card with its shadow turn, cut by its cut-out and side", () => {
+  const scene = new Scene(), fence = new Texture(), leaves = new Texture();
+  const composedOf = (texture: Texture, side: Side = FrontSide) => {
+    const own = {surface_albedo: {value: texture}, surface_uv_albedo: {value: new Vector4()}, surface_scale_albedo: {value: new Vector2(8, 8)}};
+    const part = {name: 'cut', slots: {}, uniforms: () => own,
+      cutOut: (u: Record<string, IUniform>) => cutOutOf(u.surface_albedo, u.surface_uv_albedo, {scale: u.surface_scale_albedo})};
+    return composedMaterial(litTemplate, [part], {alphaTest: 0.5, side});
+  };
+  const wall = new Mesh(new BoxGeometry(), composedOf(fence)), gate = new Mesh(new BoxGeometry(), composedOf(fence));
+  const tree = new Mesh(new BoxGeometry(), Object.assign(composedOf(leaves, DoubleSide), {shadowSide: DoubleSide}));
+  tree.customDepthMaterial = billboardShadowMaterial();
+  for (const mesh of [wall, gate, tree]) { mesh.castShadow = true; scene.add(mesh); }
+  scene.updateMatrixWorld(true);
+  let seen: Material[] = [];
+  const renderer = {
+    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {}, getScissorTest: () => false, setScissorTest() {},
+    render() { seen = [wall, gate, tree].map(mesh => mesh.material as Material); },
+  } as unknown as WebGLRenderer;
+  const pass = createShadowCasterPass(renderer, scene);
+  const draw = () => pass.draw(new WebGLRenderTarget(4, 4), [{viewport: new Vector4(0, 0, 4, 4), light: new OrthographicCamera(), depthBias: noBias}], new PerspectiveCamera(), [], 0);
+  draw();
+  const [wallDepth, gateDepth, card] = seen as ShaderMaterial[], wallCut = composedCutOut(wall.material)!;
+  // On the depth template, reading the wall's own cut-out uniforms (its world XZ at its scale), on its back faces.
+  expect(composedTemplate(wallDepth)).toBe(depthTemplate);
+  expect([wallDepth.uniforms.cutOut_map, wallDepth.uniforms.cutOut_uvSets, wallDepth.uniforms.cutOut_scale]).toEqual([wallCut.map, wallCut.uvSets, wallCut.scale]);
+  expect(wallDepth.uniforms.cutOut_scale).toBe(wallCut.scale);
+  expect([wallDepth.alphaTest, wallDepth.side]).toEqual([0.5, BackSide]);
+  // Another surface of the same texture reads its own values: its own depth material, the same program.
+  expect(gateDepth).not.toBe(wallDepth); expect(gateDepth.customProgramCacheKey()).toBe(wallDepth.customProgramCacheKey());
+  // The card's own shadow material, on its side, with the depth cut by its leaves' cut-out.
+  expect(composedParts(card)?.[0]).toBe(billboardShadowPart); expect(composedParts(card)?.[1]?.name).toBe('depthCutOut');
+  expect([card.side, card.alphaTest, card.uniforms.cutOut_map.value]).toEqual([DoubleSide, 0.5, leaves]);
+  expect(card.fragmentShader).toContain('if ( diffuseColor.a < alphaTest ) discard;');
+  // A cut-out's depth material goes with its surface.
+  wall.material.dispose(); draw();
+  expect(seen[0]).not.toBe(wallDepth); expect(seen[1]).toBe(gateDepth);
 });
 
 it('frees its depth materials and depth-copy quad on dispose, and lets go of the textures they cut by', () => {

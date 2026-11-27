@@ -1,10 +1,11 @@
 import { expect, it } from 'vitest';
-import { Vector3 } from 'three';
-import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M, syncRacingLine } from '../../../../../src/components/replay/view3d/laps/racingLine.js';
+import { DoubleSide, Vector3 } from 'three';
+import { colorRacingLine, exposureDivide, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M, syncRacingLine } from '../../../../../src/components/replay/view3d/laps/racingLine.js';
 import { getHeatmapColor } from '../../../../../src/components/replay/map/replayMapUtils.js';
 import { TELEMETRY_COLORS } from '../../../../../src/utils/themeColors.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { EXPOSURE_GLSL, exposureUniforms, inverseToneCurve, toneCurve } from '../../../../../src/components/replay/view3d/autoExposure.js';
+import { composedParts, composedTextures } from '../../../../../src/components/replay/view3d/shaders/composer.js';
 
 const curve = {a: 2.5, b: 0.6}, display = {toneCurve: curve, outputGamma: 1};
 
@@ -33,16 +34,21 @@ it('divides auto-exposure out of the line colour, so the line keeps its colours 
   const lap: ReplayTrajectoryData = {replayName: 'test', pointsCount: 2, bounds: {minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1}, points: [
     {x: 0, y: 0, z: 0, timeSec: 0}, {x: 1, y: 0, z: 0, timeSec: 0.1},
   ]};
-  const line = makeRacingLine(lap, new Vector3(), [], () => 0, () => display);
-  const shader = {uniforms: {} as Record<string, unknown>, vertexShader: '#include <fog_pars_vertex>\n#include <fog_vertex>',
-    fragmentShader: '#include <common>\n#include <fog_pars_fragment>\nvoid main() {\n#include <color_fragment>\n#include <fog_fragment>\n}'};
-  line.material.onBeforeCompile(shader as never, null as never);
+  const line = makeRacingLine(lap, new Vector3(), [], () => 0, () => display), {material} = line;
   // It reads the exposure the GPU adapted (the same uniform as the canvas pass) and divides it out of the colour before the haze.
-  expect(shader.uniforms.exposure_state).toBe(exposureUniforms.exposure_state);
-  expect(shader.fragmentShader).toContain(EXPOSURE_GLSL);
-  expect(shader.fragmentShader.indexOf('diffuseColor.rgb /= displayExposure()')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <color_fragment>'));
-  expect(shader.fragmentShader.indexOf('diffuseColor.rgb /= displayExposure()')).toBeLessThan(shader.fragmentShader.indexOf('haze'));
-});
+  expect(composedParts(material)?.map(part => part.name)).toEqual(['exposureDivide', 'haze']);
+  expect(material.uniforms.exposure_state).toBe(exposureUniforms.exposure_state);
+  expect(composedTextures(material)).toEqual([]); // The exposure state is the scene's, not the line's.
+  expect(exposureDivide.slots.fragmentPars?.glsl).toBe(EXPOSURE_GLSL);
+  expect(exposureDivide.slots.fragmentColour?.glsl.trim()).toBe('diffuseColor.rgb /= displayExposure();');
+  const fragment = material.fragmentShader;
+  expect(fragment.indexOf('diffuseColor.rgb /= displayExposure()')).toBeGreaterThan(fragment.indexOf('#include <color_fragment>'));
+  expect(fragment.indexOf('diffuseColor.rgb /= displayExposure()')).toBeLessThan(fragment.indexOf('hazeColour'));
+  expect([material.vertexColors, material.side, material.transparent, material.polygonOffset]).toEqual([true, DoubleSide, true, true]);
+  // The lap view fades a line by its material's opacity, which the program reads at upload.
+  material.opacity = 0.25;
+  expect(material.uniforms.opacity.value).toBe(0.25);
+  expect(makeRacingLine(lap, new Vector3(), [], () => 0, () => display).material.customProgramCacheKey()).toBe(material.customProgramCacheKey());});
 
 it('colours the ribbon with the 2D map modes', () => {
   const lap: ReplayTrajectoryData = {replayName: 'test', pointsCount: 2, bounds: {minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1}, points: [

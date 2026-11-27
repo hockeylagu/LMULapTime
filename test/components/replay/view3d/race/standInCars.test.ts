@@ -1,6 +1,9 @@
-import { BoxGeometry, BufferAttribute, BufferGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Vector3 } from 'three';
+import { BoxGeometry, BufferAttribute, BufferGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Vector3, type Color, type ShaderMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
+import { hazePart } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
 import { createStandInCars, standInGeometry } from '../../../../../src/components/replay/view3d/race/standInCars.js';
+import { composedParts } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { plainSurfacePart } from '../../../../../src/components/replay/view3d/shaders/plainSurface.js';
 
 /** A car group as the far loader builds it: two parts under `body-envelope`, placed by their own matrices. */
 function farCar(): Group {
@@ -43,6 +46,10 @@ describe('race stand-in cars', () => {
     expect([standIns.place('GT3', at), standIns.place('GT3', at), standIns.place('Hypercar', at)]).toEqual([true, true, true]);
     standIns.end();
     expect([mesh.count, mesh.visible, mesh.castShadow]).toEqual([3, true, false]);
+    // Plain grey under the haze, as three's standard material at roughness 0.6 and metalness 0.1 on the scene's environment.
+    const material = mesh.material as ShaderMaterial, u = material.uniforms;
+    expect(composedParts(material)).toEqual([plainSurfacePart, hazePart]);
+    expect([(u.plain_colour.value as Color).getHexString(), u.plain_roughness.value, u.plain_metalness.value, u.plain_environment.value]).toEqual(['9aa0a6', 0.6, 0.1, 1]);
     expect(new Matrix4().fromArray(mesh.instanceMatrix.array, 0).equals(at)).toBe(true);
     // A second body of the class changes nothing; with every car loaded none draws.
     standIns.offer('GT3', farCar()); expect(root.children).toHaveLength(1);

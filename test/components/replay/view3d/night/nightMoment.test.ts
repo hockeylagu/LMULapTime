@@ -4,7 +4,7 @@ import { sceneSun } from '../../../../../src/components/replay/view3d/sceneEnvir
 import { TEST_HAZE_WEIGHTS, testLayoutNight, testNight, testShading, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const model = testNight();
-const daylight = {date: '2023-09-10', sessions: [{id: 'race' as const, localTime: '12:00', sunElevationDeg: 50}], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 1, longitudeDeg: 2, utcOffsetHours: 3};
+const daylight = {date: '2023-09-10', sessions: [{id: 'race' as const, localTime: '12:00', sunElevationDeg: 50, sunBearingDeg: 180}], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 1, longitudeDeg: 2, utcOffsetHours: 3};
 /** Two scenes: the WEC one at Algarve's place on its own date with no threshold, an ELMS one with Qatar's. */
 const night = {...testLayoutNight(), scenes: [
   {sceneDesc: 'algarvewec', date: '2023-04-04', latitudeDeg: 37.23, longitudeDeg: -8.63, timezoneHours: 0, dstRange: null, utcOffsetHours: 1, nightLightThreshold: null, nightLightPollution: 0.001},

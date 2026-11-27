@@ -5,23 +5,19 @@ import type { SceneryBloomChain, SceneryBloomLook, SceneryBloomType } from '../.
 // scene at the first level, Gaussian blurs at three levels, their sum times the merge gain, drawn up to the output size; the canvas
 // pass adds it after the tone curve as tone + (1 − tone) · saturate(bloom). Every value is the package's.
 
-/** The player's in-game Post Effects quality, which picks the tier of the bloom's merge gain. */
-export type PostEffectsQuality = 'low' | 'medium' | 'high';
-/** The quality the bloom draws at: the user's own setting, Low, which the reference night captures were taken at (user, 2026-11-26). */
-export const POST_EFFECTS_QUALITY: PostEffectsQuality = 'low';
-
 /** One look's bloom, ready for the passes: the bright pass threshold, knee and weight, and the merge gain. */
 export interface BloomParameters { threshold: number; knee: number; weight: number; gain: number }
 
 /**
  * The bright pass and merge values of a look under a camera type: with s = max(remapFactor, 0.001), knee k = 4 / s² − 2 and weight
- * (s² / 2) / (64 · rangeScale); gain = 64 · rangeScale · mergeScale · the tier's glareLuminance · shapeLuminance · the look's luminance.
+ * (s² / 2) / (64 · rangeScale); gain = 64 · rangeScale · mergeScale · the low tier's glareLuminance · shapeLuminance · the look's
+ * luminance. The low tier is the player's in-game Post Effects quality, which the reference night captures were taken at (user, 2026-11-26).
  */
-export function bloomParameters(look: SceneryBloomLook, type: SceneryBloomType, chain: SceneryBloomChain, quality: PostEffectsQuality = POST_EFFECTS_QUALITY): BloomParameters {
+export function bloomParameters(look: SceneryBloomLook, type: SceneryBloomType, chain: SceneryBloomChain): BloomParameters {
   const s = Math.max(look.remapFactor, 0.001);
   return {
     threshold: look.threshold, knee: 4 / (s * s) - 2, weight: s * s / 2 / (64 * type.rangeScale),
-    gain: 64 * type.rangeScale * chain.mergeScale * type.quality[quality].glareLuminance * type.shapeLuminance * look.luminance,
+    gain: 64 * type.rangeScale * chain.mergeScale * type.quality.low.glareLuminance * type.shapeLuminance * look.luminance,
   };
 }
 
@@ -32,31 +28,8 @@ export function blurWeights(sigma: number, radius: number): number[] {
   return w.map(v => v / total);
 }
 
-/** One look's bright pass for an exposed colour (exposure applied; the white balance comes after the composite): 0 at or under the threshold. */
-export function brightPass(colour: readonly [number, number, number], p: BloomParameters): [number, number, number] {
-  const L = (colour[0] + colour[1] + colour[2]) / 3, t = Math.max(L - p.threshold, 0);
-  if (t === 0) return [0, 0, 0];
-  const f = (t + Math.sqrt(t * (t + p.knee) + 1) - 1) * p.weight / L;
-  return [colour[0] * f, colour[1] * f, colour[2] * f];
-}
-
 /** The largest finite value of the HDR target's half floats: a brighter pixel stores as infinity. */
-export const HALF_MAX = 65504;
-
-/**
- * The first reduction of the frame (four texels to one), each texel weighed by 1 / (1 + its exposed brightness): a lone bright texel
- * (a distant bulb smaller than a pixel, which the raster catches on some frames and misses on others) no longer outweighs its block,
- * so its halo does not pop in and out; a block bright all over keeps its full value. A texel is taken at most HALF_MAX.
- */
-export function spotReduction(texels: readonly (readonly [number, number, number])[], exposure: number): [number, number, number] {
-  const sum: [number, number, number] = [0, 0, 0]; let total = 0;
-  for (const texel of texels) {
-    const c = texel.map(v => Math.min(Math.max(v, 0), HALF_MAX)), w = 1 / (1 + exposure * (c[0] + c[1] + c[2]) / 3);
-    for (let i = 0; i < 3; i++) sum[i] += c[i] * w;
-    total += w;
-  }
-  return [sum[0] / total, sum[1] / total, sum[2] / total];
-}
+const HALF_MAX = 65504;
 
 /** What the canvas pass needs of the exposure to expose the scene as it does: its state uniform and the GLSL that reads it. */
 export interface BloomExposure { uniform: IUniform<Texture | null>; glsl: string }
@@ -94,7 +67,9 @@ export function createBloom(chain: SceneryBloomChain, exposure: BloomExposure): 
         + texture2D(source, vUv + texel * vec2(-0.5, 0.5)).rgb + texture2D(source, vUv + texel * vec2(0.5, 0.5)).rgb);
     }`;
   const copy = pass(`${REDUCE}\nvoid main() { gl_FragColor = vec4(reduced(), 1.0); }`, {source: {value: null}, texel: {value: new Vector2()}});
-  // The first reduction weighs each texel by 1 / (1 + its exposed brightness) (`spotReduction`).
+  // The first reduction (four texels to one) weighs each texel by 1 / (1 + its exposed brightness): a lone bright texel (a distant
+  // bulb smaller than a pixel, which the raster catches on some frames and misses on others) no longer outweighs its block, so its
+  // halo does not pop in and out; a block bright all over keeps its full value.
   const first = pass(`
     uniform sampler2D source; uniform vec2 texel; varying vec2 vUv;
     ${exposure.glsl}
@@ -109,6 +84,7 @@ export function createBloom(chain: SceneryBloomChain, exposure: BloomExposure): 
       }
       gl_FragColor = vec4(sum / total, 1.0);
     }`, {source: {value: null}, texel: {value: new Vector2()}, exposure_state: exposure.uniform});
+  // The bright pass of an exposed colour (the white balance comes after the composite): 0 at or under the threshold.
   const bright = pass(`
     ${REDUCE}
     uniform vec3 shape;

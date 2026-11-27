@@ -1,10 +1,35 @@
+import type { ShaderPart } from '../../shaders/composer.js';
 import { list, value, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
 /**
- * Dry static vegetation material inputs. The camera-facing billboard vertex stage and the
- * translucency lighting hook are patched in by `patchSurfaceShader`.
+ * Leaf translucency from the material's power and scale: pow(saturate(dot(eye-to-point, normalize(N + L))), Power) * leaf mask
+ * * Scale, times the shadowed sun and albedo over pi, added to the sun's diffuse before its shadow curve (first in its slot, ahead of
+ * the cascade's diffuse split). Leaves seen against the sun glow; the card keeps its own normal, so fronds facing away from the sun
+ * stay shaded. Power and scale are uniforms: trees that differ only by them share a program.
  */
+export function leafTranslucencyPart(config: SurfaceConfig): ShaderPart {
+  const p = config.parameters.translucency;
+  const uniforms = {surface_leafPower: {value: value(p, 'power')}, surface_leafScale: {value: value(p, 'scale')}};
+  return {
+    name: 'leafTranslucency',
+    slots: {
+      fragmentPars: {at: 40, glsl: `uniform float surface_leafPower, surface_leafScale;
+void surfaceLeafScatter(const in IncidentLight light, const in vec3 normal, const in vec3 viewDir, const in PhysicalMaterial material,
+  inout ReflectedLight reflected) {
+  float scatter = pow(clamp(dot(-viewDir,normalize(normal+light.direction)),0.0,1.0),surface_leafPower);
+  reflected.directDiffuse += light.color * material.diffuseColor * (surfaceLeafMask * scatter * surface_leafScale) * RECIPROCAL_PI;
+}`},
+      fragmentSunDirect: {at: 0, glsl: '  surfaceLeafScatter( directLight, geometryNormal, geometryViewDir, material, reflectedLight );'},
+    },
+    uniforms: () => uniforms,
+  };
+}
+
+/** Whether a vegetation surface takes the sun through its leaves (`leafTranslucencyPart`). */
+export const readsLeafTranslucency = (config: SurfaceConfig): boolean => config.kind === 'vegetation' && !!config.flags.translucency;
+
+/** Dry static vegetation material inputs; camera-facing cards turn by billboardCard.ts, and the leaves take the sun through them by `leafTranslucencyPart`. */
 export function vegetationShaderParts(config: SurfaceConfig, { sample, uv, number, vec }: ShaderContext): SurfaceParts {
   const { maps, parameters: p, flags } = config;
   const base = p.base, adjust = p.adjust;

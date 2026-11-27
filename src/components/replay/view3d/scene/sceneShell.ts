@@ -23,12 +23,12 @@ import { underCarBaker } from '../car/carContactShadow.js';
 import { readoutPainter } from '../car/readoutCanvas.js';
 import { linkUnderCarBake } from '../car/underCarBake.js';
 import { CAR_REFLECTION_STEPS, createCarReflection } from '../car/carReflection.js';
+import { placePaintBox } from '../car/carPaint.js';
 import { CachedKtx2Loader, type TextureStartFile } from '../scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from '../scenery/chunkLoader.js';
 import { createSceneryBatches, reflects } from '../scenery/sceneryBatches.js';
 import { createNightSwitch, DAY_STATE, type NightState, type NightSwitch } from '../night/nightSwitch.js';
 import { createNearTrackLights, switchTrackLights } from '../night/trackLightProgram.js';
-import { createTrackLighting } from '../night/trackLights.js';
 import { createCarSpots, type SpotCar } from '../night/carSpots.js';
 import { setCockpitFrame } from '../night/cockpitLight.js';
 import { onSceneTimeOfDay, shownDaylight } from './timeOfDay.js';
@@ -39,11 +39,11 @@ import { createSceneryStream } from '../scenery/sceneryStream.js';
 import { createSceneWarmup } from '../scenery/sceneWarmup.js';
 import { startStreaming } from '../scenery/materials/mipStreaming.js';
 import { focusing } from '../scenery/textureFocus.js';
-import { trackCardFacing } from '../scenery/materials/shadowEye.js';
+import { trackCardFacing } from '../scenery/materials/billboardCard.js';
 import { isDriverCamera } from '../camera/driverCameras.js';
 import { isFreeCameraMode, viewMoved } from '../scenery/streamView.js';
 import { placeCarFrame } from '../cars/carParts.js';
-import { sceneryClock } from '../scenery/materials/surfaceAnimation.js';
+import { setSceneryClock } from '../scenery/materials/surfaceAnimation.js';
 import type { CarMotion } from '../cars/carMotion.js';
 
 /** What a scene shows on the circuit: the lap view's cars and lines, or the race replay's cars. */
@@ -173,6 +173,8 @@ export interface SceneShell {
 export const SUN_STEP_DEG = 0.25;
 /** How far the cloud cover or the sun's visibility through the clouds moves before `setDaylight` lights the scene again. */
 const WEATHER_STEP = 0.01;
+/** A frame's time budget, from its start: past it the car's reflection probe draws no further face (car/carReflection.ts). */
+const FRAME_BUDGET_MS = 8;
 
 /** The scenery's switches at a moment (nightMoment.ts): day without the night model. */
 const nightState = ({lighting: {night}}: SceneSun): NightState => night ? {night: night.night, lightsOn: night.lightsOn} : DAY_STATE;
@@ -215,8 +217,6 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // The scenery the game switches between day and night keeps its own draws, drawn for the moment's night state.
   const nightSwitch = createNightSwitch(nightState(sun));
   switchTrackLights(nightSwitch.state.lightsOn);
-  // Each chunk vertex's track light sum, worked out as the chunk loads.
-  const trackLighting = createTrackLighting(layout.night);
   // The cars' track lights: the nearest the camera, in the scene's coordinates (native less the origin, z mirrored).
   const nearTrackLights = createNearTrackLights(layout.night.lights.map(light =>
     ({...light, position: [light.position[0] - origin.x, light.position[1] - origin.y, origin.z - light.position[2]] as const})));
@@ -240,8 +240,6 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   let lit: Promise<void> = Promise.resolve();
   // Content is draped on the road: when the resident chunks change, drape it again (coalesced).
   let freezeScenery = () => {};
-  /** The scenery's chunk roots and batches, frozen once they join: the frame's matrix update skips them. */
-  const frozen = new WeakSet<Object3D>(), isFrozen = (object: Object3D) => frozen.has(object);
   const scheduleRefresh = () => {
     if (refreshTimer || !content) return;
     refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; content?.refreshHeights(); invalidate(); }, 250);
@@ -290,7 +288,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
         grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
         grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
       });
-      realRoad.prepare(root); trackLighting.prepare(root); prepareLampSizes(root);
+      realRoad.prepare(root); prepareLampSizes(root);
       const created = batches.add(root);
       // The parts left out of the batches that the car's reflection does not draw either.
       root.traverse(object => { if ((object as Partial<Mesh>).isMesh === true && object.layers.mask !== 0 && !reflects(object)) ownNotReflected.push(object); });
@@ -362,6 +360,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const draw = (frameTime?: number) => {
     // A started shell between views (the next one took the canvas, its content still building) draws the scenery alone.
     if (disposed || (!content && !started)) return;
+    const frameStart = performance.now();
     // First, while this frame has issued no draws: the fetch waits for every command before it.
     exposure.collect();
     if (frameTime !== undefined) frameHook?.(frameTime);
@@ -380,7 +379,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       camera.lookAt(rig.focus);
     }
     try {
-      sceneryClock.value = rig.timeSec;
+      setSceneryClock(rig.timeSec);
       // A new primary car brings its own game cameras, whose shadow keys may differ.
       environment.setShadowCascades(shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null);
       underCarBaker.flush(renderer); // Bakes at most one car body's under-car shade per frame; every car of that body then shows it.
@@ -390,7 +389,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       spotCars.length = 0; content?.headlights(spotCars);
       carSpots.update(spotCars, camera, content?.reflected.visible ? content.reflected.getWorldPosition(spotFocus) : null);
       placeCockpitLight(content?.reflected ?? null);
-      updateShownMatrices(scene, isFrozen);
+      updateShownMatrices(scene);
+      placePaintBox(); // The reflected car's box as its frame now stands.
       trackCardFacing(camera); trackLampPixel(renderer.getDrawingBufferSize(drawingSize).y);
       // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.
       const seen = meter?.step(cloudEye()) ?? null;
@@ -407,8 +407,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       exposure.render(scene, camera, !asked); asked = false;
       drawnView = camera instanceof PerspectiveCamera ? drawnCameras.perspective.copy(camera, false) : drawnCameras.orthographic.copy(camera, false);
       for (const waiting of afterFrames.splice(0)) waiting.run();
-      // The car's reflection probe renders three faces after the frame (car/carReflection.ts), around the body's centre.
-      if (car?.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn)) invalidate();
+      // The car's reflection probe renders up to three faces after the frame (car/carReflection.ts), around the body's centre.
+      if (car?.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn, frameStart + FRAME_BUDGET_MS)) invalidate();
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);
@@ -491,13 +491,14 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     async start(first) {
       scene.add(world);
       // Nothing under the scenery moves: a chunk's root or a batch freezes once, when it first joins (a batch that leaves and
-      // returns keeps its matrices).
+      // returns keeps its matrices). The frame's matrix update leaves a frozen one out (`updateShownMatrices`); the root stays in it, so
+      // a batch the distance culling adds between two changes takes its matrix until it freezes.
       const freeze = (object: Object3D) => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; };
-      sceneryRoot.updateWorldMatrix(true, false); freeze(sceneryRoot);
+      sceneryRoot.updateWorldMatrix(true, false); sceneryRoot.matrixAutoUpdate = false;
       freezeScenery = () => {
         for (const joined of sceneryRoot.children) {
-          if (frozen.has(joined)) continue;
-          frozen.add(joined); joined.updateWorldMatrix(false, true); joined.traverse(freeze);
+          if (!joined.matrixWorldAutoUpdate) continue;
+          joined.updateWorldMatrix(false, true); joined.traverse(freeze);
         }
       };
       freezeScenery();

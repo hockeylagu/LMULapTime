@@ -175,7 +175,6 @@ export function testLayoutNight(): SceneryNight {
   return {
     scenes: [{sceneDesc: 'test', date: '2023-09-10', latitudeDeg: 35.37, longitudeDeg: 138.93, timezoneHours: 9, dstRange: null, utcOffsetHours: 9, nightLightThreshold: null, nightLightPollution: 0.001}],
     lights: [{position: [0, 10, 0], rangeM: 50, colour: [1, 0.9, 0.8]}],
-    nodes: [],
   };
 }
 

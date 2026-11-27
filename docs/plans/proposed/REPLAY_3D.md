@@ -145,6 +145,16 @@ a car: the user said "not now"; don't re-offer.
   the full model path (6.2 s waiting for the far models first); play heap 789 MB against 825 MB. The full models now build while
   the scenery loads (done ~2.1 s) and take 1.8 s instead of 0.8 s: the start is bound by that shared load.
 - Fuji lap p99 18.1 ms against the 16.7 ms aim (personal-v20, measured before the GPU exposure).
+- Shader composer (done 2026-11-27, `view3d/shaders/`): every patched built-in material (about 95 `.replace` calls on three's
+  source in 13 `onBeforeCompile` hooks, with chunk-text guards and implicit order rules) became a `ShaderMaterial` composed from
+  our parts in our templates (unlit, lit, depth), with our own light loop (`lights: false`, one sun and the environment) and the
+  scene-wide values in two std140 uniform blocks (a scene block written once per frame, a four-float pass block for the values
+  that differ between a frame's renders). Each map's UV set is a per-material weight, not a program variant. Picture (personal-v31,
+  D1–D11 and Q1–Q9 against the run before): the night views identical; day views within 0.2 % of pixels (a far grandstand roof edge
+  in D4, a faint shade on one car in D10). Spa lap, 4 interleaved runs each: main pass CPU p50 3.95 → 3.35 ms, callback p50
+  7.9 → 7.35 ms, GPU total 7.49 → 7.24 ms, uniform calls −49 % in the main pass and −43 % per probe draw, program links in play
+  4–5 → 2–3. Not chosen: three's node materials (they target `WebGPURenderer` in r187), a renderer of our own, and keeping the
+  built-ins with tidier patches (still string surgery on three's source).
 
 ### Race replay
 

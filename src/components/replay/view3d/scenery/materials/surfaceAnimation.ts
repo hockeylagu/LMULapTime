@@ -1,15 +1,21 @@
 import { Vector2, type IUniform } from 'three';
+import { setScene } from '../../shaders/sceneBlock.js';
+
+let clockSec = 0;
 
 /**
- * The replay's time in seconds, which every animated surface reads (digital flags blink by it): the scene shell sets it before each
- * frame from the pose the camera follows, so animations pause and scrub with the replay, as the reference animates them by game
- * time.
+ * Sets the replay's time in seconds, which every animated surface reads (digital flags blink by the scene block's `surface_time`; the
+ * UV shifts are worked out from it in double precision): the scene shell sets it before each frame from the pose the camera follows,
+ * so animations pause and scrub with the replay, as the reference animates them by game time.
  */
-export const sceneryClock = { value: 0 };
+export function setSceneryClock(timeSec: number): void {
+  clockSec = timeSec;
+  setScene('surface_time', timeSec);
+}
 
 /**
  * UV-animated surface maps (`maps.<role>.uvAnimation`, the pipeline's docs/SCENE_PACKAGE.md): LED boards, screens, fountains and
- * water. The shift is added after the map's UV scale, on the replay's clock (`sceneryClock`), so it scrubs and runs backwards with
+ * water. The shift is added after the map's UV scale, on the replay's clock (`setSceneryClock`), so it scrubs and runs backwards with
  * the replay: scroll adds rate · t, step adds step · floor(rate · t). Texture-frame animations (`frames`) are not drawn: every
  * scenery map published with frames is driven by game state the package does not carry (its first frame is its texture) or names
  * no method.
@@ -33,10 +39,10 @@ export function uvShift(animation: SurfaceUvAnimation, timeSec: number, out = ne
   return out.set(u - Math.floor(u), v - Math.floor(v));
 }
 
-/** The uniform holding a map's UV shift at the scenery clock's time. */
+/** The uniform holding a map's UV shift at the scenery clock's time: the material's own, worked out as it is uploaded. */
 export function uvShiftUniform(animation: SurfaceUvAnimation): IUniform<Vector2> {
   const out = new Vector2();
-  return { get value() { return uvShift(animation, sceneryClock.value, out); } };
+  return { get value() { return uvShift(animation, clockSec, out); } };
 }
 
 /** Whether a package UV animation is well formed. */

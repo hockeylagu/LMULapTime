@@ -51,17 +51,23 @@ interface FieldCar {
   far: {car: Group; parts: CarParts};
   /**
    * The far model's road fit, as a full model's wheels place its body (`createWheelAnimation`), so the swap between them does not
-   * jump: its body moves by `y` so that `bottomY` (in its frame) lies on the road under its poses in `window`. `bottomY` is the
-   * full model's tyre contact (hubs less radius, at rest) once its body's full models are built; until then the far model's
-   * lowest point, which can be a body part a little below the tyres.
+   * jump: its body moves by `y` so that its bottom (`footprint.min.y`) lies on the road under its poses in `window`.
    */
-  fit: {envelope: Object3D; bottomY: number; y: number; window: RacePoseWindow | null};
-  /** The far model's bounds in its frame: its contact shadow's footprint (`blobShadows`). */
+  fit: {envelope: Object3D; y: number; window: RacePoseWindow | null};
+  /**
+   * The far model's bounds in its frame: its contact shadow's footprint (`blobShadows`). Its bottom is the full model's tyre contact
+   * (hubs less radius, at rest) once its body's full models are built; until then the far model's lowest point, which can be a body
+   * part a little below the tyres.
+   */
   footprint: Box3;
   near: DrawnCar | null;
   tier: 'far' | 'near';
-  /** Its pose at the last drawn time (null while off the track or followed), and the window and index its samples are in. */
+  /**
+   * Its pose at the last drawn time (null while off the track or followed): `placed`, its own, copied from the scene's; and the
+   * window and index its samples are in.
+   */
   pose: RenderPose | null;
+  placed: RenderPose;
   orientation: Quaternion;
   window: RacePoseWindow | null;
   carIndex: number;
@@ -86,7 +92,10 @@ export interface RaceField {
   reclaim(slot: number): void;
   /** Places the cars in view for the frame: the nearest few with their full model, wheels and lamps, the others with their far model. */
   beforeDraw(camera: PerspectiveCamera | OrthographicCamera): void;
-  /** The car's body bounds in its frame (metres, its far model's), its bottom where it meets the road; null without a model. */
+  /**
+   * The car's body bounds in its frame (metres, its far model's), its bottom where it meets the road; null without a model. The
+   * field's own box, to read only.
+   */
   bounds(slot: number): Box3 | null;
   /** The body envelope of the car's model drawn (its full model's while near, else its far model's road fit); null without a model. */
   envelope(slot: number): Object3D | null;
@@ -150,7 +159,7 @@ export function createRaceField(
       if (!Number.isFinite(x)) continue;
       const ground = shell.surfaceHeight({x, y, z});
       if (ground === null) continue;
-      const offset = ground - (y + fit.bottomY);
+      const offset = ground - (y + car.footprint.min.y);
       if (Math.abs(offset) <= MAX_FIT_M) offsets.push(offset);
     }
     // Without road under the poses yet, the fit stays: the road streaming in fits it again (`refreshHeights`).
@@ -219,12 +228,13 @@ export function createRaceField(
         if (!entry) { field.set(slots[index], 'none'); return; }
         entry.car.visible = false; root.add(entry.car);
         // A body whose full models came first (the followed car's) fits its far models by their wheels at once.
-        const each = slots[index];
+        const each = slots[index], footprint = boxes[present.indexOf(entry)];
+        footprint.min.y = contactOf.get(folder) ?? footprint.min.y;
         const car: FieldCar = {
           slot: each, body: entry.livery, of, far: {car: entry.car, parts: tables[present.indexOf(entry)]}, near: nearBySlot.get(each) ?? null,
-          fit: {envelope: entry.car.getObjectByName('body-envelope')!, bottomY: contactOf.get(folder) ?? boxes[present.indexOf(entry)].min.y, y: 0, window: null},
-          footprint: boxes[present.indexOf(entry)],
-          tier: lent.has(each) ? 'near' : 'far', pose: null, orientation: new Quaternion(), window: null, carIndex: 0, glowFrame: new Matrix4(),
+          fit: {envelope: entry.car.getObjectByName('body-envelope')!, y: 0, window: null}, footprint,
+          tier: lent.has(each) ? 'near' : 'far', pose: null, placed: {x: 0, y: 0, z: 0, index: 0, fraction: 0}, orientation: new Quaternion(),
+          window: null, carIndex: 0, glowFrame: new Matrix4(),
         };
         of.cars.push(car); field.set(each, car);
       });
@@ -286,7 +296,7 @@ export function createRaceField(
     for (const car of field.values()) {
       if (!car || car === 'none' || car.of.folder !== folder) continue;
       car.near = nearBySlot.get(car.slot) ?? null;
-      if (contact !== undefined) { car.fit.bottomY = contact; car.fit.window = null; }
+      if (contact !== undefined) { car.footprint.min.y = contact; car.fit.window = null; }
     }
     changed();
     return true;
@@ -300,11 +310,7 @@ export function createRaceField(
     has: slot => typeof field.get(slot) === 'object' && field.get(slot) !== null,
     bounds(slot) {
       const car = field.get(slot);
-      if (!car || car === 'none') return null;
-      // The tyres' contact once the full models are built, else the far model's lowest point.
-      const box = car.footprint.clone();
-      box.min.y = car.fit.bottomY;
-      return box;
+      return !car || car === 'none' ? null : car.footprint;
     },
     envelope(slot) {
       const car = field.get(slot);
@@ -314,7 +320,12 @@ export function createRaceField(
     pose(slot, pose, window, carIndex) {
       const car = field.get(slot);
       if (!car || car === 'none') return;
-      car.pose = pose ? {...pose, orientation: pose.orientation ? car.orientation.copy(pose.orientation) : undefined} : null;
+      if (pose) {
+        const own = car.placed;
+        own.x = pose.x; own.y = pose.y; own.z = pose.z; own.yaw = pose.yaw; own.index = pose.index; own.fraction = pose.fraction;
+        own.orientation = pose.orientation ? car.orientation.copy(pose.orientation) : undefined;
+      }
+      car.pose = pose && car.placed;
       car.window = window; car.carIndex = carIndex;
     },
     load(distances) {
@@ -386,7 +397,7 @@ export function createRaceField(
         shown.parts.sync();
         if (shown === car.far && metres < FAR_GLOW_M && glowing.length < FAR_GLOW_MAX) glowing.push(glowOf(car));
         // The road under a far model: its lowest point, fitted to the road by the envelope's offset.
-        if (shown === car.far) { shown.car.updateMatrix(); blobs.place(shown.car.matrix, car.fit.bottomY + car.fit.y, car.footprint); }
+        if (shown === car.far) { shown.car.updateMatrix(); blobs.place(shown.car.matrix, car.footprint.min.y + car.fit.y, car.footprint); }
       }
       blobs.end();
       glows.draw(glowing);

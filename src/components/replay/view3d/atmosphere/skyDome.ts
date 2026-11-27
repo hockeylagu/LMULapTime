@@ -20,9 +20,9 @@ import { NIGHT_DOME_GLSL, nightDome, nightUniforms, nightXyY, type NightDome } f
 /** The weather the sky is drawn for: the layout's air pollution, the cloud cover C and the precipitation term S (0 to 1). */
 export interface SkyConditions { airPollution: number; cloudCover: number; precipitation: number; /** How much of the sun passes the clouds, 0 to 1; absent without a cloud field. */ sunVisibility?: number }
 
-/** A layout's weather: its air pollution (none without daylight), the replay's cloud cover, dry. */
-export function skyConditions(daylight: SceneryDaylight | undefined, cloudCover: number, sunVisibility?: number): SkyConditions {
-  return {airPollution: daylight?.airPollution ?? 0, cloudCover: MathUtils.clamp(cloudCover, 0, 1), precipitation: 0, sunVisibility};
+/** A layout's weather: its air pollution, the replay's cloud cover, dry. */
+export function skyConditions(daylight: SceneryDaylight, cloudCover: number, sunVisibility?: number): SkyConditions {
+  return {airPollution: daylight.airPollution,cloudCover: MathUtils.clamp(cloudCover, 0, 1), precipitation: 0, sunVisibility};
 }
 
 /** p: the air pollution, damped by cloud cover. */
@@ -38,12 +38,11 @@ export function skyTurbidity(sky: ScenerySky, weather: SkyConditions): number {
 const dayRamp = (sky: ScenerySky, sunElevationDeg: number) => Math.min(1, Math.abs(sunElevationDeg / sky.fog.colour.sunElevationRampDeg - sky.fog.colour.sunElevationRampOffset));
 
 /**
- * The dry haze density (per metre) of a layout's daylight, clamped to the package's range; none without daylight. The base term
- * mixes from the dawn density to the day density along the fog colour's ramp, cloud cover adds its term and the damped pollution
- * its own (the package's dry formula; the storm term is not applied, every replay is dry).
+ * The dry haze density (per metre) of a layout's daylight, clamped to the package's range. The base term mixes from the dawn
+ * density to the day density along the fog colour's ramp, cloud cover adds its term and the damped pollution its own (the
+ * package's dry formula; the storm term is not applied, every replay is dry).
  */
-export function hazeDensity(sky: ScenerySky, daylight: SceneryDaylight | undefined, weather: SkyConditions, sunElevationDeg: number): number {
-  if (!daylight) return 0;
+export function hazeDensity(sky: ScenerySky, daylight: SceneryDaylight, weather: SkyConditions, sunElevationDeg: number): number {
   const {base, overcast, sunrise, pollution, min, max} = sky.fog.density, C = weather.cloudCover;
   const clearDay = MathUtils.lerp(sunrise * daylight.hazeDawnScale, base * daylight.hazeBaseScale, dayRamp(sky, sunElevationDeg));
   return MathUtils.clamp(clearDay + overcast * C * daylight.hazeCloudyScale + pollution * effectivePollution(sky, weather), min, max);
@@ -51,9 +50,8 @@ export function hazeDensity(sky: ScenerySky, daylight: SceneryDaylight | undefin
 
 /** The height term: haze thins with altitude above the native zero by amount · saturate(y · rate)^exponent. */
 export interface HeightHaze { amount: number; rate: number; exponent: number }
-export function heightHaze(sky: ScenerySky, daylight: SceneryDaylight | undefined, weather: SkyConditions): HeightHaze {
+export function heightHaze(sky: ScenerySky, daylight: SceneryDaylight, weather: SkyConditions): HeightHaze {
   const {max, scalar, exponent, scalarMin, scalarMax, exponentMin} = sky.fog.height;
-  if (!daylight) return {amount: 0, rate: scalarMin, exponent: Math.max(exponentMin, exponent)};
   return {
     amount: max * (1 - weather.cloudCover),
     rate: MathUtils.clamp(scalar * daylight.fogHeightAltitudeScalar, scalarMin, scalarMax),
@@ -85,10 +83,9 @@ export function skyColourLook(sky: ScenerySky, sun: Color, sunElevationDeg: numb
 /**
  * The dome's haze optical depth at the zenith, depth·intensity, divided by the view's height above the horizon: depth = base +
  * overcast·C + pollution·p and intensity = lerp(dawn·hazeDawnScale, base·hazeBaseScale, D) + overcast·C·hazeCloudyScale, with D the
- * fog colour's day ramp. None without daylight, as the scene's haze.
+ * fog colour's day ramp.
  */
-export function skyHazeDepth(sky: ScenerySky, daylight: SceneryDaylight | undefined, weather: SkyConditions, sunElevationDeg: number): number {
-  if (!daylight) return 0;
+export function skyHazeDepth(sky: ScenerySky, daylight: SceneryDaylight, weather: SkyConditions, sunElevationDeg: number): number {
   const {depth, intensity} = sky.haze, C = weather.cloudCover;
   const thickness = depth.base + depth.overcast * C + depth.pollution * effectivePollution(sky, weather);
   const strength = MathUtils.lerp(intensity.dawn * daylight.hazeDawnScale, intensity.base * daylight.hazeBaseScale, dayRamp(sky, sunElevationDeg)) + intensity.overcast * C * daylight.hazeCloudyScale;
@@ -147,11 +144,6 @@ const SKY_RGB_GLSL = `${HOSEK_GLSL}${NIGHT_DOME_GLSL}
  * along y, and each of its points has the colour of its direction from the cube's own centre: with the cube hanging below the eye,
  * the eye's horizon gets the colour of a direction a little above the model's horizon.
  */
-export function skyBoxDirection(box: ScenerySky['hosek']['box'], view: Vector3, target = new Vector3()): Vector3 {
-  const half = box.size / 2, t = Math.min(half / Math.abs(view.x), half / Math.abs(view.z), (view.y > 0 ? half + box.yOffset : half - box.yOffset) / Math.abs(view.y));
-  return target.copy(view).multiplyScalar(t).setY(view.y * t - box.yOffset).normalize();
-}
-
 const SKY_BOX_GLSL = `
       vec3 skyBoxDirection(vec3 view) {
         vec3 size = abs(view);
@@ -164,19 +156,10 @@ const SKY_BOX_GLSL = `
  * hazed toward `hazeColour` (the sky haze colour toward the view, sceneEnvironment.ts keeps it current; black until then) by
  * exp(−depth / cos θ). With a night sky, the game's night dome; day and night are one program.
  */
-export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, daylight: SceneryDaylight | undefined, weather: SkyConditions, night?: NightSky): ShaderMaterial {
-  const model = skyModel(sky, sunDirection, weather, night), [kx, ky, kz] = model.state.coefficients;
+export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, daylight: SceneryDaylight, weather: SkyConditions, night?: NightSky): ShaderMaterial {
   return new ShaderMaterial({
     name: 'sky-dome',
-    uniforms: {
-      hazeColour: {value: new Color(0, 0, 0)}, hazeDepth: {value: skyHazeDepth(sky, daylight, weather, model.sunElevationDeg)},
-      skyBox: {value: new Vector2(sky.hosek.box.size, sky.hosek.box.yOffset)},
-      sunDirection: {value: model.sun}, coefficientsX: {value: kx}, coefficientsY: {value: ky}, coefficientsZ: {value: kz},
-      radiances: {value: new Vector3(...model.state.radiances)}, isothermal: {value: model.isothermal},
-      sunProximity: {value: model.look.sunProximity}, gain: {value: new Vector3(...model.look.gain)},
-      xyzToRgb: {value: new Matrix3().set(...model.xyzToRgb[0], ...model.xyzToRgb[1], ...model.xyzToRgb[2])},
-      ...nightUniforms(model.night, model.nightWeight),
-    },
+    uniforms: {hazeColour: {value: new Color(0, 0, 0)}, ...skyDomeUniforms(sunDirection, sky, daylight, weather, night)},
     vertexShader: `
       varying vec3 vWorld;
       void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w;\n#ifdef USE_REVERSED_DEPTH_BUFFER\ngl_Position.z = 0.0;\n#else\ngl_Position.z = gl_Position.w;\n#endif\n}`,
@@ -190,6 +173,24 @@ export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, da
       }`,
     side: BackSide, depthWrite: false,
   });
+}
+
+/** The dome's sky for a new sun or weather: only its uniforms change, so it keeps its program. */
+export function setSkyDome(material: ShaderMaterial, sunDirection: Vector3, sky: ScenerySky, daylight: SceneryDaylight, weather: SkyConditions, night?: NightSky): void {
+  for (const [name, uniform] of Object.entries(skyDomeUniforms(sunDirection, sky, daylight, weather, night))) material.uniforms[name].value = uniform.value;
+}
+
+function skyDomeUniforms(sunDirection: Vector3, sky: ScenerySky, daylight: SceneryDaylight, weather: SkyConditions, night?: NightSky): Record<string, {value: unknown}> {
+  const model = skyModel(sky, sunDirection, weather, night), [kx, ky, kz] = model.state.coefficients;
+  return {
+    hazeDepth: {value: skyHazeDepth(sky, daylight, weather, model.sunElevationDeg)},
+    skyBox: {value: new Vector2(sky.hosek.box.size, sky.hosek.box.yOffset)},
+    sunDirection: {value: model.sun}, coefficientsX: {value: kx}, coefficientsY: {value: ky}, coefficientsZ: {value: kz},
+    radiances: {value: new Vector3(...model.state.radiances)}, isothermal: {value: model.isothermal},
+    sunProximity: {value: model.look.sunProximity}, gain: {value: new Vector3(...model.look.gain)},
+    xyzToRgb: {value: new Matrix3().set(...model.xyzToRgb[0], ...model.xyzToRgb[1], ...model.xyzToRgb[2])},
+    ...nightUniforms(model.night, model.nightWeight),
+  };
 }
 
 /** The dome's XYZ toward a view: the day's Hosek-Wilkie (its luminance dimmed by the altitude) and the night's Perez by the night weight. */
@@ -210,11 +211,6 @@ function radiance(model: SkyModel, direction: Vector3, target: Color): Color {
   const lift = Math.min(0, ...rgb), lifted = rgb.map(value => value - lift), high = Math.max(...lifted, 1e-5), saturation = (high - Math.min(...lifted)) / high;
   const channel = (i: number) => lifted[i] * MathUtils.lerp(1, model.look.gain[i], saturation) * GAME_LIGHT_UNIT;
   return target.setRGB(channel(0), channel(1), channel(2));
-}
-
-/** The sky's radiance toward a unit direction, as the dome draws it before its haze. */
-export function skyRadiance(sky: ScenerySky, sunDirection: Vector3, weather: SkyConditions, direction: Vector3, target = new Color(), night?: NightSky): Color {
-  return radiance(skyModel(sky, sunDirection, weather, night), direction, target);
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BatchedMesh, BoxGeometry, DoubleSide, Group, Mesh, MeshStandardMaterial } from 'three';
+import { BatchedMesh, BoxGeometry, DoubleSide, Group, Mesh, type ShaderMaterial } from 'three';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
 import type { CarTextures } from '../../../../../src/components/replay/view3d/cars/carModels.js';
@@ -7,20 +7,20 @@ import type { CarTemplates } from '../../../../../src/components/replay/view3d/c
 import { createCarSets, createDrawnCars } from '../../../../../src/components/replay/view3d/cars/drawnCar.js';
 import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 import { setCockpitView } from '../../../../../src/components/replay/view3d/cars/carParts.js';
-import { rigModel } from '../../../../helpers/scenes/rigModel.js';
+import { rigMaterial, rigModel } from '../../../../helpers/scenes/rigModel.js';
 
 /** Whether each loader made shares materials; its models are the rig with a cabin part (the interior) and two glass panes. */
 const loaders = vi.hoisted(() => [] as boolean[]);
 vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async () => {
-  const three = await import('three'), {rigModel: rig} = await import('../../../../helpers/scenes/rigModel.js');
+  const three = await import('three'), {rigMaterial: lit, rigModel: rig} = await import('../../../../helpers/scenes/rigModel.js');
   const {makeCar: make} = await import('../../../../../src/components/replay/view3d/cars/carObject.js');
   const withParts = () => {
-    const model = rig(), cabin = new three.Mesh(new three.BoxGeometry(1, 1, 1), new three.MeshStandardMaterial());
+    const model = rig(), cabin = new three.Mesh(new three.BoxGeometry(1, 1, 1), lit());
     cabin.name = 'cabin'; cabin.userData.interior = true;
     // A level drawn from 30 m: the field's cars switch to it, the own car never does.
-    const far = new three.Group(), farHull = new three.Mesh(new three.BoxGeometry(1, 1, 1), new three.MeshStandardMaterial());
+    const far = new three.Group(), farHull = new three.Mesh(new three.BoxGeometry(1, 1, 1), lit());
     far.name = 'far'; far.userData.lod = {inM: 30, outM: null}; far.add(farHull); model.add(far);
-    const tint = new three.MeshStandardMaterial({transparent: true, opacity: 0.4}), pane = new three.BoxGeometry(1, 1, 1);
+    const tint = Object.assign(lit(), {transparent: true, opacity: 0.4}), pane = new three.BoxGeometry(1, 1, 1);
     model.add(cabin, new three.Mesh(pane, tint), new three.Mesh(pane, tint));
     return model;
   };
@@ -29,7 +29,7 @@ vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async (
       loaders.push(shareMaterials);
       // A cabin of two dash panels under the body and a part under a node the car leaves out.
       const cabin = async () => {
-        const parts = new three.Group(), material = new three.MeshStandardMaterial(), geometry = new three.BoxGeometry(1, 1, 1);
+        const parts = new three.Group(), material = lit(), geometry = new three.BoxGeometry(1, 1, 1);
         for (const name of ['dash', 'dash 2']) { const dash = new three.Mesh(geometry, material); dash.name = name; dash.userData.cabinParent = 'body'; parts.add(dash); }
         const lost = new three.Mesh(geometry, material); lost.name = 'lost'; lost.userData.cabinParent = 'other livery'; parts.add(lost);
         return parts;
@@ -41,7 +41,7 @@ vi.mock('../../../../../src/components/replay/view3d/cars/carModels.js', async (
 
 /** The rig model plus two body panels of one material: a batch. */
 function model(): Group {
-  const rig = rigModel(), geometry = new BoxGeometry(1, 1, 1), carbon = new MeshStandardMaterial({shadowSide: DoubleSide});
+  const rig = rigModel(), geometry = new BoxGeometry(1, 1, 1), carbon = Object.assign(rigMaterial(), {shadowSide: DoubleSide});
   for (const x of [0, 1]) { const panel = new Mesh(geometry, carbon); panel.position.x = x; panel.castShadow = true; rig.add(panel); }
   return rig;
 }
@@ -73,7 +73,7 @@ describe('createDrawnCars', () => {
   });
 
   it('leaves the materials other cars draw with when dropped', async () => {
-    const rig = model(), panel = rig.children.find(child => child instanceof Mesh) as Mesh<BoxGeometry, MeshStandardMaterial>;
+    const rig = model(), panel = rig.children.find(child => child instanceof Mesh) as Mesh<BoxGeometry, ShaderMaterial>;
     const material = panel.material, disposed: unknown[] = [];
     material.addEventListener('dispose', () => disposed.push(material));
     (await createDrawnCars([makeCar('#38bdf8', false, rig)], () => 0, {sharedMaterial: each => each === material})).dispose();

@@ -1,31 +1,33 @@
 /**
- * The track lights in the surface programs (trackLights.ts holds the game's per-vertex term). The scenery's vertices carry their sums,
- * worked out once as each chunk loads; a car moves, so its vertices sum the lights nearest the camera (`NEAR_TRACK_LIGHTS`, picked on
+ * The track lights in the surface programs. The game adds them per vertex, diffuse only, under the ambient occlusion:
+ * N·L · colour · saturate(1 − d / range), a light below the vertex at its vertical distance stretched. The scenery's vertices carry
+ * their sums, baked by the package (`TRACK_LIGHT_ATTRIBUTE`, RGBE); a car moves, so its vertices sum the lights nearest the camera (`NEAR_TRACK_LIGHTS`, picked on
  * the CPU each frame: ours, the game lists the lights per draw). The fragment adds the sum to the diffuse before the ambient occlusion,
- * albedo over pi times GAME_LIGHT_UNIT as a screen's strength is (shaderParts.ts). One uniform, shared by every program, switches them:
- * off by day and while the venue is captured (dayLight.ts `sceneEmission`), as the game's ambient probe takes no lamps.
+ * albedo over pi times GAME_LIGHT_UNIT as a screen's strength is (shaderParts.ts). The scene block (sceneBlock.ts) switches them:
+ * `trackLight_scale` is off by day, and the pass block's `surface_emission` while the venue is captured, as the game's ambient probe
+ * takes no lamps.
  */
-import { Vector4, type Vector3, type WebGLProgramParametersWithUniforms } from 'three';
+import type { Vector3 } from 'three';
+import type { ShaderPart } from '../shaders/composer.js';
 import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
-import { sceneEmission } from '../scene/dayLight.js';
-import { BELOW_STRETCH, TRACK_LIGHT_ATTRIBUTE, TRACK_LIGHT_DECODE_GLSL, type TrackLight } from './trackLights.js';
-import { CAR_SPOT_TERM, carSpotDeclarations, carSpotUniforms } from './carSpots.js';
-import { ALL_LAMPS, COCKPIT_LIGHT_DECLARATIONS, cockpitLightUniforms, type LampShares } from './cockpitLight.js';
+import { NEAR_TRACK_LIGHTS, SCENE_BLOCK, sceneBlock, setScene } from '../shaders/sceneBlock.js';
+import { TRACK_LIGHT_ATTRIBUTE as PACKAGE_TRACK_LIGHT_ATTRIBUTE, TRACK_LIGHT_BELOW_STRETCH, TRACK_LIGHT_EXPONENT_BIAS,
+  type SceneryNightLight } from '../../../../../shared/packageContract/index.js';
+import { CAR_SPOT_TERM, carSpotDeclarations } from './carSpots.js';
+import { ALL_LAMPS, COCKPIT_LIGHT_DECLARATIONS, type LampShares } from './cockpitLight.js';
 
-/** The lights a car's vertices sum: the nearest the camera (ours; the game's per-draw list holds 20). */
-export const NEAR_TRACK_LIGHTS = 32;
+/** The scenery's per-vertex sums, as three's glTF loader names a custom attribute (lower case). */
+export const TRACK_LIGHT_ATTRIBUTE = PACKAGE_TRACK_LIGHT_ATTRIBUTE.toLowerCase();
+/** RGBE decoded: rgb × 2^(round(a × 255) − bias). */
+const TRACK_LIGHT_DECODE = `(${TRACK_LIGHT_ATTRIBUTE}.rgb * exp2(floor(${TRACK_LIGHT_ATTRIBUTE}.a * 255.0 + 0.5) - ${TRACK_LIGHT_EXPONENT_BIAS.toFixed(1)}))`;
 
 let lightsOn = false;
-const near = Array.from({length: 2 * NEAR_TRACK_LIGHTS}, () => new Vector4());
-export const trackLightUniforms = {
-  trackLight_scale: {get value() { return lightsOn ? GAME_LIGHT_UNIT * sceneEmission.value : 0; }},
-  /** Per near light: position and range, then colour. */
-  trackLight_near: {value: near},
-  trackLight_nearCount: {value: 0},
-};
 
-/** Switches the track lights (the night state's `lightsOn`). */
-export function switchTrackLights(on: boolean): void { lightsOn = on; }
+/** Switches the track lights (the night state's `lightsOn`): the scene block's `trackLight_scale`, the light unit or 0. */
+export function switchTrackLights(on: boolean): void {
+  lightsOn = on;
+  setScene('trackLight_scale', on ? GAME_LIGHT_UNIT : 0);
+}
 
 export interface NearTrackLights {
   /** Picks the lights nearest `eye` (scene coordinates) for the cars' programs, while the lights are on. */
@@ -34,7 +36,7 @@ export interface NearTrackLights {
 }
 
 /** The layout's lights in scene coordinates, for the cars. */
-export function createNearTrackLights(lights: readonly TrackLight[]): NearTrackLights {
+export function createNearTrackLights(lights: readonly SceneryNightLight[]): NearTrackLights {
   const order = lights.map((_, index) => index), reach = new Float64Array(lights.length);
   return {
     update(eye) {
@@ -42,13 +44,15 @@ export function createNearTrackLights(lights: readonly TrackLight[]): NearTrackL
       lights.forEach(({position: [x, y, z], rangeM}, index) => { reach[index] = Math.hypot(x - eye.x, y - eye.y, z - eye.z) - rangeM; });
       order.sort((a, b) => reach[a] - reach[b]);
       const count = Math.min(NEAR_TRACK_LIGHTS, order.length);
+      // Per near light, two vec4s of the scene block's `trackLight_near`: position and range, then colour.
+      const at = SCENE_BLOCK.offsets.trackLight_near;
       for (let i = 0; i < count; i++) {
         const {position, rangeM, colour} = lights[order[i]];
-        near[2 * i].set(position[0], position[1], position[2], rangeM); near[2 * i + 1].set(colour[0], colour[1], colour[2], 0);
+        sceneBlock.set(position, at + 8 * i); sceneBlock[at + 8 * i + 3] = rangeM; sceneBlock.set(colour, at + 8 * i + 4); sceneBlock[at + 8 * i + 7] = 0;
       }
-      trackLightUniforms.trackLight_nearCount.value = count;
+      setScene('trackLight_nearCount', count);
     },
-    dispose() { trackLightUniforms.trackLight_nearCount.value = 0; },
+    dispose() { setScene('trackLight_nearCount', 0); },
   };
 }
 
@@ -64,10 +68,10 @@ export function trackLightFragment({omni, spot, cockpit}: LampShares): string {
   return `{vec3 lampPoint=(vec4(-vViewPosition,0.0)*viewMatrix).xyz+cameraPosition;vec3 lampNormal=inverseTransformDirection(normal,viewMatrix);
 reflectedLight.indirectDiffuse+=(${terms.join('+')})*BRDF_Lambert(material.diffuseContribution);}`;
 }
-export const TRACK_LIGHT_FRAGMENT = trackLightFragment(ALL_LAMPS);
 
 const NEAR_MAIN = `vTrackLight = vec3(0.0);
-  if (trackLight_scale > 0.0) {
+  float trackLightScale = trackLight_scale * surface_emission;
+  if (trackLightScale > 0.0) {
     vec4 trackLightPoint = vec4(transformed, 1.0);
     #ifdef USE_BATCHING
       trackLightPoint = batchingMatrix * trackLightPoint;
@@ -81,28 +85,38 @@ const NEAR_MAIN = `vTrackLight = vec3(0.0);
       if (float(i) >= trackLight_nearCount) break;
       vec4 light = trackLight_near[2 * i];
       vec3 d = light.xyz - trackLightPoint.xyz;
-      if (d.y < 0.0) d.y *= ${BELOW_STRETCH.toFixed(1)};
+      if (d.y < 0.0) d.y *= ${TRACK_LIGHT_BELOW_STRETCH.toFixed(1)};
       float len = length(d);
       if (len > 0.0 && len < light.w) vTrackLight += trackLight_near[2 * i + 1].rgb * max(0.0, dot(trackLightNormal, d) / len) * (1.0 - len / light.w);
     }
-    vTrackLight *= trackLight_scale;
+    vTrackLight *= trackLightScale;
   }
 `;
 
+/** The vertex stage's declarations and sum for `source`, and the fragment's declarations (the scene-wide inputs are block members). */
+function trackLightProgram(source: 'baked' | 'near', shares: LampShares) {
+  return {
+    vertexPars: `${source === 'baked' ? `attribute vec4 ${TRACK_LIGHT_ATTRIBUTE};\n` : ''}varying vec3 vTrackLight;`,
+    vertexMain: source === 'baked' ? `vTrackLight = ${TRACK_LIGHT_DECODE} * trackLight_scale * surface_emission;\n` : NEAR_MAIN,
+    fragmentPars: `varying vec3 vTrackLight;\n${carSpotDeclarations(source === 'near')}${shares.cockpit ? `\n${COCKPIT_LIGHT_DECLARATIONS}` : ''}`,
+  };
+}
+
 /**
- * Adds the track lights to a program: `baked` reads the scenery's per-vertex sums (a geometry without them reads none), `near` sums
- * the lights nearest the camera (cars). Before any other patch replaces the occlusion include.
+ * The track lights in a lit composed program (litTemplate.ts): `baked` reads the scenery's per-vertex sums, which every scenery
+ * primitive carries (a geometry without them would decode WebGL's default attribute into NaN: the chunk loader refuses one,
+ * scenery/chunkLoader.ts `prepareSceneryMesh`), `near` sums the lights nearest the camera (cars). The vertices' sums are passed once the position is final, the
+ * fragment's share (`trackLightFragment`) added on the light before the occlusion, first there.
  */
-export function patchTrackLights(shader: WebGLProgramParametersWithUniforms, source: 'baked' | 'near', shares: LampShares = ALL_LAMPS): void {
-  Object.assign(shader.uniforms, trackLightUniforms);
-  const declarations = source === 'baked' ? `attribute vec4 ${TRACK_LIGHT_ATTRIBUTE};`
-    : `uniform vec4 trackLight_near[${2 * NEAR_TRACK_LIGHTS}];\nuniform float trackLight_nearCount;`;
-  const main = source === 'baked' ? `vTrackLight = ${TRACK_LIGHT_DECODE_GLSL(TRACK_LIGHT_ATTRIBUTE)} * trackLight_scale;\n` : NEAR_MAIN;
-  shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', `#include <common>\n${declarations}\nuniform float trackLight_scale;\nvarying vec3 vTrackLight;`)
-    .replace('#include <worldpos_vertex>', `${main}#include <worldpos_vertex>`);
-  Object.assign(shader.uniforms, carSpotUniforms, shares.cockpit ? cockpitLightUniforms : {});
-  shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\nvarying vec3 vTrackLight;\n${carSpotDeclarations(source === 'near')}${shares.cockpit ? `\n${COCKPIT_LIGHT_DECLARATIONS}` : ''}`)
-    .replace('#include <aomap_fragment>', `${trackLightFragment(shares)}\n#include <aomap_fragment>`);
+export function trackLightPart(source: 'baked' | 'near', shares: LampShares = ALL_LAMPS): ShaderPart {
+  const program = trackLightProgram(source, shares), fragment = trackLightFragment(shares);
+  return {
+    name: 'trackLights',
+    slots: {
+      vertexPars: {at: 20, glsl: program.vertexPars},
+      vertexOutputs: {at: 20, glsl: program.vertexMain},
+      fragmentPars: {at: 20, glsl: program.fragmentPars},
+      ...(fragment ? {fragmentOcclusion: {at: 0, glsl: fragment}} : {}),
+    },
+  };
 }

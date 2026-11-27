@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { BufferGeometry, DoubleSide, Matrix4, Mesh, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Texture, Vector2, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshStandardMaterial, Texture, Vector2, Vector4 } from 'three';
+import { TRACK_LIGHT_ATTRIBUTE } from '../../../../../src/components/replay/view3d/night/trackLightProgram.js';
 import { configureSurfaceMaterial, createSharedSurfaceMaterials } from '../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
 import { prepareSceneryMesh } from '../../../../../src/components/replay/view3d/scenery/chunkLoader.js';
-import { crownSun } from '../../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
-import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
-import { cardFacing, trackCardFacing, trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
-import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
-import { surfaceAlphaCut } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
-import { shaderParts } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
+import { surfaceFamilyPart, surfaceMaterial } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceProgram.js';
+import { SCENE_BLOCK_GROUPS } from '../../../../../src/components/replay/view3d/shaders/sceneBlock.js';
+import { shaderParts, surfaceUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
 import { GAME_LIGHT_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { readSurfaceConfig, SURFACE_KINDS, terrainLayerCount, textureAsset, type SurfaceConfig, type SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 import { imageUriMap, resolveMapUri } from '../../../../../src/components/replay/view3d/scenery/materials/textureSource.js';
@@ -71,20 +69,38 @@ describe('texture resolution', () => {
 });
 
 describe('shaderParts', () => {
-  it('declares one sampler and scale uniform per map, sorted, and samples through the scale uniform', () => {
+  it('declares one sampler, scale and UV set uniform per map, sorted, and samples through them with the fade-in', () => {
     const parts = shaderParts(surface('standard', { maps: { normal: map('N'), albedo: map('A', true) } }));
     expect(parts.declarations.indexOf('surface_albedo;')).toBeLessThan(parts.declarations.indexOf('surface_normal;'));
     expect(parts.declarations).toContain('uniform vec2 surface_scale_normal;');
-    expect(parts.albedo).toContain('texture2D(surface_albedo, (vSurfaceUV01.xy * surface_scale_albedo))');
-    expect(parts.normals).toContain('surfaceNormalVector(normal,(vSurfaceUV01.xy * surface_scale_normal)');
+    expect(parts.declarations).toContain('uniform vec4 surface_uv_normal;');
+    expect(parts.albedo).toContain('focusTexture(surface_albedo, focus_surface_albedo, (surfaceUv(surface_uv_albedo) * surface_scale_albedo))');
+    expect(parts.normals).toContain('surfaceNormalVector(normal,(surfaceUv(surface_uv_normal) * surface_scale_normal)');
   });
-  it('bakes constants instead of uniforms when asked', () => {
+  it('bakes constants and UV sets instead of uniforms when asked', () => {
     const parts = shaderParts(surface('standard', { maps: { albedo: map('A', true) } }), { uniforms: false });
     expect(parts.declarations).not.toContain('surface_scale_albedo'); expect(parts.albedo).toContain('vec2(2.00000000,3.00000000)');
+    expect(parts.albedo).toContain('texture2D(surface_albedo, (vSurfaceUV01.xy * vec2(');
+    expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true, 'worldPlanar') } }), { uniforms: false }).albedo).toContain('(vSurfaceXZ * vec2(');
   });
-  it('selects the UV expression by the map UV set', () => {
-    const parts = shaderParts(surface('diffuse', { maps: { albedo: map('A', true, 'worldPlanar') } }));
-    expect(parts.albedo).toContain('vSurfaceXZ * surface_scale_albedo');
+  it('weighs the UV sets per material: one set 1, the world XZ none, so maps on other sets share the program', () => {
+    const weights = (uv: SurfaceMap['uv']) => (surfaceUniforms(surface('diffuse', { maps: { albedo: map('A', true, uv) } }), { albedo: new Texture() }).surface_uv_albedo.value as Vector4).toArray();
+    expect([weights('uv0'), weights('uv1'), weights('uv2'), weights('uv3'), weights('worldPlanar')])
+      .toEqual([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1], [0, 0, 0, 0]]);
+    expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true, 'uv2') } }))).toEqual(shaderParts(surface('diffuse', { maps: { albedo: map('A', true) } })));
+  });
+  it('names every tunable for every surface (values 0 where it carries none), and throws for a map without its texture', () => {
+    const tunables = ['surface_specular', 'surface_mixBias', 'surface_decalStrength', 'surface_grooveAlbedo', 'surface_coatIOR', 'surface_coatStrength', 'surface_coatLacquerThickness', 'surface_normalScale'];
+    for (const kind of ['standard', 'road', 'clearcoat'] as const) expect(Object.keys(surfaceUniforms(surface(kind), {}))).toEqual(expect.arrayContaining(tunables));
+    const road = surfaceUniforms(surface('road'), {});
+    expect([road.surface_coatStrength.value, road.surface_decalStrength.value]).toEqual([0, 0.4]);
+    expect(() => surfaceUniforms(surface('standard', { maps: { albedo: map('A', true) } }), {})).toThrow('has no texture for its map albedo');
+  });
+  it('refuses a malformed tunable: a value that is not a finite number, a group the surface carries without its list', () => {
+    for (const strength of [Number.NaN, Number.POSITIVE_INFINITY, '0.4' as unknown as number]) {
+      expect(() => surfaceUniforms(surface('road', { parameters: { decal: { strength } } }), {})).toThrow('Missing surface value: strength');
+    }
+    expect(() => surfaceUniforms(surface('clearcoat', { parameters: { clearCoat: { lacquerColour: undefined } } }), {})).toThrow('Missing surface value: lacquerColour');
   });
   it('drives the luminous kinds by emission only, with their native multipliers in the game light unit, the bright panels brightest head-on', () => {
     const maps = { albedo: map('A', true) };
@@ -116,23 +132,23 @@ describe('shaderParts', () => {
     const share = (1 - 0.5 * (0.4 / 2.4) ** 2) / Math.PI * GAME_LIGHT_UNIT;
     expect(100 * GAME_LIGHT_UNIT).toBeCloseTo(4, 9);
     expect(dash.albedo).toContain('surfaceRoughness=0.40000000');
-    expect(dash.emissive).toBe(`diffuseColor.rgb*mix(1.50000000,9.00000000,surface_dayLight)*${share.toFixed(8)}`);
-    expect(dash.declarations).toContain('uniform float surface_dayLight;');
+    expect(dash.emissive).toBe(`diffuseColor.rgb*mix(1.50000000,9.00000000,lit_dayLight)*${share.toFixed(8)}`);
+    expect(dash.declarations).not.toContain('lit_dayLight'); // The day share is the scene block's.
     expect(dash.albedo).toContain('surfaceSpecular=0.5;');
     // With uniforms, the values leave the source for `surface_constants`.
     const shared = shaderParts(config);
     expect([shared.albedo, shared.emissive, shared.constants]).toEqual([expect.stringContaining('surfaceRoughness=surface_constants[0].x'),
-      'diffuseColor.rgb*mix(surface_constants[0].y,surface_constants[0].z,surface_dayLight)*surface_constants[0].w', [0.4, 1.5, 9, share]]);
+      'diffuseColor.rgb*mix(surface_constants[0].y,surface_constants[0].z,lit_dayLight)*surface_constants[0].w', [0.4, 1.5, 9, share]]);
     expect(shared.declarations).toContain('uniform vec4 surface_constants[1];');
     expect(shaderParts(surface('diffuse', { vertexColour: false, maps: { albedo: map('A', true) } })).albedo).not.toContain('*vSurfaceColour');
     expect(shaderParts(surface('diffuse', { maps: { albedo: map('A', true) } })).albedo).toContain('*vSurfaceColour');
   });
   it('glows a standard surface always, at night only (under full day), or not at all, by its emissive flag', () => {
     const glow = (emissive: string | undefined) => shaderParts(surface('standard', { flags: { emissive } }), { uniforms: false });
-    expect(glow('always').emissive).not.toContain('surface_dayLight');
-    expect(glow('always').declarations).not.toContain('surface_dayLight');
-    expect(glow('night').emissive).toMatch(/\*\(1\.0-step\(1\.0,surface_dayLight\)\)$/);
-    expect(glow('night').declarations).toContain('uniform float surface_dayLight;');
+    expect(glow('always').emissive).not.toContain('lit_dayLight');
+    expect(glow('always').declarations).not.toContain('lit_dayLight');
+    expect(glow('night').emissive).toMatch(/\*\(1\.0-step\(1\.0,lit_dayLight\)\)$/);
+    expect(glow('night').declarations).not.toContain('lit_dayLight');
     expect(glow(undefined).emissive).toBe('vec3(0.0)');
     // Its strength is a game light value summed with the sun's light before the 1/pi: converted by GAME_LIGHT_UNIT as the sun is.
     expect(glow('always').emissive).toContain(`*diffuseColor.rgb*${(GAME_LIGHT_UNIT / Math.PI).toFixed(8)}*`);
@@ -157,7 +173,7 @@ describe('shaderParts', () => {
   });
   it('adds the blink clock for digital flags and keeps the authored period', () => {
     const parts = shaderParts(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) }, parameters: { blink: { period: 0.5 } } }), { uniforms: false });
-    expect(parts.declarations).toContain('uniform float surface_time;'); expect(parts.albedo).toContain('3.141592653589793/0.50000000');
+    expect(parts.albedo).toContain('surface_time'); expect(parts.declarations).not.toContain('surface_time'); expect(parts.albedo).toContain('3.141592653589793/0.50000000');
   });
   it('widens the water roughness by the screen-space spread of the wave normal', () => {
     const water = shaderParts(surface('water', { maps: { albedo: map('A', true), normalA: map('N', false) } }));
@@ -206,177 +222,57 @@ describe('shaderParts', () => {
   });
 });
 
-describe('computeCustomProgramCacheKey', () => {
+/** The composed program key of a surface (surfaceProgram.ts), its maps loaded. */
+const programKey = (config: SurfaceConfig) => composedSurface(config).customProgramCacheKey();
+const composedSurface = (config: SurfaceConfig) => surfaceMaterial(new MeshStandardMaterial(), config, Object.fromEntries(Object.keys(config.maps).map(key => [key, new Texture()])));
+
+describe('surface program keys', () => {
   const base = () => surface('standard', { maps: { albedo: map('A', true), normal: map('N') }, parameters: { adjust: { roughness: 0.3 } } });
-  it('is shared by materials that differ only in tunables, scales and texture names', () => {
-    const other = surface('standard', { maps: { albedo: { ...map('OTHER', true), scale: [9, 9] }, normal: map('N2') }, parameters: { adjust: { roughness: 0.9, normalStrength: 0.2 } } });
-    expect(computeCustomProgramCacheKey(other)).toBe(computeCustomProgramCacheKey(base()));
+  it('is shared by materials that differ only in tunables, scales, UV sets and texture names', () => {
+    const other = surface('standard', { maps: { albedo: { ...map('OTHER', true, 'uv2'), scale: [9, 9] }, normal: map('N2') }, parameters: { adjust: { roughness: 0.9, normalStrength: 0.2 } } });
+    expect(programKey(other)).toBe(programKey(base()));
   });
-  it('differs when the generated GLSL or a vertex hook differs', () => {
-    const key = computeCustomProgramCacheKey(base());
-    expect(computeCustomProgramCacheKey({ ...base(), flags: { vertexColour: 'aoMultiply' } })).not.toBe(key);
-    expect(computeCustomProgramCacheKey({ ...base(), billboard: true })).not.toBe(key);
-    expect(key.startsWith('standard_')).toBe(true);
-  });
-  it('keys the leaf translucency curve, which is baked into the program', () => {
-    const tree = (power: number) => surface('vegetation', { flags: { translucency: 'on' }, maps: { albedo: map('A', true) }, parameters: { translucency: { power } } });
-    expect(computeCustomProgramCacheKey(tree(2))).not.toBe(computeCustomProgramCacheKey(tree(3)));
+  it('differs when the generated GLSL differs', () => {
+    expect(programKey({ ...base(), flags: { vertexColour: 'aoMultiply' } })).not.toBe(programKey(base()));
   });
 });
 
-describe('patchSurfaceShader', () => {
-  const vertex = '#include <common>\n#include <beginnormal_vertex>\n#include <begin_vertex>\n#include <worldpos_vertex>';
-  const fragment = ['common', 'map_fragment', 'roughnessmap_fragment', 'metalnessmap_fragment', 'normal_fragment_maps', 'lights_physical_fragment', 'aomap_fragment', 'emissivemap_fragment', 'normal_fragment_begin', 'lights_physical_pars_fragment', 'shadowmap_pars_fragment', 'lights_fragment_begin', 'lights_fragment_maps', 'lights_fragment_end', 'opaque_fragment']
-    .map(chunk => `#include <${chunk}>`).join('\n');
-  const depthVertex = ['common', 'begin_vertex', 'project_vertex'].map(chunk => `#include <${chunk}>`).join('\n');
-  const patched = (config: SurfaceConfig) => {
-    const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: fragment } as unknown as Parameters<typeof patchSurfaceShader>[0];
-    const own = { surface_albedo: { value: 'tex' } };
-    patchSurfaceShader(shader, config, own);
-    return shader;
-  };
-
-  it('replaces the albedo include and registers scale, tunable and caller uniforms', () => {
-    const shader = patched(surface('standard', { maps: { albedo: map('A', true) }, parameters: { adjust: { normalStrength: 0.5 } } }));
+describe('the surface program', () => {
+  it('reads the albedo by the family and registers the surface, focus and sun uniforms', () => {
+    const shader = composedSurface(surface('standard', { maps: { albedo: map('A', true) }, parameters: { adjust: { normalStrength: 0.5 } } }));
     expect(shader.fragmentShader).not.toContain('#include <map_fragment>'); expect(shader.fragmentShader).toContain('surfaceStandardBlend');
-    expect(shader.uniforms).toHaveProperty('surface_albedo');
-    expect((shader.uniforms as Record<string, { value: Vector2 }>).surface_scale_albedo.value.toArray()).toEqual([2, 3]);
-    expect((shader.uniforms as Record<string, { value: Vector2 }>).surface_normalScale.value.toArray()).toEqual([0.5, -1]);
+    const uniforms = shader.uniforms as Record<string, { value: unknown }>;
+    expect((uniforms.surface_scale_albedo.value as Vector2).toArray()).toEqual([2, 3]);
+    expect((uniforms.surface_normalScale.value as Vector2).toArray()).toEqual([0.5, -1]);
+    // The alpha cut, the emission switch and the sun are the scene and pass blocks' members, never the material's uniforms.
+    for (const name of ['surface_alphaCut', 'surface_emission', 'lit_sunDirection']) expect(uniforms).not.toHaveProperty(name);
+    expect(shader.uniformsGroups).toEqual(SCENE_BLOCK_GROUPS);
+    expect(uniforms).toHaveProperty('focus_surface_albedo');
+    expect(shader.fragmentShader).toContain('focusTexture(surface_albedo, focus_surface_albedo, (surfaceUv(surface_uv_albedo) * surface_scale_albedo))');
     expect(shader.vertexShader).toContain('vSurfaceColour = _lmu_colour;');
     expect(shader.vertexShader).toContain('attribute vec4 _lmu_colour;');
+    // A car part without the package's vertex colour reads white.
+    const config = surface('standard', { maps: { albedo: map('A', true) } });
+    expect(surfaceFamilyPart(config, shaderParts(config, { uniforms: true }), {}, false).slots.vertexPars?.glsl).toContain('const vec4 _lmu_colour = vec4(1.0);');
   });
-  it('takes a bright luminous panel\'s facing cosine per vertex, as the game blends it across the panel', () => {
-    const shaderOf = (kind: 'highLumTrackside' | 'lowLumEmissive') => {
-      const shader = { uniforms: {}, vertexShader: `${vertex}\n#include <project_vertex>`, fragmentShader: fragment } as unknown as Parameters<typeof patchSurfaceShader>[0];
-      patchSurfaceShader(shader, surface(kind, { maps: { albedo: map('A', true) } }), {});
-      return shader.vertexShader;
-    };
-    const bright = shaderOf('highLumTrackside');
-    expect(bright).toContain('varying float vSurfaceFacing;');
-    expect(bright).toMatch(/#include <project_vertex>\nvSurfaceFacing = max\(0\.0, dot\(normalize\(transformedNormal\), normalize\(-mvPosition\.xyz\)\)\);/);
-    expect(shaderOf('lowLumEmissive')).not.toContain('vSurfaceFacing');
-    // Grown on screen when far (lampSize.ts), after the facing cosine is taken.
-    expect(bright.indexOf('vSurfaceLampShare = 1.0 / (growth * growth);')).toBeGreaterThan(bright.indexOf('vSurfaceFacing = max('));
-    expect(shaderOf('lowLumEmissive')).toContain('attribute vec4 _lmu_lamp;');
+  it('cuts by the pass block alpha cut scale, reflects by the package rule and takes the halved ambient lookup', () => {
+    const shader = composedSurface(surface('standard', { maps: { albedo: map('A', true) } })).fragmentShader;
+    expect(shader).toContain('if (diffuseColor.a < alphaTest * surface_alphaCut || diffuseColor.a == 0.0) discard;');
+    expect(shader).toContain('surfaceIndirectSpecular(');
+    expect(shader.indexOf('surfaceReflectionSpecular=surfaceSpecular;')).toBeLessThan(shader.indexOf('surfaceCascadeShadow( - vViewPosition.z )'));
+    expect(shader).toContain('getIBLIrradiance( transformDirection( inverseTransformDirection( geometryNormal, viewMatrix ) * vec3( 1.0, 0.5, 1.0 ), viewMatrix ) )');
+    expect(composedSurface(surface('glass', { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain('surfaceIndirectSpecular(');
   });
-  it('reads white for geometry without the vertex colour', () => {
-    const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: fragment } as unknown as Parameters<typeof patchSurfaceShader>[0];
-    patchSurfaceShader(shader, surface('standard', { maps: { albedo: map('A', true) } }), {}, false);
-    expect(shader.vertexShader).not.toContain('attribute vec4 _lmu_colour;');
-    expect(shader.vertexShader).toContain('const vec4 _lmu_colour = vec4(1.0);');
+  it('lights the glass glint by the scene sun', () => {
+    const glass = composedSurface(surface('glass', { maps: { albedo: map('A', true) } })).fragmentShader;
+    expect(glass).toContain('glintL = normalize((viewMatrix * vec4(lit_sunDirection, 0.0)).xyz)'); expect(glass).not.toContain('directionalLights[');
   });
-  it('cuts a cut-out by the shared alpha cut scale, so the multisampled scene pass can leave the cut to coverage', () => {
-    const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: `#include <alphatest_pars_fragment>\n${fragment}\n#include <alphatest_fragment>` } as unknown as Parameters<typeof patchSurfaceShader>[0];
-    patchSurfaceShader(shader, surface('standard', { maps: { albedo: map('A', true) } }), {});
-    expect(shader.fragmentShader).not.toContain('#include <alphatest_fragment>');
-    expect(shader.fragmentShader).toContain('if (diffuseColor.a < alphaTest * surface_alphaCut || diffuseColor.a == 0.0) discard;');
-    expect(shader.fragmentShader).toContain('uniform float surface_alphaCut;');
-    expect((shader.uniforms as Record<string, unknown>).surface_alphaCut).toBe(surfaceAlphaCut);
-    expect(surfaceAlphaCut.value).toBe(1);
-  });
-  it('carries the groove values of a rubbered road as uniforms', () => {
-    const road = surface('road', { maps: { albedo: map('A', true), groove: map('G', false, 'uv2') }, flags: { decalBlend: 'addSub', ambientOcclusion: 'local', groove: 'perVertex', grooveMap: 'on' } });
-    road.parameters.groove = { albedo: [0.1, 0.11, 0.14], roughness: 0.6, specular: 0.5 };
-    const shader = patched(road);
-    expect((shader.uniforms.surface_grooveAlbedo.value as Vector3).toArray()).toEqual([0.1, 0.11, 0.14]);
-    expect(shader.uniforms.surface_grooveRoughness.value).toBe(0.6);
-    expect(shader.fragmentShader).toContain('uniform vec3 surface_grooveAlbedo;');
-  });
-  it('makes billboards camera-facing in the vertex stage only when the config says so', () => {
-    const tree = surface('vegetation', { maps: { albedo: map('A', true) } });
-    expect(patched(tree).vertexShader).not.toContain('_lmu_pivot');
-    const billboard = patched({ ...tree, billboard: true });
-    expect(billboard.vertexShader).toContain('attribute vec3 _lmu_pivot;'); expect(billboard.vertexShader).toContain('directionToCamera');
-    // The card's normal turns with it toward the camera; the rest-plane normal faced whole crowds away from the sun.
-    expect(billboard.vertexShader).toContain('objectNormal = normalize(normalize(toEye) * mat3(modelMatrix));');
-    // Leaves keep the card's own normal (fronds facing away from the sun stay shaded), not a world-up normal.
-    expect(billboard.fragmentShader).not.toContain('vec3(0.0,1.0,0.0));');
-    // A card skips its own plane in the cascade lookup (shadows/cascadeSampling.ts); other cards and objects still shade it.
-    expect(billboard.fragmentShader.startsWith('#define SURFACE_CARD\n')).toBe(true);
-    // Leaf cards light with a crown-shaped normal: sideways by the corner's side, up above a metre and less so facing the sun; never down.
-    expect(billboard.vertexShader).toContain('uniform vec3 surface_crownSun;'); expect(billboard.vertexShader).toContain('vec3 crownNormal = facing + across * side + vec3(0.0, up, 0.0);');
-    expect(billboard.vertexShader).toContain('float up = clamp(2.0 * clamp(_lmu_corner.y, 0.0, 1.0) - 1.0, 0.0, 1.0) * clamp(1.0 - dot(facing, surface_crownSun), 0.0, 1.0);');
-    expect((billboard.uniforms as Record<string, unknown>).surface_crownSun).toBe(crownSun);
-    // Crowd cards keep the camera-facing normal: lit as seen, not as sunlit tops.
-    const crowd = surface('standard', { maps: { albedo: map('A', true) }, billboard: true });
-    expect(patched(crowd).fragmentShader).not.toContain('vec3(0.0,1.0,0.0));');
-    expect(patched(crowd).vertexShader).not.toContain('crownNormal'); expect(patched(crowd).uniforms).not.toHaveProperty('surface_crownSun');
-  });
-  it("takes ambient light with the normal's height halved, and reflects by the package's rule except on glass and clear coat", () => {
-    const shader = patched(surface('standard', { maps: { albedo: map('A', true) } }));
-    expect(shader.fragmentShader).toContain('getIBLIrradiance( transformDirection( inverseTransformDirection( geometryNormal, viewMatrix ) * vec3( 1.0, 0.5, 1.0 ), viewMatrix ) )');
-    expect(shader.fragmentShader).not.toContain('getIBLIrradiance( geometryNormal )');
-    // The venue's convolved cube at lodScale × roughness, the split-sum table at (N·V, roughness), the family's inputs set before the lights.
-    expect(shader.fragmentShader).toContain('#define RE_IndirectSpecular surfaceIndirectSpecular');
-    expect(shader.fragmentShader).toContain('textureLod(surface_reflection, r, surface_reflectionLodScale * roughness)');
-    expect(shader.fragmentShader).toContain('mix(vec3(surfaceReflectionSpecular * (split.y + surface_dielectricF0 * split.x)), mix(surfaceReflectionAlbedo, vec3(1.0), split.y), material.metalness)');
-    expect(shader.fragmentShader).toContain('surfaceReflectionSpecular=surfaceSpecular;');
-    expect(shader.fragmentShader.indexOf('surfaceReflectionSpecular=surfaceSpecular;')).toBeLessThan(shader.fragmentShader.indexOf('surfaceCascadeShadow( - vViewPosition.z )'));
-    expect(shader.uniforms.surface_reflection).toBe(sceneryReflectionUniforms.surface_reflection);
-    for (const kind of ['glass', 'clearcoat'] as const) expect(patched(surface(kind, { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain('surfaceIndirectSpecular');
-  });
-  it('shades terrain by its baked shadow on the sun as well as the ambient', () => {
-    const terrain = patched(surface('terrain', { maps: { layerA: map('A', true), splatter: map('S') }, flags: { layers: '1' } }));
-    expect(terrain.fragmentShader).toContain('surfaceBakedShadow=splatter.a;');
-    expect(terrain.fragmentShader).toContain('float sunShadow = receiveShadow ? min(surfaceCascadeShadow( - vViewPosition.z ), surfaceBakedShadow) : 1.0;');
-    expect(patched(surface('standard', { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain(', surfaceBakedShadow)');
-  });
-  it('turns shadow-pass cards toward the viewing camera, so a card shades what is drawn', () => {
-    const material = billboardShadowMaterial();
-    expect(billboardShadowMaterial()).toBe(material);
-    const shader = { uniforms: {}, vertexShader: depthVertex, fragmentShader: '' } as unknown as Parameters<typeof patchSurfaceShader>[0];
-    material.onBeforeCompile(shader, undefined as never);
-    expect(shader.vertexShader).toContain('vec3 directionToCamera = cardToEye(surface_shadowEye, pivotWorld);');
-    trackShadowEye(Object.assign(new PerspectiveCamera(), { matrixWorld: new Matrix4().makeTranslation(3, 4, 5) }));
-    expect((shader.uniforms as Record<string, { value: Vector3 }>).surface_shadowEye.value.toArray()).toEqual([3, 4, 5]);
-    expect((shader.uniforms as Record<string, unknown>).surface_cardFacing).toBe(cardFacing);
-  });
-  it('turns every card the overhead camera\'s own way, so none turns as it moves, and each toward the eye under a perspective camera', () => {
-    const tree = patched({ ...surface('vegetation', { maps: { albedo: map('A', true) } }), billboard: true });
-    expect(tree.vertexShader).toContain('vec3 toEye = surface_cardFacing.w > 0.5 ? surface_cardFacing.xyz : eye - pivotWorld;');
-    expect(tree.uniforms.surface_cardFacing).toBe(cardFacing);
-    // Straight down, the screen's top towards -z: the cards face +z (the screen's bottom), wherever the camera is.
-    const overhead = new OrthographicCamera();
-    for (const x of [0, 250]) {
-      overhead.position.set(x, 180, 0.01); overhead.lookAt(x, 0, 0);
-      trackCardFacing(overhead);
-      expect(cardFacing.value.toArray().map(value => Math.round(value * 1e6) / 1e6)).toEqual([0, 0, 1, 1]);
-    }
-    trackCardFacing(new PerspectiveCamera());
-    expect(cardFacing.value.w).toBe(0);
-  });
-  it('declares only the extra UV attributes its maps need', () => {
-    expect(patched(surface('standard', { maps: { albedo: map('A', true, 'uv1') } })).vertexShader).toContain('attribute vec2 uv1;');
-    expect(patched(surface('standard', { maps: { albedo: map('A', true) } })).vertexShader).toContain('vec2 uv1 = vec2(0.0);');
-  });
-  it('hooks leaf translucency into the lighting only for flagged vegetation', () => {
-    const tree = surface('vegetation', { maps: { albedo: map('A', true) }, flags: { translucency: 'on' }, parameters: { translucency: { power: 3, scale: 4 } } });
-    expect(patched(tree).fragmentShader).toContain('#define RE_Direct surfaceLeafDirect');
-    expect(patched(tree).fragmentShader).toContain('3.00000000');
-    expect(patched({ ...tree, flags: {} }).fragmentShader).not.toContain('surfaceLeafDirect');
-  });
-  it('lights the diffuse of every family by twice the sun shadow and its specular by the shadow, terrain also by its baked shade', () => {
-    for (const kind of ['vegetation', 'standard'] as const) {
-      const shader = patched(surface(kind, { maps: { albedo: map('A', true) } })).fragmentShader;
-      expect(shader).toContain('float sunShadow = receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;');
-      expect(shader).toContain('surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0;');
-      expect(shader).toContain('#define RE_Direct surfaceSunDirect');
-    }
-    const ground = patched(surface('terrain', { maps: { albedo: map('A', true) } })).fragmentShader;
-    expect(ground).toContain('float sunShadow = receiveShadow ? min(surfaceCascadeShadow( - vViewPosition.z ), surfaceBakedShadow) : 1.0;');
-  });
-  it('shares the digital flag clock uniform object', () => {
-    const shader = patched(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) } }));
-    expect(shader.uniforms).toHaveProperty('surface_time');
-  });
-});
-
-it('draws a blended two-sided surface once, both sides in one pass, but glass back faces first', async () => {
+});it('draws a blended two-sided surface once, both sides in one pass, but glass back faces first', async () => {
   const configured = async (config: SurfaceConfig) => {
     const material = new MeshStandardMaterial({transparent: true, depthWrite: false, side: DoubleSide});
     material.userData = holder(config);
     const mesh = new Mesh(new BufferGeometry(), material);
-    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(new Texture())});
+    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(new Texture())}, createSharedSurfaceMaterials());
     expect(mesh.material).not.toBe(material);
     return mesh.material;
   };
@@ -392,7 +288,7 @@ it('casts a foliage card from both sides, and leaves the other cut-outs to the c
     const material = new MeshStandardMaterial({alphaTest: 0.5});
     material.userData = holder(config);
     const mesh = new Mesh(new BufferGeometry(), material);
-    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(new Texture())});
+    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(new Texture())}, createSharedSurfaceMaterials());
     return mesh.material;
   };
   expect((await configured(surface('vegetation', {maps: {albedo: map('A', true)}}))).shadowSide).toBe(DoubleSide);
@@ -404,9 +300,9 @@ it('shares one configured material among meshes of the same surface, textures an
   const configured = async (texture: Texture, glb: Partial<MeshStandardMaterial> = {}, packageKey = 'fb81305939eff0a5') => {
     const material = Object.assign(new MeshStandardMaterial(), glb);
     material.userData = {...holder(surface('standard', {maps: {albedo: map('ground')}})), lmuMaterial: packageKey};
-    const mesh = new Mesh(new BufferGeometry(), material);
+    const mesh = new Mesh(new BufferGeometry().setAttribute(TRACK_LIGHT_ATTRIBUTE, new BufferAttribute(new Uint8Array(4), 4, true)), material);
     prepareSceneryMesh(mesh);
-    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(texture)}, false, shared);
+    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(texture)}, shared);
     return mesh;
   };
   const [first, second, differentTexture, differentBlend] = [await configured(grass), await configured(grass), await configured(gravel), await configured(grass, {transparent: true})];
@@ -428,7 +324,7 @@ describe('shared surface programs', () => {
   it('gives materials that differ only in values one program, and a different shape its own', () => {
     const at = (roughness: number, maps: Record<string, ReturnType<typeof map>> = { albedo: map('A', true) }) =>
       surface('dashboard', { maps, parameters: { dashboard: { roughness, emissiveStrength: 9, emissiveNight: 1 } } });
-    expect(computeCustomProgramCacheKey(at(0.4))).toBe(computeCustomProgramCacheKey(at(0.7)));
-    expect(computeCustomProgramCacheKey(at(0.4))).not.toBe(computeCustomProgramCacheKey(at(0.4, {})));
+    expect(programKey(at(0.4))).toBe(programKey(at(0.7)));
+    expect(programKey(at(0.4))).not.toBe(programKey(at(0.4, {})));
   });
 });

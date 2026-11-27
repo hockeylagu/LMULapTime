@@ -1,22 +1,24 @@
-import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, FloatType, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, Object3D, RedFormat, type BatchedMesh, type Material } from 'three';
+import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, FloatType, Group, Mesh, MeshBasicMaterial, Object3D, RedFormat, type BatchedMesh, type Material } from 'three';
 import { BATCH_VERTEX_TEXTURES } from '../scenery/materials/shaderParts.js';
 import { addHiddenInstance, computeBatchBounds, createBatch, createShownCounts, createSlicer, layoutOf, releaseBatchOnUpload } from '../batching/batchedParts.js';
+import { composedTemplate } from '../shaders/composer.js';
+import { litTemplate } from '../shaders/litTemplate.js';
 import type { CarPart, CarParts } from './carParts.js';
 
 /** Texture units every WebGL 2 GPU has: three counts both stages of a program against them. */
 export const GUARANTEED_TEXTURE_UNITS = 16;
 
 /**
- * A lit car part whose material and geometry a batch can draw, glass and decals included (sorted in their batch): lamps keep their
- * own draws (switched per frame). A surface-program material whose samplers (`userData.surfaceTextureUnits`, carMaterials.ts) leave
- * no room for the batch's vertex textures keeps its own draws: a cabin part with nine maps and the cabin volume needed 17 units
- * batched, and three bound the 17th to no unit.
+ * A lit car part (a material composed on the lit template) whose material and geometry a batch can draw, glass and decals included
+ * (sorted in their batch): lamps keep their own draws (switched per frame). A surface-program material whose samplers
+ * (`userData.surfaceTextureUnits`, carMaterials.ts) leave no room for the batch's vertex textures keeps its own draws: a cabin part
+ * with nine maps and the cabin volume needed 17 units batched, and three bound the 17th to no unit.
  */
-export function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>): mesh is Mesh<BufferGeometry, MeshStandardMaterial> {
+export function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>): mesh is Mesh<BufferGeometry, Material> {
   const material = mesh.material;
   if (Array.isArray(material)) return false;
   const units: unknown = material.userData.surfaceTextureUnits;
-  return material instanceof MeshStandardMaterial && material.visible
+  return composedTemplate(material) === litTemplate && material.visible
     && (typeof units !== 'number' || units + BATCH_VERTEX_TEXTURES <= GUARANTEED_TEXTURE_UNITS)
     && !mesh.customDepthMaterial && mesh.onBeforeRender === Object3D.prototype.onBeforeRender;
 }
@@ -50,7 +52,7 @@ function moved(geometry: BufferGeometry): BufferGeometry {
 }
 
 /** Whether the part's material casts the whole surface of its geometry from both faces, as the shadow-only batch does: opaque, no cut-out. */
-const castsSolid = (material: MeshStandardMaterial) => !material.transparent && material.alphaTest === 0 && !material.alphaToCoverage
+const castsSolid = (material: Material) => !material.transparent && material.alphaTest === 0 && !material.alphaToCoverage
   && (material.shadowSide ?? material.side) === DoubleSide;
 
 /** The positions and index of `geometry`: what its sun shadow needs. */
@@ -133,7 +135,7 @@ export async function batchCars(tables: readonly CarParts[]): Promise<CarBatchSe
   let warmed = false;
   const counts = createShownCounts((batch, visible) => { if (warmed) batch.visible = visible; });
   for (const members of groups.values()) {
-    const first = members[0].mesh as Mesh<BufferGeometry, MeshStandardMaterial>, livery = liveryLayerOf(first) !== undefined;
+    const first = members[0].mesh as Mesh<BufferGeometry, Material>, livery = liveryLayerOf(first) !== undefined;
     // A livery part reads its layer through its batch, even alone.
     if (members.length < 2 && !livery) { unbatched.add(first.geometry); continue; }
     const geometries = [...new Set(members.map(part => part.mesh.geometry))];

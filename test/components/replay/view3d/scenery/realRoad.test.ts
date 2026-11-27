@@ -1,13 +1,14 @@
-import { BufferAttribute, BufferGeometry, Group, Mesh } from 'three';
+import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial, Texture } from 'three';
 import { describe, expect, it } from 'vitest';
 import { REALROAD_NONE } from '../../../../../shared/packageContract/scenery.js';
-import { patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
+import { surfaceMaterial } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceProgram.js';
 import { shaderParts, surfaceTextureUnits } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
 import type { SurfaceConfig, SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 import {
   ASSUMED_RUBBER, createRealRoadSurface, fillVertexStates, gatherPointStates, REALROAD_POINT_ATTRIBUTE,
-  REALROAD_STATE_ATTRIBUTE, realRoadUniforms,
+  REALROAD_STATE_ATTRIBUTE,
 } from '../../../../../src/components/replay/view3d/scenery/realRoad.js';
+import { sceneValue } from '../../../../../src/components/replay/view3d/shaders/sceneBlock.js';
 import { surface } from './surfaceFixture.js';
 
 const map = (texture: string, uv: SurfaceMap['uv'] = 'uv0'): SurfaceMap => ({ texture, uv, scale: [1, 1], srgb: false });
@@ -43,7 +44,7 @@ describe('surface state attribute', () => {
     const written = geometry.getAttribute(REALROAD_STATE_ATTRIBUTE) as BufferAttribute;
     expect([written.itemSize, written.normalized, [...written.array]]).toEqual([2, true, [ASSUMED_RUBBER, 0, ASSUMED_RUBBER, 0, 0, 0]]);
     expect(plain.getAttribute(REALROAD_STATE_ATTRIBUTE)).toBeUndefined();
-    expect(realRoadUniforms.surface_realRoadMedian.value).toBe(ASSUMED_RUBBER / 255);
+    expect(sceneValue('surface_realRoadMedian')).toBe(Math.fround(ASSUMED_RUBBER / 255));
   });
   it('refuses a table naming an element past the count', () => {
     expect(() => createRealRoadSurface(Uint32Array.from([0, 3]), 3)).toThrow(/element 3 of 3/);
@@ -87,22 +88,14 @@ describe('road and kerb surface state terms', () => {
     expect(shaderParts(config, { uniforms: false }).normals).toContain('blendWet.r*realRoadKeep*0.5');
   });
   it('reads the vertex state in the vertex stage, with no texture', () => {
-    const vertex = '#include <common>\n#include <beginnormal_vertex>\n#include <begin_vertex>\n#include <worldpos_vertex>';
-    const fragment = ['common', 'map_fragment', 'roughnessmap_fragment', 'metalnessmap_fragment', 'normal_fragment_maps', 'lights_physical_fragment', 'aomap_fragment',
-      'emissivemap_fragment', 'normal_fragment_begin', 'lights_physical_pars_fragment', 'shadowmap_pars_fragment', 'lights_fragment_begin', 'lights_fragment_maps',
-      'lights_fragment_end', 'opaque_fragment'].map(chunk => `#include <${chunk}>`).join('\n');
-    const patched = (config: SurfaceConfig) => {
-      const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: fragment } as unknown as Parameters<typeof patchSurfaceShader>[0];
-      patchSurfaceShader(shader, config, {});
-      return shader;
-    };
+    const patched = (config: SurfaceConfig) => surfaceMaterial(new MeshStandardMaterial(), config, Object.fromEntries(Object.keys(config.maps).map(key => [key, new Texture()])));
     const perVertex = patched(road({ groove: 'perVertex' }));
     expect(perVertex.vertexShader).toContain(`attribute vec2 ${REALROAD_STATE_ATTRIBUTE};`);
     expect(perVertex.vertexShader).toContain(`vSurfaceRealRoad = ${REALROAD_STATE_ATTRIBUTE};`);
     expect(perVertex.fragmentShader).toContain('varying vec2 vSurfaceRealRoad;');
     const average = patched(road({ groove: 'trackAverage' }));
     expect(average.vertexShader).not.toContain(REALROAD_STATE_ATTRIBUTE);
-    expect(average.uniforms.surface_realRoadMedian).toBe(realRoadUniforms.surface_realRoadMedian);
+    expect(average.uniforms).not.toHaveProperty('surface_realRoadMedian'); // The scene block's.
     // An attribute, not a texture: the state takes no texture unit, so a road keeps its batch.
     expect(surfaceTextureUnits(road({ marbles: 'on' }))).toBe(surfaceTextureUnits(road({})));
   });

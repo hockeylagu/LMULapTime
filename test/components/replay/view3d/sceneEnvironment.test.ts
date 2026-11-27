@@ -1,47 +1,57 @@
 import { skyBodies } from '../../../../src/components/replay/view3d/night/skyBodies.js';
 import { expect, it, vi } from 'vitest';
-import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLProgramParametersWithUniforms, type WebGLRenderer } from 'three';
-import { sceneEmission } from '../../../../src/components/replay/view3d/scene/dayLight.js';
-import { addSceneEnvironment, sceneLighting, sceneSun, sunSeenFrom, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
-import { hazeProgram } from '../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLRenderer } from 'three';
+import { addSceneEnvironment, sceneLighting, sceneSun, sunSeenFrom, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { hazePart } from '../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { composedMaterial } from '../../../../src/components/replay/view3d/shaders/composer.js';
+import { unlitTemplate } from '../../../../src/components/replay/view3d/shaders/unlitTemplate.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { GAME_LIGHT_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testLayoutNight, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
-import { cascadeShadowUniforms } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
-import { crownSun } from '../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
+import { cascadeAtlasUniform } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
+import { passValues, SCENE_BLOCK, sceneBlock, sceneValue } from '../../../../src/components/replay/view3d/shaders/sceneBlock.js';
+import { sceneEnvironmentMap } from '../../../../src/components/replay/view3d/shaders/sceneLight.js';
 import { sceneryReflectionUniforms } from '../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 
 /** The sun's light in scene units, as the environment's sun carries it. */
+/** A scene-block vec3 as a vector. */
+const blockVector = (name: keyof typeof SCENE_BLOCK.offsets) => new Vector3().fromArray(sceneBlock, SCENE_BLOCK.offsets[name]);
 const sunColour = (sun: Parameters<typeof sunRadiance>[0], elevationDeg: number, cloudCover: number) => sunRadiance(sun, elevationDeg, cloudCover).multiplyScalar(GAME_LIGHT_UNIT);
 
 const probe = vi.hoisted(() => ({render: vi.fn<(scene: Scene) => void>(), dispose: vi.fn(), cubemaps: 0}));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
+  // A PMREM as three's generator makes one for the probe's 128 px faces: its levels down to 8 px.
+  const pmrem = () => Object.assign(new actual.Texture(), {isPMREMTexture: true, mipmaps: [128, 64, 32, 16, 8].map(width => ({width, height: width}))});
   return {...actual, PMREMGenerator: class {
-    fromScene(scene: Scene) { probe.render(scene); return {texture: new actual.Texture(), dispose: probe.dispose}; }
-    fromCubemap() { probe.cubemaps++; return {texture: new actual.Texture(), dispose: probe.dispose}; }
+    fromScene(scene: Scene) { probe.render(scene); return {texture: pmrem(), dispose: probe.dispose}; }
+    fromCubemap() { probe.cubemaps++; return {texture: pmrem(), dispose: probe.dispose}; }
     dispose() {}
   }};
 });
 const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), setScissorTest: vi.fn(), getScissorTest: () => false, copyTextureToTexture: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
-/** A venue without daylight unless given one (the scene code keeps its default midday sun for it, though a package always states daylight): the synthetic sky, the probe at the scene origin. */
-/** A venue whose one night scene is at its daylight's place and date. */
-const venue = (daylight?: SceneVenue['daylight'], position: [number, number, number] = [0, 0, 0]): SceneVenue => {
+/** A mid-afternoon race sun at Le Mans. */
+const afternoon = {date: '2023-06-10', sessions: [{id: 'race' as const, localTime: '15:00', sunElevationDeg: 50, sunBearingDeg: 200}], airPollution: 0.6, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
+/** The synthetic sky with the probe at the scene origin, its one night scene at its daylight's place and date. */
+const venue = (daylight: SceneVenue['daylight'] = afternoon, position: [number, number, number] = [0, 0, 0]): SceneVenue => {
   const night = testLayoutNight();
-  if (daylight) night.scenes = [{...night.scenes[0], date: daylight.date, latitudeDeg: daylight.latitudeDeg, longitudeDeg: daylight.longitudeDeg, timezoneHours: daylight.utcOffsetHours, utcOffsetHours: daylight.utcOffsetHours}];
-  return {daylight: daylight as SceneVenue['daylight'], sky: testSky(), environmentProbe: {position}, shading: testShading(), night};
+  night.scenes = [{...night.scenes[0], date: daylight.date, latitudeDeg: daylight.latitudeDeg, longitudeDeg: daylight.longitudeDeg, timezoneHours: daylight.utcOffsetHours, utcOffsetHours: daylight.utcOffsetHours}];
+  return {daylight, sky: testSky(), environmentProbe: {position}, shading: testShading(), night};
 };
+/** The environment at the venue's published race sun. */
+const environmentAt = (scene: Scene, renderer: WebGLRenderer, at: SceneVenue, origin = new Vector3()) => addSceneEnvironment(scene, renderer, at, origin, 'chase', null, sceneSun(at, origin.y));
 const skyMaterial = (scene: Scene) => (scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>).material;
 
 it('uses the analytic sky, PMREM and a sun light without three shadow maps, keeping the shared lighting chunks', () => {
   const scene = new Scene(), renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
   const lightChunk = ShaderChunk.lights_fragment_begin, lightPars = ShaderChunk.lights_pars_begin;
   const material = new MeshStandardMaterial(), receiver = new Mesh(new BoxGeometry(), material); receiver.receiveShadow = true; scene.add(receiver);
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase', null);
+  const initial = sceneSun(venue(), 0), toSun = initial.lighting.sunDirection;
+  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase', null, initial);
   expect(scene.getObjectByName('default-terrain')).toBeUndefined(); expect(scene.children.filter(child => child instanceof Mesh && child.name !== 'sky')).toEqual([receiver]);
   expect(scene.getObjectByName('sky')).toBeDefined();
-  // Without daylight there is no haze to thicken the fog; the fog is exponential in the distance along the ray.
-  expect(scene.fog).toBeInstanceOf(FogExp2); expect((scene.fog as FogExp2).density).toBe(0);
+  // The fog is exponential in the distance along the ray, as thick as the daylight's haze.
+  expect(scene.fog).toBeInstanceOf(FogExp2); expect((scene.fog as FogExp2).density).toBeCloseTo(hazeDensity(testSky(), afternoon, initial.weather, initial.sunElevationDeg), 12);
   expect(ShaderChunk.fog_vertex).toContain('vFogDepth = - mvPosition.z;'); // three's own fog chunks stay as they are.
   expect(skyMaterial(scene).name).toBe('sky-dome');
   // The dome hazes toward its own haze colour (set with the fog's, not three's fog).
@@ -55,53 +65,59 @@ it('uses the analytic sky, PMREM and a sun light without three shadow maps, keep
   expect(suns.map(light => light.name)).toEqual(['sun']);
   const [sun] = suns;
   expect(sun.castShadow).toBe(false); expect(sun.intensity).toBe(1);
-  expect(sun.color.toArray()).toEqual(sunColour(testSun(), Math.asin(SUN_DIRECTION.y) * 180 / Math.PI, 0).toArray());
-  expect(sun.position.clone().sub(sun.target.position).normalize().toArray().map(v => +v.toFixed(6))).toEqual(SUN_DIRECTION.toArray().map(v => +v.toFixed(6)));
-  expect(crownSun.value.distanceTo(SUN_DIRECTION)).toBeLessThan(1e-9); // Foliage cards read the same sun.
+  expect(sun.color.toArray()).toEqual(sunColour(testSun(), initial.sunElevationDeg, 0).toArray());
+  expect(sun.position.clone().sub(sun.target.position).normalize().toArray().map(v => +v.toFixed(6))).toEqual(toSun.toArray().map(v => +v.toFixed(6)));
+  expect(blockVector('surface_crownSun').distanceTo(toSun)).toBeLessThan(1e-6); // Foliage cards read the same sun.
   // Materials keep their own compile hooks and the shared lighting chunks stay three.js's.
   expect(material.defines ?? {}).not.toHaveProperty('USE_CSM');
   expect(ShaderChunk.lights_fragment_begin).toBe(lightChunk); expect(ShaderChunk.lights_pars_begin).toBe(lightPars);
   environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
   environment.update(); expect(scene.children.filter(child => child instanceof DirectionalLight)).toHaveLength(1);
   expect(scene.environment).toBeInstanceOf(Texture); expect(scene.environmentIntensity).toBe(1);
+  // Each render of the scene gives the composed lit programs the sun and the environment three gives the built-in materials.
+  scene.onBeforeRender(renderer, scene, camera, null as never, null as never, null as never);
+  expect(blockVector('lit_sunDirection').distanceTo(toSun)).toBeLessThan(1e-6); expect(blockVector('lit_sunColour').toArray()).toEqual(sun.color.toArray().map(Math.fround));
+  expect(sceneEnvironmentMap.value).toBe(scene.environment); expect(passValues().lit_environmentIntensity).toBe(1);
   const sky = scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>;
   const reflectedSky = probe.render.mock.calls.at(-1)![0].getObjectByName('sky') as Mesh;
   expect(reflectedSky.material).toBe(sky.material);
   // The lower hemisphere is sunlit ground (albedo 0.2), not a near-black plane: shaded faces get bounce light.
   const ground = probe.render.mock.calls.at(-1)![0].children.find(child => child instanceof Mesh && child.name !== 'sky') as Mesh<BoxGeometry, MeshBasicMaterial>;
-  expect(ground.material.color.r).toBeCloseTo(0.2 * sun.color.r * SUN_DIRECTION.y / Math.PI, 6);
-  expect((sky.material.uniforms.sunDirection.value as Vector3).distanceTo(SUN_DIRECTION)).toBeLessThan(1e-12);
+  expect(ground.material.color.r).toBeCloseTo(0.2 * sun.color.r * toSun.y / Math.PI, 6);
+  expect((sky.material.uniforms.sunDirection.value as Vector3).distanceTo(toSun)).toBeLessThan(1e-12);
   environment.dispose(); expect(scene.environment).toBeNull(); expect(probe.dispose).toHaveBeenCalledOnce();
+  expect(sceneEnvironmentMap.value).toBeNull(); // The next shell's warm-up binds no disposed environment.
   expect(scene.children.some(child => child instanceof DirectionalLight)).toBe(false);
 });
 
 it('lights a layout from its published daylight: race-start sun height and bearing', () => {
   const sessions = (race: number, sunBearingDeg?: number) => [{id: 'race' as const, localTime: '11:00', sunElevationDeg: race, sunBearingDeg}, {id: 'qualify' as const, localTime: '15:00', sunElevationDeg: 46.1},
     {id: 'practice1' as const, localTime: '11:00', sunElevationDeg: 51.88}, {id: 'practice2' as const, localTime: '15:30', sunElevationDeg: 40.89}];
-  const fuji = sceneLighting({date: '2023-09-10', sessions: sessions(51.88, 136.26), airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9});
+  const fuji = sceneLighting(venue({date: '2023-09-10', sessions: sessions(51.88, 136.26), airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9}));
   expect(Math.asin(fuji.sunDirection.y) * 180 / Math.PI).toBeCloseTo(51.88, 6);
   expect(fuji.sunDirection.x).toBeCloseTo(0.42680, 5);
   expect(fuji.sunDirection.z).toBeCloseTo(0.44600, 5);
   expect(fuji.sunDirection.length()).toBeCloseTo(1, 9);
-  // A race start after sunset is held on the horizon (night is not drawn).
-  expect(sceneLighting({date: '2023-11-04', sessions: sessions(-3), airPollution: 0.8, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9}).sunDirection.y).toBe(0);
-  expect(sceneLighting().sunDirection.toArray()).toEqual(SUN_DIRECTION.toArray());
+  // A published race start after sunset is held on the horizon.
+  expect(sceneLighting(venue({date: '2023-11-04', sessions: sessions(-3, 250), airPollution: 0.8, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9})).sunDirection.y).toBe(0);
+  // A package session without a bearing shows nothing rather than a guessed sun.
+  expect(() => sceneLighting(venue({...afternoon, sessions: sessions(40)}))).toThrow('race session has no sun bearing');
 });
 
 it("places the sun at the replay's clock: session start plus session time at the layout's location", () => {
-  const sessions = [{id: 'race' as const, localTime: '13:00', sunElevationDeg: 50}, {id: 'qualify' as const, localTime: '12:45', sunElevationDeg: 46.1},
+  const sessions = [{id: 'race' as const, localTime: '13:00', sunElevationDeg: 50, sunBearingDeg: 180}, {id: 'qualify' as const, localTime: '12:45', sunElevationDeg: 46.1},
     {id: 'practice1' as const, localTime: '11:00', sunElevationDeg: 51.88}, {id: 'practice2' as const, localTime: '15:30', sunElevationDeg: 40.89}];
   const located = {date: '2023-09-10', sessions, airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9};
   const fuji = {latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9};
   const height = (lighting: {sunDirection: {y: number}}) => Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
   // An online event's start (here 15:30 qualifying, 120 s in) wins over the session default.
-  expect(height(sceneLighting(located, {session: 'qualify', startMinute: 930, sessionTimeSec: 120})))
+  expect(height(sceneLighting(venue(located), {session: 'qualify', startMinute: 930, sessionTimeSec: 120})))
     .toBeCloseTo(skyBodies(fuji, '2023-09-10', 932 * 60).sun.elevationDeg, 6);
   // Offline, the session's default time, plus the session time.
-  expect(height(sceneLighting(located, {session: 'practice1', startMinute: null, sessionTimeSec: 3600})))
+  expect(height(sceneLighting(venue(located), {session: 'practice1', startMinute: null, sessionTimeSec: 3600})))
     .toBeCloseTo(skyBodies(fuji, '2023-09-10', 720 * 60).sun.elevationDeg, 6);
   // Without a clock, the race session's published sun.
-  expect(height(sceneLighting(located))).toBeCloseTo(50, 6);
+  expect(height(sceneLighting(venue(located)))).toBeCloseTo(50, 6);
 });
 
 it('places the sun as the sky middleware does: overhead at the equator at solar noon on the equinox, east in the morning, west in the afternoon', () => {
@@ -130,7 +146,7 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
   const clock = {session: 'qualify' as const, startMinute: null, sessionTimeSec: 0, cloudCover: 0.62};
   const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', null, sceneSun(venue(daylight), 0, clock)), fog = scene.fog as FogExp2;
   try {
-    const sun = sceneLighting(daylight, clock, venue(daylight)).sunDirection, sunElevationDeg = Math.asin(sun.y) * 180 / Math.PI, weather = skyConditions(daylight, 0.62);
+    const sun = sceneLighting(venue(daylight), clock).sunDirection, sunElevationDeg = Math.asin(sun.y) * 180 / Math.PI, weather = skyConditions(daylight, 0.62);
     expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, weather, sunElevationDeg), 12);
     const horizon = hazeColour(testSky(), sun, weather);
     expect((scene.getObjectByName('sun') as DirectionalLight).color.toArray()).toEqual(sunColour(testSun(), sunElevationDeg, 0.62).toArray());
@@ -141,23 +157,25 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
     expect(away.toArray().map(v => +v.toFixed(6))).toEqual(expected.toArray().map(v => +v.toFixed(6)));
     // The haze toward a low sun is brighter than away from it.
     expect(sunward.r).toBeGreaterThan(away.r);
-    // The scene's haze terms are in the uniforms hazed programs share: its origin height, its sun and its sunward share.
-    const hazed = new MeshBasicMaterial(), shader = {uniforms: {} as Record<string, {value: unknown}>, vertexShader: '#include <fog_pars_vertex>\n#include <fog_vertex>', fragmentShader: '#include <fog_pars_fragment>\n#include <fog_fragment>'};
-    hazeProgram(hazed); hazed.onBeforeCompile(shader as unknown as WebGLProgramParametersWithUniforms, renderer);
+    // The scene's haze terms are in the scene block hazed programs share: its origin height, its sun and its sunward share, and the fog's colour.
+    const shader = composedMaterial(unlitTemplate, [hazePart]);
     environment.applyHaze();
-    expect([shader.uniforms.HAZE_ORIGIN_Y.value, (shader.uniforms.HAZE_SUN_DIRECTION.value as Vector3).toArray()]).toEqual([0, sun.toArray()]);
-    expect(shader.uniforms.HAZE_SUNWARD.value).toBeGreaterThan(0);
+    expect(shader.uniforms).not.toHaveProperty('HAZE_ORIGIN_Y'); expect(shader.fog).toBe(false);
+    expect(sceneValue('HAZE_ORIGIN_Y')).toBe(0); expect(blockVector('HAZE_SUN_DIRECTION').distanceTo(sun)).toBeLessThan(1e-6);
+    expect(sceneValue('HAZE_SUNWARD')).toBeGreaterThan(0); expect(sceneValue('haze_density')).toBe(Math.fround(fog.density));
+    expect(blockVector('haze_colour').toArray()).toEqual(fog.color.toArray().map(Math.fround));
   } finally { environment.dispose(); }
 });
 
 it("captures the venue at the package's probe without the cars, twice, and lights the scene with the second capture", () => {
   const render = vi.fn<(scene: Scene, camera: Camera) => void>(), scene = new Scene(), renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
   const car = new Mesh(new BoxGeometry(), new MeshBasicMaterial()); scene.add(car);
-  const seen: {at: number[]; car: boolean; lit: boolean; environment: Texture | null; emission: number; reflecting: number}[] = [];
+  const seen: {at: number[]; car: boolean; lit: boolean; composedLit: boolean; environment: Texture | null; emission: number; reflecting: number}[] = [];
   render.mockImplementation((_scene, camera) => {
-    if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environmentIntensity > 0, environment: scene.environment, emission: sceneEmission.value, reflecting: sceneryReflectionUniforms.surface_reflectionReady.value});
+    _scene.onBeforeRender(renderer, _scene, camera, null as never, null as never, null as never);
+    if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environmentIntensity > 0, composedLit: passValues().lit_environmentIntensity > 0, environment: scene.environment, emission: passValues().surface_emission, reflecting: sceneryReflectionUniforms.surface_reflectionReady.value});
   });
-  const environment = addSceneEnvironment(scene, renderer, venue(undefined, [110, 7, -40]), new Vector3(100, 5, 20), 'chase', null);
+  const environment = environmentAt(scene, renderer, venue(afternoon, [110, 7, -40]), new Vector3(100, 5, 20));
   environment.setDynamic([car]);
   try {
     const first = scene.environment, cubemaps = probe.cubemaps;
@@ -166,8 +184,9 @@ it("captures the venue at the package's probe without the cars, twice, and light
     // LMU local (110, 7, -40) against the origin (100, 5, 20): scene x right, y up, z mirrored.
     expect(seen.every(face => face.at.join() === '10,2,60' && !face.car)).toBe(true);
     // Unlit like the game's probe: no emission while it is captured, back on after.
-    expect(seen.every(face => face.emission === 0) && sceneEmission.value === 1).toBe(true);
+    expect(seen.every(face => face.emission === 0) && passValues().surface_emission === 1).toBe(true);
     expect(seen.slice(0, 6).every(face => !face.lit) && seen.slice(6).every(face => face.lit)).toBe(true);
+    expect(seen.every(face => face.composedLit === face.lit)).toBe(true); // The composed programs follow the scene's intensity.
     // The sun-only pass keeps the first environment bound (at zero intensity), so no material needs a second program.
     expect(seen.slice(0, 6).every(face => face.environment === first)).toBe(true); expect(scene.environmentIntensity).toBe(1);
     expect(car.visible).toBe(true); expect(scene.environment).not.toBe(first); expect(scene.environment).toBeInstanceOf(Texture);
@@ -183,26 +202,26 @@ it("captures the venue at the package's probe without the cars, twice, and light
 it("samples the package's cascade set from its first draw, for any camera, and holds the surfaces lit on the next set's atlas", () => {
   const scene = new Scene(), render = vi.fn<(scene: Scene, camera: OrthographicCamera) => void>();
   const renderer = {...fakeRenderer(), render} as unknown as WebGLRenderer;
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase', null);
+  const environment = environmentAt(scene, renderer, venue());
   // From the start the surfaces sample an allocated depth texture, unread: WebGL drops draws whose shadow sampler has none.
-  const chaseAtlas = cascadeShadowUniforms.surface_cascadeAtlas.value;
-  expect(chaseAtlas?.isDepthTexture).toBe(true); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
+  const chaseAtlas = cascadeAtlasUniform.value;
+  expect(chaseAtlas?.isDepthTexture).toBe(true); expect(sceneValue('surface_cascadeCount')).toBe(0);
   try {
     expect(environment.update()).toBe(false); expect(render).not.toHaveBeenCalled(); // No camera yet.
     environment.setCamera(new PerspectiveCamera(48, 1.5, 0.5, 15000));
     // The first frame draws the test chase set's three cascades from the scene (its two held tiles then copied from their static depth),
     // then the surfaces sample them.
     const sceneRenders = () => render.mock.calls.filter(([root]) => root === scene).length;
-    environment.update(); expect(sceneRenders()).toBe(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
+    environment.update(); expect(sceneRenders()).toBe(3); expect(sceneValue('surface_cascadeCount')).toBe(3);
     // The cockpit set (two cascades) replaces it: lit on its own atlas until its first draw.
-    environment.setShadowCascades('cockpit', null); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
-    expect(cascadeShadowUniforms.surface_cascadeAtlas.value).not.toBe(chaseAtlas);
-    environment.update(); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(2);
+    environment.setShadowCascades('cockpit', null); expect(sceneValue('surface_cascadeCount')).toBe(0);
+    expect(cascadeAtlasUniform.value).not.toBe(chaseAtlas);
+    environment.update(); expect(sceneValue('surface_cascadeCount')).toBe(2);
     // The overhead camera is orthographic: the cascades follow it as well.
     render.mockClear(); environment.setShadowCascades('chase', null); environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
-    environment.update(); expect(sceneRenders()).toBe(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
+    environment.update(); expect(sceneRenders()).toBe(3); expect(sceneValue('surface_cascadeCount')).toBe(3);
   } finally { environment.dispose(); }
-  expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0); expect(cascadeShadowUniforms.surface_cascadeAtlas.value).toBeNull();
+  expect(sceneValue('surface_cascadeCount')).toBe(0); expect(cascadeAtlasUniform.value).toBeNull();
 });
 
 it("lights the scene by another moment's sun: sky, haze, light, foliage and shadow, and captures the venue again once captured", () => {
@@ -218,10 +237,11 @@ it("lights the scene by another moment's sun: sky, haze, light, foliage and shad
     environment.setSun(evening);
     expect(probe.render.mock.calls.length).toBe(renders + 1);
     expect((probe.render.mock.calls.at(-1)![0].getObjectByName('sky') as Mesh).material).toBe(skyMaterial(scene));
-    expect(skyMaterial(scene)).not.toBe(firstSky);
+    // One sky material: only its uniforms change, so its program is never linked again.
+    expect(skyMaterial(scene)).toBe(firstSky);
     const toSun = evening.lighting.sunDirection.clone().normalize();
     expect((skyMaterial(scene).uniforms.sunDirection.value as Vector3).distanceTo(toSun)).toBeLessThan(1e-9);
-    expect(sunLight.position.distanceTo(toSun)).toBeLessThan(1e-9); expect(crownSun.value.distanceTo(toSun)).toBeLessThan(1e-9);
+    expect(sunLight.position.distanceTo(toSun)).toBeLessThan(1e-9); expect(blockVector('surface_crownSun').distanceTo(toSun)).toBeLessThan(1e-6);
     expect(sunLight.color.toArray()).toEqual(sunColour(testSun(), evening.sunElevationDeg, 0.4).toArray());
     expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, evening.weather, evening.sunElevationDeg), 12);
     // Once captured, a new sun captures the venue again (twice), and the next frame draws every cascade from the new direction.
@@ -250,7 +270,7 @@ it("follows the sun's visibility from elsewhere: sky, haze and light, without ca
     const cubemaps = probe.cubemaps, firstEnvironments = probe.render.mock.calls.length, sky = skyMaterial(scene), seen = sunSeenFrom(venue(daylight), sun, 0.5);
     environment.setSunVisibility(seen);
     expect(sunLight.color.toArray()).toEqual(sunColour(testSun(), sun.sunElevationDeg, 0.4).multiplyScalar(0.5).toArray());
-    expect(seen.weather.sunVisibility).toBe(0.5); expect(skyMaterial(scene)).not.toBe(sky);
+    expect(seen.weather.sunVisibility).toBe(0.5); expect(skyMaterial(scene)).toBe(sky);
     expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, seen.weather, sun.sunElevationDeg), 12);
     expect(probe.cubemaps).toBe(cubemaps); expect(probe.render.mock.calls.length).toBe(firstEnvironments);
     render.mockClear(); environment.update();

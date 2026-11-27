@@ -1,7 +1,9 @@
-import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshStandardMaterial, RedFormat, RepeatWrapping, RGBAFormat, ShaderChunk, Vector2, Vector3, type Texture } from 'three';
+import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, RedFormat, RepeatWrapping, RGBAFormat, Vector2, Vector3, type IUniform, type ShaderMaterial, type Texture } from 'three';
 import type { CloudMapLevels, SceneryClouds, SceneryCloudMaterial } from '../../../../../shared/types/scenes/clouds.js';
+import { composedMaterial, type ShaderPart } from '../shaders/composer.js';
+import { litTemplate } from '../shaders/litTemplate.js';
 import type { CloudSheet } from './clouds.js';
-import { hazeProgram } from './haze.js';
+import { hazePart, setHazeDistanceScale } from './haze.js';
 
 /**
  * The replay's clouds, drawn: one mesh per placed sheet (clouds.ts) with the first of its materials, lit by the package's cloud
@@ -28,8 +30,6 @@ export interface CloudLayer {
   dispose(): void;
 }
 
-if (!ShaderChunk.opaque_fragment.includes('gl_FragColor = vec4( outgoingLight, diffuseColor.a );')) throw Error('three.js opaque_fragment changed: the cloud layer needs updating');
-
 const CLOUD_VERTEX_PARS = `
 attribute vec3 cloudTangent;
 attribute vec3 cloudBinormal;
@@ -42,16 +42,19 @@ varying vec3 vCloudNormal;
 varying vec3 vCloudRay;
 varying float vCloudFade;
 `;
-/** The ray from the camera to the point, with z turned to LMU local axes. */
-const CLOUD_VERTEX = `
-vCloudUv = uv; vCloudTangent = cloudTangent; vCloudBinormal = cloudBinormal; vCloudNormal = cloudNormal; vCloudFade = cloudFade;
-vec3 cloudRay = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz - cameraPosition;
-vCloudRay = vec3( cloudRay.x, cloudRay.y, - cloudRay.z );
+/** Drawn at the far limit: behind everything, hidden by the scenery. */
+const CLOUD_VERTEX_FAR = `
 #ifdef USE_REVERSED_DEPTH_BUFFER
 gl_Position.z = 0.0;
 #else
 gl_Position.z = gl_Position.w;
 #endif
+`;
+/** The ray from the camera to the point, with z turned to LMU local axes. */
+const CLOUD_VERTEX = `
+vCloudUv = uv; vCloudTangent = cloudTangent; vCloudBinormal = cloudBinormal; vCloudNormal = cloudNormal; vCloudFade = cloudFade;
+vec3 cloudRay = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz - cameraPosition;
+vCloudRay = vec3( cloudRay.x, cloudRay.y, - cloudRay.z );
 `;
 const CLOUD_FRAGMENT_PARS = `
 uniform sampler2D cloudAlphaMap;
@@ -98,11 +101,8 @@ const CLOUD_FRAGMENT = `
   vec2 lean = vec2( side.r - side.g, end.g - end.b );
   vec3 open = normalize( vec3( lean, sqrt( max( 0.0, 1.0 - dot( lean, lean ) ) ) ) );
   vec3 openWorld = vCloudTangent * open.x + vCloudBinormal * open.y + vCloudNormal * open.z;
-  vec3 ambient = vec3( 0.0 );
-  #ifdef USE_ENVMAP
-    // The environment's light from that direction; the lookup takes a view-space normal and returns pi times the light.
-    ambient = getIBLIrradiance( normalize( ( viewMatrix * vec4( openWorld.x, openWorld.y, - openWorld.z, 0.0 ) ).xyz ) ) * RECIPROCAL_PI * cloudAmbient.x * ( density * cloudAmbient.y + 1.0 - cloudAmbient.y );
-  #endif
+  // The environment's light from that direction; the lookup takes a view-space normal and returns pi times the light.
+  vec3 ambient = getIBLIrradiance( normalize( ( viewMatrix * vec4( openWorld.x, openWorld.y, - openWorld.z, 0.0 ) ).xyz ) ) * RECIPROCAL_PI * cloudAmbient.x * ( density * cloudAmbient.y + 1.0 - cloudAmbient.y );
   outgoingLight = ( vec3( cloudSunLight * lit ) + ambient ) * albedo * albedo;
 }
 `;
@@ -141,11 +141,32 @@ function cloudUniforms(clouds: SceneryClouds, material: SceneryCloudMaterial, li
   };
 }
 
-/** The program of a cloud sheet: three's standard program (for the environment lookup) with the cloud's own colour and alpha; its haze is added by `hazeProgram`. */
-function patchCloudShader(shader: { vertexShader: string; fragmentShader: string }): void {
-  shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>${CLOUD_VERTEX_PARS}`).replace('#include <fog_vertex>', `#include <fog_vertex>${CLOUD_VERTEX}`);
-  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>${CLOUD_FRAGMENT_PARS}`)
-    .replace('#include <opaque_fragment>', `${CLOUD_FRAGMENT}#include <opaque_fragment>`);
+/** The maps of a cloud material: the warm-up uploads them with the layer. */
+const CLOUD_MAPS = ['cloudAlphaMap', 'cloudDensityMap', 'cloudSideMap', 'cloudEndMap'] as const;
+
+/**
+ * The program of a cloud sheet: the lit template (for the environment lookup) with the cloud's own light and alpha in place of the
+ * template's, drawn at the far limit, under the haze at half its distance: a cloud takes the square root of the haze's distance term.
+ * The light the template works out is not drawn.
+ */
+function cloudMaterial(uniforms: Record<string, IUniform>): ShaderMaterial {
+  const cloud: ShaderPart = {
+    name: 'cloud',
+    slots: {
+      vertexPars: {at: 0, glsl: CLOUD_VERTEX_PARS}, vertexView: {at: 0, glsl: CLOUD_VERTEX_FAR}, vertexOutputs: {at: 0, glsl: CLOUD_VERTEX},
+      fragmentPars: {at: 0, glsl: CLOUD_FRAGMENT_PARS}, fragmentLight: {at: 0, glsl: CLOUD_FRAGMENT},
+    },
+    uniforms: () => uniforms,
+    ownTextures: CLOUD_MAPS,
+  };
+  // One pass for both sides: a sheet never overlaps itself, and three's two-pass path looks the program up again before each pass.
+  const material = composedMaterial(litTemplate, [cloud, hazePart], {transparent: true, depthWrite: false, side: DoubleSide, forceSinglePass: true});
+  material.name = 'cloud-sheet';
+  // Flat shaded (a program parameter three reads off any material; a shader material has no field for it): a sheet has no normal
+  // attribute, so the template's light model takes the face normal (three's `FLAT_SHADED`) instead of normalizing a zero one into NaN.
+  Object.assign(material, {flatShading: true});
+  setHazeDistanceScale(material, 0.5);
+  return material;
 }
 
 /** A sheet's geometry in scene axes around its centre, with its vertex frame (LMU local axes) and fade. */
@@ -170,7 +191,7 @@ function sheetGeometry(sheet: CloudSheet): BufferGeometry {
  * field's origin is in the scene: the LMU local origin at the height the sheets were placed for). Nothing in it moves.
  */
 export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], light: CloudLayerLight, fieldOrigin: Vector3): CloudLayer {
-  const group = new Group(), textures = new Map<string, DataTexture>(), materials = new Map<string, MeshStandardMaterial>();
+  const group = new Group(), textures = new Map<string, DataTexture>(), materials = new Map<string, ShaderMaterial>();
   group.name = 'clouds'; group.position.copy(fieldOrigin);
   const texture = (key: string, alpha = false) => {
     const id = `${alpha ? 'alpha' : 'light'}:${key}`;
@@ -181,12 +202,7 @@ export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], li
   const materialOf = (cloud: SceneryCloudMaterial) => {
     let made = materials.get(cloud.name);
     if (made) return made;
-    const uniforms = cloudUniforms(clouds, cloud, light, texture);
-    // One pass for both sides: a sheet never overlaps itself, and three's two-pass path looks the program up again before each pass.
-    made = new MeshStandardMaterial({ transparent: true, depthWrite: false, side: DoubleSide, forceSinglePass: true });
-    made.onBeforeCompile = shader => { Object.assign(shader.uniforms, uniforms); patchCloudShader(shader); };
-    made.customProgramCacheKey = () => 'cloud-sheet';
-    hazeProgram(made, 0.5); // The haze's distance halved in the exponent: a cloud takes the square root of the haze's distance term.
+    made = cloudMaterial(cloudUniforms(clouds, cloud, light, texture));
     materials.set(cloud.name, made);
     return made;
   };

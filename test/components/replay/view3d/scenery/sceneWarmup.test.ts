@@ -1,8 +1,14 @@
-import { Box3, CompressedTexture, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, RGBA_BPTC_Format, Scene, Vector3, type Object3D, type Texture, type WebGLRenderer } from 'three';
+import { Box3, CompressedTexture, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, RGBA_BPTC_Format, Scene, Texture, Vector3, type Object3D, type WebGLRenderer } from 'three';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { isStreaming, startStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import { trackSurfaceTextures } from '../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
 import { createSceneWarmup } from '../../../../../src/components/replay/view3d/scenery/sceneWarmup.js';
+import { carMapPart } from '../../../../../src/components/replay/view3d/car/carStandardSurface.js';
+import { composedMaterial } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { litTemplate } from '../../../../../src/components/replay/view3d/shaders/litTemplate.js';
+
+/** A material reading map as its own texture, as a car part does. */
+const mapped = (map: Texture) => composedMaterial(litTemplate, [carMapPart(map, false)]);
 
 let frames: ((time: number) => void)[] = [], clock = 0;
 /** Runs one frame: every callback asked for so far, with the frame's one timestamp, as a browser does. */
@@ -74,7 +80,7 @@ it('sharpens the car first, then the scenery nearest the camera, the track surfa
   const {warmup, texture, upload, drain, bound} = fixture(), signal = new AbortController().signal;
   const [car, fieldCar, far, nearSmall, nearLarge, road, roadUnder] = [texture(512), texture(), texture(), texture(512), texture(), texture(512), texture()];
   trackSurfaceTextures.add(road); trackSurfaceTextures.add(roadUnder);
-  const chunk = (...maps: Texture[]) => maps.map(map => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map})));
+  const chunk = (...maps: Texture[]) => maps.map(map => new Mesh(new PlaneGeometry(), mapped(map)));
   const box = (x: number) => new Box3(new Vector3(x, 0, 0), new Vector3(x + 10, 1, 10));
   try {
     await warmup.queue(chunk(far), signal, box(500));
@@ -115,7 +121,7 @@ it('warms a shown scene within the frame byte budget: the first upload whole, th
   const {warmup, bound} = fixture(), mib = 1024 * 1024;
   // Uploads return at once: only the bytes end the frame's slice.
   vi.spyOn(performance, 'now').mockReturnValue(0);
-  const card = () => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)}));
+  const card = () => new Mesh(new PlaneGeometry(), mapped(new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)));
   try {
     warmup.shown();
     const done = warmup.warm([card(), card(), card()], new AbortController().signal);
@@ -131,9 +137,9 @@ it('warms a shown scene within the frame byte budget: the first upload whole, th
 it('moves a warm-up begun behind the loading screen onto the frame budget once the scene shows', async () => {
   const {warmup, bound} = fixture(), mib = 1024 * 1024;
   vi.spyOn(performance, 'now').mockReturnValue(0);
-  const card = () => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)}));
+  const card = () => new Mesh(new PlaneGeometry(), mapped(new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)));
   const cards = [card(), card(), card()];
-  cards[0].material.map!.onUpdate = () => warmup.shown(); // The first frame goes out while the first card uploads.
+  (cards[0].material.uniforms.map.value as Texture).onUpdate = () => warmup.shown(); // The first frame goes out while the first card uploads.
   try {
     const done = warmup.warm(cards, new AbortController().signal);
     // 1.5 MiB, then 3 MiB counted since the scene shows: over the 2 MiB budget, so it waits for a frame, not for a task.
@@ -149,7 +155,7 @@ it('moves a warm-up begun behind the loading screen onto the frame budget once t
 it('shares one frame byte budget between warm-ups running together', async () => {
   const {warmup, bound} = fixture(), mib = 1024 * 1024;
   vi.spyOn(performance, 'now').mockReturnValue(0);
-  const card = () => new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)}));
+  const card = () => new Mesh(new PlaneGeometry(), mapped(new CompressedTexture([{data: new Uint8Array(1.5 * mib), width: 1, height: 1}], 1, 1, RGBA_BPTC_Format)));
   const cards = () => [card(), card(), card()], signal = new AbortController().signal;
   try {
     warmup.shown();
@@ -163,6 +169,20 @@ it('shares one frame byte budget between warm-ups running together', async () =>
     // second's first (0.5 MiB owed), then the second's last two.
     expect(sentByFrame.slice(0, 4)).toEqual([2, 3, 4, 6]);
   } finally { warmup.dispose(); vi.restoreAllMocks(); }
+});
+
+it("uploads a composed material's own textures and any other material's texture fields (a readout's canvas)", async () => {
+  const uploaded: Texture[] = [];
+  const renderer = {getRenderTarget: () => null, setRenderTarget: () => {}, initTexture: (texture: Texture) => { uploaded.push(texture); }, render: () => {}, compile: () => {},
+    compileAsync: () => Promise.resolve()} as unknown as WebGLRenderer;
+  const warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, () => {});
+  const canvas = new Texture(), map = new Texture(), root = new Group();
+  root.add(new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: canvas})), new Mesh(new PlaneGeometry(), mapped(map)));
+  try {
+    warmup.shown();
+    await warmup.warm(root, new AbortController().signal);
+    expect(uploaded).toEqual([canvas, map]);
+  } finally { warmup.dispose(); }
 });
 
 it('compiles what a camera layer draws, hidden or not, and no stand-in in no layer', async () => {

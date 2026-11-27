@@ -17,7 +17,7 @@ describe('surface animation', () => {
     const animated = surface('diffuse', { maps: { albedo: { ...map, uvAnimation: { mode: 'scroll', rate: [0.1, 0], step: [0, 0] } } } });
     for (const uniforms of [true, false]) {
       const parts = shaderParts(animated, { uniforms });
-      expect(parts.albedo).toMatch(/texture2D\(surface_albedo, \(vSurfaceUV01\.xy \* \S+ \+ surface_shift_albedo\)\)/);
+      expect(parts.albedo).toMatch(uniforms ? /surface_albedo, \(surfaceUv\(surface_uv_albedo\) \* surface_scale_albedo \+ surface_shift_albedo\)\)/ : /texture2D\(surface_albedo, \(vSurfaceUV01\.xy \* \S+ \+ surface_shift_albedo\)\)/);
       expect(parts.declarations).toContain('uniform vec2 surface_shift_albedo;');
     }
     expect(shaderParts(surface('diffuse', { maps: { albedo: map } })).declarations).not.toContain('surface_shift');

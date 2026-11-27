@@ -132,8 +132,8 @@ export function standardShaderParts(config: SurfaceConfig, { sample, uv, number,
   // 1/pi, so it converts to the scene by GAME_LIGHT_UNIT as the sun does.
   // The map's rgb for rgb and rgba, its green for rg and for a map named without a mode (the shader's default branch), none without a map.
   const emissiveMask = ['rgb', 'rgba'].includes(f.emissiveMask ?? '') ? `${sample('emissive')}.rgb` : f.emissiveMask === 'rg' || f.emissiveMask === 'map' ? `vec3(${sample('emissive')}.g)` : 'vec3(1.0)';
-  // A surface lit at night only glows while the scene's day share is under full day (`sceneDayLight`).
-  const lit = f.emissive === 'always' ? '' : f.emissive === 'night' ? '*(1.0-step(1.0,surface_dayLight))' : null;
+  // A surface lit at night only glows while the scene's day share is under full day (the scene block's `lit_dayLight`).
+  const lit = f.emissive === 'always' ? '' : f.emissive === 'night' ? '*(1.0-step(1.0,lit_dayLight))' : null;
   const emissive = lit !== null
     ? `${vec(list(p.emissive, 'colour').map(x => x * x))}*${n(p.emissive, 'strength')}*${emissiveMask}*diffuseColor.rgb*${glslNumber(GAME_LIGHT_UNIT / Math.PI)}*(1.0-surfaceMetallic)*(1.0-surfaceSpecular*${glslNumber(f0)})${lit}`
     : 'vec3(0.0)';

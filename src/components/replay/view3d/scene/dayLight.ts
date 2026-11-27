@@ -4,16 +4,13 @@ import type { SurfaceConfig } from '../scenery/materials/surfaceConfig.js';
 /**
  * The day share of the scene's light, 0 (night) to 1 (day): the scene's ambient level over the package's night level, saturated
  * (dayShare). A screen glows between its night and day strengths by it, and a surface that glows at night only (`flags.emissive`
- * 'night') glows while it is under 1. Day until the scene sets it.
+ * 'night') glows while it is under 1. Day until the scene sets it: the scene block's `lit_dayLight` (sceneBlock.ts), which the
+ * environment writes (sceneEnvironment.ts) and the programs read.
+ *
+ * Whether the scenery's own light draws (emission: glow, screens, lamps, glow cards) is the pass block's `surface_emission`: 0 while
+ * the venue is captured. The game's ambient probe is an unlit G-buffer relit by the sun or the moon alone (the pipeline's shader
+ * reading, 2026-11-25), so at night the capture must not take the venue's glowing panels for light.
  */
-export const sceneDayLight = { value: 1 };
-
-/**
- * Whether the scenery's own light (emission: glow, screens, lamps, glow cards) draws: 1, or 0 while the venue is captured. The game's
- * ambient probe is an unlit G-buffer relit by the sun or the moon alone (the pipeline's shader reading, 2026-11-25), so at night the
- * capture must not take the venue's glowing panels for light.
- */
-export const sceneEmission = { value: 1 };
 
 /**
  * The day share under a sun of green radiance `sunGreen` (the package's light unit, before GAME_LIGHT_UNIT): the ambient's red is the sun's

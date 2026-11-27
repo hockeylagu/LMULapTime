@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { useState, type ComponentProps } from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import Replay3DView from '../../../../../src/components/replay/view3d/laps/Replay3DView.js';
 import { createReplayScene } from '../../../../../src/components/replay/view3d/laps/replayScene.js';
@@ -26,12 +27,20 @@ const trajectory: ReplayTrajectoryData = {replayName: 'test', pointsCount: 7, la
 const carMatch: unknown = expect.objectContaining({vehicleId: 'CAR_VEH'});
 beforeEach(() => { vi.clearAllMocks(); });
 
+type PageState = 'isExpanded' | 'onToggleExpanded' | 'fadedLine' | 'onToggleFadedLine' | 'showFrictionCircle' | 'onToggleFrictionCircle';
+/** The view with the expand, faded line and friction circle state its page keeps (ReplayMapContainer); a test's own props win. */
+function View(props: Omit<ComponentProps<typeof Replay3DView>, PageState> & Partial<Pick<ComponentProps<typeof Replay3DView>, PageState>>) {
+  const [isExpanded, setExpanded] = useState(false), [showFrictionCircle, setShowFrictionCircle] = useState(false);
+  const [fadedLine, setFadedLine] = useState<'none' | 'primary' | 'baseline'>('none');
+  return <Replay3DView isExpanded={isExpanded} onToggleExpanded={setExpanded} fadedLine={fadedLine} onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))}
+    showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} {...props} />;
+}
 it('keeps the track and camera when changing either lap, removing comparison, or reusing a vehicle', async () => {
   const lap = {...trajectory, vehicleData: {id: 'car', model: 'test', carClass: 'LMP2', vehicleIds: []}};
   const comparison = {...lap, replayName: 'comparison'};
   const otherComparison = {...comparison, currentLap: 4};
   const next = {...lap, currentLap: 3, points: lap.points.map(point => ({...point, x: point.x + 1}))};
-  const view = (primary: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <Replay3DView trajectory={primary} baseline={baseline}
+  const view = (primary: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <View trajectory={primary} baseline={baseline}
     currentIndex={2} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />;
   const {rerender, unmount} = render(view(lap, null));
   await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Textured car'));
@@ -49,7 +58,7 @@ it('keeps the track and camera when changing either lap, removing comparison, or
 it('applies the latest laps if selection changes while the initial scene is still loading', async () => {
   let release!: (value: Awaited<ReturnType<typeof createReplayScene>>) => void;
   vi.mocked(createReplayScene).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
-  const view = (lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <Replay3DView trajectory={lap} baseline={baseline}
+  const view = (lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <View trajectory={lap} baseline={baseline}
     currentIndex={0} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />;
   const {rerender} = render(view(trajectory, null));
   await waitFor(() => expect(createReplayScene).toHaveBeenCalledOnce());
@@ -65,7 +74,7 @@ it('applies the latest laps if selection changes while the initial scene is stil
 });
 
 it('rebuilds for another layout and rejects a comparison from a different geometry', async () => {
-  const view = (lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <Replay3DView trajectory={lap} baseline={baseline}
+  const view = (lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <View trajectory={lap} baseline={baseline}
     currentIndex={0} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />;
   const {rerender} = render(view(trajectory, null));
   await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Textured car'));
@@ -81,7 +90,7 @@ it('rebuilds for another layout and rejects a comparison from a different geomet
 async function setup(onReturnTo2D = vi.fn(), onChangeColorBy = vi.fn()) {
   const onSelectIndex = vi.fn(), onTogglePlay = vi.fn();
   const result = render(<><div data-replay-surface="chart" tabIndex={0} data-testid="chart"><ReplayShortcutHelp /></div>
-    <Replay3DView trajectory={trajectory} baseline={null} currentIndex={2} onSelectIndex={onSelectIndex}
+    <View trajectory={trajectory} baseline={null} currentIndex={2} onSelectIndex={onSelectIndex}
       onTogglePlay={onTogglePlay} onReturnTo2D={onReturnTo2D} onChangeColorBy={onChangeColorBy} /></>);
   await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toMatch(/Textured car/));
   const map = result.container.querySelector<HTMLElement>('[data-replay-view="3d"]')!;
@@ -222,7 +231,7 @@ it('supports floating map controls overlay buttons (zoom, center, follow, reset,
 it('supports top control buttons (return to 2D, color modes, primary/baseline line fading)', async () => {
   const onReturnTo2D = vi.fn(), onChangeColorBy = vi.fn(), onToggleFadedLine = vi.fn();
   render(
-    <Replay3DView
+    <View
       trajectory={trajectory}
       baseline={trajectory}
       currentIndex={2}
@@ -320,7 +329,7 @@ it('keeps friction, legend and trace controls working through expand and collaps
 it('uses the interpolated playhead for the collapsed HUD, fullscreen comparison HUD and minimap', async () => {
   const cursor = createPlaybackCursor();
   const {container} = render(<ReplayPlaybackCursorContext value={cursor}>
-    <Replay3DView trajectory={trajectory} baseline={trajectory} currentIndex={2} onSelectIndex={vi.fn()}
+    <View trajectory={trajectory} baseline={trajectory} currentIndex={2} onSelectIndex={vi.fn()}
       onReturnTo2D={vi.fn()} />
   </ReplayPlaybackCursorContext>);
   await waitFor(() => expect(scene.cursor).toHaveBeenCalled());
@@ -340,7 +349,7 @@ it('uses the interpolated playhead for the collapsed HUD, fullscreen comparison 
 it('draws a jump at its new index, never back at the last index the page showed', async () => {
   const cursor = createPlaybackCursor();
   const view = (currentIndex: number) => <ReplayPlaybackCursorContext value={cursor}>
-    <Replay3DView trajectory={trajectory} baseline={trajectory} currentIndex={currentIndex} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />
+    <View trajectory={trajectory} baseline={trajectory} currentIndex={currentIndex} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />
   </ReplayPlaybackCursorContext>;
   const {rerender} = render(view(1));
   await waitFor(() => expect(scene.cursor).toHaveBeenCalled());
@@ -359,7 +368,7 @@ it('repeats a picked corner from its entry, keeping the camera until the corner 
     primaryThrottleOnDistM: 4, exitDistM: 5, timeDeltaSec: 0.25} as CornerSegmentComparison;
   const controls = {playback: {speed: 1, speeds: [0.5, 1], onChangeSpeed}} as unknown as ReplayFullscreenControls;
   const view = (active: boolean) => <ReplayPlaybackCursorContext.Provider value={cursor}><ReplayFullscreenControlsContext.Provider value={controls}>
-    <Replay3DView trajectory={trajectory} baseline={trajectory} currentIndex={0} onSelectIndex={onSelectIndex} onReturnTo2D={vi.fn()}
+    <View trajectory={trajectory} baseline={trajectory} currentIndex={0} onSelectIndex={onSelectIndex} onReturnTo2D={vi.fn()}
       active={active} focusCorner={corner} onLeaveCorner={onLeaveCorner} />
   </ReplayFullscreenControlsContext.Provider></ReplayPlaybackCursorContext.Provider>;
   const {rerender} = render(view(true));

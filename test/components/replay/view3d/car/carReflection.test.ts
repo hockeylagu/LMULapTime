@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, MeshPhysicalMaterial, MeshStandardMaterial, Scene, Texture, Vector3, WebGLCoordinateSystem, type PerspectiveCamera, type WebGLRenderer } from 'three';
+import { BoxGeometry, Group, Mesh, MeshBasicMaterial, Scene, Texture, Vector3, WebGLCoordinateSystem, type PerspectiveCamera, type ShaderMaterial, type Vector2, type WebGLRenderer } from 'three';
 const pmrem = vi.hoisted(() => ({conversions: 0, convolutions: 0, reused: 0, disposed: 0, sources: [] as unknown[]}));
 vi.mock('../../../../../src/components/replay/view3d/reflectionCube.js', () => ({
   convolveReflection(_renderer: unknown, source: {texture: {generateMipmaps: boolean}}, kernels: unknown[], into?: {sharp: unknown}) {
@@ -28,18 +28,31 @@ vi.mock('../../../../../src/components/replay/view3d/car/overheadMap.js', async 
 }));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
-  const prefiltered = {texture: new actual.Texture(), dispose() {}};
+  // three's prefiltered 1024 px cube: its levels down to 16 px.
+  const prefiltered = {texture: Object.assign(new actual.Texture(), {isPMREMTexture: true, mipmaps: Array.from({length: 7}, () => ({}))}), dispose() {}};
   return {...actual, PMREMGenerator: class {
     compileCubemapShader() {}
     fromCubemap(_cube: unknown, reuse: unknown) { pmrem.conversions++; return reuse ?? prefiltered; }
     dispose() {}
   }};
 });
-import { bindCarSurfaceReflection, CAR_REFLECTION_STEPS, createCarReflection } from '../../../../../src/components/replay/view3d/car/carReflection.js';
-import { SCENERY_REFLECTION_GLSL, sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
-import { configureCarPaint } from '../../../../../src/components/replay/view3d/car/carPaint.js';
+import { CAR_REFLECTION_STEPS, carSurfaceProbe, createCarReflection } from '../../../../../src/components/replay/view3d/car/carReflection.js';
+import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
+import { createCarMaterial } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
+import { composedMaterial } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { litTemplate, ownEnvironment } from '../../../../../src/components/replay/view3d/shaders/litTemplate.js';
+import { sceneEnvironmentMap } from '../../../../../src/components/replay/view3d/shaders/sceneLight.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
-import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
+import type { CarAppearance, CarSurface } from '../../../../../shared/types/scenes/car.js';
+
+/** A car material drawn by the surface program's probe read alone (carReflection.ts), bound to its car's probe. */
+function probeMaterial(reflects: boolean, overhead = true): ShaderMaterial {
+  const probe = carSurfaceProbe(reflects, overhead), material = composedMaterial(litTemplate, probe.parts);
+  probe.bind(material);
+  return material;
+}
+/** A car paint material, as the car draws it. */
+const paintMaterial = () => createCarMaterial({id: 'p', name: 'BODY', paint: true}, {alias: 'x', albedo: 'a', paint: carPaint(), optionNodes: []} as unknown as CarAppearance, () => new Texture(), testShading());
 
 function stubRenderer() {
   const faces: Array<{face: number; carShown: boolean; mips: boolean}> = [], eyes: Vector3[] = [], ranges: [number, number][] = [];
@@ -62,17 +75,14 @@ const setFaces = () => ({notReflected: () => [], clipM: 150});
 
 it('renders the probe three faces a frame from the roof without the cars, then gives the car its reflection', () => {
   const {renderer, faces, eyes, ranges, cars, target} = stubRenderer();
-  const glass = new MeshPhysicalMaterial(), unlit = new MeshBasicMaterial({envMap: null}), paint = new MeshPhysicalMaterial({map: new Texture()});
-  configureCarPaint(paint, carPaint(), () => new Texture(), testShading());
-  const paintUniforms = () => { const shader = {uniforms: {}, vertexShader: '', fragmentShader: ''}; paint.onBeforeCompile(shader as never, null as never); return shader.uniforms as Record<string, {value: unknown}>; };
-  // A lamp housing, drawn by the surface program: its own program patch runs first, then the reflection uniforms become the car's.
-  const lamp = new MeshStandardMaterial(), venueCube = new Texture();
-  lamp.onBeforeCompile = shader => { shader.uniforms.surface_albedo = {value: null}; };
-  bindCarSurfaceReflection(lamp, true);
-  const lampUniforms = () => { const shader = {uniforms: {}, vertexShader: '', fragmentShader: ''}; lamp.onBeforeCompile(shader as never, null as never); return shader.uniforms as Record<string, {value: unknown}>; };
+  const glass = composedMaterial(litTemplate, []), unlit = new MeshBasicMaterial({envMap: null}), paint = paintMaterial();
+  const paintUniforms = () => paint.uniforms as Record<string, {value: unknown}>;
+  // A lamp housing, drawn by the surface program: the reflection uniforms are the car's.
+  const lamp = probeMaterial(true), venueCube = new Texture();
+  const lampUniforms = () => lamp.uniforms as Record<string, {value: unknown}>;
   sceneryReflectionUniforms.surface_reflection.value = venueCube; sceneryReflectionUniforms.surface_reflectionReady.value = 1;
-  expect(Object.keys(lampUniforms())).toEqual(['surface_albedo', 'surface_reflection', 'surface_reflectionReady', 'overhead_top', 'overhead_below',
-    'overhead_topMatrix', 'overhead_belowMatrix', 'overhead_eyes', 'overhead_ready', 'overhead_sky', 'overhead_skyLodScale']);
+  expect(Object.keys(lampUniforms())).toEqual(expect.arrayContaining(['surface_reflection', 'surface_reflectionReady', 'overhead_top', 'overhead_below',
+    'overhead_topMatrix', 'overhead_belowMatrix', 'overhead_eyes', 'overhead_ready', 'overhead_sky']));
   expect(lampUniforms().overhead_ready.value).toBe(0);
   expect(lampUniforms().surface_reflection.value).toBe(venueCube);
   // A 2 m tall body whose origin is on the ground: the box centre is 1 m up.
@@ -80,11 +90,13 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   const car = new Group().add(body);
   cars.add(car);
   const reflection = createCarReflection(renderer, new Scene(), testShading(), setFaces()), centre = new Vector3(10, 0.5, 20);
-  // The prefiltered target is converted once from the empty cube, and the car's lit materials take it at once: its size is a
-  // program define, so they compile a single time.
+  // The prefiltered target is converted once from the empty cube, and the car's lit materials take it at once, its last level
+  // a uniform: one program with the scene's environment or the probe's.
   expect(pmrem.conversions).toBe(1);
+  const key = glass.customProgramCacheKey();
   reflection.setCar(car, cars);
-  expect(glass.envMap).not.toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0);
+  expect(ownEnvironment(glass)).not.toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0);
+  expect(glass.customProgramCacheKey()).toBe(key); expect((glass.uniforms.lit_ownEnvironment.value as Vector2).toArray()).toEqual([1, 6]); expect(ownEnvironment(paint)).toBeNull();
   // Three faces a frame: three's prefilter rides with the last three, the paint's convolution takes the frame after.
   expect(reflection.update(centre)).toBe(true); expect(pmrem.conversions).toBe(1);
   expect(reflection.update(centre)).toBe(true); expect(pmrem.conversions).toBe(2); expect(pmrem.convolutions).toBe(0);
@@ -97,8 +109,8 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   expect(cars.visible).toBe(true); expect(target()).toBeNull();
   // Only after the sixth face: an incomplete cube would reflect black. The paint takes the convolved cubes, the other lit
   // materials three's prefiltered one, the unlit nothing.
-  expect(pmrem.conversions).toBe(2); expect(pmrem.convolutions).toBe(1); expect(glass.envMap).not.toBeNull(); expect(unlit.envMap).toBeNull();
-  expect(paint.envMap).toBeNull(); expect(paintUniforms().paint_probe.value).toBe(1); expect(paintUniforms().paint_levels.value).toBe(2);
+  expect(pmrem.conversions).toBe(2); expect(pmrem.convolutions).toBe(1); expect(ownEnvironment(glass)).not.toBeNull(); expect(unlit.envMap).toBeNull();
+  expect(ownEnvironment(paint)).toBeNull(); expect(paintUniforms().paint_probe.value).toBe(1); expect(paintUniforms().paint_levels.value).toBe(2);
   // The overhead map was drawn around the car with the cars left out, and the paint reads it with each face's eye.
   expect(overhead.updates[0]).toEqual({at: [10, 0.5, 20], cars: [cars], busy: false});
   expect(paintUniforms().overhead_ready.value).toBe(1); expect(paintUniforms().overhead_below.value).not.toBeNull();
@@ -129,7 +141,7 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   expect(eyes.slice(-6).map(eye => eye.x)).toEqual([12, 12, 12, 13, 13, 13]);
 
   reflection.dispose();
-  expect(glass.envMap).toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0); expect(pmrem.disposed).toBe(1);
+  expect(ownEnvironment(glass)).toBeNull(); expect(glass.uniforms.envMap).toBe(sceneEnvironmentMap); expect(paintUniforms().paint_probe.value).toBe(0); expect(pmrem.disposed).toBe(1);
   expect(paintUniforms().overhead_ready.value).toBe(0); expect(overhead.disposed).toBe(1);
   expect(lampUniforms().surface_reflection.value).toBe(venueCube); expect(lampUniforms().surface_reflectionReady.value).toBe(0);
   sceneryReflectionUniforms.surface_reflection.value = null;
@@ -138,7 +150,7 @@ it('renders the probe three faces a frame from the roof without the cars, then g
 it('leaves a due step to the next frame when the frame is busy, never two frames in a row, and never the first probe', () => {
   const {renderer, faces} = stubRenderer();
   const reflection = createCarReflection(renderer, new Scene(), testShading(), setFaces()), centre = new Vector3();
-  reflection.setCar(new Mesh(new BoxGeometry(), new MeshPhysicalMaterial()), new Group());
+  reflection.setCar(new Mesh(new BoxGeometry(), composedMaterial(litTemplate, [])), new Group());
   for (let i = 0; i < CAR_REFLECTION_STEPS; i++) reflection.update(centre, true);
   expect(faces).toHaveLength(6);
   // The map is told the frame is busy, and waits by its own rule (overheadMap.ts).
@@ -150,17 +162,32 @@ it('leaves a due step to the next frame when the frame is busy, never two frames
   reflection.dispose();
 });
 
+it('draws no further face once the frame is past its budget, one at least, a cube never running past its sixth face', () => {
+  const {renderer, faces, eyes} = stubRenderer();
+  const reflection = createCarReflection(renderer, new Scene(), testShading(), setFaces());
+  reflection.setCar(new Mesh(new BoxGeometry(), composedMaterial(litTemplate, [])), new Group());
+  for (let i = 0; i < CAR_REFLECTION_STEPS; i++) reflection.update(new Vector3());
+  faces.length = 0; eyes.length = 0;
+  const conversions = pmrem.conversions, now = performance.now();
+  // A moving car: two frames over budget (one face each), one with time to spare (three), then one with the last face left.
+  for (const [x, until] of [[1, now - 1], [2, now - 1], [3, Infinity], [4, Infinity]] as const) reflection.update(new Vector3(x, 0, 0), false, until);
+  expect(faces.map(f => f.face)).toEqual([0, 1, 2, 3, 4, 5]);
+  expect(eyes.map(eye => eye.x)).toEqual([1, 2, 3, 3, 3, 4]);
+  // The cube completed once: one prefilter.
+  expect(pmrem.conversions - conversions).toBe(1);
+  reflection.dispose();
+});
+
 it('gives a near car the probe: its glass and trim the prefiltered cube, its paint the probe cubes from the first one on', () => {
   const {renderer} = stubRenderer();
   const reflection = createCarReflection(renderer, new Scene(), testShading(), setFaces());
-  const own = new MeshPhysicalMaterial(), nearGlass = new MeshPhysicalMaterial(), nearPaint = new MeshPhysicalMaterial({map: new Texture()}), unlit = new MeshBasicMaterial();
-  configureCarPaint(nearPaint, carPaint(), () => new Texture(), testShading());
-  const probe = () => { const shader = {uniforms: {}, vertexShader: '', fragmentShader: ''}; nearPaint.onBeforeCompile(shader as never, null as never); return (shader.uniforms as Record<string, {value: unknown}>).paint_probe.value; };
+  const own = composedMaterial(litTemplate, []), nearGlass = composedMaterial(litTemplate, []), nearPaint = paintMaterial(), unlit = new MeshBasicMaterial();
+  const probe = () => nearPaint.uniforms.paint_probe.value as number;
   reflection.setCar(new Mesh(new BoxGeometry(), own), new Group());
   reflection.share(new Group().add(new Mesh(new BoxGeometry(), [nearGlass, nearPaint, unlit])));
   // The followed car's prefiltered probe: the same program as the followed car's glass.
-  expect(nearGlass.envMap).toBe(own.envMap); expect(nearGlass.envMap).not.toBeNull();
-  expect(nearPaint.envMap).toBeNull(); expect(unlit.envMap).toBeNull();
+  expect(ownEnvironment(nearGlass)).toBe(ownEnvironment(own)); expect(ownEnvironment(nearGlass)).not.toBeNull();
+  expect(ownEnvironment(nearPaint)).toBeNull(); expect(unlit.envMap).toBeNull();
   // The paint waits for the first complete probe, as the followed car's does.
   expect(probe()).toBe(0);
   for (let i = 0; i < CAR_REFLECTION_STEPS; i++) reflection.update(new Vector3());
@@ -172,30 +199,22 @@ it('gives a near car the probe: its glass and trim the prefiltered cube, its pai
 });
 
 it("corrects either of the car's surface reads for the scenery overhead, in a program of its own", () => {
-  const compile = (body: string, overhead = true) => {
-    const material = new MeshStandardMaterial();
-    material.onBeforeCompile = () => {}; material.customProgramCacheKey = () => 'standard_x';
-    bindCarSurfaceReflection(material, overhead);
-    const shader = {uniforms: {}, vertexShader: '', fragmentShader: `#include <lights_physical_pars_fragment>\n${body}`};
-    material.onBeforeCompile(shader as never, null as never);
-    return {fragment: shader.fragmentShader, key: material.customProgramCacheKey()};
-  };
+  const fragment = (reflects: boolean, overhead = true) => probeMaterial(reflects, overhead).fragmentShader;
   // The scenery rule's cube read (trim, lamps): corrected right after it.
-  const trim = compile(SCENERY_REFLECTION_GLSL);
-  expect(trim.fragment).toContain('vec4 overheadFix(vec3 r)');
-  expect(trim.fragment).toContain('light = carSurfaceReflection(light, r, roughness);');
-  expect(trim.fragment.indexOf('vec3 carSurfaceReflection')).toBeGreaterThan(trim.fragment.indexOf('uniform samplerCube surface_reflection'));
-  expect(trim.key).toBe('standard_x-car');
-  // three's environment read (glass, screens).
-  const glass = compile('vec3 iblRadiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );');
-  expect(glass.fragment).toContain('vec3 iblRadiance = carIBLRadiance( geometryViewDir, geometryNormal, material.roughness );');
-  expect(glass.fragment).not.toContain('carSurfaceReflection(light');
+  const trim = fragment(true);
+  expect(trim).toContain('vec4 overheadFix(vec3 r)');
+  expect(trim).toContain('light = carSurfaceReflection(light, r, roughness);');
+  expect(trim.indexOf('vec3 carSurfaceReflection')).toBeGreaterThan(trim.indexOf('uniform samplerCube surface_reflection'));
+  // three's environment read (glass, screens), corrected once read.
+  const glass = fragment(false);
+  expect(glass.indexOf('radiance = carOverheadRadiance( radiance, geometryViewDir, geometryNormal, material.roughness );')).toBeGreaterThan(glass.indexOf('radiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );'));
+  expect(glass).not.toContain('carSurfaceReflection(light');
   // A material at the texture unit limit reads its car's probe uncorrected, in a program of its own.
-  const cabin = compile(SCENERY_REFLECTION_GLSL, false);
-  expect(cabin.fragment).not.toContain('overheadFix');
-  expect(cabin.key).toBe('standard_x-car-plain');
+  const cabin = probeMaterial(true, false);
+  expect(cabin.fragmentShader).not.toContain('overheadFix');
+  expect(cabin.customProgramCacheKey()).not.toBe(probeMaterial(true).customProgramCacheKey());
+  expect(carSurfaceProbe(false, false).parts).toEqual([]);
 });
-
 it('leaves the scenery the game does not reflect out of its faces, three faces a frame, a conversion step riding with them', () => {
   const {renderer, faces} = stubRenderer();
   // A reflected part, a part left out, and one left out that another rule already hides.
@@ -203,7 +222,7 @@ it('leaves the scenery the game does not reflect out of its faces, three faces a
   const render = renderer.render.bind(renderer);
   renderer.render = (scene, camera) => { seen.push([reflected.visible, left.visible, hiddenAnyway.visible]); render(scene, camera); };
   const reflection = createCarReflection(renderer, new Scene(), testShading(), {notReflected: () => [left, hiddenAnyway], clipM: 150}), centre = new Vector3();
-  reflection.setCar(new Mesh(new BoxGeometry(), new MeshPhysicalMaterial()), new Group());
+  reflection.setCar(new Mesh(new BoxGeometry(), composedMaterial(litTemplate, [])), new Group());
   const conversions = pmrem.conversions, convolutions = pmrem.convolutions;
   // The first cube: three faces, then three more with the prefilter, then the convolution alone (the car has not moved).
   expect(reflection.update(centre)).toBe(true); expect(faces.map(f => f.face)).toEqual([0, 1, 2]);

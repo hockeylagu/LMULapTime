@@ -1,24 +1,31 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BatchedMesh, Box3, BoxGeometry, DataTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Sphere, SphereGeometry, Vector3, type BufferGeometry } from 'three';
+import { BatchedMesh, Box3, BoxGeometry, DataTexture, DoubleSide, Group, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial, Sphere, SphereGeometry, Vector3, type BufferGeometry, type Material } from 'three';
 import { layoutOf } from '../../../../../src/components/replay/view3d/batching/batchedParts.js';
 import { batchable, batchCars, SHADOW_ONLY_LAYER, UNSEEN_LAYER } from '../../../../../src/components/replay/view3d/cars/carBatching.js';
 import { buildCarParts, type CarParts } from '../../../../../src/components/replay/view3d/cars/carParts.js';
 import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
+import { composedMaterial, type ComposedParameters } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { litTemplate } from '../../../../../src/components/replay/view3d/shaders/litTemplate.js';
+import { plainSurfaceMaterial } from '../../../../../src/components/replay/view3d/shaders/plainSurface.js';
+import { unlitTemplate } from '../../../../../src/components/replay/view3d/shaders/unlitTemplate.js';
+
+/** A car material on the lit template. */
+const lit = (parameters: ComposedParameters = {}) => composedMaterial(litTemplate, [], parameters);
 
 /** What cars of one body share: the geometry and materials of its parts (the loader's shareMaterials). */
 function body() {
   return {
     solid: new BoxGeometry(1, 1, 1), plain: new BoxGeometry(1, 1, 1),
     // Car materials cast from both faces.
-    carbon: new MeshStandardMaterial({ shadowSide: DoubleSide }), rubber: new MeshStandardMaterial({ shadowSide: DoubleSide }),
-    glass: new MeshStandardMaterial({ transparent: true }), lamp: new MeshBasicMaterial(),
+    carbon: lit({ shadowSide: DoubleSide }), rubber: lit({ shadowSide: DoubleSide }),
+    glass: lit({ transparent: true }), lamp: new MeshBasicMaterial(),
   };
 }
 
 /** A car: a hull, a wing and a wheel rim (under spin_fl) in carbon, a tyre, glass and a lamp. */
 function car(shared: ReturnType<typeof body>) {
   const model = new Group(), spin = new Group();
-  const part = (name: string, geometry: BufferGeometry, material: MeshStandardMaterial | MeshBasicMaterial, x: number) => {
+  const part = (name: string, geometry: BufferGeometry, material: Material, x: number) => {
     const mesh = new Mesh(geometry, material); mesh.name = name; mesh.position.x = x; mesh.castShadow = true; mesh.receiveShadow = true;
     return mesh;
   };
@@ -38,17 +45,21 @@ const expectClose = (actual: Matrix4, expected: Matrix4) => actual.elements.forE
 describe('batchable and layoutOf', () => {
   it('accepts lit single-material meshes only, glass included', async () => {
     const geometry = new BoxGeometry(1, 1, 1);
-    expect(batchable(new Mesh(geometry, new MeshStandardMaterial()))).toBe(true);
-    expect(batchable(new Mesh(geometry, new MeshStandardMaterial({ transparent: true })))).toBe(true);
+    expect(batchable(new Mesh(geometry, lit()))).toBe(true);
+    expect(batchable(new Mesh(geometry, lit({ transparent: true })))).toBe(true);
     expect(batchable(new Mesh(geometry, new MeshBasicMaterial()))).toBe(false);
-    expect(batchable(new Mesh(geometry, [new MeshStandardMaterial()]))).toBe(false);
-    const hidden = new MeshStandardMaterial(); hidden.visible = false;
+    expect(batchable(new Mesh(geometry, [lit()]))).toBe(false);
+    // A plain surface (the rear-view glass) is on the lit template too; a built-in or unlit material is not.
+    expect(batchable(new Mesh(geometry, plainSurfaceMaterial({ colour: 0, roughness: 1, metalness: 0, environment: 0 })))).toBe(true);
+    expect(batchable(new Mesh(geometry, composedMaterial(unlitTemplate, [])))).toBe(false);
+    expect(batchable(new Mesh(geometry, new MeshStandardMaterial()))).toBe(false);
+    const hidden = lit(); hidden.visible = false;
     expect(batchable(new Mesh(geometry, hidden))).toBe(false);
   });
 
   it('leaves out a surface material with no room for the batch textures', () => {
     const geometry = new BoxGeometry(1, 1, 1);
-    const withUnits = (units: number) => { const made = new MeshStandardMaterial(); made.userData.surfaceTextureUnits = units; return made; };
+    const withUnits = (units: number) => { const made = lit(); made.userData.surfaceTextureUnits = units; return made; };
     expect(batchable(new Mesh(geometry, withUnits(14)))).toBe(true);
     expect(batchable(new Mesh(geometry, withUnits(15)))).toBe(false);
   });
@@ -176,7 +187,7 @@ describe('batchCars, several cars', () => {
   });
 
   it('draws a livery material from one batch carrying each instance\'s layer, even a lone part', async () => {
-    const shared = body(), a = car(shared), b = car(shared), paint = new MeshStandardMaterial();
+    const shared = body(), a = car(shared), b = car(shared), paint = lit();
     // The hulls share the body's livery material, each car its own layer; one hull casts, the other not (one batch all the same).
     a.hull.material = paint; a.hull.userData.liveryLayer = 3;
     b.hull.material = paint; b.hull.userData.liveryLayer = 1; b.hull.castShadow = false;
@@ -185,7 +196,7 @@ describe('batchCars, several cars', () => {
     const values = (paint.userData.carLiveryLayer as DataTexture).image.data as Float32Array;
     expect([values[instanceOf(a.table, a.hull)], values[instanceOf(b.table, b.hull)]]).toEqual([3, 1]);
     // Alone, a livery part still draws from its batch.
-    const lone = car(body()), solo = new MeshStandardMaterial();
+    const lone = car(body()), solo = lit();
     lone.hull.material = solo; lone.hull.userData.liveryLayer = 0;
     await batchCars([lone.table]);
     expect((solo.userData.carLiveryLayer as DataTexture).image.data).toEqual(new Float32Array([0]));

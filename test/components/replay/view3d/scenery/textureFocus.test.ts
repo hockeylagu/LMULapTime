@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Texture } from 'three';
-import { FOCUS_MS, focusing, focusOf, patchTextureFocus, startFocus } from '../../../../../src/components/replay/view3d/scenery/textureFocus.js';
+import { FOCUS_MS, focusedLookup, focusing, focusOf, startFocus, textureFocusPart } from '../../../../../src/components/replay/view3d/scenery/textureFocus.js';
 
 describe('texture focus', () => {
   it('holds a sharpened texture back by the levels it drew without, easing to none over the fade', () => {
@@ -17,34 +17,21 @@ describe('texture focus', () => {
     expect([focusOf(new Texture(), 1000), focusOf(null), focusOf(texture, 5000), focusing(5000)]).toEqual([0, 0, 0, false]);
   });
 
-  it("fades the program's lookups of the samplers named, read from the texture each holds at the draw", () => {
-    const texture = new Texture(), other = new Texture();
-    const shader = {
-      uniforms: {map: {value: texture}, surface_normal: {value: other}, cascade_atlas: {value: null}},
-      fragmentShader: '#include <common>\nvec3 n() { return texture2D(surface_normal, vUv).xyz; }\nvoid main() {\n  vec4 a = texture2D( map, vMapUv );\n  float s = texture2D(cascade_atlas, vUv).r;\n  vec4 b = texture2D(surface_missing, vUv);\n}',
-    };
-    patchTextureFocus(shader, ['map', 'surface_normal', 'surface_missing']);
-    const fragment = shader.fragmentShader;
-    expect(fragment).toContain('focusTexture(map, focus_map, vMapUv );');
-    expect(fragment).toContain('focusTexture(surface_normal, focus_surface_normal, vUv)');
-    // A sampler not named, or not a uniform of the program, is left alone.
-    expect(fragment).toContain('texture2D(cascade_atlas, vUv)');
-    expect(fragment).toContain('texture2D(surface_missing, vUv)');
-    // Declared with three's common declarations, ahead of the program's own functions.
-    expect(fragment.indexOf('uniform float focus_map;')).toBeGreaterThan(fragment.indexOf('#include <common>'));
-    expect(fragment.indexOf('vec4 focusTexture(')).toBeLessThan(fragment.indexOf('vec3 n()'));
-    const uniforms = shader.uniforms as Record<string, {value: unknown}>;
+  it("reads each sampler's focus from the texture it holds at the draw, at the frame's time", () => {
+    const texture = new Texture(), uniforms = textureFocusPart({map: {value: texture}, surface_normal: {value: new Texture()}}).uniforms?.() ?? {};
     expect(uniforms.focus_map.value).toBe(0);
-    // Read at the time of the frame being drawn (`focusing`).
     startFocus(texture, 2, 10_000);
     focusing(10_000);
     expect(uniforms.focus_map.value).toBeGreaterThan(1.9);
     expect(uniforms.focus_surface_normal.value).toBe(0);
-  });
+  });});
 
-  it('leaves a program reading none of the samplers as it is', () => {
-    const shader = {uniforms: {map: {value: null}}, fragmentShader: 'void main() {}'};
-    patchTextureFocus(shader, ['map']);
-    expect(shader).toEqual({uniforms: {map: {value: null}}, fragmentShader: 'void main() {}'});
-  });
+it("gives a composed program's lookups the same fade-in: the sampling function and each sampler's focus, read off its texture", () => {
+  const texture = new Texture(), sampler = {value: texture}, part = textureFocusPart({surface_b: {value: null}, surface_a: sampler});
+  expect(focusedLookup('surface_a', 'uv')).toBe('focusTexture(surface_a, focus_surface_a, uv)');
+  const glsl = part.slots.fragmentPars?.glsl ?? '';
+  expect(glsl.indexOf('uniform float focus_surface_a;')).toBeLessThan(glsl.indexOf('uniform float focus_surface_b;'));
+  expect(glsl).toContain('vec4 focusTexture(sampler2D map2D, float focus, vec2 uv)');
+  expect(part.slots.fragmentPars?.at).toBe(-100);
+  expect(part.uniforms?.().focus_surface_a.value).toBe(0);
 });

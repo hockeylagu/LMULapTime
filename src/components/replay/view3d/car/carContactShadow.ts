@@ -1,7 +1,8 @@
-import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, Vector3, type Object3D, type WebGLRenderTarget } from 'three';
-import { hazeProgram } from '../atmosphere/haze.js';
-import { sceneDayLight } from '../scene/dayLight.js';
-import { patchCascadeShadowLookup } from '../shadows/cascadeSampling.js';
+import { Box3, DataTexture, LinearFilter, Mesh, PlaneGeometry, RGBAFormat, Vector3, type IUniform, type Object3D, type ShaderMaterial, type Texture, type WebGLRenderTarget } from 'three';
+import { hazePart } from '../atmosphere/haze.js';
+import { cascadeLookupPart } from '../shadows/cascadeSampling.js';
+import { composedMaterial, type ShaderPart } from '../shaders/composer.js';
+import { unlitTemplate } from '../shaders/unlitTemplate.js';
 import { bakeArea, bakeParts, bakeUnderCar, underCarQuadGeometry, CONTACT_SHADOW_NAME, type BakePart, type BakeRenderer } from './underCarBake.js';
 
 /** How far the darkening spreads beyond the body, its strength under the body, and the lift that keeps it off the road. */
@@ -9,22 +10,70 @@ export const CONTACT_SHADOW_SPREAD_M = 0.5, CONTACT_SHADOW_LIFT_M = 0.02;
 const STRENGTH = 0.6, CORNER_M = 0.3, TEXELS_PER_M = 24;
 /** The share of its darkening the shade keeps where the sun reaches the road: the sky's share of the light, which the car still hides. */
 const SUN_LIT_SHARE = 0.25;
-const ALPHA_MAP = '#include <alphamap_fragment>';
 /**
  * How far toward the eye the shade draws, metres: the quad is flat and rides the body's roll and pitch, so on a cambered or bumpy road
  * most of it lay under the surface, and which part cleared it changed every frame (the shade popped). The car's body still hides it.
  */
 export const CONTACT_SHADOW_PULL_M = 0.15;
-const PROJECT_VERTEX = '#include <project_vertex>';
 /** Drawn after the road and before the racing line (renderOrder 2), which stays readable over it. */
 export const CONTACT_SHADOW_ORDER = 1;
+
+/**
+ * The shade's own part: black, its alpha from the shade map (the analytic quad's, then the body's bake), drawn pulled toward the eye.
+ * The shade under the car takes the sky's light: where the sun reaches the road (under an overhang, around the body) it keeps
+ * SUN_LIT_SHARE of its darkening. Without sun shadows (none, or past their fade), the shade grounds the car whole. The fade follows
+ * the day share (the scene block's `lit_dayLight`): at night the cascades follow the moon, whose light is nothing beside the track lights and the sky
+ * the car still hides, so the shade stays whole there instead of following the moon's shadow and the view.
+ */
+export const CONTACT_SHADOW_GLSL = {
+  vertexPars: '  varying vec2 vContactShadowUv;',
+  vertexView: `
+  mvPosition.xyz *= max( 0.0, 1.0 - ${CONTACT_SHADOW_PULL_M.toFixed(2)} / length( mvPosition.xyz ) );
+  gl_Position = projectionMatrix * mvPosition;`,
+  vertexOutputs: '  vContactShadowUv = uv;',
+  fragmentPars: '  uniform sampler2D contactShadow_map;\n  varying vec2 vContactShadowUv;',
+  fragmentColour: `
+  diffuseColor.rgb = vec3( 0.0 );
+  diffuseColor.a *= texture2D( contactShadow_map, vContactShadowUv ).g;
+  {
+    float sunLit = surfaceCascadeShadow( vCascadeViewDepth ) * lit_dayLight;
+    float beyond = surface_cascadeCount > 0.0
+      ? clamp( ( vCascadeViewDepth - surface_cascadeFade.x ) / ( surface_cascadeFade.y - surface_cascadeFade.x ), 0.0, 1.0 ) : 1.0;
+    diffuseColor.a *= mix( 1.0 - ${(1 - SUN_LIT_SHARE).toFixed(2)} * sunLit, 1.0, beyond );
+  }`,
+};
+
+/** Each shade's map uniform: the bake swaps the body's map in. */
+const shadeMaps = new WeakMap<ShaderMaterial, IUniform<Texture>>();
+
+/** The composed contact shadow material on `map`: its own part, the cascade lookup and the haze. */
+function contactShadowMaterial(map: Texture): ShaderMaterial {
+  const uniform: IUniform<Texture> = {value: map};
+  const shade: ShaderPart = {
+    name: 'contactShadow',
+    slots: {
+      vertexPars: {at: 10, glsl: CONTACT_SHADOW_GLSL.vertexPars},
+      vertexView: {at: 0, glsl: CONTACT_SHADOW_GLSL.vertexView},
+      vertexOutputs: {at: 10, glsl: CONTACT_SHADOW_GLSL.vertexOutputs},
+      fragmentPars: {at: 10, glsl: CONTACT_SHADOW_GLSL.fragmentPars},
+      fragmentColour: {at: 0, glsl: CONTACT_SHADOW_GLSL.fragmentColour},
+    },
+    uniforms: () => ({contactShadow_map: uniform}),
+    ownTextures: ['contactShadow_map'],
+    needs: [cascadeLookupPart],
+  };
+  const material = composedMaterial(unlitTemplate, [shade, cascadeLookupPart, hazePart], {transparent: true, depthWrite: false});
+  material.name = 'contact-shadow';
+  shadeMaps.set(material, uniform);
+  return material;
+}
 
 /**
  * The contact shadow of a footprint `halfX` × `halfZ` metres about its centre: a flat quad (normal up) whose alpha falls from
  * STRENGTH inside the body outline (a rounded rectangle) to nothing CONTACT_SHADOW_SPREAD_M beyond it. Its alpha map goes with
  * the material's disposal.
  */
-export function contactShadowQuad(halfX: number, halfZ: number): {geometry: PlaneGeometry; material: MeshBasicMaterial} {
+export function contactShadowQuad(halfX: number, halfZ: number): {geometry: PlaneGeometry; material: ShaderMaterial} {
   const sizeX = 2 * (halfX + CONTACT_SHADOW_SPREAD_M), sizeZ = 2 * (halfZ + CONTACT_SHADOW_SPREAD_M);
   const width = Math.max(8, Math.round(sizeX * TEXELS_PER_M)), height = Math.max(8, Math.round(sizeZ * TEXELS_PER_M));
   const data = new Uint8Array(width * height * 4);
@@ -39,34 +88,12 @@ export function contactShadowQuad(halfX: number, halfZ: number): {geometry: Plan
   }
   const alpha = new DataTexture(data, width, height, RGBAFormat);
   alpha.magFilter = LinearFilter; alpha.minFilter = LinearFilter; alpha.needsUpdate = true;
-  const material = new MeshBasicMaterial({color: 0x000000, alphaMap: alpha, transparent: true, depthWrite: false});
-  // The shade under the car takes the sky's light: where the sun reaches the road (under an overhang, around the body) it keeps
-  // SUN_LIT_SHARE of its darkening. Without sun shadows (none, or past their fade), the shade grounds the car whole, as before. The
-  // fade follows the day share (`sceneDayLight`): at night the cascades follow the moon, whose light is nothing beside the track
-  // lights and the sky the car still hides, so the shade stays whole there instead of following the moon's shadow and the view.
-  material.onBeforeCompile = shader => {
-    patchCascadeShadowLookup(shader);
-    if (!shader.fragmentShader.includes(ALPHA_MAP)) throw Error('The contact shadow program has no alpha map to fade in the sun');
-    if (!shader.vertexShader.includes(PROJECT_VERTEX)) throw Error('The contact shadow program has no projection to pull toward the eye');
-    shader.vertexShader = shader.vertexShader.replace(PROJECT_VERTEX, () => `${PROJECT_VERTEX}
-    mvPosition.xyz *= max( 0.0, 1.0 - ${CONTACT_SHADOW_PULL_M.toFixed(2)} / length( mvPosition.xyz ) );
-    gl_Position = projectionMatrix * mvPosition;`);
-    shader.uniforms.contactShadow_dayLight = sceneDayLight;
-    shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'uniform float contactShadow_dayLight;\nvoid main() {').replace(ALPHA_MAP, () => `${ALPHA_MAP}
-    {
-      float sunLit = surfaceCascadeShadow( vCascadeViewDepth ) * contactShadow_dayLight;
-      float beyond = surface_cascadeCount > 0
-        ? clamp( ( vCascadeViewDepth - surface_cascadeFade.x ) / ( surface_cascadeFade.y - surface_cascadeFade.x ), 0.0, 1.0 ) : 1.0;
-      diffuseColor.a *= mix( 1.0 - ${(1 - SUN_LIT_SHARE).toFixed(2)} * sunLit, 1.0, beyond );
-    }`);
-  };
-  material.customProgramCacheKey = () => 'lmu-contact-shadow';
-  hazeProgram(material);
+  const material = contactShadowMaterial(alpha);
   material.addEventListener('dispose', () => { alpha.dispose(); });
   return {geometry: new PlaneGeometry(sizeX, sizeZ).rotateX(-Math.PI / 2), material};
 }
 
-type ContactShadow = Mesh<PlaneGeometry, MeshBasicMaterial>;
+type ContactShadow = Mesh<PlaneGeometry, ShaderMaterial>;
 
 /**
  * The shadows of one body (they share one bake): its footprint and the parts the bake draws (until baked), the cars' shadows (waiting
@@ -90,10 +117,11 @@ export function createUnderCarBaker() {
   const noop = () => {};
   const dropParts = (body: BodyShade) => { for (const part of body.parts ?? []) part.geometry.dispose(); body.parts = null; };
   const swapIn = (body: BodyShade, shadow: ContactShadow) => {
-    const material = shadow.material, previous = material.alphaMap;
+    const map = shadeMaps.get(shadow.material)!, previous = map.value;
     shadow.geometry.dispose(); shadow.geometry = underCarQuadGeometry(bakeArea(body.bounds).size);
-    material.alphaMap = body.map!.texture; material.needsUpdate = true;
-    previous?.dispose();
+    // The same program: only the map uniform changes.
+    map.value = body.map!.texture;
+    previous.dispose();
   };
   /** Registers a car's shadow under its body `key`; `bounds` is the car's footprint in its own frame, `parts` what a bake draws of it. */
   const register = (key: string, shadow: ContactShadow, bounds: Box3, parts: () => BakePart[]) => {

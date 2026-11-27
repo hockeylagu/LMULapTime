@@ -1,39 +1,32 @@
 import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, LinearMipmapLinearFilter, MathUtils, Mesh, MeshBasicMaterial, NoToneMapping, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
-import { dayShare, sceneDayLight, sceneEmission } from './scene/dayLight.js';
+import { dayShare } from './scene/dayLight.js';
 import { nativeToScene } from './scene/replayPose.js';
 import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
 import { holdCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
 import { shadowCameraOf, shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';
 import type { CarCamera } from '../../../../shared/types/scenes/car.js';
-import type { SceneryDaylight, SceneryLayout } from '../../../../shared/types/scenes/scenery.js';
+import type { SceneryLayout } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
-import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze, type NightSky, type SkyConditions } from './atmosphere/skyDome.js';
+import { createSkyDomeMaterial, hazeColour, setSkyDome, hazeDensity, heightHaze, skyConditions, sunwardHaze, type NightSky, type SkyConditions } from './atmosphere/skyDome.js';
 import { createHaze } from './atmosphere/haze.js';
 import { cloudCoverage, cloudSheets, sunVisibility, type CloudEye, type CloudSheet } from './atmosphere/clouds.js';
 import { createCloudLayer } from './atmosphere/cloudLayer.js';
 import { GAME_LIGHT_UNIT, sunRadiance } from './atmosphere/sunSamples.js';
-import { crownSun } from './scenery/materials/foliageCrown.js';
-import { skyBodies } from './night/skyBodies.js';
 import { nightMoment, nightPlace, type NightMoment } from './night/nightMoment.js';
 import { convolveReflection, type ReflectionCubes } from './reflectionCube.js';
 import { integrationTexture, setSceneryReflection } from './scenery/materials/sceneryReflection.js';
-
-/** The sun direction without a layout's daylight: midday, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js). */
-const DAYLIGHT = Object.freeze({elevationDeg: 55, azimuthDeg: 45});
+import { setPass, setScene } from './shaders/sceneBlock.js';
+import { ENVIRONMENT_FACE_PX, sceneEnvironmentMap, sceneLight } from './shaders/sceneLight.js';
 
 const SKY_RADIUS_M = 12000, ENVIRONMENT_GROUND_Y = -0.5;
 /** Mean reflectance of the ground around a circuit (grass, asphalt, concrete) for the bounce light of the first environment. */
 const GROUND_ALBEDO = 0.2;
-/** The venue capture: cube face size (the size of the venue cubes in the reference frame captures; no game file sets it) and how far it sees. */
-export const VENUE_PROBE_PX = 128;
+/**
+ * How far the venue capture sees. Its cube face size, ENVIRONMENT_FACE_PX, is the size of the venue cubes in the reference frame
+ * captures (no game file sets it); the first environment takes it too.
+ */
 const VENUE_PROBE_FAR_M = 3000;
-const sunToward = (elevationDeg: number) => {
-  const a = MathUtils.degToRad(DAYLIGHT.azimuthDeg), e = MathUtils.degToRad(elevationDeg);
-  return new Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));
-};
-/** Unit vector toward the sun in scene space, without a layout's daylight. */
-export const SUN_DIRECTION = sunToward(DAYLIGHT.elevationDeg);
-/** Without the night model (no replay clock): a sun below the horizon lights the scene from the horizon. */
+/** Without a replay clock: a published sun below the horizon lights the scene from the horizon. */
 const MIN_SUN_ELEVATION_DEG = 0;
 
 export interface SceneLighting {
@@ -45,9 +38,6 @@ export interface SceneLighting {
   night: NightMoment | null;
 }
 
-/** What the night model needs from the layout: the package's night model and the layout's night scenes. */
-export type SceneNight = Pick<SceneryLayout, 'sky' | 'night' | 'shading'>;
-
 /** A direction toward a sky position (bearing clockwise from north), in scene space. */
 function skyDirection({elevationDeg, bearingDeg}: {elevationDeg: number; bearingDeg: number}): Vector3 {
   const bearing = MathUtils.degToRad(bearingDeg), elevation = MathUtils.degToRad(elevationDeg), horizontal = Math.cos(elevation);
@@ -56,30 +46,23 @@ function skyDirection({elevationDeg, bearingDeg}: {elevationDeg: number; bearing
 
 /**
  * The replay's clock sets the sun: its session start (the track's default time for the session when the replay does not carry
- * one) plus the lap's session time, placed as the game's sky middleware places it (night/skyBodies.ts). With the night model, at the
- * replay's night scene (its place and date, nightMoment.ts) with the moon, unclamped; without it, at the layout's daylight place and
- * held at the horizon. Without a clock, the race session's published sun; packages without a bearing use the default scene azimuth.
- * Without daylight, the default midday.
+ * one) plus the lap's session time, placed as the game's sky middleware places it (night/skyBodies.ts) at the replay's night scene
+ * (its place and date, nightMoment.ts) with the moon, unclamped. Without a clock, the race session's published sun, held at the horizon.
  */
-export function sceneLighting(daylight?: SceneryDaylight, clock?: ReplayDaylightClock, night?: SceneNight): SceneLighting {
-  const day = (direction: Vector3): SceneLighting => ({sunDirection: direction, lightDirection: direction.clone(), night: null});
-  if (!daylight) return day(SUN_DIRECTION.clone());
-  const id = clock?.session ?? 'race', session = daylight.sessions.find(entry => entry.id === id);
+export function sceneLighting(venue: Pick<SceneVenue, 'daylight' | 'sky' | 'night' | 'shading'>, clock?: ReplayDaylightClock): SceneLighting {
+  const {daylight} = venue, id = clock?.session ?? 'race', session = daylight.sessions.find(entry => entry.id === id);
   if (!session) throw Error(`Layout daylight has no ${id} session`);
-  let sun: {elevationDeg: number; bearingDeg?: number} = {elevationDeg: session.sunElevationDeg, bearingDeg: session.sunBearingDeg};
   if (clock) {
     const [hours, minutes] = session.localTime.split(':').map(Number);
     const localSeconds = (clock.startMinute ?? hours * 60 + minutes) * 60 + clock.sessionTimeSec;
-    if (night) {
-      const moment = nightMoment(night.sky.night, night.sky.hosek.xyzToRgb, nightPlace(night.night, daylight, clock.scene), localSeconds, night.shading.ambient.nightLevel);
-      const sunDirection = skyDirection(moment.bodies.sun), {moon} = moment.bodies;
-      const lightDirection = moment.sunShare > 0 ? sunDirection.clone() : skyDirection(moon);
-      return {sunDirection, lightDirection, night: moment};
-    }
-    sun = skyBodies(daylight, daylight.date, localSeconds).sun;
+    const moment = nightMoment(venue.sky.night, venue.sky.hosek.xyzToRgb, nightPlace(venue.night, daylight, clock.scene), localSeconds, venue.shading.ambient.nightLevel);
+    const sunDirection = skyDirection(moment.bodies.sun), {moon} = moment.bodies;
+    const lightDirection = moment.sunShare > 0 ? sunDirection.clone() : skyDirection(moon);
+    return {sunDirection, lightDirection, night: moment};
   }
-  const elevationDeg = Math.max(MIN_SUN_ELEVATION_DEG, sun.elevationDeg);
-  return day(sun.bearingDeg === undefined ? sunToward(elevationDeg) : skyDirection({elevationDeg, bearingDeg: sun.bearingDeg}));
+  if (session.sunBearingDeg === undefined) throw Error(`Layout daylight's ${id} session has no sun bearing`);
+  const direction = skyDirection({elevationDeg: Math.max(MIN_SUN_ELEVATION_DEG, session.sunElevationDeg), bearingDeg: session.sunBearingDeg});
+  return {sunDirection: direction, lightDirection: direction.clone(), night: null};
 }
 export interface SceneEnvironment {
   /** The camera the shadow cascades follow and whose view direction turns the haze toward its horizon colour. */
@@ -106,7 +89,7 @@ export interface SceneEnvironment {
    * through the clouds; the shadows, the clouds and the environment captures stay. Not during a render.
    */
   setSunVisibility(sun: SceneSun): void;
-  /** Writes this scene's haze terms into the uniforms hazed materials read; each of the scene's renders does it too. */
+  /** Writes this scene's haze into the scene block hazed materials read (haze.ts); each of the scene's renders does it too. */
   applyHaze(): void;
   /**
    * Before a frame renders: colours the haze toward the view and draws the shadow cascades that are due, the cars into the far ones
@@ -158,7 +141,7 @@ export interface SceneSun {
  * cloud cover sets the weather and dims the sun. `originY` is the scene origin's height in LMU local metres.
  */
 export function sceneSun(venue: Pick<SceneVenue, 'daylight' | 'sky' | 'shading' | 'night'>, originY: number, clock?: ReplayDaylightClock, eye?: CloudEye): SceneSun {
-  const lighting = sceneLighting(venue.daylight, clock, venue), sunElevationDeg = MathUtils.radToDeg(Math.asin(MathUtils.clamp(lighting.sunDirection.y, -1, 1)));
+  const lighting = sceneLighting(venue, clock),sunElevationDeg = MathUtils.radToDeg(Math.asin(MathUtils.clamp(lighting.sunDirection.y, -1, 1)));
   const clouds = sceneClouds(venue, lighting, originY, clock, eye), weather = skyConditions(venue.daylight, clouds.cloudCover, clouds.sunVisibility);
   const {night} = lighting;
   const radiance = !night ? sunRadiance(venue.sky.sun, sunElevationDeg, weather.cloudCover)
@@ -188,7 +171,7 @@ function nightFog(haze: ReturnType<typeof hazeColour>, night: NightMoment | null
  * origin in LMU local metres.
  */
 export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, shadowSet: ShadowCascadeSet,
-  ownShadow: CarCamera['shadow'], initial: SceneSun = sceneSun(venue, origin.y)): SceneEnvironment {
+  ownShadow: CarCamera['shadow'], initial: SceneSun): SceneEnvironment {
   const sky = new Mesh(new BoxGeometry(1, 1, 1), createSkyDomeMaterial(initial.lighting.sunDirection, venue.sky, venue.daylight, initial.weather, nightSky(venue, initial)));
   sky.scale.setScalar(SKY_RADIUS_M);
   sky.name = 'sky'; sky.frustumCulled = false;
@@ -221,9 +204,9 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     const {shadows} = venue.shading, layout = shadowCascadeLayout(shadows, shadowCameraOf(shadows.cameras[set], own));
     const pass = createCascadeShadows(renderer, scene, shadows, layout, toLight.clone().negate());
     holdCascadeShadows(pass.state.atlas);
-    return {set, own, layout, pass, sampled: false};
+    return {set, own, layout, pass};
   };
-  let cascades: {set: ShadowCascadeSet; own: CarCamera['shadow']; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} =
+  let cascades: {set: ShadowCascadeSet; own: CarCamera['shadow']; layout: ShadowCascadeLayout; pass: CascadeShadows} =
     startCascades(shadowSet, ownShadow), lit = false;
   scene.add(sky);
   /** The haze colour toward a view heading (and the sky's, just above the horizon), and the haze terms hazed materials read. */
@@ -240,12 +223,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     const turned = !toLight.equals(heading.copy(lighting.lightDirection).normalize());
     toLight.copy(lighting.lightDirection).normalize();
     const {night} = lighting, darkSky = nightSky(venue, {lighting});
-    if (lit) {
-      // The same program: only its uniforms change.
-      const previous = sky.material;
-      sky.material = environmentSky.material = createSkyDomeMaterial(lighting.sunDirection, venue.sky, venue.daylight, weather, darkSky);
-      previous.dispose();
-    }
+    // One material (the environment's sky shares it): a new one would link its program again.
+    if (lit) setSkyDome(sky.material, lighting.sunDirection, venue.sky, venue.daylight, weather, darkSky);
     // The haze takes its colour from the sky just above the horizon toward the view (update); the sun's light, the height term and
     // the distance shape are in the hazed materials' programs (haze.ts).
     haze = nightFog(hazeColour(venue.sky, lighting.sunDirection, weather, darkSky), night);
@@ -253,15 +232,15 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     fog.density = hazeDensity(venue.sky, venue.daylight, weather, sunElevationDeg);
     // The haze's glow toward the sun goes with the sun's direct light: none by the moon.
     applyHaze = createHaze({originY: origin.y, height: heightHaze(venue.sky, venue.daylight, weather), sunDirection: lighting.sunDirection.clone().normalize(),
-      sunRadiance: night && night.sunShare === 0 ? new Color(0, 0, 0) : sunRgb.clone(), sunward: sunwardHaze(venue.sky, weather)});
+      sunRadiance: night && night.sunShare === 0 ? new Color(0, 0, 0) : sunRgb.clone(), sunward: sunwardHaze(venue.sky, weather)}, fog);
     applyHaze();
     // Ground radiance is a lambertian ground of GROUND_ALBEDO under the sun: albedo · sun · sin(elevation) / π.
     reflectedGround.material.color.copy(sunRgb).multiplyScalar(GROUND_ALBEDO * Math.max(0, toLight.y) / Math.PI);
     sun.color.copy(sunRgb); sun.position.copy(toLight);
     // The game's day share is the ambient's (nightMoment.ts); the package's fit from the sun's green holds it at day where the twilight
     // table ends.
-    sceneDayLight.value = Math.max(dayShare(venue.shading.ambient, night && night.sunShare === 0 ? 0 : radiance.g), night?.dayShare ?? 0);
-    crownSun.value.copy(toLight); // Foliage cards tilt their lighting normal up less as they come to face the sun.
+    setScene('lit_dayLight', Math.max(dayShare(venue.shading.ambient, night && night.sunShare === 0 ? 0 : radiance.g), night?.dayShare ?? 0));
+    setScene('surface_crownSun', toLight.toArray()); // Foliage cards tilt their lighting normal up less as they come to face the sun.
     if (lit && turned) cascades.pass.setLight(toLight.clone().negate());
     // The clouds are lit by the sun before they dim it, as it stood when they were made: made again when it moves (the daylight
     // switched back to night kept day-lit clouds). The first environment and the venue capture are taken without them.
@@ -273,19 +252,21 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     }
     if (!venueProbe && environments) {
       firstEnvironment?.dispose();
-      firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: VENUE_PROBE_PX});
+      firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: ENVIRONMENT_FACE_PX});
       scene.environment = firstEnvironment.texture;
     }
     lit = true;
   };
   light(initial);
-  // Hazed materials read the terms of the scene that rendered last: each scene writes its own before it renders.
-  scene.onBeforeRender = () => applyHaze();
+  // The composed programs read the haze and the light of the scene that rendered last (the scene and pass blocks): each scene writes
+  // its own before it renders (the environment at zero intensity included, while the venue's first capture is taken).
+  const applyLight = sceneLight(scene, sun);
+  scene.onBeforeRender = () => { applyHaze(); applyLight(); };
   const [probeX, probeY, probeZ] = venue.environmentProbe.position;
   const probeAt = new Vector3(...nativeToScene({x: probeX, y: probeY, z: probeZ}, origin));
   const captureVenue = () => {
     // The cube keeps its mips: the reflection convolution reads them.
-    const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
+    const cube = new WebGLCubeRenderTarget(ENVIRONMENT_FACE_PX, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
     if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
     camera.position.copy(probeAt); camera.updateMatrixWorld();
     // The scene's world matrices update once per frame, not per render (sceneShell), and the capture may come before the first
@@ -296,10 +277,9 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       dynamic.forEach(object => { object.visible = false; });
       if (cloudLayer) cloudLayer.group.visible = false;
       // The game's probe is an unlit G-buffer relit by the sun or the moon and its own bounce: no glow, no lamps (dayLight.ts).
-      sceneEmission.value = 0;
-      // The first capture is lit by the sun alone; the second adds the light of the first. The environment stays set at zero
-      // intensity, and the first environment has the probe's size: an unset or differently sized one is another program variant
-      // of every material, compiled on the main thread here instead of by the warm-up.
+      setPass({surface_emission: 0});
+      // The first capture is lit by the sun alone; the second adds the light of the first. The environment stays set, at zero
+      // intensity (a pass value of the composed programs, sceneLight.ts).
       scene.environmentIntensity = 0;
       // Nor the scenery's reflection of the last capture, as on a first load: a capture at night kept the day's light in it.
       setSceneryReflection(venue.shading, null, integration);
@@ -314,7 +294,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     } finally {
       dynamic.forEach((object, i) => { object.visible = shown[i]; });
       if (cloudLayer) cloudLayer.group.visible = true;
-      sceneEmission.value = 1;
+      setPass({surface_emission: 1});
       if (venueCube !== cube) cube.dispose();
     }
   };
@@ -339,13 +319,15 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       cloudLayer?.order(view.getWorldPosition(heading));
       view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze());
       const set = cascades, drawing = set.pass.update(view, dynamic, casters);
-      if (!set.sampled) { sampleCascadeShadows(venue.shading.shadows, set.layout, set.pass.state); set.sampled = true; }
+      // The surfaces read the cascades as this update left them (into the scene block).
+      sampleCascadeShadows(venue.shading.shadows, set.layout, set.pass.state);
       return drawing;
     },
     dispose() {
       holdCascadeShadows(null); cascades.pass.dispose();
       scene.remove(sun, sun.target); sun.dispose();
-      scene.environment = null; generator.dispose(); firstEnvironment?.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
+      // The composed programs' environment too: the next shell's warm-up would bind the disposed one.
+      scene.environment = null; sceneEnvironmentMap.value = null; generator.dispose(); firstEnvironment?.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
       setSceneryReflection(venue.shading, null, integration); integration.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
       sky.geometry.dispose(); sky.material.dispose();
       if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }

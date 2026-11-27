@@ -1,7 +1,8 @@
-import { Vector3, type WebGLProgramParametersWithUniforms } from 'three';
+import { Vector3, type IUniform } from 'three';
 import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
-import { sceneDayLight, sceneEmission } from '../scene/dayLight.js';
+import { glslNumber } from '../scenery/materials/shaderContext.js';
+import type { ShaderPart } from '../shaders/composer.js';
 
 /** A lit race number: its glow colour (colour² · strength / π, the package's light unit), where it glows, and whether by night only. */
 export interface NumberPlateGlow { colour: Vector3; switchU: number; nightOnly: boolean }
@@ -24,17 +25,21 @@ export function numberPlateGlow(surface: CarSurface | undefined): NumberPlateGlo
 }
 
 /**
- * Adds the plate's glow to three's emission, over its albedo: in the scene's light unit, not while the venue is captured
- * (`sceneEmission` 0), and for a night-only plate only while the day share is under full day (as the surface program gates it).
+ * The plate's glow on the car's emission (a part of its standard family, carStandardSurface.ts), over its albedo: in the scene's
+ * light unit, not while the venue is captured (the pass block's `surface_emission` 0), and for a night-only plate only while the day
+ * share (`lit_dayLight`) is under full day (as the surface program gates it). With its albedo map (`mapped`, `vCarMapUv`) only past `switchU` along the map's U.
  */
-export function patchNumberPlateGlow(shader: WebGLProgramParametersWithUniforms, glow: NumberPlateGlow): void {
-  shader.uniforms.plate_colour = {value: glow.colour};
-  shader.uniforms.plate_switchU = {value: glow.switchU};
-  shader.uniforms.plate_scale = {get value() { return glow.nightOnly && sceneDayLight.value >= 1 ? 0 : GAME_LIGHT_UNIT * sceneEmission.value; }};
-  shader.fragmentShader = `uniform vec3 plate_colour;\nuniform float plate_switchU, plate_scale;\n${shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-#ifdef USE_MAP
-totalEmissiveRadiance += plate_colour * step(plate_switchU, vMapUv.x) * diffuseColor.rgb * plate_scale;
-#else
-totalEmissiveRadiance += plate_colour * diffuseColor.rgb * plate_scale;
-#endif`)}`;
+export function numberPlateGlowPart(glow: NumberPlateGlow, mapped: boolean): ShaderPart {
+  const uniforms: Record<string, IUniform> = {
+    plate_colour: {value: glow.colour}, plate_switchU: {value: glow.switchU}, plate_nightOnly: {value: glow.nightOnly ? 1 : 0},
+  };
+  return {
+    name: 'numberPlateGlow',
+    slots: {
+      fragmentPars: {at: 40, glsl: 'uniform vec3 plate_colour;\nuniform float plate_switchU, plate_nightOnly;'},
+      fragmentEmission: {at: 10, glsl: `  totalEmissiveRadiance += plate_colour${mapped ? ' * step( plate_switchU, vCarMapUv.x )' : ''} * diffuseColor.rgb
+    * ( plate_nightOnly > 0.5 && lit_dayLight >= 1.0 ? 0.0 : ${glslNumber(GAME_LIGHT_UNIT)} * surface_emission );`},
+    },
+    uniforms: () => uniforms,
+  };
 }

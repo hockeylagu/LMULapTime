@@ -1,11 +1,13 @@
-import { ShaderChunk, Vector3, type Color, type IUniform, type Material, type Object3D, type Scene, type WebGLProgramParametersWithUniforms } from 'three';
+import { type Color, type FogExp2, type IUniform, type Material, type Object3D, type Scene, type ShaderMaterial, type Vector3 } from 'three';
+import { composedParts, type ShaderPart } from '../shaders/composer.js';
+import { SCENE_BLOCK, sceneBlock, setScene } from '../shaders/sceneBlock.js';
 import type { HeightHaze } from './skyDome.js';
 
 /**
- * The replay's haze, in the programs of the materials that call `hazeProgram`: the fog density and colour stay three's `FogExp2`
- * uniforms, and the layout's terms are uniforms shared by every hazed material, which a scene writes (`createHaze`'s apply) before
- * each of its renders. One program serves every scene; a scene's materials draw with its own haze. three's own fog chunks are
- * left alone: a fog-enabled material that skips `hazeProgram` is found by `assertHazed`.
+ * The replay's haze, in the programs of the materials that compose `hazePart`: the scene's `FogExp2` holds its colour and density,
+ * and the scene writes them with the layout's terms into the scene block (`createHaze`'s apply, sceneBlock.ts) before each of its
+ * renders. One program serves every scene; a scene's materials draw with its own haze. three's own fog is off in every composed
+ * material; a fog-enabled material would draw three's plain fog beside the haze: `assertHazed` finds it.
  *
  * - Distance: 1 − exp(−density·d), linear in the exponent (not three's squared exponential), d the distance from the eye along
  *   the ray (three's view depth under-hazed the frame's edges, by a tenth at 48° of view and more in wide trackside views).
@@ -24,92 +26,66 @@ export interface HazeShape {
   sunward: number;
 }
 
-/** The haze terms of the scene that rendered last, read by every hazed program (names as in the GLSL). */
-const uniforms = {
-  HAZE_ORIGIN_Y: {value: 0}, HAZE_HEIGHT_AMOUNT: {value: 0}, HAZE_HEIGHT_RATE: {value: 0}, HAZE_HEIGHT_EXPONENT: {value: 1},
-  HAZE_SUN_DIRECTION: {value: new Vector3()}, HAZE_SUN_RADIANCE: {value: new Vector3()}, HAZE_SUNWARD: {value: 0},
-} satisfies Record<string, IUniform>;
-
-const EXPECTED = {vertex: 'vFogDepth = - mvPosition.z;', fragment: 'gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );'};
-if (!ShaderChunk.fog_vertex.includes(EXPECTED.vertex) || !ShaderChunk.fog_fragment.includes(EXPECTED.fragment)) throw Error('three.js fog chunks changed: the replay haze needs updating');
-
-const VERTEX_PARS = '#ifdef USE_FOG\n  varying float vFogDepth;\n  varying vec3 vFogWorld;\n#endif\n';
+const VERTEX_PARS = '  varying float vHazeDepth;\n  varying vec3 vHazeWorld;\n';
 // World position from the view-space one: the view matrix's rotation is orthonormal, so its transpose undoes it.
-const VERTEX = '#ifdef USE_FOG\n  vFogDepth = length( mvPosition.xyz );\n  vFogWorld = transpose( mat3( viewMatrix ) ) * ( mvPosition.xyz - viewMatrix[ 3 ].xyz );\n#endif\n';
-const FRAGMENT_PARS = `${ShaderChunk.fog_pars_fragment}
-#ifdef USE_FOG
-  varying vec3 vFogWorld;
-  uniform float HAZE_ORIGIN_Y;
-  uniform float HAZE_HEIGHT_AMOUNT, HAZE_HEIGHT_RATE, HAZE_HEIGHT_EXPONENT;
-  uniform vec3 HAZE_SUN_DIRECTION, HAZE_SUN_RADIANCE;
-  uniform float HAZE_SUNWARD;
-#endif
-`;
-/** The fragment's haze; `distance` is the GLSL of the distance term. */
-const fragment = (distance: string) => `#ifdef USE_FOG
-  float fogFactor = 1.0 - exp( - ${distance} );
-  fogFactor *= 1.0 - HAZE_HEIGHT_AMOUNT * pow( clamp( ( vFogWorld.y + HAZE_ORIGIN_Y ) * HAZE_HEIGHT_RATE, 0.0, 1.0 ), HAZE_HEIGHT_EXPONENT );
-  float hazeSun = clamp( dot( HAZE_SUN_DIRECTION, normalize( vFogWorld - cameraPosition ) ), 0.0, 1.0 );
-  vec3 hazeColour = mix( fogColor, HAZE_SUN_RADIANCE, hazeSun * hazeSun * HAZE_SUNWARD );
-  gl_FragColor.rgb = mix( gl_FragColor.rgb, hazeColour, fogFactor );
-#endif
+const VERTEX = '  vHazeDepth = length( mvPosition.xyz );\n  vHazeWorld = transpose( mat3( viewMatrix ) ) * ( mvPosition.xyz - viewMatrix[ 3 ].xyz );\n';
+/** The fragment's haze (the scene block's terms), its distance in the exponent scaled by the material's `HAZE_DISTANCE_SCALE`. */
+const FRAGMENT_PARS = '  varying float vHazeDepth;\n  varying vec3 vHazeWorld;\n  uniform float HAZE_DISTANCE_SCALE;\n';
+const FRAGMENT = `  {
+    float hazeFactor = 1.0 - exp( - HAZE_DISTANCE_SCALE * haze_density * vHazeDepth );
+    hazeFactor *= 1.0 - HAZE_HEIGHT_AMOUNT * pow( clamp( ( vHazeWorld.y + HAZE_ORIGIN_Y ) * HAZE_HEIGHT_RATE, 0.0, 1.0 ), HAZE_HEIGHT_EXPONENT );
+    float hazeSun = clamp( dot( HAZE_SUN_DIRECTION, normalize( vHazeWorld - cameraPosition ) ), 0.0, 1.0 );
+    vec3 hazeColour = mix( haze_colour, HAZE_SUN_RADIANCE, hazeSun * hazeSun * HAZE_SUNWARD );
+    gl_FragColor.rgb = mix( gl_FragColor.rgb, hazeColour, hazeFactor );
+  }
 `;
 
-/** The haze of one scene: the returned apply writes its terms into the shared uniforms; hazed materials drawn afterwards use them. */
-export function createHaze(shape: HazeShape): () => void {
+/**
+ * The haze of one scene: the returned apply writes `fog`'s colour and density as they are then, and the shape's terms, into the scene
+ * block; hazed materials drawn afterwards use them.
+ */
+export function createHaze(shape: HazeShape, fog: FogExp2): () => void {
   const {originY, height, sunDirection, sunRadiance, sunward} = shape;
-  const sun = sunDirection.clone(), light = new Vector3(sunRadiance.r, sunRadiance.g, sunRadiance.b);
-  for (const value of [originY, height.amount, height.rate, height.exponent, sunward, ...sun.toArray(), ...light.toArray()]) {
+  const sun = sunDirection.toArray(), light = [sunRadiance.r, sunRadiance.g, sunRadiance.b];
+  for (const value of [originY, height.amount, height.rate, height.exponent, sunward, ...sun, ...light]) {
     if (!Number.isFinite(value)) throw Error(`Haze value is not finite: ${value}`);
   }
   return () => {
-    uniforms.HAZE_ORIGIN_Y.value = originY;
-    uniforms.HAZE_HEIGHT_AMOUNT.value = height.amount; uniforms.HAZE_HEIGHT_RATE.value = height.rate; uniforms.HAZE_HEIGHT_EXPONENT.value = height.exponent;
-    uniforms.HAZE_SUN_DIRECTION.value.copy(sun); uniforms.HAZE_SUN_RADIANCE.value.copy(light); uniforms.HAZE_SUNWARD.value = sunward;
+    fog.color.toArray(sceneBlock, SCENE_BLOCK.offsets.haze_colour); setScene('haze_density', fog.density);
+    setScene('HAZE_ORIGIN_Y', originY);
+    setScene('HAZE_HEIGHT_AMOUNT', height.amount); setScene('HAZE_HEIGHT_RATE', height.rate); setScene('HAZE_HEIGHT_EXPONENT', height.exponent);
+    setScene('HAZE_SUN_DIRECTION', sun); setScene('HAZE_SUN_RADIANCE', light); setScene('HAZE_SUNWARD', sunward);
   };
 }
 
-/** The distance scale of each hazed material (1 for the scene's haze as it is). */
-const hazed = new WeakMap<Material, number>();
-
-/** Whether `material` draws the replay's haze. */
-export const isHazed = (material: Material): boolean => hazed.has(material);
-
 /**
- * Makes `material` draw the scene's haze where three's fog would go (a fog-enabled material of a scene with `scene.fog`): call it
- * from the factory that builds the material, after its own `onBeforeCompile` and `customProgramCacheKey` are set; it chains with
- * both. `distanceScale` multiplies the exponent's distance (a cloud takes half). Calling it again with the same scale does nothing.
+ * The haze as a part of a composed program: its varyings once the position is final, the haze on the encoded colour, from the
+ * scene block's terms. Its distance in the exponent is scaled by the material's `HAZE_DISTANCE_SCALE` (1, the scene's haze as it is;
+ * `setHazeDistanceScale`). Last in its slots. The block holds the haze of the scene that wrote it last: a scene that draws hazed
+ * materials writes its own (`createHaze`'s apply) before each of its renders, or it draws with another scene's haze.
  */
-export function hazeProgram(material: Material, distanceScale = 1): void {
-  const done = hazed.get(material);
-  if (done !== undefined) {
-    if (done !== distanceScale) throw Error(`Material ${material.name || material.type} is hazed with distance scale ${done}, not ${distanceScale}`);
-    return;
-  }
-  hazed.set(material, distanceScale);
-  const own = material.onBeforeCompile.bind(material);
-  // three's default key is the compile hook's source: read it before this hook replaces it.
-  const ownText = material.onBeforeCompile.toString();
-  const key = Object.hasOwn(material, 'customProgramCacheKey') ? material.customProgramCacheKey.bind(material) : () => ownText;
-  if (!Number.isFinite(distanceScale) || distanceScale <= 0) throw Error(`Haze distance scale is not positive: ${distanceScale}`);
-  const literal = String(distanceScale), distance = distanceScale === 1 ? 'fogDensity * vFogDepth' : `${/[.e]/.test(literal) ? literal : literal + '.0'} * fogDensity * vFogDepth`;
-  const swap = (source: string, include: string, code: string) => {
-    if (!source.includes(include)) throw Error(`Material ${material.name || material.type} has no ${include} to take the haze`);
-    return source.replace(include, () => code);
-  };
-  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms, renderer) => {
-    own(shader, renderer);
-    Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = swap(swap(shader.vertexShader, '#include <fog_pars_vertex>', VERTEX_PARS), '#include <fog_vertex>', VERTEX);
-    shader.fragmentShader = swap(swap(shader.fragmentShader, '#include <fog_pars_fragment>', FRAGMENT_PARS), '#include <fog_fragment>', fragment(distance));
-  };
-  material.customProgramCacheKey = () => `${key()}|haze${distanceScale}`;
-  material.needsUpdate = true;
+export const hazePart: ShaderPart = {
+  name: 'haze',
+  slots: {
+    vertexPars: {at: 100, glsl: VERTEX_PARS},
+    vertexOutputs: {at: 100, glsl: VERTEX},
+    fragmentPars: {at: 100, glsl: FRAGMENT_PARS},
+    fragmentOutput: {at: 100, glsl: FRAGMENT},
+  },
+  uniforms: () => ({HAZE_DISTANCE_SCALE: {value: 1}}),
+};
+
+/** Scales the haze's distance in the exponent of a composed material with `hazePart` (a cloud takes half). */
+export function setHazeDistanceScale(material: ShaderMaterial, scale: number): void {
+  if (!composedParts(material)?.includes(hazePart)) throw Error(`Material ${material.name || material.type} has no haze part`);
+  if (!Number.isFinite(scale) || scale <= 0) throw Error(`Haze distance scale is not positive: ${scale}`);
+  (material.uniforms.HAZE_DISTANCE_SCALE as IUniform<number>).value = scale;
 }
 
 /**
- * Throws when a visible object of a scene with fog draws a fog-enabled material that skipped `hazeProgram`: it would draw three's
- * plain fog beside the replay's haze. Call it once the scene's content is built.
+ * Throws when a visible object of a scene with fog draws a fog-enabled material: it would draw three's plain fog beside the replay's
+ * haze (a composed material's fog is off; compose `hazePart`). Call it once the scene's content is built. It checks no haze values:
+ * `hazePart` reads the scene block's, so the scene must also write its haze (`createHaze`) before it renders.
  */
 export function assertHazed(scene: Scene): void {
   if (!scene.fog) return;
@@ -118,8 +94,8 @@ export function assertHazed(scene: Scene): void {
     if ((object.layers.mask & 1) === 0) return; // Not drawn by the scene camera (a shadow-only batch).
     const {material} = object as Object3D & {material?: Material | Material[]};
     for (const each of material === undefined ? [] : [material].flat()) {
-      if ('fog' in each && each.fog === true && each.visible && !hazed.has(each)) bare.add(`${each.name || each.type} on ${object.name || object.type}`);
+      if ('fog' in each && each.fog === true && each.visible) bare.add(`${each.name || each.type} on ${object.name || object.type}`);
     }
   });
-  if (bare.size) throw Error(`Fog-enabled materials without the replay haze (call hazeProgram): ${[...bare].join('; ')}`);
+  if (bare.size) throw Error(`Fog-enabled materials without the replay haze (compose hazePart): ${[...bare].join('; ')}`);
 }

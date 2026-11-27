@@ -42,42 +42,31 @@ interface Props {
   colorBy?: MapColorMode;
   onChangeColorBy?: (mode: MapColorMode) => void;
   currentPoint?: ReplayTrajectoryPoint | null;
-  fadedLine?: 'none' | 'primary' | 'baseline';
-  onToggleFadedLine?: (line: 'primary' | 'baseline') => void;
+  fadedLine: 'none' | 'primary' | 'baseline';
+  onToggleFadedLine: (line: 'primary' | 'baseline') => void;
   trackGeometry?: TrackBoundaryGeometry | null;
-  showFrictionCircle?: boolean;
-  onToggleFrictionCircle?: () => void;
-  isExpanded?: boolean;
+  showFrictionCircle: boolean;
+  onToggleFrictionCircle: () => void;
+  isExpanded: boolean;
   /** False while kept loaded behind the 2D map: the view is hidden and takes the focus again when shown. */
   active?: boolean;
-  onToggleExpanded?: (expanded: boolean) => void;
+  onToggleExpanded: (expanded: boolean) => void;
   /** The corner picked in the inspector: the view repeats it (corner focus); null for none. */
   focusCorner?: CornerSegmentComparison | null;
   onLeaveCorner?: () => void;
 }
 
-export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy, currentPoint, fadedLine, onToggleFadedLine, trackGeometry, showFrictionCircle, onToggleFrictionCircle, isExpanded: controlledExpanded, onToggleExpanded, active = true, focusCorner = null, onLeaveCorner}: Props) {
-  const map = useRef<HTMLDivElement>(null), [internalExpanded, setInternalExpanded] = useState(false);
-  const isExpanded = controlledExpanded ?? internalExpanded;
-  const handleToggleExpanded = (expanded?: boolean) => {
-    const next = typeof expanded === 'boolean' ? expanded : !isExpanded;
-    if (onToggleExpanded) onToggleExpanded(next);
-    else setInternalExpanded(next);
-  };
+export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy, currentPoint, fadedLine, onToggleFadedLine, trackGeometry, showFrictionCircle, onToggleFrictionCircle, isExpanded, onToggleExpanded, active = true, focusCorner = null, onLeaveCorner}: Props) {
+  const map = useRef<HTMLDivElement>(null);
+  const handleToggleExpanded = (expanded?: boolean) => onToggleExpanded(typeof expanded === 'boolean' ? expanded : !isExpanded);
   const host = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<CameraMode>('chase'), [retry, setRetry] = useState(0);
-  const [internalFadedLine, setInternalFadedLine] = useState<'none' | 'primary' | 'baseline'>('none');
   const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
   const [showLines, toggleLines] = useStoredToggle('lmu-3d-racing-lines-v1', true);
-  const activeFadedLine = fadedLine ?? internalFadedLine;
   const ghostSync = useGhostSync(), syncControls = ghostSyncControls(ghostSync);
-  const {scene, state} = useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine: activeFadedLine, showLines, retry,
+  const {scene, state} = useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine, showLines, retry,
     syncMode: ghostSync.mode, anchorDistM: ghostSync.markerDistM});
-  const handleToggleFadedLine = onToggleFadedLine ?? ((line: 'primary' | 'baseline') => setInternalFadedLine(f => (f === line ? 'none' : line)));
 
-  const [localShowFriction, toggleLocalFriction] = useState(false);
-  const effectiveShowFriction = showFrictionCircle ?? localShowFriction;
-  const handleToggleFriction = onToggleFrictionCircle ?? (() => toggleLocalFriction(value => !value));
   const baselinePoints = useMemo(() => baseline?.points ?? [], [baseline]);
   const svgPoints = useMemo(() => projectTrajectoryPoints(trajectory.points, trajectory.bounds, 800, 60), [trajectory.points, trajectory.bounds]);
   const { activeIndex, primaryDists, currentPos, baselineGhostPos, comparisons, currentPrimaryPoint, currentDeltaTimeSec } = useGpsSceneDynamics({
@@ -113,14 +102,14 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   return (
     <Scene3DFrame surface={map} host={host} scene={scene} state={state} mode={mode} onModeChange={setMode} followMode="follow"
       onRetry={() => setRetry(value => value + 1)} onToggleView={onReturnTo2D} active={active} expanded={isExpanded}
-      streamingClassName={isExpanded && effectiveShowFriction ? 'bottom-48' : 'bottom-2'}
+      streamingClassName={isExpanded && showFrictionCircle ? 'bottom-48' : 'bottom-2'}
       className="w-full h-full min-h-[360px] [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen"
       controlsBefore={<><CornerCardButton /><ReplayShortcutHelp view="3d" /></>} controlsAfter={<MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded} />}
       top={!isExpanded && (
         <div data-testid="replay-3d-toolbar" title={sources} className="flex items-start justify-between px-2 py-1 gap-2 shrink-0 text-xs border-b border-lmu-border bg-lmu-deep">
           <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy} hasBaseline={Boolean(baseline)}
-            isCompareMode={Boolean(baseline)} fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
-            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction}
+            isCompareMode={Boolean(baseline)} fadedLine={fadedLine} onToggleFadedLine={onToggleFadedLine}
+            showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={onToggleFrictionCircle}
             showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />
         </div>
       )}
@@ -133,8 +122,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           sectors={trajectory.sectors} deltaTimeSec={currentDeltaTimeSec} primaryPoint={activePrimaryPoint ?? undefined}
           baselinePoint={baselineGhostPos?.point ?? null} baselinePoints={baselinePoints}
           colorBy={colorBy} onChangeColorBy={onChangeColorBy} isCompareMode={Boolean(baseline)} hasBaseline={Boolean(baseline)}
-          fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
-          showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction}
+          fadedLine={fadedLine} onToggleFadedLine={onToggleFadedLine}
+          showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={onToggleFrictionCircle}
           showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />}
       </>}
       bottom={isExpanded && onSelectIndex ? (
@@ -144,9 +133,9 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           hud={<GpsMapTelemetryHud primaryPoint={activePrimaryPoint} baselinePoint={baselineGhostPos?.point} deltaTimeSec={currentDeltaTimeSec} />} />
       ) : (
         <div className="shrink-0 bg-lmu-deep">
-          {effectiveShowFriction && <ReplayFrictionCircle points={trajectory.points} currentIndex={activeIndex}
+          {showFrictionCircle && <ReplayFrictionCircle points={trajectory.points} currentIndex={activeIndex}
             primaryPoint={activePrimaryPoint} baselinePoint={baselineGhostPos?.point ?? null} baselinePoints={baselinePoints}
-            onClose={handleToggleFriction} />}
+            onClose={onToggleFrictionCircle} />}
           <ReplayTelemetryHud currentPoint={activePrimaryPoint} />
         </div>
       )}>

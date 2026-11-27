@@ -3,6 +3,7 @@ import { Mesh, type Object3D, type WebGLRenderer } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import type { SceneryChunkFile, SceneryTexture } from '../../../../../shared/types/scenes/scenery.js';
 import { fetchSceneryChunk, SCENERY_FILES } from '../../../../api/sceneryApi.js';
+import { TRACK_LIGHT_ATTRIBUTE } from '../night/trackLightProgram.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
 import { configureSurfaceMaterial, createSharedSurfaceMaterials } from './materials/configureSurfaceMaterial.js';
@@ -22,9 +23,11 @@ export interface ChunkLoader {
  * GLB material's package key (`extras.lmuMaterial`): materials that draw alike share one configured material, which keeps the key of
  * the first, and the batches go by each mesh's own key. A node the game switches (`extras.lmuVisibility`) stays visible here, in every
  * state, so the chunk's warm-up compiles and uploads it; the scene's night switch then shows only the current state's
- * (night/nightSwitch.ts), and switching later costs no upload.
+ * (night/nightSwitch.ts), and switching later costs no upload. Every primitive carries its track light sum (the package's
+ * `_LMU_TRACKLIGHT`, night/trackLightProgram.ts), which the surface programs decode: a mesh without it throws.
  */
 export function prepareSceneryMesh(mesh: Mesh): void {
+  if (!mesh.geometry.getAttribute(TRACK_LIGHT_ATTRIBUTE)) throw Error(`Scenery mesh ${mesh.name || mesh.uuid} has no ${TRACK_LIGHT_ATTRIBUTE} attribute`);
   mesh.receiveShadow = !mesh.name.startsWith('FILLER_GROUND');
   if (mesh.name.toLowerCase().includes('screenframebuffer')) mesh.visible = false;
   mesh.castShadow = mesh.userData.lmuCastShadow === true;
@@ -90,7 +93,7 @@ export function createChunkLoader(renderer: WebGLRenderer, textures: readonly Sc
       const meshes: Mesh[] = [];
       root.traverse(object => { if (object instanceof Mesh) { const mesh = object as Mesh; prepareSceneryMesh(mesh); meshes.push(mesh); } });
       onParsed?.(root);
-      await Promise.all(meshes.map(mesh => configureSurfaceMaterial(mesh, source, false, materials)));
+      await Promise.all(meshes.map(mesh => configureSurfaceMaterial(mesh, source, materials)));
       signal.throwIfAborted();
       return root;
     },

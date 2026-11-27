@@ -1,8 +1,10 @@
 import { expect, it } from 'vitest';
-import { BoxGeometry, Color, Group, Mesh, MeshBasicMaterial, ShaderLib, Vector4, type Camera, type Object3D, type WebGLRenderTarget } from 'three';
-import { createContactShadow, createUnderCarBaker } from '../../../../../src/components/replay/view3d/car/carContactShadow.js';
+import { BoxGeometry, Color, Group, Mesh, MeshBasicMaterial, ShaderMaterial, Vector4, type Camera, type Object3D, type Texture, type WebGLRenderTarget } from 'three';
+import { hazePart } from '../../../../../src/components/replay/view3d/atmosphere/haze.js';
+import { CONTACT_SHADOW_GLSL, contactShadowQuad, createContactShadow, createUnderCarBaker } from '../../../../../src/components/replay/view3d/car/carContactShadow.js';
 import type { BakeRenderer } from '../../../../../src/components/replay/view3d/car/underCarBake.js';
-import { sceneDayLight } from '../../../../../src/components/replay/view3d/scene/dayLight.js';
+import { composedParts, composedTextures } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { cascadeAtlasUniform, cascadeLookupPart } from '../../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 
 const carModel = () => {
   const model = new Group(); model.position.set(5, 1, 5);
@@ -10,6 +12,8 @@ const carModel = () => {
   body.userData.footprint = [-1, 0, -2.3, 1, 1, 2.3]; // The part's box in the model's frame, measured by the body loader.
   return model;
 };
+/** The shade map a contact shadow draws now. */
+const mapOf = (shadow: {material: ShaderMaterial}) => shadow.material.uniforms.contactShadow_map.value as Texture;
 
 /** A renderer that records its calls and holds a state the bake must put back. */
 const stubRenderer = () => {
@@ -37,37 +41,45 @@ it('lays a soft analytic shadow on the car contact plane until its body is baked
   const shadow = createContactShadow(carModel(), 'a', createUnderCarBaker());
   expect(shadow.position.y).toBeCloseTo(0.02); expect(shadow.position.x).toBeCloseTo(0); // Model-local, on the lowest point.
   expect(shadow.geometry.parameters.width).toBeCloseTo(3); expect(shadow.geometry.parameters.height).toBeCloseTo(5.6);
-  const map = shadow.material.alphaMap!, {data, width, height} = map.image as {data: Uint8Array; width: number; height: number};
+  const {data, width, height} = mapOf(shadow).image as {data: Uint8Array; width: number; height: number};
   const at = (column: number, row: number) => data[(row * width + column) * 4];
   expect(at(width >> 1, height >> 1)).toBe(Math.round(255 * 0.6));
   expect(at(0, 0)).toBe(0);
-  expect(shadow.castShadow).toBe(false); expect(shadow.material).toBeInstanceOf(MeshBasicMaterial);
+  expect(shadow.castShadow).toBe(false); expect(shadow.material).toBeInstanceOf(ShaderMaterial);
 });
 
-it("keeps a quarter of its darkening where the sun reaches the road, all of it past the sun's shadows", () => {
-  const {material} = createContactShadow(carModel(), 'a', createUnderCarBaker());
-  const shader = {uniforms: {}, vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader};
-  material.onBeforeCompile(shader as never, null as never);
-  expect(shader.fragmentShader).toContain('diffuseColor.a *= mix( 1.0 - 0.75 * sunLit, 1.0, beyond );');
-  expect(shader.fragmentShader.indexOf('sunLit = surfaceCascadeShadow')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <alphamap_fragment>'));
+it('composes the shade with the cascade lookup and the haze, its map its own texture and the cascade atlas not', () => {
+  const {material} = contactShadowQuad(1, 2);
+  expect(composedParts(material)?.map(part => part.name)).toEqual(['contactShadow', 'cascadeLookup', 'haze']);
+  expect(composedParts(material)).toContain(cascadeLookupPart); expect(composedParts(material)).toContain(hazePart);
+  expect(composedTextures(material)).toEqual([mapOf({material})]);
+  expect(material.uniforms.surface_cascadeAtlas).toBe(cascadeAtlasUniform);
+  expect([material.transparent, material.depthWrite, material.polygonOffset, material.fog]).toEqual([true, false, false, false]); // Hazed by its part, not three's fog.
+  // Every shade draws with one program: the map is a value, not part of the key.
+  expect(contactShadowQuad(2, 3).material.customProgramCacheKey()).toBe(material.customProgramCacheKey());
+});
+
+it("keeps a quarter of its darkening where the sun reaches the road, all of it past the sun's shadows, after the map's alpha", () => {
+  const glsl = CONTACT_SHADOW_GLSL.fragmentColour;
+  expect(glsl).toContain('diffuseColor.rgb = vec3( 0.0 );');
+  expect(glsl).toContain('diffuseColor.a *= mix( 1.0 - 0.75 * sunLit, 1.0, beyond );');
+  expect(glsl.indexOf('sunLit = surfaceCascadeShadow')).toBeGreaterThan(glsl.indexOf('texture2D( contactShadow_map, vContactShadowUv ).g'));
 });
 
 it('stays whole at night: the sun share of the fade follows the day share, not the moon', () => {
-  const {material} = createContactShadow(carModel(), 'a', createUnderCarBaker());
-  const shader = {uniforms: {} as Record<string, unknown>, vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader};
-  material.onBeforeCompile(shader as never, null as never);
-  expect(shader.fragmentShader).toContain('sunLit = surfaceCascadeShadow( vCascadeViewDepth ) * contactShadow_dayLight;');
-  expect(shader.uniforms.contactShadow_dayLight).toBe(sceneDayLight);
+  const {material} = contactShadowQuad(1, 2);
+  expect(CONTACT_SHADOW_GLSL.fragmentColour).toContain('sunLit = surfaceCascadeShadow( vCascadeViewDepth ) * lit_dayLight;');
+  expect(material.uniforms).not.toHaveProperty('lit_dayLight'); // The scene block's day share.
 });
 
 it('draws pulled toward the eye, so a cambered road under the flat quad does not cut it frame by frame', () => {
-  const {material} = createContactShadow(carModel(), 'a', createUnderCarBaker());
-  const shader = {uniforms: {} as Record<string, unknown>, vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader};
-  material.onBeforeCompile(shader as never, null as never);
+  const {material} = contactShadowQuad(1, 2);
   expect(material.polygonOffset).toBe(false);
-  expect(shader.vertexShader).toMatch(/#include <project_vertex>\s*mvPosition\.xyz \*= max\( 0\.0, 1\.0 - 0\.15 \/ length\( mvPosition\.xyz \) \);\s*gl_Position = projectionMatrix \* mvPosition;/);
+  expect(CONTACT_SHADOW_GLSL.vertexView).toMatch(/^\s*mvPosition\.xyz \*= max\( 0\.0, 1\.0 - 0\.15 \/ length\( mvPosition\.xyz \) \);\s*gl_Position = projectionMatrix \* mvPosition;$/);
+  // The cascade lookup reads the pulled view depth, as the haze does: both after the pull.
+  expect(material.vertexShader.indexOf('vCascadeViewDepth = - mvPosition.z')).toBeGreaterThan(material.vertexShader.indexOf('1.0 - 0.15 / length'));
+  expect(material.vertexShader.indexOf('vHazeDepth = length')).toBeGreaterThan(material.vertexShader.indexOf('vCascadeViewDepth = - mvPosition.z'));
 });
-
 it('refuses a model without measured parts', () => {
   expect(() => createContactShadow(new Group().add(new Mesh(new BoxGeometry())), 'a')).toThrow('no measured parts');
 });
@@ -80,13 +92,13 @@ it('bakes a body once for all its cars, one body per frame, and swaps the baked 
   shadows.forEach(draw);
   const second = stubRenderer(); baker.flush(second.renderer);
   expect(renderCount(second.calls)).toBe(2); // One body: its height pass and its occlusion pass.
-  expect(shadows[0].material.alphaMap!.image).not.toHaveProperty('data'); // A render target's image, not the analytic data.
-  expect(shadows[1].material.alphaMap).toBe(shadows[0].material.alphaMap); // Shared by the second car of the body.
-  expect(shadows[2].material.alphaMap!.image).toHaveProperty('data'); // The other body waits for the next frame.
+  expect(mapOf(shadows[0]).image).not.toHaveProperty('data'); // A render target's image, not the analytic data.
+  expect(mapOf(shadows[1])).toBe(mapOf(shadows[0])); // Shared by the second car of the body.
+  expect(mapOf(shadows[2]).image).toHaveProperty('data'); // The other body waits for the next frame.
   expect(shadows[0].geometry.parameters.width).toBeCloseTo(5.6); // Car length + 1 m (the footprint is 4.6 m long).
   const third = stubRenderer(); baker.flush(third.renderer);
   expect(renderCount(third.calls)).toBe(2);
-  expect(shadows[2].material.alphaMap).not.toBe(shadows[0].material.alphaMap);
+  expect(mapOf(shadows[2])).not.toBe(mapOf(shadows[0]));
   const idle = stubRenderer(); baker.flush(idle.renderer);
   expect(idle.calls).toHaveLength(0); // Baked once each: nothing more.
 });

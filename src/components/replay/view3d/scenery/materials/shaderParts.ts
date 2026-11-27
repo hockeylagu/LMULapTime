@@ -1,19 +1,24 @@
+import { Vector2, Vector3, Vector4, type IUniform, type Texture } from 'three';
 import { GAME_LIGHT_UNIT } from '../../atmosphere/sunSamples.js';
-import { readsDayLight } from '../../scene/dayLight.js';
+import { focusedLookup } from '../textureFocus.js';
+import { uvShiftUniform } from './surfaceAnimation.js';
 import { tyreReadsAxle, tyreShaderParts } from '../../car/tyreSurface.js';
 import { clearcoatShaderParts } from './clearcoatSurface.js';
 import { digitalFlagShaderParts, flagShaderParts } from './flagSurface.js';
 import { glassShaderParts, windscreenInsideShaderParts } from './glassSurface.js';
 import { roadDecalShaderParts } from './roadDecalSurface.js';
-import { readsRealRoad, readsTrackRubber, roadShaderParts } from './roadSurface.js';
+import { readsRealRoad, roadShaderParts } from './roadSurface.js';
 import { REFLECTING_KINDS } from './sceneryReflection.js';
 import { glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type ExtendedParts, type ShaderContext } from './shaderContext.js';
 import { standardShaderParts } from './standardSurface.js';
-import { TERRAIN_WEIGHTS, terrainLayerCount, type SurfaceConfig } from './surfaceConfig.js';
+import { TERRAIN_WEIGHTS, terrainLayerCount, type ParameterGroup, type SurfaceConfig, type SurfaceMap } from './surfaceConfig.js';
 import { vegetationShaderParts } from './vegetationSurface.js';
 import { isLampKind } from '../lampSize.js';
 import { lampShares, type LampShares } from '../../night/cockpitLight.js';
-/** The GLSL a surface config contributes: declarations plus one chunk per patched `MeshStandardMaterial` include. */
+/**
+ * The GLSL a surface config contributes: declarations plus one chunk per stage of the light model, placed in the composed program of
+ * a scenery surface or a car's (surfaceProgram.ts, car/carMaterials.ts).
+ */
 export interface ShaderParts {
   declarations: string;
   albedo: string;
@@ -131,7 +136,7 @@ function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): Extend
  * an external monitor (screen times decal). The screen lights itself as a constant light inside the diffuse sum, so it shows
  * albedo times its strength over pi, a game light value converted to the scene by GAME_LIGHT_UNIT as the sun is, with the usual
  * environment lighting on top at half the specular level.
- * Its strength runs from its night strength to its day strength with the scene's day share (`sceneDayLight`).
+ * Its strength runs from its night strength to its day strength with the scene's day share (the scene block's `lit_dayLight`).
  */
 function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): ExtendedParts {
   const screen = config.parameters.dashboard, monitor = config.kind === 'externalMonitor';
@@ -145,7 +150,7 @@ function screenParts(config: SurfaceConfig, { sample, number }: ShaderContext): 
     albedo: `${albedo} surfaceMetallic=0.0; surfaceSpecular=0.5;`,
     normals: '', occlusion: '',
     physical: `material.specularColor=vec3(${glslNumber(f0)}); material.specularColorBlended=vec3(${glslNumber(f0)});`,
-    emissive: `diffuseColor.rgb*mix(${number(value(screen, 'emissiveNight'))},${number(value(screen, 'emissiveStrength'))},surface_dayLight)*${number((1 - 0.5 * f0) / Math.PI * GAME_LIGHT_UNIT)}`,
+    emissive: `diffuseColor.rgb*mix(${number(value(screen, 'emissiveNight'))},${number(value(screen, 'emissiveStrength'))},lit_dayLight)*${number((1 - 0.5 * f0) / Math.PI * GAME_LIGHT_UNIT)}`,
   };
 }
 
@@ -179,20 +184,19 @@ function familyParts(config: SurfaceConfig, context: ShaderContext, tint: string
 /** The maps a surface program declares as samplers, in declaration order. */
 function surfaceMapKeys(config: SurfaceConfig): string[] { return Object.keys(config.maps).sort(); }
 
-export const REFLECTION_SAMPLERS = 2, CASCADE_SAMPLERS = 1, THREE_SAMPLERS = 2;
+export const REFLECTION_SAMPLERS = 2, CASCADE_SAMPLERS = 1, LIT_SAMPLERS = 2;
 /** `batchingTexture` and `batchingIdTexture` of a BatchedMesh's vertex shader (no per-instance colour). */
 export const BATCH_VERTEX_TEXTURES = 2;
 
 /**
  * Texture units a surface's program samples: its maps (`mapDeclarations`), the reflection cube and integration table of the
- * reflecting kinds (sceneryReflection.ts), the cascade atlas (patchCascadeShadow, every surface), and three's own two for a scene
- * with an environment, no area lights, light probes or glTF maps: `envMap` (scene.environment) and `dfgLUT` (the physical program).
- * The road surface state and the track lights' sums are vertex attributes (`realRoad.ts`, trackLights.ts), no texture. The glTF `map`
- * is declared but unread once `map_fragment` is replaced, so the link drops it. A batch adds `BATCH_VERTEX_TEXTURES` in the vertex stage; three counts both
- * stages against `capabilities.maxTextures`.
+ * reflecting kinds (sceneryReflection.ts), the cascade atlas (cascadeShadowPart, every surface), and the lit template's two:
+ * `envMap` (the scene's environment, or a car's probe; the template declares it) and three's `dfgLUT` (the physical model). The road surface state
+ * and the track lights' sums are vertex attributes (`realRoad.ts`, trackLightProgram.ts), no texture. A batch adds
+ * `BATCH_VERTEX_TEXTURES` in the vertex stage; three counts both stages against `capabilities.maxTextures`.
  */
 export function surfaceTextureUnits(config: SurfaceConfig): number {
-  return surfaceMapKeys(config).length + (REFLECTING_KINDS.has(config.kind) ? REFLECTION_SAMPLERS : 0) + CASCADE_SAMPLERS + THREE_SAMPLERS;
+  return surfaceMapKeys(config).length + (REFLECTING_KINDS.has(config.kind) ? REFLECTION_SAMPLERS : 0) + CASCADE_SAMPLERS + LIT_SAMPLERS;
 }
 
 /**
@@ -211,22 +215,25 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   };
   const number = useUniforms ? constant : glslNumber;
   const vec = useUniforms ? (a: readonly number[]) => `vec${a.length}(${a.map(constant).join(',')})` : glslVec;
+  // With uniforms, a map reads its UV set by its weights (`surfaceUv`): maps on other sets share the program.
   const uv = (key: string, alternateScale?: readonly number[]) => {
     const map = maps[key];
     if (!map) throw Error(`Unsupported shader UV: ${config.name ?? '?'}/${key}`);
-    const source = SAMPLER_UVS[map.uv], shift = map.uvAnimation ? ` + surface_shift_${key}` : '';
+    const source = useUniforms ? `surfaceUv(surface_uv_${key})` : SAMPLER_UVS[map.uv], shift = map.uvAnimation ? ` + surface_shift_${key}` : '';
     if (useUniforms && !alternateScale) return `(${source} * surface_scale_${key}${shift})`;
     return `(${source} * ${vec(alternateScale ?? map.scale)}${shift})`;
   };
-  const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => maps[key] ? `texture2D(surface_${key}, ${uv(key, scale)})` : fallback;
+  // With uniforms, every lookup fades in as its texture sharpens (textureFocus.ts).
+  const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => !maps[key] ? fallback
+    : useUniforms ? focusedLookup(`surface_${key}`, uv(key, scale)) : `texture2D(surface_${key}, ${uv(key, scale)})`;
   const context: ShaderContext = { sample, uv, number, vec, uniforms: useUniforms };
   const tint = useUniforms ? 'diffuse' : glslVec(list(config.parameters.adjust, 'tint'));
   const parts = familyParts(config, context, tint), lamps = lampShares(config, context);
-  const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`
+  const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};\nuniform vec4 surface_uv_${key};` : ''}`
     + (maps[key]!.uvAnimation ? `\nuniform vec2 surface_shift_${key};` : '')).join('\n');
   return {
-    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '') + (readsDayLight(config) ? '\nuniform float surface_dayLight;' : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
-      + (readsRealRoad(config) ? '\nvarying vec2 vSurfaceRealRoad;' : '') + (luminousFacingPower(config) ? '\nvarying float vSurfaceFacing;' : '') + (isLampKind(config.kind) ? '\nvarying float vSurfaceLampShare;' : '') + (readsTrackRubber(config) ? '\nuniform float surface_realRoadMedian;' : '')
+    declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
+      + (readsRealRoad(config) ? '\nvarying vec2 vSurfaceRealRoad;' : '') + (luminousFacingPower(config) ? '\nvarying float vSurfaceFacing;' : '') + (isLampKind(config.kind) ? '\nvarying float vSurfaceLampShare;' : '')
       + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);
@@ -241,4 +248,111 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
     lamps,
     constants,
   };
+}
+
+/** The weights of a map's UV set for `surfaceUv`: uv0..uv3, none for the world XZ. */
+const UV_WEIGHTS: Record<SurfaceMap['uv'], readonly [number, number, number, number]> = {
+  uv0: [1, 0, 0, 0], uv1: [0, 1, 0, 0], uv2: [0, 0, 1, 0], uv3: [0, 0, 0, 1], worldPlanar: [0, 0, 0, 0],
+};
+
+/**
+ * The vertex stage's surface inputs: every extra UV set (a map reads its own by weight), the package's vertex colour (white
+ * without `vertexColour`), and the varyings the family reads.
+ */
+export function surfaceVertexDeclarations(config: SurfaceConfig, vertexColour: boolean): string {
+  const uvs = [1, 2, 3].map(set => `#ifndef USE_UV${set}\n    attribute vec2 uv${set};\n    #endif`).join('\n    ');
+  return `
+    ${uvs}
+    ${vertexColour ? 'attribute vec4 _lmu_colour;' : 'const vec4 _lmu_colour = vec4(1.0);'}
+    varying vec2 vSurfaceXZ;
+    varying float vSurfaceRandom;
+    varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;${tyreReadsAxle(config) ? '\n    varying float vSurfaceAxle;' : ''}${luminousFacingPower(config) ? '\n    varying float vSurfaceFacing;' : ''}`;
+}
+
+/** After `begin_vertex`: the varyings, from the vertex's own position, UV sets, colour and normal. */
+export function surfaceVertexMain(config: SurfaceConfig): string {
+  return `vSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;${tyreReadsAxle(config) ? ' vSurfaceAxle = objectNormal.x;' : ''}`;
+}
+
+/** After `project_vertex`, before a lamp grows: a bright luminous panel's facing cosine (`luminousFacingPower`), never turned to a back face. */
+export const SURFACE_FACING = 'vSurfaceFacing = max(0.0, dot(normalize(transformedNormal), normalize(-mvPosition.xyz)));';
+
+/**
+ * A cut-out's alpha test: its own alpha is its coverage in the multisampled scene pass, so wire thinner than a pixel still dims what is
+ * behind it; passes without multisampling cut at the threshold (the pass block's `surface_alphaCut`).
+ */
+export const SURFACE_ALPHA_TEST = '#ifdef USE_ALPHATEST\n if (diffuseColor.a < alphaTest * surface_alphaCut || diffuseColor.a == 0.0) discard;\n#endif';
+
+/** The light model's roughness and metalness from the family's. */
+export const SURFACE_ROUGHNESS = ' roughnessFactor = clamp(surfaceRoughness,0.045,1.0);';
+export const SURFACE_METALNESS = ' metalnessFactor = clamp(surfaceMetallic,0.0,1.0);';
+
+/** On the light model's material once set up: the family's specular level, a metal's reflectance its albedo. */
+export const SURFACE_SPECULAR = '{ material.specularColor=mix(material.specularColor*surfaceSpecular,diffuseColor.rgb,metalnessFactor); material.specularColorBlended=mix(material.specularColorBlended*surfaceSpecular,diffuseColor.rgb,metalnessFactor); material.specularF90=mix(surfaceSpecular,1.0,metalnessFactor); }';
+
+/** On the light once it is all in: the family's ambient occlusion, then its specular occlusion (clear coat's, its coat's too). */
+export function surfaceOcclusion(config: SurfaceConfig, code: ShaderParts): string {
+  const occlusion = config.kind === 'clearcoat'
+    ? 'reflectedLight.directSpecular*=surfaceSpecularOcclusion;reflectedLight.indirectSpecular*=surfaceSpecularOcclusion;clearcoatSpecularDirect*=surfaceSpecularOcclusion;clearcoatSpecularIndirect*=surfaceSpecularOcclusion;'
+    : code.occlusion;
+  return `reflectedLight.indirectDiffuse*=surfaceAO;${occlusion}`;
+}
+
+/** The family's emission in place of the material's own, if it has one; off while the venue is captured (the pass block's `surface_emission`). */
+export function surfaceEmission(code: ShaderParts): string {
+  return `${code.emissive ? `totalEmissiveRadiance=${code.emissive};` : ''}totalEmissiveRadiance*=surface_emission;`;
+}
+
+/** The family values that are uniforms where the surface carries them (names as `UNIFORM_DECLARATIONS`): name, group, key. */
+const TUNABLES: readonly (readonly [string, string, string])[] = [
+  ['surface_specular', 'adjust', 'specular'], ['surface_specularTinting', 'adjust', 'specularTinting'],
+  ['surface_mixBias', 'terrain', 'mixBias'], ['surface_splatterOverlayFactor', 'terrain', 'splatterOverlay'], ['surface_patternStrength', 'terrain', 'patternStrength'],
+  ['surface_decalStrength', 'decal', 'strength'], ['surface_decalThickness', 'decal', 'thickness'], ['surface_decalSoftness', 'decal', 'softness'], ['surface_decalDetail', 'decal', 'detail'],
+  ['surface_detailStrength', 'detail', 'albedo'], ['surface_kerbMixBias', 'kerbBlend', 'mixBias'], ['surface_kerbDefaultBlend', 'kerbBlend', 'default'],
+  ['surface_noOverlayRoughness', 'bare', 'roughness'], ['surface_noOverlaySpecular', 'bare', 'specular'],
+  ['surface_grooveRoughness', 'groove', 'roughness'], ['surface_grooveSpecular', 'groove', 'specular'],
+  ...([['single', 'singleCoat'], ['base', 'baseCoat'], ['coat', 'clearCoat']] as const).flatMap(([prefix, group]) => [
+    [`surface_${prefix}Roughness`, group, 'roughness'], [`surface_${prefix}IOR`, group, 'ior'],
+    [`surface_${prefix}Specular`, group, 'specular'], [`surface_${prefix}NormalStrength`, group, 'normalStrength'],
+  ] as const),
+  ['surface_coatStrength', 'clearCoat', 'strength'],
+];
+
+/**
+ * A three-component value of a group as a vector, or zero where the surface has no such group (its uniform is then not read): a
+ * group the surface carries must carry the value (`list`).
+ */
+const vector3 = (group: ParameterGroup | undefined, key: string) => !group ? new Vector3() : new Vector3(...list(group, key) as [number, number, number]);
+
+/**
+ * A surface material's own uniforms (its program's values, `shaderParts` with uniforms): the family's tunables (each one the
+ * surface carries; the names are the same for every surface, so they never split a program), its packed constants, normal scale,
+ * every map's sampler (`textures`, by map key), scale, UV set weights and UV shift. The clock, day share, track rubber, alpha cut and
+ * emission switch it reads are the scene and pass blocks' (shaders/sceneBlock.ts).
+ */
+export function surfaceUniforms(config: SurfaceConfig, textures: Readonly<Record<string, Texture>>): Record<string, IUniform> {
+  const code = shaderParts(config, { uniforms: true }), p = config.parameters;
+  const uniforms: Record<string, IUniform> = {};
+  // A value the surface carries is checked (`value`: a finite number); 0 for one it does not, whose uniform its program never reads.
+  for (const [name, group, key] of TUNABLES) uniforms[name] = { value: p[group]?.[key] === undefined ? 0 : value(p[group], key) };
+  uniforms.surface_grooveAlbedo = { value: vector3(p.groove, 'albedo') };
+  uniforms.surface_coatLacquerColour = { value: vector3(p.clearCoat, 'lacquerColour') };
+  uniforms.surface_coatLacquerThickness = { value: p.clearCoat ? Math.max(0.001, value(p.clearCoat, 'lacquerThickness')) : 0 };
+  uniforms.surface_normalScale = { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) };
+  // The family's values, four to a vec4 (the last one padded).
+  if (code.constants.length) uniforms.surface_constants = { value: Float32Array.from({ length: Math.ceil(code.constants.length / 4) * 4 }, (_, i) => code.constants[i] ?? 0) };
+  for (const [key, map] of Object.entries(config.maps)) {
+    const texture = textures[key];
+    if (!texture) throw Error(`Surface ${config.name ?? '?'} has no texture for its map ${key}`);
+    uniforms[`surface_${key}`] = { value: texture };
+    uniforms[`surface_scale_${key}`] = { value: new Vector2(...map!.scale) };
+    uniforms[`surface_uv_${key}`] = { value: new Vector4(...UV_WEIGHTS[map!.uv]) };
+    if (map!.uvAnimation) uniforms[`surface_shift_${key}`] = uvShiftUniform(map!.uvAnimation);
+  }
+  return uniforms;
+}
+
+/** The sampler uniforms of a surface's maps (`surfaceUniforms`), by uniform name: the textures its lookups fade in. */
+export function surfaceSamplers(config: SurfaceConfig, uniforms: Readonly<Record<string, IUniform>>): Record<string, IUniform> {
+  return Object.fromEntries(surfaceMapKeys(config).map(key => [`surface_${key}`, uniforms[`surface_${key}`]]));
 }

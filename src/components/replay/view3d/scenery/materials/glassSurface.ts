@@ -4,17 +4,16 @@ import type { SurfaceConfig } from './surfaceConfig.js';
 /**
  * The sun's glint on smooth glass (roughness under 0.1): a flat disc of 1 / (1 − 0.99985) wherever the half vector lies within
  * about 1° of the normal, times the sun, its shadow and Schlick's Fresnel at L·H (F0 0.04), summed with the sun's GGX highlight and
- * the sum halved. The sun is the first directional light; its GGX share is three's direct specular.
+ * the sum halved. The sun is the scene's (`lit_sunDirection`, `lit_sunColour`, shaders/sceneLight.ts); its GGX share is three's
+ * direct specular.
  */
 const SUN_GLINT = `
-  #if NUM_DIR_LIGHTS > 0
   if (surfaceRoughness < 0.1) {
-    vec3 glintL = directionalLights[0].direction, glintH = normalize(glintL + geometryViewDir);
+    vec3 glintL = normalize((viewMatrix * vec4(lit_sunDirection, 0.0)).xyz), glintH = normalize(glintL + geometryViewDir);
     float glintF = 0.04 + 0.96 * pow(1.0 - saturate(dot(glintL, glintH)), 5.0);
     float glintDisc = dot(normal, glintH) > 0.99985 && dot(normal, glintL) > 0.0 ? 1.0 / (1.0 - 0.99985) : 0.0;
-    totalSpecular += 0.5 * (directionalLights[0].color * surfaceSunShadow * glintF * glintDisc - reflectedLight.directSpecular);
-  }
-  #endif`;
+    totalSpecular += 0.5 * (lit_sunColour * surfaceSunShadow * glintF * glintDisc - reflectedLight.directSpecular);
+  }`;
 
 /**
  * Glass and the outside of windscreens, from the package's glass parameters: alpha-composited reflections. The glass is a mirror
@@ -58,9 +57,7 @@ export function windscreenInsideShaderParts({ sample }: ShaderContext): Extended
     physical: '',
     finish: `{ vec3 backNormal=-normal;
       vec3 backLight=getIBLIrradiance(transformDirection(inverseTransformDirection(backNormal,viewMatrix)*vec3(1.0,0.5,1.0),viewMatrix));
-      #if NUM_DIR_LIGHTS > 0
-      backLight+=directionalLights[0].color*clamp(dot(backNormal,directionalLights[0].direction),0.0,1.0)*min(2.0*surfaceSunShadow,1.0);
-      #endif
+      backLight+=lit_sunColour*clamp(dot(backNormal,normalize((viewMatrix*vec4(lit_sunDirection,0.0)).xyz)),0.0,1.0)*min(2.0*surfaceSunShadow,1.0);
       outgoingLight=totalDiffuse+totalEmissiveRadiance+backLight*RECIPROCAL_PI*diffuseColor.rgb*0.96*glassClear; }`,
     emissive: 'vec3(0.0)',
     occlusion: '',

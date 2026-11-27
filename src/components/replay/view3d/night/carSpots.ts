@@ -12,15 +12,14 @@
  * under the lamps rather than evenly over its whole wide cone. A car takes no light of its own spots, as an object in the game never does: in the cars'
  * programs a spot skips the points inside its car's box (`SpotCar.box`). And the road under a car takes none of its lamps (ours: the
  * game's spots cast no shadow): a spot lights only what lies ahead of its lamp along the beam on the ground, fading in over the first half metre. They add nothing while
- * the venue is captured (`sceneEmission` 0), as the game's ambient probe takes no lamps.
+ * the venue is captured (the pass block's `surface_emission` 0), as the game's ambient probe takes no lamps, nor in the car's probe
+ * (`carSpot_shown` 0, `withoutCarSpots`). The list is the scene block's (sceneBlock.ts).
  */
-import { Frustum, Matrix4, Vector3, Vector4, type Box3, type Camera } from 'three';
+import { Frustum, Matrix4, Vector3, type Box3, type Camera } from 'three';
 import type { CarLights } from '../../../../../shared/packageContract/index.js';
 import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
-import { sceneEmission } from '../scene/dayLight.js';
-
-/** The spots drawn at once: the game's 20 per scene object. */
-export const CAR_SPOTS = 20;
+import { glslNumber } from '../scenery/materials/shaderContext.js';
+import { CAR_SPOTS, SCENE_BLOCK, sceneBlock, setScene, withPass } from '../shaders/sceneBlock.js';
 
 /**
  * A car with its headlights on or braking (`isBraking`): its lights, its native car frame in the scene (the body envelope's world
@@ -31,27 +30,24 @@ export interface SpotCar { lights: CarLights; frame: Matrix4; headlights: boolea
 /** How far outside its bounds a car's surface still counts as its own, metres: the bounds are measured on another level of the body. */
 const OWN_SLACK_M = 0.05;
 
-const slots = Array.from({length: 4 * CAR_SPOTS}, () => new Vector4()), owners = Array.from({length: 2 * CAR_SPOTS}, () => new Vector4());
-let probing = false;
-export const carSpotUniforms = {
-  carSpot_scale: {get value() { return probing ? 0 : GAME_LIGHT_UNIT * sceneEmission.value; }},
-  /** Per spot: position and range; direction and cos(outer / 2); attenuation and cos(inner / 2); colour and falloff. */
-  carSpot_spots: {value: slots},
-  /**
-   * Per spot, its car's box (the cars' programs only): centre and half width; the car's length axis on the ground (x, z), half length
-   * and half height. A half length of 0 is no box.
-   */
-  carSpot_owners: {value: owners},
-  carSpot_count: {value: 0},
-};
+/**
+ * The scene block's spot list: per spot four vec4s (`carSpot_spots`: position and range; direction and cos(outer / 2); attenuation and
+ * cos(inner / 2); colour and falloff) and, read by the cars' programs only, two of its car's box (`carSpot_owners`: centre and half
+ * width; the car's length axis on the ground (x, z), half length and half height; a half length of 0 is no box).
+ */
+const SPOTS_AT = SCENE_BLOCK.offsets.carSpot_spots, OWNERS_AT = SCENE_BLOCK.offsets.carSpot_owners;
+/** Writes the `index`th vec4 of a list at `list` in the scene block. */
+function setVec4(list: number, index: number, x: number, y: number, z: number, w: number): void {
+  const at = list + 4 * index;
+  sceneBlock[at] = x; sceneBlock[at + 1] = y; sceneBlock[at + 2] = z; sceneBlock[at + 3] = w;
+}
 
 /**
  * Draws without the spots: the car's reflection probe (car/carReflection.ts), as the game's mirror pass, whose draws list no spot
  * (captures of 2026-11-26), so the mirror and the paint do not show the road lit by the car's own beams.
  */
 export function withoutCarSpots(draw: () => void): void {
-  probing = true;
-  try { draw(); } finally { probing = false; }
+  withPass({carSpot_shown: 0}, draw);
 }
 
 type Spot = CarLights['spots'][number];
@@ -81,16 +77,16 @@ const levelLength = new Vector3(), levelSide = new Vector3(), WORLD_UP = new Vec
  * test a level box (`OWN_CAR_TEST`: along the car's heading on the level, across it, and up), so a car on a grade or banking gets
  * the level box round its tilted one: each half extent sums the tilted box's half axes along that direction.
  */
-function placeOwner({box, frame}: SpotCar, centre: Vector4, axis: Vector4): void {
-  if (!box || box.isEmpty()) { centre.set(0, 0, 0, 0); axis.set(0, 0, 0, 0); return; }
+function placeOwner({box, frame}: SpotCar, spot: number): void {
+  if (!box || box.isEmpty()) { sceneBlock.fill(0, OWNERS_AT + 8 * spot, OWNERS_AT + 8 * spot + 8); return; }
   box.getCenter(boxCentre).applyMatrix4(frame);
   frame.extractBasis(sideAxis, upAxis, lengthAxis);
   // The box's half axes in the world, frame scale included.
   sideAxis.multiplyScalar((box.max.x - box.min.x) / 2); upAxis.multiplyScalar((box.max.y - box.min.y) / 2); lengthAxis.multiplyScalar((box.max.z - box.min.z) / 2);
   levelLength.set(lengthAxis.x, 0, lengthAxis.z).normalize(); levelSide.set(levelLength.z, 0, -levelLength.x);
   const half = (along: Vector3) => Math.abs(sideAxis.dot(along)) + Math.abs(upAxis.dot(along)) + Math.abs(lengthAxis.dot(along)) + OWN_SLACK_M;
-  centre.set(boxCentre.x, boxCentre.y, boxCentre.z, half(levelSide));
-  axis.set(levelLength.x, levelLength.z, half(levelLength), half(WORLD_UP));
+  setVec4(OWNERS_AT, 2 * spot, boxCentre.x, boxCentre.y, boxCentre.z, half(levelSide));
+  setVec4(OWNERS_AT, 2 * spot + 1, levelLength.x, levelLength.z, half(levelLength), half(WORLD_UP));
 }
 
 export function createCarSpots(): CarSpots {
@@ -135,16 +131,16 @@ export function createCarSpots(): CarSpots {
       const tail = (beam: Beam) => beam.spot.states ? 1 : 0;
       const nearest = pool.slice(0, count).sort((a, b) => tail(a) - tail(b) || a.key - b.key).slice(0, CAR_SPOTS);
       nearest.forEach(({position, direction, spot, colour, car}, i) => {
-        slots[4 * i].set(position.x, position.y, position.z, spot.rangeM);
-        slots[4 * i + 1].set(direction.x, direction.y, direction.z, cosHalf(spot.outerConeDeg));
-        slots[4 * i + 2].set(spot.attenuation[0], spot.attenuation[1], spot.attenuation[2], cosHalf(spot.innerConeDeg));
+        setVec4(SPOTS_AT, 4 * i, position.x, position.y, position.z, spot.rangeM);
+        setVec4(SPOTS_AT, 4 * i + 1, direction.x, direction.y, direction.z, cosHalf(spot.outerConeDeg));
+        setVec4(SPOTS_AT, 4 * i + 2, spot.attenuation[0], spot.attenuation[1], spot.attenuation[2], cosHalf(spot.innerConeDeg));
         // A tail spot (the one with states) carries its falloff negated: it lights by the angle of incidence too.
-        slots[4 * i + 3].set(colour[0], colour[1], colour[2], spot.states ? -spot.falloff : spot.falloff);
-        placeOwner(car, owners[2 * i], owners[2 * i + 1]);
+        setVec4(SPOTS_AT, 4 * i + 3, colour[0], colour[1], colour[2], spot.states ? -spot.falloff : spot.falloff);
+        placeOwner(car, i);
       });
-      carSpotUniforms.carSpot_count.value = nearest.length;
+      setScene('carSpot_count', nearest.length);
     },
-    dispose() { carSpotUniforms.carSpot_count.value = 0; },
+    dispose() { setScene('carSpot_count', 0); },
   };
 }
 
@@ -167,10 +163,7 @@ const OWN_CAR_TEST = `
  * car's own spots also skip its body (`carSpot_owners`).
  */
 export function carSpotDeclarations(ownCar: boolean): string {
-  return `uniform vec4 carSpot_spots[${4 * CAR_SPOTS}];
-${ownCar ? `uniform vec4 carSpot_owners[${2 * CAR_SPOTS}];\n` : ''}uniform float carSpot_count;
-uniform float carSpot_scale;
-vec3 carSpotLight(vec3 point, vec3 normal) {
+  return `vec3 carSpotLight(vec3 point, vec3 normal) {
   vec3 sum = vec3(0.0);
   for (int i = 0; i < ${CAR_SPOTS}; i++) {
     if (float(i) >= carSpot_count) break;
@@ -197,7 +190,7 @@ vec3 carSpotLight(vec3 point, vec3 normal) {
       * (1.0 - d / posRange.w) * smoothstep(-0.05, 0.2, facing) * (rgbFalloff.w < 0.0 ? toLamp : 1.0)
       * smoothstep(0.0, ${AHEAD_FADE_M.toFixed(1)}, ahead);
   }
-  return sum * carSpot_scale;
+  return sum * (${glslNumber(GAME_LIGHT_UNIT)} * surface_emission * carSpot_shown);
 }`;
 }
 

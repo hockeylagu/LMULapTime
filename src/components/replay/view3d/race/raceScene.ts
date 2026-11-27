@@ -73,6 +73,8 @@ interface FollowedCar {
  */
 interface RaceCars {
   cars: readonly RaceReplayCar[];
+  /** Each car's class by slot ('' without one). */
+  classOf: ReadonlyMap<number, string>;
   sets: CarSets;
   root: Group;
   standIns: StandInCars;
@@ -93,7 +95,7 @@ function newRaceCars(shell: SceneShell, layout: SceneryLayoutResource, cars: rea
   const standIns = createStandInCars(root, cars.length, object => shell.warm(object));
   /** The other cars, the followed car's included (hidden while followed); the scene's `draw` gives them their poses. */
   const field = createRaceField(shell, sets, root, cars, slot => hooks.bodyOf(slot), () => hooks.changed(), (slot, car) => standIns.offer(classOf.get(slot) ?? '', car));
-  return {cars, sets, root, standIns, field, hooks};
+  return {cars, classOf, sets, root, standIns, field, hooks};
 }
 
 function disposeRaceCars({root, standIns, field}: RaceCars): void {
@@ -132,7 +134,7 @@ export async function createRaceScene(
   keptRaceCars.delete(shell);
   if (kept && kept.cars !== cars) disposeRaceCars(kept);
   const raceCars = kept?.cars === cars ? kept : newRaceCars(shell, layout, cars);
-  const {sets, root, standIns, field, hooks} = raceCars;
+  const {classOf, sets, root, standIns, field, hooks} = raceCars;
   /** Stands in for the reflection probe's car while the followed car has no model: never visible, so the probe stays idle. */
   const noCar = new Group(); noCar.visible = false;
   const followedCentre = new Vector3();
@@ -150,7 +152,6 @@ export async function createRaceScene(
   };
   const beams = createRaceBeams(origin, bodyOf, slot => pickShapeOf(slot)?.box ?? null, envelopeOf, () => { if (drawing) draw(); });
   let followed: FollowedCar | null = null;
-  const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
   // The field's models can be ready before the scene draws (the first followed car's): nothing to redraw until `draw` exists.
   let drawing = false;
   hooks.changed = () => { if (drawing) draw(); };
@@ -317,7 +318,7 @@ export async function createRaceScene(
   const draw = () => {
     if (!window || disposed) return;
     const current = window, places: DrawnPlace[] = [];
-    let followedAt: {x: number; z: number} | null = null;
+    let followedAt: {x: number; z: number} | null = null, standingIn = false;
     standIns.begin(); beams.begin();
     for (const [ownIndex, slot] of current.slots.entries()) {
       if (!classOf.has(slot)) continue;
@@ -354,13 +355,15 @@ export async function createRaceScene(
       if (!placed || model || field.has(slot)) continue;
       // A stand-in's lowest point is its origin: on the road under the pose (the body's centre, above it).
       const ground = shell.surfaceHeight({x: pose[0], y: pose[1], z: pose[2]}) ?? pose[1];
+      standingIn = true;
       standIns.place(classOf.get(slot) ?? '', matrix.compose(position.set(pose[0] - origin.x, ground - origin.y, pose[2] - origin.z), orientation, scale));
     }
     standIns.end();
     drawnPlaces = places;
     if (!followedAt) placeAside(current);
+    // Bodies load only while a car on the track still stands in (loading, or without a body for good).
     const from = followedAt ?? places[0];
-    field.load(from ? places.filter(car => car.slot !== followed?.slot).map(car => ({slot: car.slot, metres: Math.hypot(car.x - from.x, car.z - from.z)})) : []);
+    if (standingIn) field.load(from ? places.filter(car => car.slot !== followed?.slot).map(car => ({slot: car.slot, metres: Math.hypot(car.x - from.x, car.z - from.z)})) : []);
     shell.invalidate();
   };
   drawing = true;
@@ -385,8 +388,7 @@ export async function createRaceScene(
       }
       const next = await buildFollowed(slot, body);
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
-      // Its lit materials take the probe's prefiltered cube before they compile: warmed with the venue's (another size, a program
-      // define), each would link again at its first draw, a dozen programs one after another in the frame it shows (2 s, 2026-11-16).
+      // Its lit materials take the probe's prefiltered cube before they are warmed, so they are warmed as they will draw.
       if (next?.car) { shell.shareReflection(next.car); await shell.warm(next.car); }
       if (disposed || signal?.aborted || ticket !== request) { next?.dispose(); return false; }
       // A driver camera needs the car's own cameras: without a model, the chase camera follows its stand-in.

@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
-import { ClampToEdgeWrapping, Data3DTexture, LinearFilter, RedFormat, Texture, UnsignedByteType, Vector3, type IUniform } from 'three';
+import { ClampToEdgeWrapping, Data3DTexture, LinearFilter, RedFormat, Texture, UnsignedByteType, Vector3 } from 'three';
 import { cockpitVolumeTexture } from '../../../../../src/components/replay/view3d/car/cockpitOcclusion.js';
 import { carMaterialKey, createCarMaterial } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
+import { composedParts, composedTextures } from '../../../../../src/components/replay/view3d/shaders/composer.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const row = { sha256: 'cc', byteLength: 24, width: 2, height: 3, depth: 4 };
@@ -29,15 +30,8 @@ const display: CarMaterialRecipe = {
 const volume = () => cockpitVolumeTexture(new ArrayBuffer(24), row);
 const compile = (recipe: CarMaterialRecipe) => {
   const material = createCarMaterial(recipe, appearance, () => new Texture(), testShading(), volume);
-  const shader = {
-    uniforms: {} as Record<string, IUniform>,
-    vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>\n#include <project_vertex>\n#include <fog_pars_vertex>\n#include <fog_vertex>',
-    fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <shadowmap_pars_fragment>\n#include <lights_physical_pars_fragment>\n#include <lights_fragment_begin>\n#include <lights_fragment_maps>\n#include <lights_fragment_end>\n#include <fog_pars_fragment>\n#include <fog_fragment>',
-  };
-  material.onBeforeCompile(shader as never, undefined as never);
-  return {material, shader};
+  return {material, shader: material};
 };
-
 it('reads a body volume as one linear, edge-clamped byte a voxel, and rejects one of another size', () => {
   const texture = volume();
   expect(texture).toBeInstanceOf(Data3DTexture);
@@ -55,7 +49,8 @@ it('occludes the cube reflection of the surface program, marching from the verte
   expect(shader.vertexShader).toContain('modelMatrix * batchingMatrix');
   expect(shader.fragmentShader).toContain('surfaceReflectionOcclusion=cockpitOcclusion(surfaceReflectionRoughness);');
   expect(shader.fragmentShader.indexOf('float cockpitOcclusion')).toBeLessThan(shader.fragmentShader.indexOf('light *= cockpitReflectionScale'));
-  expect(material.customProgramCacheKey()).toContain('cockpitOcclusion');
+  expect(composedParts(material)?.map(part => part.name)).toContain('cockpitOcclusion');
+  expect(composedTextures(material)).toContain(shader.uniforms.cockpit_volume.value);
 });
 
 it('occludes the prefiltered environment of a material on the standard program of three', () => {

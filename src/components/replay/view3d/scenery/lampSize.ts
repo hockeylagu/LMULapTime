@@ -1,4 +1,6 @@
-import { BufferAttribute, Mesh, type IUniform, type Material, type Object3D } from 'three';
+import { BufferAttribute, Mesh, type Material, type Object3D } from 'three';
+import type { ShaderPart } from '../shaders/composer.js';
+import { setScene } from '../shaders/sceneBlock.js';
 import { glslNumber } from './materials/shaderContext.js';
 import type { SurfaceConfig } from './materials/surfaceConfig.js';
 
@@ -12,10 +14,8 @@ import type { SurfaceConfig } from './materials/surfaceConfig.js';
  */
 export const LAMP_MIN_PX = 1.5;
 export const LAMP_ATTRIBUTE = '_lmu_lamp';
-/** Two over the drawing height in pixels: a pixel in clip space. The shell sets it each frame (`trackLampPixel`). */
-export const lampPixel: IUniform<number> = {value: 0};
-
-export function trackLampPixel(heightPx: number): void { lampPixel.value = heightPx > 0 ? 2 / heightPx : 0; }
+/** Sets two over the drawing height in pixels, a pixel in clip space (the scene block's `surface_lampPixel`): the shell, each frame. */
+export function trackLampPixel(heightPx: number): void { setScene('surface_lampPixel', heightPx > 0 ? 2 / heightPx : 0); }
 
 /** The glowing kinds, whose emission is the whole of what they draw. */
 export const isLampKind = (kind: SurfaceConfig['kind']): boolean => kind === 'lowLumEmissive' || kind === 'highLumTrackside' || kind === 'highLumSun';
@@ -79,13 +79,12 @@ export function prepareLampSizes(root: Object3D): void {
 }
 
 /** The vertex program's declarations for a glowing kind. */
-export const LAMP_VERTEX_DECLARATIONS = `
+const LAMP_VERTEX_DECLARATIONS = `
     attribute vec4 ${LAMP_ATTRIBUTE};
-    uniform float surface_lampPixel, surface_lampDay;
     varying float vSurfaceLampShare;`;
 
 /** After `project_vertex`: grows a lamp under LAMP_MIN_PX to that radius on screen, at night, and passes the share of its light. */
-export const LAMP_VERTEX_MAIN = `
+const LAMP_VERTEX_MAIN = `
     {
       vec4 lampCentre = vec4(${LAMP_ATTRIBUTE}.xyz, 1.0);
       #ifdef USE_BATCHING
@@ -95,8 +94,18 @@ export const LAMP_VERTEX_MAIN = `
       float metresPerPixel = (isPerspectiveMatrix(projectionMatrix) ? -lampCentre.z : 1.0) * surface_lampPixel / projectionMatrix[1][1];
       float radius = -${LAMP_ATTRIBUTE}.w;
       float growth = radius > 0.0 ? max(1.0, ${glslNumber(LAMP_MIN_PX)} * metresPerPixel / radius) : 1.0;
-      growth = mix(growth, 1.0, clamp(surface_lampDay, 0.0, 1.0));
+      growth = mix(growth, 1.0, clamp(lit_dayLight, 0.0, 1.0));
       mvPosition.xyz = lampCentre.xyz + (mvPosition.xyz - lampCentre.xyz) * growth;
       gl_Position = projectionMatrix * mvPosition;
       vSurfaceLampShare = 1.0 / (growth * growth);
     }`;
+
+/**
+ * A glowing kind's size on screen in a lit composed program: it moves the drawn position (grown about the lamp's centre, by night)
+ * and passes its light's share to the emission (`vSurfaceLampShare`, declared by the surface for its fragment stage). The pixel and
+ * the day share are the scene block's.
+ */
+export const lampSizePart: ShaderPart = {
+  name: 'lampSize',
+  slots: {vertexPars: {at: 40, glsl: LAMP_VERTEX_DECLARATIONS}, vertexView: {at: 0, glsl: LAMP_VERTEX_MAIN}},
+};

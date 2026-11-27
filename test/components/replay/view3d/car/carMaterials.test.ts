@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
-import { FrontSide, MeshBasicMaterial, NoColorSpace, SRGBColorSpace, Texture, Vector2, type IUniform } from 'three';
+import { FrontSide, MeshBasicMaterial, NoColorSpace, SRGBColorSpace, Texture, Vector2, type Color } from 'three';
 import { carMaterialKey, carPartOrder, carSortOffset, createCarMaterial, lampSortOffset, materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
+import { composedGhost, composedParts, composedTextures } from '../../../../../src/components/replay/view3d/shaders/composer.js';
+import { isPlainSurface } from '../../../../../src/components/replay/view3d/shaders/plainSurface.js';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
@@ -10,7 +12,7 @@ const recipe = (scale?: [number, number]): CarMaterialRecipe => ({
   id: 'm', name: 'GRID', paint: false,
   surface: { version: 4, kind: 'diffuse', normalShadowInfluence: 1, finish: { roughness: 0.5, metalness: 0 }, maps: { albedo: { texture: 'a', uv: 'uv0', scale: scale as [number, number] } } },
 });
-const build = (scale?: [number, number]) => createCarMaterial(recipe(scale), appearance, () => new Texture(), testShading()).map!;
+const build = (scale?: [number, number]) => createCarMaterial(recipe(scale), appearance, () => new Texture(), testShading()).uniforms.map.value as Texture;
 
 const standardSurface: CarSurface = {
   version: 4, kind: 'standard', name: 'CARBON', flags: {}, normalYSign: -1, normalShadowInfluence: 0.5, finish: { roughness: 0.5, metalness: 0.5 },
@@ -52,36 +54,40 @@ it('loads every map of a standard material, with the livery albedo in place of i
 it('draws a rear-view mirror as dark glass: no maps, no reflection', () => {
   const mirror: CarMaterialRecipe = { ...standard, name: 'MIRROR', surface: { ...standardSurface, rearView: true } };
   expect(materialTexturePaths(mirror, appearance)).toEqual([]);
-  const material = createCarMaterial(mirror, appearance, () => { throw Error('no texture expected'); }, testShading());
-  expect([material.name, material.color.getHex(), material.envMapIntensity, material.map]).toEqual(['MIRROR', 0, 0, null]);
+  const material = createCarMaterial(mirror, appearance, () => { throw Error('no maps'); }, testShading());
+  expect(isPlainSurface(material)).toBe(true);
+  const u = material.uniforms;
+  expect([material.name, (u.plain_colour.value as Color).getHex(), u.plain_roughness.value, u.plain_metalness.value, u.plain_environment.value]).toEqual(['MIRROR', 0, 1, 0, 0]);
+  expect(composedTextures(material)).toEqual([]);
 });
 
 it('draws a standard material with its metal/roughness, AO/specular and normal maps at their own scales', () => {
-  const material = createCarMaterial(standard, appearance, () => new Texture(), testShading());
-  const shader = { uniforms: {} as Record<string, IUniform>, vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>\n#include <fog_pars_vertex>\n#include <fog_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <aomap_fragment>\n#include <shadowmap_pars_fragment>\n#include <lights_physical_pars_fragment>\n#include <lights_fragment_begin>\n#include <fog_pars_fragment>\n#include <fog_fragment>' };
-  material.onBeforeCompile(shader as never, undefined as never);
-  expect(Object.keys(shader.uniforms)).toEqual(expect.arrayContaining(['surface_albedo', 'surface_metalRough', 'surface_aoSpec', 'surface_normal']));
-  expect((shader.uniforms.surface_scale_metalRough.value as Vector2).toArray()).toEqual([2, 2]);
-  expect((shader.uniforms.surface_albedo.value as Texture).colorSpace).toBe(SRGBColorSpace);
-  expect((shader.uniforms.surface_normal.value as Texture).colorSpace).toBe(NoColorSpace);
-  expect(shader.fragmentShader).toContain('surface_metalRough');
+  const material = createCarMaterial(standard, appearance, () => new Texture(), testShading()), u = material.uniforms;
+  expect(Object.keys(u)).toEqual(expect.arrayContaining(['surface_albedo', 'surface_metalRough', 'surface_aoSpec', 'surface_normal']));
+  expect((u.surface_scale_metalRough.value as Vector2).toArray()).toEqual([2, 2]);
+  expect((u.surface_albedo.value as Texture).colorSpace).toBe(SRGBColorSpace);
+  expect((u.surface_normal.value as Texture).colorSpace).toBe(NoColorSpace);
+  expect(material.fragmentShader).toContain('surface_metalRough');
+  expect(composedTextures(material)).toEqual(expect.arrayContaining(['albedo', 'metalRough', 'aoSpec', 'normal'].map(key => u[`surface_${key}`].value as Texture)));
   // The reflection uniforms are the car's own, not the scenery's shared ones.
-  expect(shader.uniforms.surface_reflection).not.toBe(sceneryReflectionUniforms.surface_reflection);
-  expect(material.roughness).toBe(0.4);
-  expect(material.metalness).toBe(0.6);
+  expect(u.surface_reflection).not.toBe(sceneryReflectionUniforms.surface_reflection);
+  expect([u.roughness.value, u.metalness.value]).toEqual([0.4, 0.6]);
+  // A ghost starts from roughness 0.7 and no metal.
+  composedGhost(material);
+  expect([u.roughness.value, u.metalness.value]).toEqual([0.7, 0]);
 });
 
-it('draws car glass with the scenery glass program, its reflection kept whole through its opacity', () => {
+it('draws car glass with the scenery glass program on the physical model, its reflection kept whole through its opacity', () => {
   const glass: CarMaterialRecipe = { id: 'g', name: 'GLASS', paint: false, surface: {
     version: 4, kind: 'glass', flags: {}, normalYSign: -1, normalShadowInfluence: 0.5, finish: { roughness: 0.05, metalness: 0 }, renderState: { alphaBlend: true },
     parameters: { adjust: { tint: [1, 1, 1], normalStrength: 1, roughness: 0.5, metalness: 0, specular: 0.5 } },
     maps: { albedo: { texture: 'textures/glass', uv: 'uv0', scale: [1, 1], srgb: true } },
   } };
   const material = createCarMaterial(glass, appearance, () => new Texture(), testShading());
-  expect(material.type).toBe('MeshPhysicalMaterial'); expect(material.transparent).toBe(true); expect(material.depthWrite).toBe(false);
-  const shader = { uniforms: {} as Record<string, IUniform>, vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>\n#include <fog_pars_vertex>\n#include <fog_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <aomap_fragment>\n#include <shadowmap_pars_fragment>\n#include <lights_physical_pars_fragment>\n#include <lights_fragment_begin>\n#include <fog_pars_fragment>\n#include <fog_fragment>\n#include <opaque_fragment>' };
-  material.onBeforeCompile(shader as never, undefined as never);
-  expect(shader.fragmentShader).toContain('totalSpecular/clamp(diffuseColor.a+0.001,0.001,1.0)');
+  expect(material.transparent).toBe(true); expect(material.depthWrite).toBe(false); expect(material.forceSinglePass).toBe(false);
+  expect(material.defines).toMatchObject({ IOR: '', USE_SPECULAR: '' });
+  expect(material.uniforms.ior.value).toBe(1.5);
+  expect(material.fragmentShader).toContain('totalSpecular/clamp(diffuseColor.a+0.001,0.001,1.0)');
 });
 
 it('draws tyres, screens and windscreens with the surface program: a screen layer as its game blend, the inside of a windscreen blended, its outside as glass', () => {
@@ -96,14 +102,13 @@ it('draws tyres, screens and windscreens with the surface program: a screen laye
   const built = [of('tyre', { wear: { albedoMultiply: 0.6, roughnessAdjust: 0.3 } }), of('dashboard', screen, false), of('dashboard', screen, true),
     of('externalMonitor', screen, true), of('windscreen', { windscreen: {} }), of('windscreenInside')]
     .map(recipe => createCarMaterial(recipe, appearance, () => new Texture(), testShading()));
-  // The surface program names its textures; three's own program would not.
-  expect(built.map(material => material.userData.surfaceTextures as unknown)).toEqual(Array(6).fill(['albedo']));
-  expect(built.map(material => [material.type, material.transparent, material.depthWrite])).toEqual([
-    ['MeshStandardMaterial', false, true], ['MeshStandardMaterial', false, true], ['MeshStandardMaterial', true, false], ['MeshStandardMaterial', true, false],
-    ['MeshPhysicalMaterial', true, false], ['MeshStandardMaterial', true, false],
+  // The surface program's family, on its own albedo map. The windscreen is on the standard model: three's physical model at index 1.5,
+  // specular level 1 and white, as three drew it, is the same light.
+  expect(built.map(material => composedParts(material)?.find(part => part.name === 'surface')?.ownTextures)).toEqual(Array(6).fill(['surface_albedo']));
+  expect(built.map(material => [material.transparent, material.depthWrite, 'IOR' in material.defines])).toEqual([
+    [false, true, false], [false, true, false], [true, false, false], [true, false, false], [true, false, false], [true, false, false],
   ]);
 });
-
 it("orders blended parts by the game's sortOffset (the outside windscreen over the lamp glows), opaque parts first", () => {
   const blended = (sortOffset?: number) => createCarMaterial({ ...recipe(), surface: { ...recipe().surface, renderState: { alphaBlend: true }, ...(sortOffset === undefined ? {} : { sortOffset }) } as CarSurface }, appearance, () => new Texture(), testShading());
   const opaque = createCarMaterial({ ...recipe(), surface: { ...recipe().surface, sortOffset: 6 } as CarSurface }, appearance, () => new Texture(), testShading());

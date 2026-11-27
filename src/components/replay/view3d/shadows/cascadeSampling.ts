@@ -1,70 +1,53 @@
-import { ShaderChunk, Vector2, type DepthTexture, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import type { DepthTexture, IUniform } from 'three';
 import type { SceneryShadows } from '../../../../../shared/types/scenes/scenery.js';
+import type { ShaderPart } from '../shaders/composer.js';
+import { MAX_SHADOW_CASCADES, MAX_SHADOW_TAPS, SCENE_BLOCK, sceneBlock, setScene } from '../shaders/sceneBlock.js';
 import type { CascadeShadowState } from './cascadeShadows.js';
 import type { ShadowCascadeLayout } from './shadowCascades.js';
 
-/** What the surface shaders are compiled for: a package with more cascades or filter taps throws. */
-const MAX_SHADOW_CASCADES = 8;
-const MAX_SHADOW_TAPS = 16;
-
 /**
- * The sun shadow inputs every lit program shares (scenery and cars); `surface_cascadeCount` 0 leaves everything lit. The atlas
- * sampler must hold a depth texture from the first draw: with none, three binds its empty colour texture and WebGL drops the draw on
- * the sampler mismatch. The arrays are packed typed arrays: three uploads them as they are, where an array of vectors or matrices is
- * copied into one on every draw of every lit program.
+ * The sun shadow atlas every lit program samples (scenery and cars): a texture, so an ordinary uniform; the rest of the cascade set is
+ * in the scene block (`surface_cascade*`, sceneBlock.ts), where `surface_cascadeCount` 0 leaves everything lit. The sampler must hold a
+ * depth texture from the first draw: with none, three binds its empty colour texture and WebGL drops the draw on the sampler mismatch.
  */
-export const cascadeShadowUniforms = {
-  surface_cascadeAtlas: { value: null as DepthTexture | null },
-  surface_cascadeCount: { value: 0 },
-  surface_cascadeMatrices: { value: new Float32Array(MAX_SHADOW_CASCADES * 16) },
-  surface_cascadeTiles: { value: new Float32Array(MAX_SHADOW_CASCADES * 4) },
-  surface_cascadeCardDepth: { value: new Float32Array(MAX_SHADOW_CASCADES) },
-  surface_cascadeTaps: { value: new Float32Array(MAX_SHADOW_TAPS * 3) },
-  surface_cascadeTapCount: { value: 0 },
-  /** One atlas texel across and up, as a fraction of the stacked texture. */
-  surface_cascadeTexel: { value: new Vector2() },
-  /** Filter scale, select halfExtent. */
-  surface_cascadeFilter: { value: new Vector2() },
-  /** View depth where the fade starts, and far. */
-  surface_cascadeFade: { value: new Vector2() },
-  surface_cascadeNormalOffset: { value: 0 },
-} satisfies Record<string, IUniform>;
+export const cascadeAtlasUniform: IUniform<DepthTexture | null> = { value: null };
 
 /**
- * Points the surfaces at a cascade set: its atlases and packed matrices (shared, so the per-frame redraws reach the shaders without a
- * copy) and the package's filter, select, fade and normal offset.
+ * Points the surfaces at a cascade set: its atlas, and into the scene block its matrices, tiles and card depths as they are now and
+ * the package's taps, filter, select, fade and normal offset. The cascades move every frame: call it after each update of the set,
+ * before the frame's other renders.
  */
 export function sampleCascadeShadows(shadows: SceneryShadows, layout: ShadowCascadeLayout, state: CascadeShadowState): void {
-  const { cascades } = layout, { taps, texelSize, scale } = shadows.filter;
+  const { cascades } = layout, { taps, texelSize, scale } = shadows.filter, { offsets } = SCENE_BLOCK;
   if (cascades.length > MAX_SHADOW_CASCADES) throw Error(`The surfaces sample at most ${MAX_SHADOW_CASCADES} shadow cascades, not ${cascades.length}`);
   if (taps.length > MAX_SHADOW_TAPS) throw Error(`The surfaces sample at most ${MAX_SHADOW_TAPS} shadow filter taps, not ${taps.length}`);
-  const u = cascadeShadowUniforms;
-  u.surface_cascadeAtlas.value = state.atlas;
-  u.surface_cascadeMatrices.value = state.packedMatrices;
-  u.surface_cascadeCardDepth.value = state.cardDepth;
-  cascades.forEach((_, i) => state.tiles[i].toArray(u.surface_cascadeTiles.value, i * 4));
-  taps.forEach(({ offset, weight }, i) => u.surface_cascadeTaps.value.set([offset[0], offset[1], weight], i * 3));
-  u.surface_cascadeTapCount.value = taps.length;
+  cascadeAtlasUniform.value = state.atlas;
+  sceneBlock.set(state.packedMatrices, offsets.surface_cascadeMatrices);
+  cascades.forEach((_, i) => {
+    state.tiles[i].toArray(sceneBlock, offsets.surface_cascadeTiles + i * 4);
+    sceneBlock[offsets.surface_cascadeCardDepth + i * 4] = state.cardDepth[i];
+  });
+  taps.forEach(({ offset, weight }, i) => sceneBlock.set([offset[0], offset[1], weight], offsets.surface_cascadeTaps + i * 4));
+  setScene('surface_cascadeTapCount', taps.length);
   // The atlases are stacked upward (cascadeShadows.ts): a texel up is 1 / count of one across.
-  u.surface_cascadeTexel.value.set(texelSize, texelSize / shadows.atlas.count);
-  u.surface_cascadeFilter.value.set(scale, shadows.select.halfExtent);
-  u.surface_cascadeFade.value.set(layout.fadeStartM, layout.farM);
-  u.surface_cascadeNormalOffset.value = shadows.normalOffset.scale;
-  u.surface_cascadeCount.value = cascades.length;
+  setScene('surface_cascadeTexel', [texelSize, texelSize / shadows.atlas.count]);
+  setScene('surface_cascadeFilter', [scale, shadows.select.halfExtent]);
+  setScene('surface_cascadeFade', [layout.fadeStartM, layout.farM]);
+  setScene('surface_cascadeNormalOffset', shadows.normalOffset.scale);
+  setScene('surface_cascadeCount', cascades.length);
 }
 
 /** Holds the surfaces lit, on `atlas` (a set's atlas before its first draw, or null once the scene is gone). */
 export function holdCascadeShadows(atlas: DepthTexture | null): void {
-  cascadeShadowUniforms.surface_cascadeCount.value = 0;
-  cascadeShadowUniforms.surface_cascadeAtlas.value = atlas;
+  setScene('surface_cascadeCount', 0);
+  cascadeAtlasUniform.value = atlas;
 }
 
 /**
  * Vertex part: the shadow lookup position, the world position moved along the world normal by the package's offset scale times the
- * material's `surface_normalShadowInfluence`. Goes after three's `worldpos_vertex` (it needs `transformed` and `transformedNormal`).
+ * material's `surface_normalShadowInfluence`. Goes once the position is final (it needs `transformed` and `transformedNormal`).
  */
 const CASCADE_SHADOW_VERTEX_PARS = `
-  uniform float surface_cascadeNormalOffset;
   uniform float surface_normalShadowInfluence;
   varying vec3 vCascadePosition;
 `;
@@ -86,36 +69,28 @@ const CASCADE_SHADOW_VERTEX = `
 /**
  * Fragment part: `surfaceCascadeShadow(viewDepth)`, the sun's light fraction (1 lit) from the first cascade whose tile holds the
  * point (max(|uv − 0.5|) ≤ halfExtent), filtered by the package's hardware-compare taps (Σ weight · compare · scale), faded out toward
- * far. A point outside every cascade is lit. With `SURFACE_CARD` defined, a camera-facing card skips its own depth.
+ * far. A point outside every cascade is lit. With `SURFACE_CARD` defined, a camera-facing card skips its own depth. The set is the
+ * scene block's (its counts floats).
  */
 const CASCADE_SHADOW_FRAGMENT_PARS = `
   uniform sampler2DShadow surface_cascadeAtlas;
-  uniform int surface_cascadeCount;
-  uniform mat4 surface_cascadeMatrices[ ${MAX_SHADOW_CASCADES} ];
-  uniform vec4 surface_cascadeTiles[ ${MAX_SHADOW_CASCADES} ];
-  uniform float surface_cascadeCardDepth[ ${MAX_SHADOW_CASCADES} ];
-  uniform vec3 surface_cascadeTaps[ ${MAX_SHADOW_TAPS} ];
-  uniform int surface_cascadeTapCount;
-  uniform vec2 surface_cascadeTexel;
-  uniform vec2 surface_cascadeFilter;
-  uniform vec2 surface_cascadeFade;
   varying vec3 vCascadePosition;
   float surfaceCascadeShadow( float viewDepth ) {
     for ( int i = 0; i < ${MAX_SHADOW_CASCADES}; i ++ ) {
-      if ( i >= surface_cascadeCount ) break;
+      if ( float( i ) >= surface_cascadeCount ) break;
       vec3 coord = ( surface_cascadeMatrices[ i ] * vec4( vCascadePosition, 1.0 ) ).xyz;
       vec2 off = abs( coord.xy - 0.5 );
       if ( max( off.x, off.y ) > surface_cascadeFilter.y ) continue;
       #ifdef SURFACE_CARD
-        coord.z -= surface_cascadeCardDepth[ i ];
+        coord.z -= surface_cascadeCardDepth[ i ].x;
       #endif
       coord.z = min( coord.z, 1.0 );
       vec4 tile = surface_cascadeTiles[ i ];
       vec2 uv = tile.xy + coord.xy * tile.zw;
       float lit = 0.0;
       for ( int t = 0; t < ${MAX_SHADOW_TAPS}; t ++ ) {
-        if ( t >= surface_cascadeTapCount ) break;
-        vec3 tap = surface_cascadeTaps[ t ];
+        if ( float( t ) >= surface_cascadeTapCount ) break;
+        vec3 tap = surface_cascadeTaps[ t ].xyz;
         lit += tap.z * texture( surface_cascadeAtlas, vec3( uv + tap.xy * surface_cascadeTexel, coord.z ) );
       }
       float fadeOut = clamp( ( viewDepth - surface_cascadeFade.x ) / ( surface_cascadeFade.y - surface_cascadeFade.x ), 0.0, 1.0 );
@@ -126,18 +101,17 @@ const CASCADE_SHADOW_FRAGMENT_PARS = `
 `;
 
 /**
- * Gives an unlit program (three's basic material, instanced or not) the sun's light fraction at each fragment:
- * `surfaceCascadeShadow(vCascadeViewDepth)`, looked up at the fragment's world position (no normal offset), 1 outside the cascades.
- * The caller uses it after `#include <common>` of the fragment program.
+ * Gives an unlit composed program (instanced or not) the sun's light fraction at each fragment: `surfaceCascadeShadow(vCascadeViewDepth)`,
+ * looked up at the fragment's world position (no normal offset), 1 outside the cascades. Its varyings are written once the drawn
+ * position is final (after a part that moves it), first in their slot. The atlas is the shared one, the rest the scene block's.
  */
-export function patchCascadeShadowLookup(shader: WebGLProgramParametersWithUniforms): void {
-  const replace = (source: string, from: string, to: string) => {
-    if (!source.includes(from)) throw Error(`The shader has no ${from} to take the cascade lookup`);
-    return source.replace(from, () => to);
-  };
-  shader.vertexShader = replace(replace(shader.vertexShader, '#include <common>', `#include <common>
+export const cascadeLookupPart: ShaderPart = {
+  name: 'cascadeLookup',
+  slots: {
+    vertexPars: {at: 0, glsl: `
   varying vec3 vCascadePosition;
-  varying float vCascadeViewDepth;`), '#include <worldpos_vertex>', `#include <worldpos_vertex>
+  varying float vCascadeViewDepth;`},
+    vertexOutputs: {at: 0, glsl: `
   {
     vec4 cascadeWorld = vec4( transformed, 1.0 );
     #ifdef USE_BATCHING
@@ -148,61 +122,44 @@ export function patchCascadeShadowLookup(shader: WebGLProgramParametersWithUnifo
     #endif
     vCascadePosition = ( modelMatrix * cascadeWorld ).xyz;
     vCascadeViewDepth = - mvPosition.z;
-  }`);
-  shader.fragmentShader = replace(shader.fragmentShader, '#include <common>', `#include <common>
+  }`},
+    fragmentPars: {at: 0, glsl: `
   varying float vCascadeViewDepth;
-${CASCADE_SHADOW_FRAGMENT_PARS}`);
-  Object.assign(shader.uniforms, cascadeShadowUniforms);
-}
-
-/** Where three's light loop has the sun's light (the only directional light) for a fragment, before applying it. */
-const SUN_LIGHT_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
+${CASCADE_SHADOW_FRAGMENT_PARS}`},
+  },
+  uniforms: () => ({surface_cascadeAtlas: cascadeAtlasUniform}),
+};
 
 /**
- * Splits the sun's diffuse from its specular: the sun's light carries the shadow s, and the diffuse a light adds is scaled by
- * `surfaceSunDiffuse` (set at the sun, 1 for the lights before it), so the sun's diffuse takes min(2s, 1) and its specular s. A
- * half-shadowed texel is fully lit in diffuse; only the specular follows the shadow as it is. Wraps whatever `RE_Direct` is defined
- * by then (leaf translucency included, which so takes the diffuse's curve). `surfaceSunShadow` keeps s for a surface's own light
- * after the loop (the inside of a windscreen lights its back face by it).
+ * The sun's shadow s on its light: `surfaceSunDiffuse` scales the diffuse it adds (min(2s, 1) / s), so the sun's diffuse takes
+ * min(2s, 1) and its specular s. A half-shadowed texel is fully lit in diffuse; only the specular follows the shadow as it is.
+ * `surfaceSunShadow` keeps s for a surface's own light after the loop (the inside of a windscreen lights its back face by it).
  */
-const SUN_DIFFUSE_SPLIT = `
-float surfaceSunDiffuse = 1.0, surfaceSunShadow = 1.0;
-void surfaceSunDirect( const in IncidentLight light, const in vec3 position, const in vec3 normal, const in vec3 viewDir,
-  const in vec3 coatNormal, const in PhysicalMaterial material, inout ReflectedLight reflected ) {
-  vec3 before = reflected.directDiffuse;
-  RE_Direct( light, position, normal, viewDir, coatNormal, material, reflected );
-  reflected.directDiffuse = before + ( reflected.directDiffuse - before ) * surfaceSunDiffuse;
-}
-#undef RE_Direct
-#define RE_Direct surfaceSunDirect
-`;
-
-/**
- * Gives a lit program the sun's shadow from the cascades, as every lit surface of the reference takes it: in three's light loop, the
- * sun's light is multiplied by `shade` of the cascade term where the object receives shadows, its specular by that shadow and its
- * diffuse by min(2 * shadow, 1) (`SUN_DIFFUSE_SPLIT`). `influence` is the material's normal shadow influence. The light chunk may
- * already be inlined (car paint's, the scenery's); a program without the sun's light throws.
- */
-export function patchCascadeShadow(shader: WebGLProgramParametersWithUniforms, influence: number, shade = (shadow: string) => shadow): void {
-  const replace = (source: string, from: string, to: string) => {
-    if (!source.includes(from)) throw Error(`The shader has no ${from.slice(0, 40)} to take the cascade shadow`);
-    return source.replace(from, to);
-  };
-  let vertex = replace(shader.vertexShader, '#include <common>', `#include <common>
-${CASCADE_SHADOW_VERTEX_PARS}`);
-  vertex = replace(vertex, '#include <worldpos_vertex>', `#include <worldpos_vertex>
-${CASCADE_SHADOW_VERTEX}`);
-  let fragment = shader.fragmentShader.replace('#include <lights_fragment_begin>', ShaderChunk.lights_fragment_begin);
-  fragment = replace(fragment, '#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>
-${CASCADE_SHADOW_FRAGMENT_PARS}`);
-  fragment = replace(fragment, '#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>
-${SUN_DIFFUSE_SPLIT}`);
-  fragment = replace(fragment, SUN_LIGHT_INFO, `${SUN_LIGHT_INFO}
-    #if UNROLLED_LOOP_INDEX == 0
-      { float sunShadow = receiveShadow ? ${shade('surfaceCascadeShadow( - vViewPosition.z )')} : 1.0;
+const SUN_SHADOW_STATE = 'float surfaceSunDiffuse = 1.0, surfaceSunShadow = 1.0;';
+/** Shades the sun's light `directLight` by its cascade shadow where the object receives shadows; `shade` is the family's take on it. */
+const sunShadow = (shade: (shadow: string) => string) => `{ float sunShadow = receiveShadow ? ${shade('surfaceCascadeShadow( - vViewPosition.z )')} : 1.0;
         directLight.color *= sunShadow;
-        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; surfaceSunShadow = sunShadow; }
-    #endif`);
-  shader.vertexShader = vertex; shader.fragmentShader = fragment;
-  Object.assign(shader.uniforms, cascadeShadowUniforms, { surface_normalShadowInfluence: { value: influence } });
+        surfaceSunDiffuse = sunShadow > 0.0 ? min( 2.0 * sunShadow, 1.0 ) / sunShadow : 1.0; surfaceSunShadow = sunShadow; }`;
+/** Scales the diffuse the sun's direct term added to `reflected` since `before` by `surfaceSunDiffuse`. */
+const sunDiffuse = (reflected: string, before: string) => `${reflected}.directDiffuse = ${before} + ( ${reflected}.directDiffuse - ${before} ) * surfaceSunDiffuse;`;
+
+/**
+ * The sun's shadow from the cascades in a lit composed program (litTemplate.ts), as every lit surface of the reference takes it: the
+ * lookup position moved along the normal by the package's offset times `influence` (the material's normal shadow influence), the
+ * sun's light shaded by `shade` of the cascade term where the object receives shadows, its diffuse split from its specular. The
+ * atlas is the shared one, the set the scene block's, the influence the material's. First in its slots, but last on the sun's direct term: the
+ * split takes the diffuse every part added to it there (leaf translucency).
+ */
+export function cascadeShadowPart(influence: number, shade = (shadow: string) => shadow): ShaderPart {
+  return {
+    name: 'cascadeShadow',
+    slots: {
+      vertexPars: {at: 0, glsl: CASCADE_SHADOW_VERTEX_PARS},
+      vertexOutputs: {at: 0, glsl: CASCADE_SHADOW_VERTEX},
+      fragmentPars: {at: 0, glsl: `${CASCADE_SHADOW_FRAGMENT_PARS}${SUN_SHADOW_STATE}\n`},
+      fragmentSunLight: {at: 0, glsl: `  vec3 surfaceSunBefore = reflectedLight.directDiffuse;\n  ${sunShadow(shade)}`},
+      fragmentSunDirect: {at: 100, glsl: `  ${sunDiffuse('reflectedLight', 'surfaceSunBefore')}`},
+    },
+    uniforms: () => ({surface_cascadeAtlas: cascadeAtlasUniform, surface_normalShadowInfluence: {value: influence}}),
+  };
 }

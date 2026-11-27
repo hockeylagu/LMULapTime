@@ -3,7 +3,9 @@ import {
   ShaderMaterial, Sprite, type BufferGeometry, type Material, type Object3D, type PerspectiveCamera, type Side, type Texture, type Vector4,
   type WebGLRenderer, type WebGLRenderTarget,
 } from 'three';
-import { trackShadowEye } from '../scenery/materials/shadowEye.js';
+import { trackShadowEye } from '../scenery/materials/billboardCard.js';
+import { composedCutOut, composedMaterial, composedVariant } from '../shaders/composer.js';
+import { depthCutOutPart, depthTemplate } from '../shaders/depthTemplate.js';
 
 /** One rectangle (texels) of a depth target and the sun camera that fills it. */
 /** A tile to draw: its viewport, its sun camera and the depth offset its casters draw with (polygon offset factor and units). */
@@ -79,35 +81,40 @@ function depthCopyQuad(): {scene: Scene; camera: OrthographicCamera; material: S
 export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): ShadowCasterPass {
   let depthCopy: ReturnType<typeof depthCopyQuad> | null = null;
   // Casters that draw the same way share one depth material, so the pass draws them one after another without switching material
-  // (every switch uploads the material's uniforms again): keyed by the caster's kind, the card turn, side, alpha cut and the
-  // textures the cut reads.
-  const depthMaterials = new Map<string, MeshDepthMaterial>();
+  // (every switch uploads the material's uniforms again): keyed by the caster's kind, the card turn, side, alpha cut and what the
+  // cut reads (a composed surface's own cut-out, a built-in material's textures).
+  const depthMaterials = new Map<string, Material>();
   // The key's result per scene material and caster kind, so the key is built once.
-  let byMaterial = new WeakMap<Material, Partial<Record<CasterKind, MeshDepthMaterial>>>();
-  // The texture listeners a cut-out's depth material put on, taken off when the pass goes.
-  const listening: Array<[Texture, () => void]> = [];
-  const depthOf = (mesh: Mesh, material: Material): MeshDepthMaterial => {
+  let byMaterial = new WeakMap<Material, Partial<Record<CasterKind, Material>>>();
+  // The dispose listeners a cut-out's depth material put on, taken off when the pass goes.
+  const listening: Array<() => void> = [];
+  const depthOf = (mesh: Mesh, material: Material): Material => {
     if (!castsShadow(material)) return NO_SHADOW;
-    const kind = kindOf(mesh), known = byMaterial.get(material) ?? {};
-    byMaterial.set(material, known);
+    const kind = kindOf(mesh);
+    let known = byMaterial.get(material);
+    if (!known) { known = {}; byMaterial.set(material, known); }
     const found = known[kind];
     if (found) return found;
     const alphaTest = material.alphaToCoverage ? 0.5 : material.alphaTest;
-    const custom = mesh.customDepthMaterial ?? null, side = material.shadowSide ?? casterSide(material, alphaTest > 0), source = material as Material & {map?: Texture | null; alphaMap?: Texture | null};
-    const [map, alphaMap] = alphaTest > 0 ? [source.map ?? null, source.alphaMap ?? null] : [null, null];
-    const key = `${kind}|${custom?.uuid ?? ''}|${side}|${alphaTest}|${map?.id ?? ''}|${alphaMap?.id ?? ''}`;
+    const custom = mesh.customDepthMaterial ?? null, side = material.shadowSide ?? casterSide(material, alphaTest > 0);
+    // A composed surface cuts by its own cut-out, read where the surface reads it (its uniforms, shared: the depth material is the
+    // surface's own); a built-in material by its map and alpha map, as three's depth material reads them.
+    const source = material as Material & {map?: Texture | null; alphaMap?: Texture | null}, composed = alphaTest > 0 ? composedCutOut(material) : null;
+    const [map, alphaMap] = alphaTest > 0 && !composed ? [source.map ?? null, source.alphaMap ?? null] : [null, null];
+    const key = `${kind}|${custom?.uuid ?? ''}|${side}|${alphaTest}|${composed ? `cut${material.id}` : `${map?.id ?? ''}|${alphaMap?.id ?? ''}`}`;
     let depth = depthMaterials.get(key);
     if (depth) { known[kind] = depth; return depth; }
-    depth = new MeshDepthMaterial({side, alphaTest, map, alphaMap});
-    // Camera-facing cards keep their shadow-pass turn (patchSurfaceShader's billboard depth material).
+    const parts = composed ? [depthCutOutPart(composed)] : [];
+    // Camera-facing cards keep their shadow-pass turn (the composed depth material of billboardCard.ts).
     if (custom) {
-      depth.onBeforeCompile = (shader, renderer) => custom.onBeforeCompile(shader, renderer);
-      depth.customProgramCacheKey = () => custom.customProgramCacheKey();
-    }
+      if (map || alphaMap) throw Error(`Material ${material.name || material.type} cuts by a map of its own, which a card's shadow does not read`);
+      depth = composedVariant(custom, parts, {side, alphaTest});
+    } else depth = composed ? composedMaterial(depthTemplate, parts, {side, alphaTest}) : new MeshDepthMaterial({side, alphaTest, map, alphaMap});
     depthMaterials.set(key, depth); known[kind] = depth;
-    // A depth material that cuts by a texture goes with it.
+    // A depth material that cuts goes with what it cuts by: a composed surface, a built-in's textures.
     const drop = () => { depth.dispose(); depthMaterials.delete(key); byMaterial = new WeakMap(); };
-    for (const texture of [map, alphaMap]) if (texture) { texture.addEventListener('dispose', drop); listening.push([texture, drop]); }
+    if (composed) { material.addEventListener('dispose', drop); listening.push(() => material.removeEventListener('dispose', drop)); }
+    for (const texture of [map, alphaMap]) if (texture) { texture.addEventListener('dispose', drop); listening.push(() => texture.removeEventListener('dispose', drop)); }
     return depth;
   };
   // The pass draws only shadow casters, each with its depth material; everything else is hidden for it, then restored.
@@ -119,10 +126,11 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
     for (const root of roots) root.traverseVisible(object => {
       if (object instanceof Mesh) {
         const mesh = object as Mesh<BufferGeometry, Material | Material[]>, geometry = mesh.geometry;
-        // A batch's own bounds cover its instances; its geometry is the whole reserved buffer, unused space included.
-        const bounds = mesh instanceof BatchedMesh ? mesh : geometry;
-        if (mesh.castShadow && !bounds.boundingSphere) bounds.computeBoundingSphere();
-        if (mesh.castShadow && 2 * bounds.boundingSphere!.radius * mesh.matrixWorld.getMaxScaleOnAxis() >= minCasterM) {
+        // A batch's own bounds cover its instances; its geometry is the whole reserved buffer, unused space included. Without a
+        // floor every caster draws: no size to measure.
+        const bounds = mesh instanceof BatchedMesh ? mesh : geometry, sized = minCasterM > 0;
+        if (mesh.castShadow && sized && !bounds.boundingSphere) bounds.computeBoundingSphere();
+        if (mesh.castShadow && (!sized || 2 * bounds.boundingSphere!.radius * mesh.matrixWorld.getMaxScaleOnAxis() >= minCasterM)) {
           swapped.push([mesh, mesh.material]);
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(material => depthOf(mesh, material)) : depthOf(mesh, mesh.material);
           return;
@@ -170,7 +178,7 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
     draw: (target, layers, view, dynamic, minCasterM) => render(target, layers, view, [scene], dynamic, minCasterM, true),
     drawRoots: (target, layers, view, roots, base) => render(target, layers, view, roots, [], 0, false, base),
     dispose() {
-      for (const [texture, drop] of listening) texture.removeEventListener('dispose', drop);
+      for (const stopListening of listening) stopListening();
       listening.length = 0;
       for (const depth of depthMaterials.values()) depth.dispose();
       depthMaterials.clear(); byMaterial = new WeakMap();
