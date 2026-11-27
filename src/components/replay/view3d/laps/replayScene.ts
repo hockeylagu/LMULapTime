@@ -1,5 +1,6 @@
 import { Matrix4, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import type { SpotCar } from '../night/carSpots.js';
+import { isBraking } from '../car/lampStates.js';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
@@ -83,7 +84,8 @@ export async function createReplayScene(
   /** The shell's content for a lap layer: the cars and lines, with the ghost's parts following the camera's distance. */
   const contentOf = (lap: LapLayer): SceneContent => {
     const fadeGhost = ghostFader(lap.ghost);
-    const envelope = lap.primary.getObjectByName('body-envelope')!, beams: SpotCar = {lights: lap.lights, frame: new Matrix4()};
+    const envelope = lap.primary.getObjectByName('body-envelope')!;
+    const beams: SpotCar = {lights: lap.lights, frame: new Matrix4(), headlights: false, braking: false, box: lap.bounds};
     return {
       root: lap.root, reflected: lap.primary,
       beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
@@ -98,7 +100,9 @@ export async function createReplayScene(
       // The compared car casts none (`drawnCar`).
       casters: () => [lap.primary.getWorldPosition(primaryCentre)],
       headlights(out) {
-        if (!lap.primary.visible || lap.trajectory.points[primaryIndex]?.headlights !== true) return;
+        const point = lap.trajectory.points[primaryIndex];
+        beams.headlights = point?.headlights === true; beams.braking = isBraking(point?.brake);
+        if (!lap.primary.visible || (!beams.headlights && !beams.braking)) return;
         envelope.updateMatrix();
         beams.frame.multiplyMatrices(lap.primary.matrixWorld, envelope.matrix);
         out.push(beams);

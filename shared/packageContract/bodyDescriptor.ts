@@ -43,6 +43,11 @@ export interface CarSurface {
   sortOffset?: number;
   renderState?: {alphaBlend?: boolean; alphaMask?: boolean};
   finish?: {roughness: number; metalness: number};
+  /**
+   * The game draws its live rear view into this surface (a stage bound to the MIRROR.BMP render target: cockpit mirror faces, rear camera
+   * displays). That stage has no map; absent otherwise. Data only: what to draw instead is the viewer's choice.
+   */
+  rearView?: true;
   [key: string]: unknown;
 }
 
@@ -85,6 +90,11 @@ export interface CarAppearance {
   optionNodes: string[];
   /** Index into the body's `readouts` of this entry's wheel/dash readout; null when its cockpit draws none. */
   readout: number | null;
+  /**
+   * The 8 corners of the car's reflection cube box in the native car frame (docs/PACKAGE_FORMAT.md#car-reflection-box). The game binds the
+   * axis-aligned box of these corners under the car's world matrix as its shaders' `cubeBBMin`/`cubeBBMax`, and its centre as `cubeBBPos`.
+   */
+  reflectionBox: Vec3[];
 }
 
 /** A camera of the car, named by role, in the native car frame of the GLB (+x left, +y up, -z forward). */
@@ -147,11 +157,20 @@ export interface CarSpotLight {
   innerConeDeg: number;
   outerConeDeg: number;
   falloff: number;
-  /** Color / 255 × Intensity. */
+  /** Color / 255 × Intensity: what the game draws when its per-frame light rule does not run (`states`). */
   colour: Vec3;
+  /**
+   * The tail light's colours under the game's per-frame rule, which replaces the GEN Intensity: `lit` (Color / 255 × 1) with the lamps on and
+   * not braking, `braking` (Color / 255 × 2.5) when braking, with the lamps on or off; neither: the spot is off. Braking is the brake input above
+   * `CAR_BRAKE_LIGHT_THRESHOLD`. No fade between them. Null for the headlights, which the rule only switches on and off (`colour`).
+   */
+  states: {lit: Vec3; braking: Vec3} | null;
 }
 
-/** The GEN `CockpitLight` omni, in the native car frame: `colour` is Color / 255; the cockpit materials carry their own copy (`cockpitLight`). */
+/** The brake input (0 to 1) above which the game's car lights are in their braking state (a flag, not scaled). */
+export const CAR_BRAKE_LIGHT_THRESHOLD = 0.025;
+
+/** The GEN `CockpitLight` omni, in the native car frame: `colour` is Color / 255; the cockpit-mode materials carry it too (`cockpitLight`), as the game binds it. */
 export interface CarCockpitLight {position: Vec3; rangeM: number; colour: Vec3; intensity: number}
 
 /** The car's own lights: the two headlights and the tail light, in that order (the game's spot table order), and the cockpit light or null. */
@@ -296,8 +315,8 @@ export interface CarReadoutFont {
 
 export const BODY_DESCRIPTOR_KEYS = ['optionNodes', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras', 'readouts', 'lights'] as const;
 export const CAR_SPOT_LIGHTS = ['headlightLeft', 'headlightRight', 'tail'] as const;
-const SPOT_KEYS = ['name', 'position', 'direction', 'rangeM', 'attenuation', 'innerConeDeg', 'outerConeDeg', 'falloff', 'colour'] as const;
-const APPEARANCE_KEYS = ['alias', 'number', 'albedo', 'paint', 'optionNodes', 'readout'];
+const SPOT_KEYS = ['name', 'position', 'direction', 'rangeM', 'attenuation', 'innerConeDeg', 'outerConeDeg', 'falloff', 'colour', 'states'] as const;
+const APPEARANCE_KEYS = ['alias', 'number', 'albedo', 'paint', 'optionNodes', 'readout', 'reflectionBox'];
 const READOUT_KEYS = ['material', 'rpm', 'revLimitRpm', 'canvasSize', 'elements', 'texts', 'fonts'] as const;
 const READOUT_TEXT_KEYS = ['name', 'font', 'scale', 'offset', 'alignW', 'alignH', 'alphaColor', 'units', 'defaultValue'] as const;
 const READOUT_FONT_KEYS = ['texture', 'size', 'cell', 'columns', 'advances'] as const;
@@ -341,6 +360,12 @@ function parseLights(value: unknown, what: string): void {
     if (!(inner > 0 && outer >= inner && outer < 360)) throw Error(`${at}: expected 0 < innerConeDeg <= outerConeDeg < 360`);
     nonNegative(spot.falloff, `${at}.falloff`);
     vec3(spot.colour, `${at}.colour`, 1000).forEach(n => nonNegative(n, `${at}.colour`));
+    // The tail light has its lit and braking colours; the headlights have none.
+    if (spot.name === 'tail') {
+      const states = record(spot.states, `${at}.states`);
+      exactKeys(states, ['lit', 'braking'], `${at}.states`);
+      for (const key of ['lit', 'braking']) vec3(states[key], `${at}.states.${key}`, 1000).forEach(n => nonNegative(n, `${at}.states.${key}`));
+    } else if (spot.states !== null) throw Error(`${at}.states: only the tail light has states`);
     return text(spot.name, `${at}.name`, 32);
   });
   if (names.join() !== CAR_SPOT_LIGHTS.join()) throw Error(`${what}.spots: expected ${CAR_SPOT_LIGHTS.join(", ")}`);
@@ -531,6 +556,9 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
       }
     }
     readoutIndexes.push(appearance.readout === null ? null : count(appearance.readout, `${at}.readout`));
+    const box = array(appearance.reflectionBox, `${at}.reflectionBox`, 8);
+    if (box.length !== 8) throw Error(`${at}.reflectionBox: expected 8 corners`);
+    box.forEach((corner, c) => vec3(corner, `${at}.reflectionBox[${c}]`, 100));
     return alias;
   });
   if (!sameList(aliases, row.vehicleIds)) throw Error(`${what}: the appearance aliases differ from the body's vehicleIds`);
@@ -551,6 +579,7 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
       const surface = record(material.surface, `${at}.surface`);
       text(surface.kind, `${at}.surface.kind`);
       record(surface.maps, `${at}.surface.maps`);
+      if (surface.rearView !== undefined && surface.rearView !== true) throw Error(`${at}.surface.rearView: expected true or absent`);
     }
   });
   if (materialIds.size !== (descriptor.materials as unknown[]).length) throw Error(`${what}.materials: duplicate material ids`);

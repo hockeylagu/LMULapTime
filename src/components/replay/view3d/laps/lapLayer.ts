@@ -58,6 +58,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       cameras: assets.primary.descriptor.cameras.list, chaseLodMultiplier: assets.primary.descriptor.cameras.chase.lodMultiplier,
       /** The primary car's own lights (its headlight beams); the ghost, drawn see-through, casts none. */
       lights: assets.primary.descriptor.lights,
+      /** The primary car's body bounds in its envelope's frame, which its own beams leave dark. */
+      bounds: cars.primary.pickShape.box,
       primaryDistances, baselineDistances,
       /** Both laps' elapsed time against distance, for the time-synced ghost. */
       ghostClock: baseline ? createGhostClock(trajectory.points, primaryDistances, baseline.points, baselineDistances, trajectory.trackLengthM) : null,

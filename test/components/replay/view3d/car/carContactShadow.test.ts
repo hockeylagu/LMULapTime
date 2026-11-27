@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { BoxGeometry, Color, Group, Mesh, MeshBasicMaterial, ShaderLib, Vector4, type Camera, type Object3D, type WebGLRenderTarget } from 'three';
 import { createContactShadow, createUnderCarBaker } from '../../../../../src/components/replay/view3d/car/carContactShadow.js';
 import type { BakeRenderer } from '../../../../../src/components/replay/view3d/car/underCarBake.js';
+import { sceneDayLight } from '../../../../../src/components/replay/view3d/scene/dayLight.js';
 
 const carModel = () => {
   const model = new Group(); model.position.set(5, 1, 5);
@@ -49,6 +50,14 @@ it("keeps a quarter of its darkening where the sun reaches the road, all of it p
   material.onBeforeCompile(shader as never, null as never);
   expect(shader.fragmentShader).toContain('diffuseColor.a *= mix( 1.0 - 0.75 * sunLit, 1.0, beyond );');
   expect(shader.fragmentShader.indexOf('sunLit = surfaceCascadeShadow')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <alphamap_fragment>'));
+});
+
+it('stays whole at night: the sun share of the fade follows the day share, not the moon', () => {
+  const {material} = createContactShadow(carModel(), 'a', createUnderCarBaker());
+  const shader = {uniforms: {} as Record<string, unknown>, vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader};
+  material.onBeforeCompile(shader as never, null as never);
+  expect(shader.fragmentShader).toContain('sunLit = surfaceCascadeShadow( vCascadeViewDepth ) * contactShadow_dayLight;');
+  expect(shader.uniforms.contactShadow_dayLight).toBe(sceneDayLight);
 });
 
 it('draws pulled toward the eye, so a cambered road under the flat quad does not cut it frame by frame', () => {

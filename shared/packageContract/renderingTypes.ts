@@ -9,7 +9,10 @@ import type {Vec3} from './strict.js';
 /** tone = saturate((1 - z)(1 - b·z)²), z = e^(-a·x), per exposed linear component x. */
 export interface SceneryToneCurve { a: number; b: number }
 
-/** The exposure values, white balance and tone curve of one weather state. */
+/** One look's bloom (docs/SCENE_PACKAGE.md, Bloom): the bright-pass threshold and remap factor and the bloom luminance of the merge gain. */
+export interface SceneryBloomLook { threshold: number; remapFactor: number; luminance: number }
+
+/** The exposure values, white balance, tone curve and bloom of one weather state. */
 export interface SceneryCameraLook {
   /**
    * T of the exposure law: exposure = T · B^(1 - s) / L^s kept inside [minExposure, maxExposure], s the type's adaptationScale and
@@ -24,6 +27,37 @@ export interface SceneryCameraLook {
   toneCurve: SceneryToneCurve;
   /** fSunGlareScalar: the sun glare's strength in this look. */
   sunGlareScalar: number;
+  bloom: SceneryBloomLook;
+}
+
+/**
+ * A camera type's Glare values. `quality` by the player's post-effects quality (glareLuminance is a merge gain factor; gamma is handed to YEBIS
+ * without a traced use); shapeLuminance the other preset factor of the merge gain; rangeScale divides the bright pass and multiplies the gain.
+ * scale, thresholdBloom, numLevels, dispersion and dispersionBaseLevel are published as the files hold them, their use not traced.
+ */
+export interface SceneryBloomType {
+  quality: Record<'low' | 'medium' | 'high', { glareLuminance: number; gamma: number }>;
+  shapeLuminance: number;
+  rangeScale: number;
+  scale: number;
+  thresholdBloom: number;
+  numLevels: number;
+  dispersion: number;
+  dispersionBaseLevel: number;
+}
+
+/**
+ * The executable's bloom chain constants: the merge gain scale, the first blur's Gaussian sigma per channel (R, G, B) in texels of its level and
+ * its tap radius, the factor of the later blurs' sigma, the blurred levels as fractions of the frame size and the size the merged bloom is
+ * upsampled to.
+ */
+export interface SceneryBloomChain {
+  mergeScale: number;
+  blurSigma: [number, number, number];
+  blurRadius: number;
+  wideBlurScale: number;
+  levelScales: number[];
+  outputScale: number;
 }
 
 /** One time-of-day profile of a camera type: the clear look, and the overcast look it blends to with the weather. */
@@ -56,6 +90,7 @@ export interface SceneryCameraTypeProfile {
   profiles: SceneryCameraProfile[];
   /** Sample radius and count, the occlusion's strength scale, and the grey a fully occluded spot darkens to. */
   ambientOcclusion: { radiusM: number; samples: number; scale: number; colour: number };
+  bloom: SceneryBloomType;
 }
 
 /**
@@ -67,6 +102,7 @@ export interface SceneryCamera {
   outputGamma: number;
   /** The scene luminance the exposure is divided by in the tone pass. */
   sceneLuminanceScale: number;
+  bloom: SceneryBloomChain;
   types: Record<Exclude<SceneryCameraType, 'tv'>, SceneryCameraTypeProfile> & {
     /** `lodMultiplier`: the median LODMultiplier of the layouts' trackside cameras; the game scales LOD distances by it for a TV view. */
     tv: SceneryCameraTypeProfile & { lodMultiplier: number };

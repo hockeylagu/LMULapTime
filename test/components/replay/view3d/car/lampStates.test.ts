@@ -35,12 +35,14 @@ it('switches a car lamp with the lap headlights and brake, hiding a frame withou
   const material = createLampMaterial(lamp(states, ['off', null, 'brake']), EMISSION, maps.get(0)!, {flashes: false, rain: false, states, maps});
   expect(maps.get(2)!.wrapT).toBe(RepeatWrapping);
   const car = new Group(); car.add(new Mesh(new BoxGeometry(), material));
-  const points = [{brake: 0.4}, {headlights: true, brake: 0}, {}] as ReplayTrajectoryPoint[];
+  // Brake in percent: braking above the package's CAR_BRAKE_LIGHT_THRESHOLD (2.5 %).
+  const points = [{brake: 40}, {headlights: true, brake: 0}, {}, {brake: 2}] as ReplayTrajectoryPoint[];
   const lights = createLampStates(car, points)!;
   const at = (index: number) => lights.update({index, fraction: 0} as Parameters<typeof lights.update>[0]);
   at(0); expect(material.uniforms.map.value).toBe(maps.get(2)); expect(material.visible).toBe(true);
   at(1); expect(material.visible).toBe(false); // Its headlights-on frame has no texture.
   at(2); expect(material.uniforms.map.value).toBe(maps.get(0)); expect(material.visible).toBe(true);
+  at(3); expect(material.uniforms.map.value).toBe(maps.get(0)); // A brush of the pedal under the threshold.
   const released = [...maps.values()].map(map => vi.spyOn(map, 'dispose'));
   material.dispose();
   for (const dispose of released) expect(dispose).toHaveBeenCalledOnce();

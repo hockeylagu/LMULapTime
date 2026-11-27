@@ -35,6 +35,13 @@ it('keeps the beams off glass, and the cockpit light off cabin glass', () => {
   expect(lampShares(surface('glass', 'on'), context)).toEqual({omni: '0.0', spot: '0.0', cockpit: null});
 });
 
+it('keeps the track lights and the beams off the screens, which show their own glow', () => {
+  expect(lampShares(surface('externalMonitor', undefined, undefined), context)).toEqual({omni: '0.0', spot: '0.0', cockpit: null});
+  const dash = lampShares(surface('dashboard', 'on'), context);
+  expect([dash.omni, dash.spot]).toEqual(['0.0', '0.0']);
+  expect(dash.cockpit).not.toBeNull();
+});
+
 it('writes only the terms a surface takes', () => {
   const program = () => ({uniforms: {}, vertexShader: ShaderChunk.meshphysical_vert, fragmentShader: ShaderChunk.meshphysical_frag}) as unknown as WebGLProgramParametersWithUniforms;
   const cabin = program(), glass = program();

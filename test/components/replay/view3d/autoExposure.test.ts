@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Color, Scene, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
-import { adaptExposure, createAutoExposure, EXPOSURE_PASS, exposureUniforms, inverseToneCurve, lawExposure, meteredLuminance, meterGrey, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { adaptExposure, createAutoExposure, EXPOSURE_PASS, exposureUniforms, inverseToneCurve, lawExposure, meteredLuminance, meterGrey, meterUnit, profileAt, RESET_METERINGS, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { BLOOM_PASS } from '../../../../src/components/replay/view3d/bloom.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
 /** A synthetic camera type (profiles at sun strengths 0 and 60). */
@@ -21,7 +22,7 @@ describe('autoExposure', () => {
 
   it("takes each profile value at its knot of direct-sun strength, interpolates between and holds past the ends", () => {
     // Knots 0 and 60: a sun whose strongest channel is 30, above 1°, sits half way; at or below the horizon it is profile 0.
-    expect(profileAt(TYPE, sun(30, 0))).toEqual({targetExposure: 0.4, lightDarkBorder: 1.5, minExposure: 0, maxExposure: 4, whiteBalanceK: 7000, toneCurve: {a: 2.5, b: 0.6}, sunGlareScalar: 1});
+    expect(profileAt(TYPE, sun(30, 0))).toEqual({targetExposure: 0.4, lightDarkBorder: 1.5, minExposure: 0, maxExposure: 4, whiteBalanceK: 7000, toneCurve: {a: 2.5, b: 0.6}, sunGlareScalar: 1, bloom: {threshold: 1.5, remapFactor: 0.5, luminance: 1.5}});
     const mid = profileAt(TYPE, sun(30, 30));
     expect(mid.targetExposure).toBeCloseTo(0.3); expect(mid.whiteBalanceK).toBeCloseTo(6750);
     expect(mid.lightDarkBorder).toBeCloseTo(1.375); expect(mid.maxExposure).toBeCloseTo(2.5);
@@ -71,12 +72,12 @@ describe('autoExposure', () => {
     const glint = [...scene.slice(1), 6000]; // One tap on glass catching the sun: capped at 1 by the curve.
     expect(Math.abs(reading(glint) - reading(scene))).toBeLessThan(0.01);
   });
-  it('leaves colours alone at 6500 K and warms them under a bluer profile white', () => {
+  it('leaves colours alone at 6500 K and cools them toward a bluer profile white, keeping green', () => {
     const grey = (kelvin: number) => new Vector3(0.5, 0.5, 0.5).applyMatrix3(whiteBalance(kelvin));
     expect(grey(6500).toArray().map(c => Number(c.toFixed(6)))).toEqual([0.5, 0.5, 0.5]);
-    const low = grey(7000); // The bluer light is corrected toward warm.
-    expect(low.x).toBeGreaterThan(low.y); expect(low.y).toBeGreaterThan(low.z);
-    expect(low.z / low.x).toBeCloseTo(0.89, 2); // 500 K warmer: blue about 11 % under red.
+    const cool = grey(7500); // White shows as the profile's bluer white.
+    expect(cool.y).toBeCloseTo(0.5, 6); expect(cool.z).toBeGreaterThan(cool.y); expect(cool.y).toBeGreaterThan(cool.x);
+    expect(cool.x / cool.y).toBeCloseTo(0.923, 3); // Capture 21459 (7500 K): the game's white shows red at 0.957 of green after the encode.
   });
 
   it('adapts the exposure in stops: a blend fraction per 0.15 s, capped in stops a second, smoothed twice, landing on the target', () => {
@@ -131,7 +132,11 @@ describe('autoExposure', () => {
     const initRenderTarget = vi.fn();
     const renderer = {
       getContext: () => ({}), getRenderTarget: () => target, setRenderTarget: (next: WebGLRenderTarget | null) => { target = next; },
-      initRenderTarget, render: (scene: Scene) => passes.push(`${scene.name || 'replay'}>${target ? `${target.width}x${target.height}` : 'canvas'}`),
+      // The bloom's passes are `bloom.test.ts`'s; here one stands for them all.
+      initRenderTarget, render: (scene: Scene) => {
+        const pass = `${scene.name || 'replay'}>${target ? `${target.width}x${target.height}` : 'canvas'}`;
+        if (scene.name !== BLOOM_PASS) passes.push(pass); else if (passes.at(-1) !== BLOOM_PASS) passes.push(BLOOM_PASS);
+      },
       getDrawingBufferSize: (size: {set(x: number, y: number): unknown}) => size.set(8, 8),
     } as unknown as WebGLRenderer;
     const exposure = createAutoExposure(renderer, testCamera(), sun(30, 40), () => {});
@@ -141,12 +146,12 @@ describe('autoExposure', () => {
       const shown = () => exposureUniforms.exposure_state.value;
       exposure.render(new Scene(), {} as never);
       // The replay into the HDR target, the canvas pass, the metering and the adaptation into a 1 × 1 state: nothing read back.
-      expect(passes).toEqual(['replay>8x8', `${EXPOSURE_PASS}>canvas`, `${EXPOSURE_PASS}>32x18`, `${EXPOSURE_PASS}>1x1`]);
+      expect(passes).toEqual(['replay>8x8', BLOOM_PASS, `${EXPOSURE_PASS}>canvas`, `${EXPOSURE_PASS}>32x18`, `${EXPOSURE_PASS}>1x1`]);
       expect(initRenderTarget).toHaveBeenCalledTimes(2);
       const first = shown();
       passes.length = 0; now += 17; exposure.render(new Scene(), {} as never);
       // Within the metering period (four frames at 60 Hz): no metering, the state adapted again into the other target.
-      expect(passes).toEqual(['replay>8x8', `${EXPOSURE_PASS}>canvas`, `${EXPOSURE_PASS}>1x1`]);
+      expect(passes).toEqual(['replay>8x8', BLOOM_PASS, `${EXPOSURE_PASS}>canvas`, `${EXPOSURE_PASS}>1x1`]);
       expect(shown()).not.toBe(first);
       now += 17; exposure.render(new Scene(), {} as never);
       expect(shown()).toBe(first);
@@ -181,6 +186,29 @@ describe('autoExposure', () => {
     exposure.setType('tv'); exposure.render(new Scene(), {} as never);
     expect(value('scale')).toBe(camera.types.tv.adaptationScale); expect(value('fresh')).toBe(1);
     exposure.dispose();
+  });
+
+  it('lands on the law at the next RESET_METERINGS meterings after a reset, metering at once, then adapts again', () => {
+    let material: {uniforms: Record<string, {value: unknown}>} | null = null;
+    const renderer = {
+      getRenderTarget: () => null, setRenderTarget() {}, initRenderTarget() {}, getDrawingBufferSize: (size: {set(x: number, y: number): unknown}) => size.set(8, 8),
+      render: (scene: Scene) => {
+        const mesh = scene.children[0] as unknown as {material: {uniforms: Record<string, {value: unknown}>}} | undefined;
+        if (mesh?.material.uniforms.logUnit) material = mesh.material;
+      },
+    } as unknown as WebGLRenderer;
+    const invalidate = vi.fn(), exposure = createAutoExposure(renderer, testCamera(), sun(30, 40), invalidate);
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      const frame = () => { now += 17; exposure.render(new Scene(), {} as never); const u = material!.uniforms; return `${String(u.fresh.value)}${String(u.snap.value)}`; };
+      frame(); frame();
+      invalidate.mockClear(); exposure.reset(); expect(invalidate).toHaveBeenCalled();
+      // Metering every fourth frame: each metering lands until four have, the frames between adapt.
+      const seen = Array.from({length: 17}, frame);
+      expect(seen.filter(each => each === '11')).toHaveLength(RESET_METERINGS);
+      expect(seen[0]).toBe('11'); expect(seen.slice(-4)).not.toContain('11'); expect(seen).not.toContain('01');
+    } finally { exposure.dispose(); vi.restoreAllMocks(); }
   });
 
   it('reads the state back on quiet frames only, at most every 250 ms, and stops asking for frames once it has settled', () => {
@@ -232,6 +260,13 @@ describe('autoExposure', () => {
       // A fence that cannot be made (a lost context) lets its reading's buffer go.
       fenceFails = true; now += 250; frame(true); fenceFails = false;
       expect(calls.slice(-2)).toEqual(['readPixels', 'deleteBuffer']);
+      // After a reset (the viewer's day/night switch, paused), quiet frames read nothing back until its meterings have landed, and
+      // keep asking for frames meanwhile: a first metering of a frame exposed for the other light lands on its own target.
+      now += 250; exposure.reset();
+      const reads = () => calls.filter(call => call === 'readPixels').length, before = reads();
+      for (let i = 0; i < 12; i++) { frame(true); expect(invalidated).toHaveBeenCalled(); }
+      expect(reads()).toBe(before);
+      frame(true); expect(reads()).toBe(before + 1);
       // A reading pending at dispose lets its buffer and fence go.
       now += 250; frame(true);
       exposure.dispose();

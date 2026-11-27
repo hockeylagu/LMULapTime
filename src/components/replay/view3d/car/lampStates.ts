@@ -1,4 +1,5 @@
 import { Mesh, ShaderMaterial, type Material, type Object3D, type Texture } from 'three';
+import { CAR_BRAKE_LIGHT_THRESHOLD } from '../../../../../shared/packageContract/index.js';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import type { RenderPose } from '../scene/replayPose.js';
@@ -22,6 +23,9 @@ export const PIT_FLASH_HZ = 4;
 export function pitFlashLit(pitLimiter: boolean, timeSec: number): boolean {
   return pitLimiter && Math.floor(timeSec * PIT_FLASH_HZ * 2) % 2 === 0;
 }
+
+/** Whether a car brakes by the game's lamp rule: its brake input (percent, as the replay holds it) above `CAR_BRAKE_LIGHT_THRESHOLD`. */
+export const isBraking = (brakePercent: number | undefined): boolean => (brakePercent ?? 0) / 100 > CAR_BRAKE_LIGHT_THRESHOLD;
 
 /**
  * The frame a lamp shows: its brake frame while braking, else its headlights-on frame while the headlights are on, else its off
@@ -73,7 +77,7 @@ export function lampStateFrames(states: LampStatesRow): number[] {
 export interface LampStates { update(pose: RenderPose): void }
 
 /**
- * Switches a car's lamps with its lap: headlights from the lap's headlight flag, brake lamps on any brake pedal, flashing lamps
+ * Switches a car's lamps with its lap: headlights from the lap's headlight flag, brake lamps while braking (`isBraking`), flashing lamps
  * while the pit limiter is on, and rain lamps (or a pit lamp on the same light) while the rain light flag is on and the limiter
  * is off. Dark: their off frame, or nothing when they have none. A frame without a texture draws nothing. Null when no lamp of the
  * car can switch.
@@ -92,7 +96,7 @@ export function createLampStates(car: Object3D, points: ReplayTrajectoryPoint[])
   return {
     update(pose) {
       const point = points[pose.index], next = points[pose.index + 1] ?? point;
-      const headlights = point?.headlights === true, braking = (point?.brake ?? 0) > 0;
+      const headlights = point?.headlights === true, braking = isBraking(point?.brake);
       const timeSec = (point?.timeSec ?? 0) + ((next?.timeSec ?? 0) - (point?.timeSec ?? 0)) * pose.fraction;
       const limiter = point?.pitLimiter === true, rainLit = point?.rainLight === true, flash = pitFlashLit(limiter, timeSec);
       const frameOf = ({flashes, rain, states}: LampSwitch) => {

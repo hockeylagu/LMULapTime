@@ -41,9 +41,12 @@ function ascending(rows: unknown[], what: string, row: (value: Record<string, un
 
 const CAMERA_TYPES = ['external', 'onboard', 'tv'] as const;
 
-const LOOK_KEYS = ['targetExposure', 'lightDarkBorder', 'minExposure', 'maxExposure', 'whiteBalanceK', 'toneCurve', 'sunGlareScalar'];
+const LOOK_KEYS = ['targetExposure', 'lightDarkBorder', 'minExposure', 'maxExposure', 'whiteBalanceK', 'toneCurve', 'sunGlareScalar', 'bloom'];
 
-/** A look's exposure target, border and limits (0 ≤ min ≤ max, max > 0), white balance and tone curve (a > 0); the clear values and the overcast ones share this shape. */
+/**
+ * A look's exposure target, border and limits (0 ≤ min ≤ max, max > 0), white balance, tone curve (a > 0) and bloom (a positive remap factor); the
+ * clear values and the overcast ones share this shape.
+ */
 function exposureLook(look: Record<string, unknown>, at: string): void {
   numbers({targetExposure: look.targetExposure, lightDarkBorder: look.lightDarkBorder, maxExposure: look.maxExposure, whiteBalanceK: look.whiteBalanceK},
     ['targetExposure', 'lightDarkBorder', 'maxExposure', 'whiteBalanceK'], at, true);
@@ -52,6 +55,39 @@ function exposureLook(look: Record<string, unknown>, at: string): void {
   numbers(look.toneCurve, ['a', 'b'], `${at}.toneCurve`, false);
   if ((look.toneCurve as {a: number}).a <= 0) throw Error(`${at}.toneCurve.a: must be positive`);
   if (finite(look.sunGlareScalar, `${at}.sunGlareScalar`) < 0) throw Error(`${at}.sunGlareScalar: negative`);
+  numbers(look.bloom, ['threshold', 'remapFactor', 'luminance'], `${at}.bloom`, false);
+  if ((look.bloom as {remapFactor: number}).remapFactor <= 0) throw Error(`${at}.bloom.remapFactor: must be positive`);
+}
+
+/** A camera type's Glare values: three quality tiers, a positive range scale, a whole level count; none negative. */
+function bloomType(value: unknown, what: string): void {
+  const row = record(value, what);
+  exactKeys(row, ['quality', 'shapeLuminance', 'rangeScale', 'scale', 'thresholdBloom', 'numLevels', 'dispersion', 'dispersionBaseLevel'], what);
+  const quality = record(row.quality, `${what}.quality`);
+  exactKeys(quality, ['low', 'medium', 'high'], `${what}.quality`);
+  for (const tier of ['low', 'medium', 'high']) numbers(quality[tier], ['glareLuminance', 'gamma'], `${what}.quality.${tier}`, false);
+  numbers({shapeLuminance: row.shapeLuminance, scale: row.scale, thresholdBloom: row.thresholdBloom, dispersion: row.dispersion},
+    ['shapeLuminance', 'scale', 'thresholdBloom', 'dispersion'], what, false);
+  if (finite(row.rangeScale, `${what}.rangeScale`) <= 0) throw Error(`${what}.rangeScale: must be positive`);
+  count(row.numLevels, `${what}.numLevels`);
+  count(row.dispersionBaseLevel, `${what}.dispersionBaseLevel`);
+}
+
+/** The bloom chain constants: positive scale, sigmas and wide factor, a positive tap radius, level and output sizes inside (0, 1]. */
+function bloomChain(value: unknown, what: string): void {
+  const row = record(value, what);
+  exactKeys(row, ['mergeScale', 'blurSigma', 'blurRadius', 'wideBlurScale', 'levelScales', 'outputScale'], what);
+  for (const key of ['mergeScale', 'wideBlurScale']) if (finite(row[key], `${what}.${key}`) <= 0) throw Error(`${what}.${key}: must be positive`);
+  const sigma = array(row.blurSigma, `${what}.blurSigma`, 3);
+  if (sigma.length !== 3) throw Error(`${what}.blurSigma: expected 3 values`);
+  sigma.forEach((s, i) => { if (finite(s, `${what}.blurSigma[${i}]`) <= 0) throw Error(`${what}.blurSigma[${i}]: must be positive`); });
+  positiveCount(row.blurRadius, `${what}.blurRadius`);
+  const levels = array(row.levelScales, `${what}.levelScales`, 8);
+  if (!levels.length) throw Error(`${what}.levelScales: empty`);
+  [...levels, row.outputScale].forEach((s, i) => {
+    const at = i < levels.length ? `${what}.levelScales[${i}]` : `${what}.outputScale`, n = finite(s, at);
+    if (!(n > 0 && n <= 1)) throw Error(`${at}: outside (0, 1]`);
+  });
 }
 
 /**
@@ -60,7 +96,7 @@ function exposureLook(look: Record<string, unknown>, at: string): void {
  */
 function parseCameraType(value: unknown, what: string, tv: boolean): void {
   const row = record(value, what);
-  exactKeys(row, ['meteringWindow', 'adaptationScale', 'adaptation', 'weatherBlendRate', 'profiles', 'ambientOcclusion', ...(tv ? ['lodMultiplier'] : [])], what);
+  exactKeys(row, ['meteringWindow', 'adaptationScale', 'adaptation', 'weatherBlendRate', 'profiles', 'ambientOcclusion', 'bloom', ...(tv ? ['lodMultiplier'] : [])], what);
   screenWindow(row.meteringWindow, `${what}.meteringWindow`);
   if (finite(row.adaptationScale, `${what}.adaptationScale`) <= 0) throw Error(`${what}.adaptationScale: must be positive`);
   const adaptation = record(row.adaptation, `${what}.adaptation`);
@@ -81,12 +117,14 @@ function parseCameraType(value: unknown, what: string, tv: boolean): void {
     exposureLook(overcast, `${at}.overcast`);
   }, 'sunTarget');
   numbers(row.ambientOcclusion, ['radiusM', 'samples', 'scale', 'colour'], `${what}.ambientOcclusion`, false);
+  bloomType(row.bloom, `${what}.bloom`);
 }
 
-/** The catalog's camera (SceneryCamera): a positive output gamma and every camera type. */
+/** The catalog's camera (SceneryCamera): a positive output gamma and scene luminance scale, the bloom chain and every camera type. */
 function parseCamera(value: unknown, what: string): void {
   const row = record(value, what);
-  exactKeys(row, ['outputGamma', 'sceneLuminanceScale', 'types'], what);
+  exactKeys(row, ['outputGamma', 'sceneLuminanceScale', 'bloom', 'types'], what);
+  bloomChain(row.bloom, `${what}.bloom`);
   if (finite(row.outputGamma, `${what}.outputGamma`) <= 0) throw Error(`${what}.outputGamma: must be positive`);
   if (finite(row.sceneLuminanceScale, `${what}.sceneLuminanceScale`) <= 0) throw Error(`${what}.sceneLuminanceScale: must be positive`);
   const types = record(row.types, `${what}.types`);

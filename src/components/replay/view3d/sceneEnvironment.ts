@@ -263,8 +263,9 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     sceneDayLight.value = Math.max(dayShare(venue.shading.ambient, night && night.sunShare === 0 ? 0 : radiance.g), night?.dayShare ?? 0);
     crownSun.value.copy(toLight); // Foliage cards tilt their lighting normal up less as they come to face the sun.
     if (lit && turned) cascades.pass.setLight(toLight.clone().negate());
-    // The clouds are lit by the sun before they dim it. The first environment and the venue capture are taken without them.
-    if (!lit || clouds.sheets !== shownSheets) {
+    // The clouds are lit by the sun before they dim it, as it stood when they were made: made again when it moves (the daylight
+    // switched back to night kept day-lit clouds). The first environment and the venue capture are taken without them.
+    if (!lit || turned || clouds.sheets !== shownSheets) {
       if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }
       shownSheets = clouds.sheets;
       cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toLight.clone(), sunGreen: clearSun.g, cloudCover: weather.cloudCover}, fieldOrigin) : null;
@@ -300,6 +301,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       // intensity, and the first environment has the probe's size: an unset or differently sized one is another program variant
       // of every material, compiled on the main thread here instead of by the warm-up.
       scene.environmentIntensity = 0;
+      // Nor the scenery's reflection of the last capture, as on a first load: a capture at night kept the day's light in it.
+      setSceneryReflection(venue.shading, null, integration);
       for (let pass = 0; pass < 2; pass++) {
         camera.update(renderer, scene);
         const next = generator.fromCubemap(cube.texture);

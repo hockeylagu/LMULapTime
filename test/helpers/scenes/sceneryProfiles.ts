@@ -10,11 +10,19 @@ function cameraType(window: SceneryCameraTypeProfile['meteringWindow'], adaptati
     adaptation: { sensitivity: 0.25, speedLimit: 1, delayS: 0, darkAdaptation: { scale: -1, sensitivity: -1, speedLimit: -1 } },
     profiles: [
       { sunTarget: 0, targetExposure: targets[0], lightDarkBorder: 1.5, minExposure: 0, maxExposure: 4, whiteBalanceK: 7000, toneCurve: { a: 2.5, b: 0.6 }, sunGlareScalar: 1, weatherLerpPower: 1,
-        overcast: { targetExposure: targets[0] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 5, whiteBalanceK: 7500, toneCurve: { a: 2, b: 0.5 }, sunGlareScalar: 0.5 } },
+        bloom: { threshold: 1.5, remapFactor: 0.5, luminance: 1.5 },
+        overcast: { targetExposure: targets[0] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 5, whiteBalanceK: 7500, toneCurve: { a: 2, b: 0.5 }, sunGlareScalar: 0.5,
+          bloom: { threshold: 1.5, remapFactor: 0.5, luminance: 1.5 } } },
       { sunTarget: 60, targetExposure: targets[1], lightDarkBorder: 1.25, minExposure: 0, maxExposure: 1, whiteBalanceK: 6500, toneCurve: { a: 3, b: 0.7 }, sunGlareScalar: 1, weatherLerpPower: 1,
-        overcast: { targetExposure: targets[1] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 2, whiteBalanceK: 7200, toneCurve: { a: 2.4, b: 0.6 }, sunGlareScalar: 0.5 } },
+        bloom: { threshold: 1.5, remapFactor: 0.2, luminance: 1 },
+        overcast: { targetExposure: targets[1] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 2, whiteBalanceK: 7200, toneCurve: { a: 2.4, b: 0.6 }, sunGlareScalar: 0.5,
+          bloom: { threshold: 1.5, remapFactor: 0.4, luminance: 1.5 } } },
     ],
     ambientOcclusion: { radiusM: 0.4, samples: 8, scale: 2, colour: 0.4 },
+    bloom: {
+      quality: { low: { glareLuminance: 0.75, gamma: 1 }, medium: { glareLuminance: 0.9, gamma: 1.15 }, high: { glareLuminance: 1, gamma: 1.1 } },
+      shapeLuminance: 1, rangeScale: 1, scale: 2, thresholdBloom: 0.001, numLevels: 0, dispersion: 0.25, dispersionBaseLevel: 0,
+    },
   };
 }
 
@@ -22,6 +30,7 @@ function cameraType(window: SceneryCameraTypeProfile['meteringWindow'], adaptati
 export function testCamera(): SceneryCamera {
   return {
     outputGamma: 2.2, sceneLuminanceScale: 2,
+    bloom: { mergeScale: 0.035, blurSigma: [2.2, 1.9317, 1.6634], blurRadius: 7, wideBlurScale: Math.sqrt(3), levelScales: [0.2, 0.1, 0.05], outputScale: 0.4 },
     types: {
       external: cameraType({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, 0.4, [0.4, 0.2]),
       onboard: cameraType({ x: 0.2, y: 0.2, width: 0.6, height: 0.6 }, 0.4, [0.35, 0.18]),
@@ -166,7 +175,7 @@ export function testLayoutNight(): SceneryNight {
   return {
     scenes: [{sceneDesc: 'test', date: '2023-09-10', latitudeDeg: 35.37, longitudeDeg: 138.93, timezoneHours: 9, dstRange: null, utcOffsetHours: 9, nightLightThreshold: null, nightLightPollution: 0.001}],
     lights: [{position: [0, 10, 0], rangeM: 50, colour: [1, 0.9, 0.8]}],
-    lightLists: [],
+    nodes: [],
   };
 }
 

@@ -2,6 +2,7 @@ import { type Color, DepthTexture, FloatType, HalfFloatType, Matrix3, Mesh, Near
 import { GAME_LIGHT_UNIT } from './atmosphere/sunSamples.js';
 import { surfaceAlphaCut } from './scenery/materials/shaderContext.js';
 import { profilesAt, timeOfDayPosition, weatherWeight } from './atmosphere/timeOfDay.js';
+import { bloomParameters, createBloom, type BloomParameters } from './bloom.js';
 import type { SceneryCamera, SceneryCameraLook, SceneryCameraProfile, SceneryCameraType, SceneryCameraTypeProfile, SceneryToneCurve } from '../../../../shared/types/scenes/scenery.js';
 
 // Exposure, white balance, tone curve and the output encode come from the package's camera (SceneryCamera), one profile per camera
@@ -76,6 +77,7 @@ function mixLooks(a: SceneryCameraLook, b: SceneryCameraLook, t: number): Scener
     minExposure: mix(a.minExposure, b.minExposure), maxExposure: mix(a.maxExposure, b.maxExposure),
     whiteBalanceK: mix(a.whiteBalanceK, b.whiteBalanceK),
     toneCurve: {a: mix(a.toneCurve.a, b.toneCurve.a), b: mix(a.toneCurve.b, b.toneCurve.b)}, sunGlareScalar: mix(a.sunGlareScalar, b.sunGlareScalar),
+    bloom: {threshold: mix(a.bloom.threshold, b.bloom.threshold), remapFactor: mix(a.bloom.remapFactor, b.bloom.remapFactor), luminance: mix(a.bloom.luminance, b.bloom.luminance)},
   };
 }
 
@@ -106,18 +108,19 @@ const SRGB_TO_XYZ = new Matrix3().set(0.4124564, 0.3575761, 0.1804375, 0.2126729
 const BRADFORD = new Matrix3().set(0.8951, 0.2664, -0.1614, -0.7502, 1.7135, 0.0367, 0.0389, -0.0685, 1.0296);
 
 /**
- * White balance as a linear-sRGB matrix: a Bradford adaptation from the profile's white (on the daylight locus) to the neutral
- * 6500 K one. A 6500 K profile gives the identity; a bluer one warms the image.
+ * White balance as a linear-sRGB matrix for the toned colour: a Bradford adaptation from the neutral 6500 K white to the profile's
+ * (on the daylight locus), scaled so white keeps its green. A 6500 K profile gives the identity; a bluer one cools the image.
  */
 export function whiteBalance(kelvin: number): Matrix3 {
   const cone = (k: number) => {
     const [x, y] = daylightChromaticity(k);
     return new Vector3(x / y, 1, (1 - x - y) / y).applyMatrix3(BRADFORD);
   };
-  const from = cone(kelvin), to = cone(NEUTRAL_KELVIN);
+  const from = cone(NEUTRAL_KELVIN), to = cone(kelvin);
   const scale = new Matrix3().set(to.x / from.x, 0, 0, 0, to.y / from.y, 0, 0, 0, to.z / from.z);
   const toCone = BRADFORD.clone().multiply(SRGB_TO_XYZ), fromCone = toCone.clone().invert();
-  return fromCone.multiply(scale).multiply(toCone);
+  const m = fromCone.multiply(scale).multiply(toCone), e = m.elements;
+  return m.multiplyScalar(1 / (e[1] + e[4] + e[7]));
 }
 
 /** The adapting exposure: its log2 (stops) and the smoothed step it is moving by. */
@@ -143,6 +146,8 @@ export function adaptExposure(current: AdaptedExposure, target: number, seconds:
 
 /** The name of the full-screen exposure and metering scenes, which are not the replay scene. */
 export const EXPOSURE_PASS = 'exposure-pass';
+/** The meterings a `reset` lands on (METER_PERIOD_MS apart): enough for a frame exposed for night to read day unclipped. Ours. */
+export const RESET_METERINGS = 4;
 
 /** How exposed linear light becomes a displayed value: the active type's tone curve, then the output encode. */
 export interface DisplayTransform { readonly toneCurve: SceneryToneCurve; readonly outputGamma: number }
@@ -170,6 +175,12 @@ export interface AutoExposure {
   setType(type: SceneryCameraType): void;
   /** Chooses every type's profile by another moment's sun and weather; the adapted level carries over. */
   setSun(sun: ProfileSun, cloudCover: number, sunVisibility?: number): void;
+  /**
+   * Lands on the law's exposure at the next `RESET_METERINGS` meterings instead of adapting toward it: the viewer's jump between night
+   * and day is no change of light an eye would adapt to. A first metering of a frame exposed for the other light may clip, so the
+   * next ones land again on a frame closer to right.
+   */
+  reset(): void;
   /** The active type's display transform; the same object until the type or the sun changes. */
   display(): DisplayTransform;
   dispose(): void;
@@ -183,13 +194,15 @@ interface ResolvedType extends CameraTimeOfDay {
   adaptation: SceneryCameraTypeProfile['adaptation'];
   balance: Matrix3;
   display: DisplayTransform;
+  glare: BloomParameters;
 }
 
-function resolveType(profile: SceneryCameraTypeProfile, sun: ProfileSun, weather: {cloudCover: number; sunVisibility?: number}, outputGamma: number): ResolvedType {
+function resolveType(profile: SceneryCameraTypeProfile, sun: ProfileSun, weather: {cloudCover: number; sunVisibility?: number}, camera: SceneryCamera): ResolvedType {
   const time = profileAt(profile, sun, weather.cloudCover, weather.sunVisibility), w = profile.meteringWindow;
   return {
     ...time, window: [w.x, 1 - w.y - w.height, w.width, w.height], adaptationScale: profile.adaptationScale, adaptation: profile.adaptation,
-    balance: whiteBalance(time.whiteBalanceK), display: {toneCurve: time.toneCurve, outputGamma},
+    balance: whiteBalance(time.whiteBalanceK), display: {toneCurve: time.toneCurve, outputGamma: camera.outputGamma},
+    glare: bloomParameters(time.bloom, profile.bloom, camera.bloom),
   };
 }
 
@@ -234,7 +247,7 @@ const METER_SHADER = {
 const ADAPT_SHADER = {
   vertexShader: 'void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }',
   fragmentShader: `
-    uniform sampler2D meter; uniform float fresh, seconds, logUnit, logBorder, logGrey, scale, logMin, logMax;
+    uniform sampler2D meter; uniform float fresh, snap, seconds, logUnit, logBorder, logGrey, scale, logMin, logMax;
     uniform vec4 adaptation; // sensitivity, speed limit, dark sensitivity, dark speed limit (a negative dark value takes the light one)
     ${EXPOSURE_GLSL}
     void main() {
@@ -247,7 +260,7 @@ const ADAPT_SHADER = {
         metering = log(max(${glslFloat(METER_FLOOR)}, -log(1.0 - shown) / exp2(state.r)));
       }
       float target = logUnit + clamp((1.0 - scale) * logBorder + scale * (logGrey - logUnit - metering / log(2.0)), logMin, logMax);
-      if (state.a < 0.5) { gl_FragColor = vec4(target, 0.0, metering, 1.0); return; }
+      if (state.a < 0.5 || snap > 0.5) { gl_FragColor = vec4(target, 0.0, metering, 1.0); return; }
       bool dark = target > state.r;
       float sensitivity = dark && adaptation.z >= 0.0 ? adaptation.z : adaptation.x;
       float speedLimit = dark && adaptation.w >= 0.0 ? adaptation.w : adaptation.y;
@@ -279,9 +292,9 @@ export function meteredLuminance(mean: readonly [number, number, number], exposu
 export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamera, sun: ProfileSun, invalidate: () => void, type: SceneryCameraType = 'external', cloudCover = 0, sunVisibility?: number): AutoExposure {
   const unit = meterUnit(camera.sceneLuminanceScale);
   const resolve = (at: ProfileSun, weather: {cloudCover: number; sunVisibility?: number}): Record<SceneryCameraType, ResolvedType> => ({
-    external: resolveType(camera.types.external, at, weather, camera.outputGamma),
-    onboard: resolveType(camera.types.onboard, at, weather, camera.outputGamma),
-    tv: resolveType(camera.types.tv, at, weather, camera.outputGamma),
+    external: resolveType(camera.types.external, at, weather, camera),
+    onboard: resolveType(camera.types.onboard, at, weather, camera),
+    tv: resolveType(camera.types.tv, at, weather, camera),
   });
   let types = resolve(sun, {cloudCover, sunVisibility}), activeType = type, active = types[type];
   const size = new Vector2();
@@ -296,19 +309,23 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   const quad = new PlaneGeometry(2, 2), quadCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const output = new Scene(), meterScene = new Scene(), adaptScene = new Scene();
   output.name = meterScene.name = adaptScene.name = EXPOSURE_PASS;
-  // The canvas pass: white balance in linear light, then the exposure and the type's tone curve, then the
-  // output encode. Last, a triangular dither of one 8-bit step (interleaved gradient noise, two taps) breaks the banding of smooth
-  // sky and shade gradients; its mean is zero, so flat colours (the racing line) keep their value.
+  const bloom = createBloom(camera.bloom, {uniform: exposureUniforms.exposure_state, glsl: EXPOSURE_GLSL});
+  // The canvas pass: the exposure and the type's tone curve, the bloom added after the curve (`bloom.ts`), then the white balance
+  // on the toned colour (the night capture 21459's whites show red at 0.957 of green and blue, and its red lamp cores keep blue),
+  // then the output encode. Last, a triangular dither of one 8-bit step (interleaved gradient noise, two taps) breaks
+  // the banding of smooth sky and shade gradients; its mean is zero, so flat colours (the racing line) keep their value.
   const outputMaterial = new ShaderMaterial({
-    uniforms: {source: {value: hdr.texture}, exposure_state: exposureUniforms.exposure_state, whiteBalance: {value: active.balance}, curve: {value: new Vector2()}},
+    uniforms: {source: {value: hdr.texture}, glare: {value: null}, exposure_state: exposureUniforms.exposure_state, whiteBalance: {value: active.balance}, curve: {value: new Vector2()}},
     vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
     fragmentShader: `
-      uniform sampler2D source; uniform vec2 curve; uniform mat3 whiteBalance; varying vec2 vUv;
+      uniform sampler2D source, glare; uniform vec2 curve; uniform mat3 whiteBalance; varying vec2 vUv;
       ${EXPOSURE_GLSL}
       float gradientNoise(vec2 pixel) { return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715)))); }
       void main() {
-        vec3 z = exp(-curve.x * max(whiteBalance * texture2D(source, vUv).rgb * displayExposure(), 0.0));
+        vec3 z = exp(-curve.x * max(texture2D(source, vUv).rgb * displayExposure(), 0.0));
         vec3 tone = clamp((1.0 - z) * (1.0 - curve.y * z) * (1.0 - curve.y * z), 0.0, 1.0);
+        tone += (1.0 - tone) * clamp(texture2D(glare, vUv).rgb, 0.0, 1.0);
+        tone = clamp(whiteBalance * tone, 0.0, 1.0);
         gl_FragColor = vec4(pow(tone, vec3(${glslFloat(1 / camera.outputGamma)})), 1.0);
         gl_FragColor.rgb += (gradientNoise(gl_FragCoord.xy) + gradientNoise(gl_FragCoord.xy + 5.588238) - 1.0) / 255.0;
       }`,
@@ -321,7 +338,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   const adaptMaterial = new ShaderMaterial({
     ...ADAPT_SHADER, depthTest: false, depthWrite: false,
     uniforms: {
-      meter: {value: meter.texture}, exposure_state: exposureUniforms.exposure_state, fresh: {value: 0}, seconds: {value: 0},
+      meter: {value: meter.texture}, exposure_state: exposureUniforms.exposure_state, fresh: {value: 0}, snap: {value: 0}, seconds: {value: 0},
       logUnit: {value: Math.log2(unit)}, logBorder: {value: 0}, logGrey: {value: 0}, scale: {value: 0}, logMin: {value: 0}, logMax: {value: 0},
       adaptation: {value: new Vector4()},
     },
@@ -329,6 +346,8 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   output.add(new Mesh(quad, outputMaterial)); meterScene.add(new Mesh(quad, meterMaterial)); adaptScene.add(new Mesh(quad, adaptMaterial));
   const readback = new Float32Array(4);
   let reading = false, meteredAt = -Infinity, readAt = -Infinity, last = 0, disposed = false, made = false;
+  /** Meterings left that land on the law's target instead of adapting toward it (`reset`). */
+  let snaps = 0;
   /** Settled: a state read on a quiet frame landed within SETTLED_STOPS of its target, and nothing has moved since (`epoch`). */
   let settled = false, epoch = 0;
   /** The law's exposure (stops) for the metered luminance under the active type. */
@@ -338,6 +357,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     active = next;
     const u = outputMaterial.uniforms;
     u.whiteBalance.value = next.balance; (u.curve.value as Vector2).set(next.toneCurve.a, next.toneCurve.b);
+    bloom.set(next.glare);
     meterMaterial.uniforms.window.value = next.window; (meterMaterial.uniforms.curve.value as Vector2).set(next.toneCurve.a, next.toneCurve.b);
     const a = adaptMaterial.uniforms, {sensitivity, speedLimit, darkAdaptation: dark} = next.adaptation;
     a.logBorder.value = Math.log2(next.lightDarkBorder * next.targetExposure); a.logGrey.value = Math.log2(meterGrey(next.targetExposure));
@@ -397,6 +417,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     setSun(at, cover, visibility) {
       types = resolve(at, {cloudCover: cover, sunVisibility: visibility}); apply(types[activeType]); unsettle();
     },
+    reset() { snaps = RESET_METERINGS; meteredAt = -Infinity; unsettle(); },
     display: () => active.display,
     collect: () => collect?.(),
     link() {
@@ -405,7 +426,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       renderer.setRenderTarget(meter); const metering = renderer.compileAsync(meterScene, quadCamera);
       renderer.setRenderTarget(states[0]); const adapting = renderer.compileAsync(adaptScene, quadCamera);
       renderer.setRenderTarget(previous);
-      return Promise.all([canvas, metering, adapting]).then(() => {});
+      return Promise.all([canvas, metering, adapting, bloom.link(renderer)]).then(() => {});
     },
     render(scene, camera, quiet = false) {
       renderer.getDrawingBufferSize(size);
@@ -419,15 +440,19 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       exposureUniforms.exposure_state.value = states[current].texture;
       renderer.setRenderTarget(hdr);
       surfaceAlphaCut.value = 0; renderer.render(scene, camera); surfaceAlphaCut.value = 1;
+      outputMaterial.uniforms.glare.value = bloom.render(renderer, hdr.texture, hdr.width, hdr.height);
       renderer.setRenderTarget(null);
       renderer.render(output, quadCamera);
       // The first frame always meters, so the state is metered before any frame reads it as such.
       const fresh = now - meteredAt >= METER_PERIOD_MS;
       if (fresh) { meteredAt = now; renderer.setRenderTarget(meter); renderer.render(meterScene, quadCamera); }
       adaptMaterial.uniforms.fresh.value = fresh ? 1 : 0; adaptMaterial.uniforms.seconds.value = seconds;
+      adaptMaterial.uniforms.snap.value = fresh && snaps > 0 ? 1 : 0;
+      if (fresh && snaps > 0) snaps--;
       current = 1 - current;
       renderer.setRenderTarget(states[current]); renderer.render(adaptScene, quadCamera);
-      if (quiet && !settled && !reading && now - readAt >= SETTLE_PERIOD_MS) {
+      // Not while a reset's meterings are still landing: a state snapped to a metering sits on that metering's target, settled or not.
+      if (quiet && !settled && !reading && snaps === 0 && now - readAt >= SETTLE_PERIOD_MS) {
         readAt = now;
         // A lost context leaves the exposure unsettled; the next quiet frame tries again.
         try { read(); } catch { /* frames keep coming */ }
@@ -441,7 +466,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       collect?.();
       if (states.some(state => state.texture === exposureUniforms.exposure_state.value)) exposureUniforms.exposure_state.value = null;
       hdr.dispose(); meter.dispose(); for (const state of states) state.dispose();
-      quad.dispose(); outputMaterial.dispose(); meterMaterial.dispose(); adaptMaterial.dispose();
+      quad.dispose(); outputMaterial.dispose(); meterMaterial.dispose(); adaptMaterial.dispose(); bloom.dispose();
     },
   };
 }

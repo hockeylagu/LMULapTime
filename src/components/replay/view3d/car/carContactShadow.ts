@@ -1,5 +1,6 @@
 import { Box3, DataTexture, LinearFilter, Mesh, MeshBasicMaterial, PlaneGeometry, RGBAFormat, Vector3, type Object3D, type WebGLRenderTarget } from 'three';
 import { hazeProgram } from '../atmosphere/haze.js';
+import { sceneDayLight } from '../scene/dayLight.js';
 import { patchCascadeShadowLookup } from '../shadows/cascadeSampling.js';
 import { bakeArea, bakeParts, bakeUnderCar, underCarQuadGeometry, CONTACT_SHADOW_NAME, type BakePart, type BakeRenderer } from './underCarBake.js';
 
@@ -40,7 +41,9 @@ export function contactShadowQuad(halfX: number, halfZ: number): {geometry: Plan
   alpha.magFilter = LinearFilter; alpha.minFilter = LinearFilter; alpha.needsUpdate = true;
   const material = new MeshBasicMaterial({color: 0x000000, alphaMap: alpha, transparent: true, depthWrite: false});
   // The shade under the car takes the sky's light: where the sun reaches the road (under an overhang, around the body) it keeps
-  // SUN_LIT_SHARE of its darkening. Without sun shadows (none, or past their fade), the shade grounds the car whole, as before.
+  // SUN_LIT_SHARE of its darkening. Without sun shadows (none, or past their fade), the shade grounds the car whole, as before. The
+  // fade follows the day share (`sceneDayLight`): at night the cascades follow the moon, whose light is nothing beside the track
+  // lights and the sky the car still hides, so the shade stays whole there instead of following the moon's shadow and the view.
   material.onBeforeCompile = shader => {
     patchCascadeShadowLookup(shader);
     if (!shader.fragmentShader.includes(ALPHA_MAP)) throw Error('The contact shadow program has no alpha map to fade in the sun');
@@ -48,9 +51,10 @@ export function contactShadowQuad(halfX: number, halfZ: number): {geometry: Plan
     shader.vertexShader = shader.vertexShader.replace(PROJECT_VERTEX, () => `${PROJECT_VERTEX}
     mvPosition.xyz *= max( 0.0, 1.0 - ${CONTACT_SHADOW_PULL_M.toFixed(2)} / length( mvPosition.xyz ) );
     gl_Position = projectionMatrix * mvPosition;`);
-    shader.fragmentShader = shader.fragmentShader.replace(ALPHA_MAP, () => `${ALPHA_MAP}
+    shader.uniforms.contactShadow_dayLight = sceneDayLight;
+    shader.fragmentShader = shader.fragmentShader.replace('void main() {', 'uniform float contactShadow_dayLight;\nvoid main() {').replace(ALPHA_MAP, () => `${ALPHA_MAP}
     {
-      float sunLit = surfaceCascadeShadow( vCascadeViewDepth );
+      float sunLit = surfaceCascadeShadow( vCascadeViewDepth ) * contactShadow_dayLight;
       float beyond = surface_cascadeCount > 0
         ? clamp( ( vCascadeViewDepth - surface_cascadeFade.x ) / ( surface_cascadeFade.y - surface_cascadeFade.x ), 0.0, 1.0 ) : 1.0;
       diffuseColor.a *= mix( 1.0 - ${(1 - SUN_LIT_SHARE).toFixed(2)} * sunLit, 1.0, beyond );

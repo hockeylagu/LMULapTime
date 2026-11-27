@@ -84,25 +84,29 @@ export interface SceneryNightScene {
 /** One SCN track light (omni): position in the scenery frame, far range, colour = Color / 255 × Intensity. */
 export interface SceneryNightLight {position: Vec3; rangeM: number; colour: Vec3}
 
-/** The light list of one capped instance: up to `NIGHT_LIGHT_LIST_SIZE` indices into `lights`, nearest the instance's bounding sphere centre first. */
-export interface SceneryNightLightList {id: number; lights: number[]}
+/**
+ * One scene node's bounds in the scenery frame, `[id, x, y, z, radius, meshX, meshY, meshZ, meshRadius]` (docs/SCENE_PACKAGE.md#night). The first
+ * sphere is the node's SCN instance, as the game's per-node pick of car spot lights reads it: the centre of the instance block's box (the GMT
+ * header boxes of every mesh file of the block, merged) and the distance from it to the box's farthest corner. The second is the node's own mesh
+ * file's GMT bounding sphere, which the game's pick of track lights reads. Centres to 1 mm, radii rounded up to 1 mm. The package fixes no light
+ * count: the app picks.
+ */
+export type SceneryNode = [id: number, x: number, y: number, z: number, radius: number, meshX: number, meshY: number, meshZ: number, meshRadius: number];
 
 /**
  * The layout's night data (docs/SCENE_PACKAGE.md#night). `scenes`: one per accepted scene, ordered by `sceneDesc`. `lights`: the SCN track lights.
- * `lightLists`: by ascending `id`, the lists of the instances more than `NIGHT_LIGHT_LIST_SIZE` lights reach; a chunk vertex whose
- * `NIGHT_LIGHT_LIST_ATTRIBUTE` is an id takes only that list (when the id has no entry here, every light in reach). Other vertices take every light in reach.
+ * `nodes`: by ascending id, the bounds of every node a chunk vertex of the layout names.
  */
-export interface SceneryNight {scenes: SceneryNightScene[]; lights: SceneryNightLight[]; lightLists: SceneryNightLightList[]}
-/** Lights one instance lists (the game's per-draw omni slots). */
-export const NIGHT_LIGHT_LIST_SIZE = 20;
+export interface SceneryNight {scenes: SceneryNightScene[]; lights: SceneryNightLight[]; nodes: SceneryNode[]}
 /**
- * The chunk vertex attribute carrying the light-list id of the instance a vertex comes from: SCALAR float32, an exact integer `id` of `lightLists`
- * (venue-wide, so a venue-shared piece keeps one id), or `NIGHT_LIGHT_LIST_NONE`. Every scenery chunk primitive has it, so a material keeps one vertex
- * layout; capped instances share the material batches of the others.
+ * The chunk vertex attribute naming the scene node a vertex comes from: SCALAR float32, an exact integer id of `nodes` (venue-wide, the index of
+ * the instance's `name|mesh` among the venue's, so a venue-shared piece keeps one id), or `SCENE_NODE_NONE` for
+ * geometry the pipeline makes (filler ground) and moving instances, which the per-node spot pick does not filter by reach. Every scenery chunk
+ * primitive has it, so a material keeps one vertex layout.
  */
-export const NIGHT_LIGHT_LIST_ATTRIBUTE = '_LMU_LIGHTLIST';
-export const NIGHT_LIGHT_LIST_NONE = -1;
-const MAX_NIGHT_LIGHTS = 1024, MAX_LIGHT_LISTS = 65536;
+export const SCENE_NODE_ATTRIBUTE = '_LMU_NODE';
+export const SCENE_NODE_NONE = -1;
+const MAX_NIGHT_LIGHTS = 1024, MAX_SCENE_NODES = 65536;
 
 /** A texture file of the catalog table (one entry per distinct file, the same for every layout). */
 export interface SceneryTextureFile {
@@ -371,7 +375,7 @@ function parseDaylight(value: unknown, what: string): SceneryDaylight {
 
 function parseNight(value: unknown, what: string): SceneryNight {
   const row = record(value, what);
-  exactKeys(row, ['scenes', 'lights', 'lightLists'], what);
+  exactKeys(row, ['scenes', 'lights', 'nodes'], what);
   const scenes = array(row.scenes, `${what}.scenes`, 16);
   if (!scenes.length) throw Error(`${what}.scenes: empty`);
   scenes.forEach((item, i) => {
@@ -400,16 +404,14 @@ function parseNight(value: unknown, what: string): SceneryNight {
     positive(light.rangeM, `${at}.rangeM`);
     vec3(light.colour, `${at}.colour`).forEach((n, k) => nonNegative(n, `${at}.colour[${k}]`));
   });
-  const lists = array(row.lightLists, `${what}.lightLists`, MAX_LIGHT_LISTS);
-  lists.forEach((item, i) => {
-    const at = `${what}.lightLists[${i}]`, list = record(item, at);
-    orderedKeys(list, ['id', 'lights'], at);
-    const id = count(list.id, `${at}.id`);
-    if (i && id <= (lists[i - 1] as any).id) throw Error(`${what}.lightLists: ids must ascend`);
-    const members = array(list.lights, `${at}.lights`, NIGHT_LIGHT_LIST_SIZE);
-    if (!members.length) throw Error(`${at}.lights: empty`);
-    if (new Set(members).size !== members.length || members.some(index => !Number.isInteger(index) || (index as number) < 0 || (index as number) >= lights.length))
-      throw Error(`${at}.lights: expected distinct indices into lights`);
+  const nodes = array(row.nodes, `${what}.nodes`, MAX_SCENE_NODES);
+  nodes.forEach((item, i) => {
+    const at = `${what}.nodes[${i}]`, node = array(item, at, 9);
+    if (node.length !== 9) throw Error(`${at}: expected [id, x, y, z, radius, meshX, meshY, meshZ, meshRadius]`);
+    const id = count(node[0], `${at}[0]`);
+    if (i && id <= ((nodes[i - 1] as unknown[])[0] as number)) throw Error(`${what}.nodes: ids must ascend`);
+    for (const k of [1, 2, 3, 5, 6, 7]) finite(node[k], `${at}[${k}]`);
+    for (const k of [4, 8]) nonNegative(node[k], `${at}[${k}]`);
   });
   return value as SceneryNight;
 }

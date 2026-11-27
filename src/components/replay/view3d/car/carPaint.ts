@@ -1,6 +1,6 @@
-import { ShaderChunk, Vector3, Vector4, type IUniform, type Material, type MeshPhysicalMaterial, type Texture } from 'three';
+import { Box3, Matrix4, ShaderChunk, ShaderLib, Vector3, Vector4, type IUniform, type Material, type MeshPhysicalMaterial, type Object3D, type Texture } from 'three';
 import { patchTextureFocus } from '../scenery/textureFocus.js';
-import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
+import type { CarAppearance, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
 import type { ReflectionCubes } from '../reflectionCube.js';
@@ -17,9 +17,46 @@ import { PAINT_LAYERS, paintLayers } from './paintLayers.js';
  */
 const BASE_LOOKUP = 'vec3 iblRadiance = getIBLRadiance( geometryViewDir, geometryNormal, material.roughness );';
 const COAT_LOOKUP = 'clearcoatRadiance += getIBLRadiance( geometryViewDir, geometryClearcoatNormal, material.clearcoatRoughness );';
-const PAINT_BASE_LOOKUP = 'vec3 iblRadiance = paintReflection( geometryViewDir, geometryNormal, paintBaseRoughness, PAINT_BASE_EXPLICIT );';
-const PAINT_COAT_LOOKUP = 'clearcoatRadiance += paintReflection( geometryViewDir, geometryClearcoatNormal, paintCoatRoughness, PAINT_COAT_EXPLICIT );';
+const PAINT_BASE_LOOKUP = 'vec3 iblRadiance = paintReflection( geometryViewDir, geometryNormal, paintBaseRoughness, PAINT_BASE_EXPLICIT, paintBaseCos );';
+const PAINT_COAT_LOOKUP = 'clearcoatRadiance += paintReflection( geometryViewDir, geometryClearcoatNormal, paintCoatRoughness, PAINT_COAT_EXPLICIT, paintCoatCos );';
 for (const lookup of [BASE_LOOKUP, COAT_LOOKUP]) if (!ShaderChunk.lights_fragment_maps.includes(lookup)) throw Error('three.js lights_fragment_maps changed: the car paint reflection lookups need updating');
+/** The clear coat's Fresnel angle, which takes the box-projected reflection's half vector (`FRAGMENT.declarations`). */
+const COAT_FRESNEL = 'float dotNVcc = saturate( dot( geometryClearcoatNormal, geometryViewDir ) );';
+if (!ShaderLib.physical.fragmentShader.includes(COAT_FRESNEL)) throw Error('three.js meshphysical changed: the car paint coat Fresnel needs updating');
+
+/** How far outside the reflection box a surface point still reads the box-projected cube, metres (the reference viewer's slack). */
+const BOX_SLACK_M = 0.05;
+/**
+ * The reflected car's cube box (the package's `reflectionBox`): the axis-aligned box of its corners under the car's frame, read
+ * as the paint draws (the frame is then this frame's), and its centre. w 0: no box.
+ */
+const boxLow = new Vector4(), boxHigh = new Vector3(), boxMiddle = new Vector3();
+const boxUniforms = {
+  paint_boxLow: {get value() { placeBox(); return boxLow; }},
+  paint_boxHigh: {get value() { placeBox(); return boxHigh; }},
+  paint_boxCentre: {get value() { placeBox(); return boxMiddle; }},
+};
+let boxed: {frame: Object3D; corners: CarAppearance['reflectionBox']} | null = null;
+const placedFrame = new Matrix4(), measured = new Box3(), corner = new Vector3();
+function placeBox(): void {
+  if (!boxed) { boxLow.w = 0; return; }
+  const world = boxed.frame.matrixWorld;
+  if (boxLow.w === 1 && placedFrame.equals(world)) return;
+  placedFrame.copy(world); measured.makeEmpty();
+  for (const point of boxed.corners) measured.expandByPoint(corner.set(point[0], point[1], point[2]).applyMatrix4(world));
+  measured.getCenter(boxMiddle); boxHigh.copy(measured.max); boxLow.set(measured.min.x, measured.min.y, measured.min.z, 1);
+}
+
+/**
+ * The car whose probe the paint reads (car/carReflection.ts): `frame`, its native car frame in the scene (the body envelope), and
+ * the corners of its reflection box in that frame; null for none. Its paint reads the cube box-projected, as the game's paint
+ * reads its car cube within the box it binds for the car. Ours: one box, the reflected car's; the cars that share its probe lie
+ * outside it and read the cube by direction (the game binds each car's own box).
+ */
+export function setPaintBox(frame: Object3D | null, corners: CarAppearance['reflectionBox'] = []): void {
+  boxed = frame && corners.length ? {frame, corners} : null;
+  boxLow.w = 0;
+}
 /**
  * The sun's glint (`FRAGMENT.glint`) joins the direct sun's specular of both coats right after three evaluates it, inside the
  * directional light loop: `directLight` carries the shadowed sun there, which the later chunks no longer have.
@@ -70,6 +107,19 @@ const FRAGMENT = {
   declarations: `${PAINT_LAYERS.declarations}
     uniform vec3 paint_glint; uniform vec4 paint_edge; uniform float paint_coatCutoff, paint_lodScale, paint_levels, paint_probe;
     uniform samplerCube paint_sharp, paint_convolved;${OVERHEAD_GLSL}
+    uniform vec4 paint_boxLow; uniform vec3 paint_boxHigh, paint_boxCentre;
+    // Each coat's Fresnel angle: the half vector of the view and the direction its reflection reads (-1 until read).
+    float paintBaseCos = -1.0, paintCoatCos = -1.0;
+    // The game's box projection: a point in the reflected car's box reads the cube toward where its reflected ray leaves the box,
+    // seen from the box's centre; any other point by the ray's direction.
+    vec3 paintBoxRead(vec3 r) {
+      if (paint_boxLow.w < 0.5) return r;
+      vec3 p = (vec4(-vViewPosition, 0.0) * viewMatrix).xyz + cameraPosition;
+      if (any(lessThan(p, paint_boxLow.xyz - ${BOX_SLACK_M})) || any(greaterThan(p, paint_boxHigh + ${BOX_SLACK_M}))) return r;
+      vec3 nr = normalize(r), safe = mix(vec3(-1e-6), vec3(1e-6), step(0.0, nr)) + nr;
+      vec3 t = (mix(paint_boxLow.xyz, paint_boxHigh, step(0.0, nr)) - p) / safe;
+      return p + nr * max(min(min(t.x, t.y), t.z), 0.0) - paint_boxCentre;
+    }
     // The sun's glint on smooth paint (the package's shading.sunGlint and smallEdge): the reflection cube holds no sun disc, so a
     // coat under the roughness cutoff adds a disc of the cosine threshold to its direct specular, the whole term scaled; the
     // result is limited where the highlight's screen-space edge is small (its limit squared, in the package's light units).
@@ -96,12 +146,14 @@ const FRAGMENT = {
     // else the convolved cube at the cutoff-relative roughness times the level scale, as the level itself or added to the
     // hardware level, clamped to the convolved cube's last level. Three's sky environment stands in before the first probe.
     // Where the scenery overhead makes the probe stale (car/overheadMap.ts), three's sky environment, or the probe read toward that
-    // scenery from the face's eye.
-    vec3 paintReflection(vec3 viewDir, vec3 n, float roughness, bool explicitLevel) {
+    // scenery from the face's eye. \`halfCos\`: the coat's Fresnel angle for the direction read (\`paintBoxRead\`).
+    vec3 paintReflection(vec3 viewDir, vec3 n, float roughness, bool explicitLevel, out float halfCos) {
       vec3 light = vec3(0.0);
+      halfCos = saturate(dot(n, viewDir));
       if (paint_probe < 0.5) light = getIBLRadiance(viewDir, n, roughness);
       else {
-        vec3 r = transformDirectionByInverseViewMatrix(reflect(-viewDir, n), viewMatrix);
+        vec3 r = paintBoxRead(transformDirectionByInverseViewMatrix(reflect(-viewDir, n), viewMatrix));
+        halfCos = saturate(dot(normalize(normalize((viewMatrix * vec4(r, 0.0)).xyz) + viewDir), viewDir));
         light = paintProbe(r, roughness, explicitLevel);
         vec4 fix = overheadFix(r);
         if (fix.w < 0.0) light = mix(light, getIBLRadiance(viewDir, n, roughness), -fix.w);
@@ -118,8 +170,8 @@ const FRAGMENT = {
     material.clearcoat = paintCoat; material.clearcoatF0 = vec3(paintCoatF0);
     material.clearcoatRoughness = min(max(paintCoatRoughness, 0.0525) + geometryRoughness, 1.0);`,
   occlusion: `#include <aomap_fragment>
-    // The base coat reflects the environment by its specular strength and Schlick's Fresnel at the view angle.
-    reflectedLight.indirectSpecular = radiance * paintBaseSpecular * (paintBaseF0 + (1.0 - paintBaseF0) * pow(1.0 - saturate(dot(normal, geometryViewDir)), 5.0));
+    // The base coat reflects the environment by its specular strength and Schlick's Fresnel at the angle of the direction read.
+    reflectedLight.indirectSpecular = radiance * paintBaseSpecular * (paintBaseF0 + (1.0 - paintBaseF0) * pow(1.0 - (paintBaseCos < 0.0 ? saturate(dot(normal, geometryViewDir)) : paintBaseCos), 5.0));
     reflectedLight.directSpecular *= paintBaseOcclusion; reflectedLight.indirectSpecular *= paintBaseOcclusion;
     clearcoatSpecularDirect *= paintCoatOcclusion; clearcoatSpecularIndirect *= paintCoatOcclusion;${PAINT_LAYERS.diffuse}`,
   // The metallic layer replaces that share of the base layer: the base coat's reflection through the lacquer, faded off
@@ -146,7 +198,7 @@ export function configureCarPaint(material: MeshPhysicalMaterial, paint: CarSurf
   const layers = paintLayers(paint, texture, albedo);
   const overhead = {current: null as CarOverhead | null};
   const uniforms: Record<string, IUniform> = {
-    ...layers.uniforms, ...overheadUniforms(() => overhead.current),
+    ...layers.uniforms, ...overheadUniforms(() => overhead.current), ...boxUniforms,
     paint_glint: {value: new Vector3(shading.sunGlint.cosineThreshold, shading.sunGlint.roughnessCutoff, shading.sunGlint.smoothSpecularScale)},
     paint_edge: {value: new Vector4(shading.smallEdge.detectorScale, shading.smallEdge.edgeScale, shading.smallEdge.limitMin, shading.smallEdge.limitMax)},
     paint_coatCutoff: {value: shading.carPaintReflection.roughnessCutoff}, paint_lodScale: {value: shading.carPaintReflection.lodScale},
@@ -170,6 +222,7 @@ export function configureCarPaint(material: MeshPhysicalMaterial, paint: CarSurf
     shader.fragmentShader = shader.fragmentShader // The ambient patch inlines the chunk the lookups live in.
       .replace(BASE_LOOKUP, PAINT_BASE_LOOKUP.replace('PAINT_BASE_EXPLICIT', String(baseCoatLod === 'explicit')))
       .replace(COAT_LOOKUP, PAINT_COAT_LOOKUP.replace('PAINT_COAT_EXPLICIT', String(clearCoatLod === 'explicit')))
+      .replace(COAT_FRESNEL, 'float dotNVcc = paintCoatCos < 0.0 ? saturate( dot( geometryClearcoatNormal, geometryViewDir ) ) : paintCoatCos;')
       .replace('#include <map_fragment>', ShaderChunk.map_fragment); // Written out: the livery's lookup fades in as it sharpens.
     patchTextureFocus(shader, ['map', 'paint_region', 'paint_carbon', 'paint_aoSpec']);
   };

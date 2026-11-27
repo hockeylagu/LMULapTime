@@ -1,4 +1,4 @@
-import { Box3, Euler, Group, Matrix4, Quaternion, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Box3, Euler, Group, Matrix4, Quaternion, Vector3, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { RaceReplayCar, ReplayDaylightClock, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
@@ -137,7 +137,18 @@ export async function createRaceScene(
   const noCar = new Group(); noCar.visible = false;
   const followedCentre = new Vector3();
   // The cars' headlight beams: every placed car whose headlights are on.
-  const beams = createRaceBeams(origin, bodyOf);
+  // A car's lights read after the view drew (a paused race the lap view left) draw it again: a drawing scene places its beams then.
+  // The followed car's bounds are its own model's: the field never loads the slot a car of its own follows (`pickShapeOf`).
+  // Their frames take the body envelope of the model drawn: the followed car's own, else the field's.
+  const followedEnvelopes = new WeakMap<Object3D, Object3D | null>();
+  const envelopeOf = (slot: number): Object3D | null => {
+    if (slot !== followed?.slot) return field.envelope(slot);
+    const car = followed.car;
+    if (!car) return null;
+    if (!followedEnvelopes.has(car)) followedEnvelopes.set(car, car.getObjectByName('body-envelope') ?? null);
+    return followedEnvelopes.get(car) ?? null;
+  };
+  const beams = createRaceBeams(origin, bodyOf, slot => pickShapeOf(slot)?.box ?? null, envelopeOf, () => { if (drawing) draw(); });
   let followed: FollowedCar | null = null;
   const classOf = new Map(cars.map(car => [car.slot, car.carClass ?? '']));
   // The field's models can be ready before the scene draws (the first followed car's): nothing to redraw until `draw` exists.

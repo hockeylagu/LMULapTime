@@ -3,6 +3,7 @@ import { MapViewSwitchButton } from '../../map/display/MapViewSwitchButton.js';
 import { MapControlsOverlay } from '../../map/MapControlsOverlay.js';
 import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
 import { Replay3DLoading, Replay3DStreaming } from './Replay3DLoading.js';
+import { TimeOfDayButton } from './TimeOfDayButton.js';
 import type { SceneHostState } from './useSceneHost.js';
 
 /**
@@ -98,6 +99,7 @@ export function Scene3DFrame({
           onCenterCar={actions.onCenter}
           orientation="horizontal" className={`top-2 right-3 bottom-auto ${NARROW_SCENE_CONTROLS}`}>
           <CameraModeControl mode={mode} onChange={onModeChange} />
+          <TimeOfDayButton />
           {controlsBefore}
           <MapViewSwitchButton view="3d" onToggleView={onToggleView} />
           {controlsAfter}

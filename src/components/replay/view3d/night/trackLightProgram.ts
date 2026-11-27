@@ -9,7 +9,7 @@ import { Vector4, type Vector3, type WebGLProgramParametersWithUniforms } from '
 import { GAME_LIGHT_UNIT } from '../atmosphere/sunSamples.js';
 import { sceneEmission } from '../scene/dayLight.js';
 import { BELOW_STRETCH, TRACK_LIGHT_ATTRIBUTE, TRACK_LIGHT_DECODE_GLSL, type TrackLight } from './trackLights.js';
-import { CAR_SPOT_DECLARATIONS, CAR_SPOT_TERM, carSpotUniforms } from './carSpots.js';
+import { CAR_SPOT_TERM, carSpotDeclarations, carSpotUniforms } from './carSpots.js';
 import { ALL_LAMPS, COCKPIT_LIGHT_DECLARATIONS, cockpitLightUniforms, type LampShares } from './cockpitLight.js';
 
 /** The lights a car's vertices sum: the nearest the camera (ours; the game's per-draw list holds 20). */
@@ -103,6 +103,6 @@ export function patchTrackLights(shader: WebGLProgramParametersWithUniforms, sou
     .replace('#include <worldpos_vertex>', `${main}#include <worldpos_vertex>`);
   Object.assign(shader.uniforms, carSpotUniforms, shares.cockpit ? cockpitLightUniforms : {});
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\nvarying vec3 vTrackLight;\n${CAR_SPOT_DECLARATIONS}${shares.cockpit ? `\n${COCKPIT_LIGHT_DECLARATIONS}` : ''}`)
+    .replace('#include <common>', `#include <common>\nvarying vec3 vTrackLight;\n${carSpotDeclarations(source === 'near')}${shares.cockpit ? `\n${COCKPIT_LIGHT_DECLARATIONS}` : ''}`)
     .replace('#include <aomap_fragment>', `${trackLightFragment(shares)}\n#include <aomap_fragment>`);
 }

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { CubeTexture, MeshPhysicalMaterial, NoColorSpace, ShaderLib, SRGBColorSpace, Texture, UniformsUtils, WebGLCubeRenderTarget, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
-import { configureCarPaint, setPaintReflection } from '../../../../../src/components/replay/view3d/car/carPaint.js';
+import { CubeTexture, MeshPhysicalMaterial, NoColorSpace, Object3D, ShaderLib, SRGBColorSpace, Texture, UniformsUtils, WebGLCubeRenderTarget, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
+import { configureCarPaint, setPaintBox, setPaintReflection } from '../../../../../src/components/replay/view3d/car/carPaint.js';
 import { materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarSurface } from '../../../../../shared/types/scenes/car.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
@@ -44,8 +44,12 @@ it("builds regional layered car paint on three's physical model", () => {
   }
   expect(shader.fragmentShader).toContain('material.clearcoatF0 = vec3(paintCoatF0)');
   // Each coat reads the car's own cubes by the package's rule (bias for the clear coat, explicit for the base coat in the fixture).
-  expect(shader.fragmentShader).toContain('clearcoatRadiance += paintReflection( geometryViewDir, geometryClearcoatNormal, paintCoatRoughness, false );');
-  expect(shader.fragmentShader).toContain('vec3 iblRadiance = paintReflection( geometryViewDir, geometryNormal, paintBaseRoughness, true );');
+  expect(shader.fragmentShader).toContain('clearcoatRadiance += paintReflection( geometryViewDir, geometryClearcoatNormal, paintCoatRoughness, false, paintCoatCos );');
+  expect(shader.fragmentShader).toContain('vec3 iblRadiance = paintReflection( geometryViewDir, geometryNormal, paintBaseRoughness, true, paintBaseCos );');
+  // Both coats read the cube box-projected, their Fresnel at the half vector of the view and the direction read.
+  expect(shader.fragmentShader).toContain('vec3 r = paintBoxRead(');
+  expect(shader.fragmentShader).toContain('float dotNVcc = paintCoatCos < 0.0 ?');
+  expect(shader.fragmentShader).toContain('pow(1.0 - (paintBaseCos < 0.0 ?');
   expect(shader.fragmentShader).not.toContain('getIBLRadiance( geometryViewDir, geometryClearcoatNormal');
   expect(uniforms.paint_lodScale.value).toBe(6); expect(uniforms.paint_probe.value).toBe(0);
   const cubes = {sharp: new Texture(), convolved: new CubeTexture(), levels: 8, target: new WebGLCubeRenderTarget(4), dispose() {}};
@@ -74,6 +78,25 @@ it("builds regional layered car paint on three's physical model", () => {
   expect(coat[2].x).toBe(0); expect(coat[0].z).toBeCloseTo(1.2);
   expect(uniforms.paint_coatStrength.value).toBe(0.5);
   expect(material.customProgramCacheKey()).toBe('lmu-car-paint-region-ao-bias-explicit');
+});
+
+it("binds the reflected car's box: its corners under the car's frame as the paint draws, none without a car", () => {
+  const material = new MeshPhysicalMaterial({map: new Texture()});
+  configureCarPaint(material, paint({albedo: map('a')}), () => new Texture(), testShading());
+  const {uniforms} = compile(material), frame = new Object3D();
+  // A box 4 m long, 2 m wide and 1.2 m tall in the car frame, the car turned a quarter turn and moved.
+  const corners = [-1, 1].flatMap(x => [0, 1.2].flatMap(y => [-2, 2].map(z => [x, y, z] as [number, number, number])));
+  frame.position.set(10, 0, 5); frame.rotation.y = Math.PI / 2; frame.updateMatrixWorld();
+  setPaintBox(frame, corners);
+  try {
+    [8, 0, 4, 1].forEach((value, i) => expect((uniforms.paint_boxLow.value as Vector4).getComponent(i)).toBeCloseTo(value));
+    [12, 1.2, 6].forEach((value, i) => expect((uniforms.paint_boxHigh.value as Vector3).getComponent(i)).toBeCloseTo(value));
+    [10, 0.6, 5].forEach((value, i) => expect((uniforms.paint_boxCentre.value as Vector3).getComponent(i)).toBeCloseTo(value));
+    // The car moves on: the box follows at the next draw.
+    frame.position.x = 20; frame.updateMatrixWorld();
+    expect((uniforms.paint_boxCentre.value as Vector3).x).toBeCloseTo(20);
+  } finally { setPaintBox(null); }
+  expect((uniforms.paint_boxLow.value as Vector4).w).toBe(0);
 });
 
 it('draws the metallic layer only for paint with a flake map, from the black region', () => {

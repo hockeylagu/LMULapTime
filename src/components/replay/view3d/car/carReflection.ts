@@ -2,7 +2,9 @@ import { Box3, CubeCamera, HalfFloatType, LinearMipmapLinearFilter, MeshStandard
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { convolveReflection, type ReflectionCubes } from '../reflectionCube.js';
 import { SCENERY_REFLECTION_GLSL, sceneryReflectionUniforms } from '../scenery/materials/sceneryReflection.js';
-import { isCarPaint, setPaintReflection } from './carPaint.js';
+import { withoutCarSpots } from '../night/carSpots.js';
+import type { CarAppearance } from '../../../../../shared/types/scenes/car.js';
+import { isCarPaint, setPaintBox, setPaintReflection } from './carPaint.js';
 import { createOverheadMap, OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
 
 /**
@@ -179,6 +181,10 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         for (const entry of Array.isArray(material) ? material as unknown[] : [material]) if (entry instanceof MeshStandardMaterial) found.add(entry);
       });
       materials = [...found]; hidden = nextHidden;
+      // Its paint reads the probe within its reflection box, which its body model carries (cars/carModels.ts).
+      let framed: Object3D | undefined;
+      car.traverse(object => { if (!framed && Array.isArray(object.userData.reflectionBox)) framed = object; });
+      setPaintBox(framed ?? null, framed?.userData.reflectionBox as CarAppearance['reflectionBox'] | undefined);
       // The eye sits over the car's bounding-box centre, wherever the car's origin is within it.
       car.updateWorldMatrix(true, true); box.setFromObject(car);
       eyeAbove = EYE_ABOVE_CENTRE_M + (box.isEmpty() ? 0 : box.getCenter(measure).y - car.getWorldPosition(measure).y);
@@ -229,11 +235,13 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       try {
         if (hidden) hidden.visible = false;
         for (const object of left) object.visible = false;
-        for (const last = face + FACES_PER_FRAME; face < last; face++) {
-          target.texture.generateMipmaps = face === 5;
-          renderer.setRenderTarget(target, face);
-          renderer.render(scene, camera.children[face] as Parameters<WebGLRenderer['render']>[1]);
-        }
+        withoutCarSpots(() => {
+          for (const last = face + FACES_PER_FRAME; face < last; face++) {
+            target.texture.generateMipmaps = face === 5;
+            renderer.setRenderTarget(target, face);
+            renderer.render(scene, camera.children[face] as Parameters<WebGLRenderer['render']>[1]);
+          }
+        });
       } finally {
         if (hidden) hidden.visible = shown;
         for (const object of left) object.visible = true;
@@ -249,7 +257,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         if (!setPaintReflection(material, null) && material.envMap === prefiltered.texture) material.envMap = null;
       }
       for (const paint of sharedPaint) { setPaintReflection(paint, null); paint.removeEventListener('dispose', forget); }
-      sharedPaint.clear();
+      sharedPaint.clear(); setPaintBox(null);
       for (const each of targets) each.dispose();
       prefiltered.dispose(); cubes?.dispose(); generator.dispose(); map.dispose();
     },

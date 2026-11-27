@@ -31,6 +31,7 @@ import { createNearTrackLights, switchTrackLights } from '../night/trackLightPro
 import { createTrackLighting } from '../night/trackLights.js';
 import { createCarSpots, type SpotCar } from '../night/carSpots.js';
 import { setCockpitFrame } from '../night/cockpitLight.js';
+import { onSceneTimeOfDay, shownDaylight } from './timeOfDay.js';
 import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
@@ -197,7 +198,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // Car textures load at the package's size (it stores outside-only parts small and the liveries larger).
   const carTextureLoader = new CachedKtx2Loader(renderer, {start: startOf});
   // Until the camera is placed, the clouds are seen from the scene origin.
-  let sun = sceneSun(layout, origin.y, daylightClock, [origin.x, 0, origin.z]);
+  let sun = sceneSun(layout, origin.y, shownDaylight(daylightClock), [origin.x, 0, origin.z]);
   // The exposure asks for frames of its own (`schedule`), which leave a frame quiet: it reads its state back only on quiet frames.
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => schedule(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);
@@ -220,7 +221,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const nearTrackLights = createNearTrackLights(layout.night.lights.map(light =>
     ({...light, position: [light.position[0] - origin.x, light.position[1] - origin.y, origin.z - light.position[2]] as const})));
   // The cars' headlight beams, the nearest the camera, from the cars the content draws with their headlights on.
-  const carSpots = createCarSpots(), spotCars: SpotCar[] = [];
+  const carSpots = createCarSpots(), spotCars: SpotCar[] = [], spotFocus = new Vector3();
   // The cockpit light rides in the followed car (the one the probe reflects), whose cabin the cameras sit in.
   const cockpitFrame = new Matrix4();
   const placeCockpitLight = (car: Object3D | null) => {
@@ -387,7 +388,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       content?.beforeDraw(camera);
       nearTrackLights.update(camera.position);
       spotCars.length = 0; content?.headlights(spotCars);
-      carSpots.update(spotCars, camera.position);
+      carSpots.update(spotCars, camera, content?.reflected.visible ? content.reflected.getWorldPosition(spotFocus) : null);
       placeCockpitLight(content?.reflected ?? null);
       updateShownMatrices(scene, isFrozen);
       trackCardFacing(camera); trackLampPixel(renderer.getDrawingBufferSize(drawingSize).y);
@@ -444,6 +445,20 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     viewportWidth = 0; viewportHeight = 0; resize();
   };
   const keptCar = createKeptCar();
+  /** Lights the scene by `clock`; a small move of the sun or the weather changes nothing unless `force` (timeOfDay.ts switched). */
+  const light = (clock: ReplayDaylightClock | undefined, force = false) => {
+    const eye = cloudEye(), next = sceneSun(layout, origin.y, clock, eye), weather = (at: typeof sun) => [at.weather.cloudCover, at.clouds.sunVisibility ?? 1];
+    const turnedDeg = MathUtils.radToDeg(next.lighting.sunDirection.angleTo(sun.lighting.sunDirection));
+    const [cover, seen] = weather(next), [shownCover, shownSeen] = weather(sun);
+    if (!force && turnedDeg < SUN_STEP_DEG && Math.abs(cover - shownCover) < WEATHER_STEP && Math.abs(seen - shownSeen) < WEATHER_STEP) return;
+    sun = next; meter = sunMeter(sun, eye); switchNight(nightSwitch, nightState(sun));
+    exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
+    // Before the environment exists, it is made from this sun. The car's probe saw the old light: a paused car kept a day probe at night.
+    if (environment) { environment.setSun(sun); reflection.stale(); invalidate(); }
+  };
+  // The session's clock, kept for the viewer's switch between its own time and the daylight.
+  let sessionClock = daylightClock;
+  const stopTimeOfDay = onSceneTimeOfDay(() => { if (!disposed) { light(shownDaylight(sessionClock), true); exposure.reset(); } });
   const shell: SceneShell = {
     renderer, scene, rig, origin, get drawnView() { return drawnView; }, get drawnSize() { return {width: viewportWidth, height: viewportHeight}; }, surfaceHeight: ground.surfaceHeight, carTextures, carTemplates: createCarTemplates(), keptCar,
     get started() { return started; },
@@ -533,20 +548,11 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       exposure.setType(exposureType(next));
       return true;
     },
-    setDaylight(clock) {
-      const eye = cloudEye(), next = sceneSun(layout, origin.y, clock, eye), weather = (at: typeof sun) => [at.weather.cloudCover, at.clouds.sunVisibility ?? 1];
-      const turnedDeg = MathUtils.radToDeg(next.lighting.sunDirection.angleTo(sun.lighting.sunDirection));
-      const [cover, seen] = weather(next), [shownCover, shownSeen] = weather(sun);
-      if (turnedDeg < SUN_STEP_DEG && Math.abs(cover - shownCover) < WEATHER_STEP && Math.abs(seen - shownSeen) < WEATHER_STEP) return;
-      sun = next; meter = sunMeter(sun, eye); switchNight(nightSwitch, nightState(sun));
-      exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
-      // Before the environment exists, it is made from this sun.
-      if (environment) { environment.setSun(sun); invalidate(); }
-    },
+    setDaylight(clock) { sessionClock = clock; light(shownDaylight(clock)); },
     beforeFrame(hook) { frameHook = hook; },
     invalidate: () => invalidate(),
     dispose() {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect();
+      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); stopTimeOfDay();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost); document.removeEventListener('visibilitychange', invalidate);
       // The stream takes its chunks out first (the chunk loader frees them) with their batches, then the content and sky go with the scene.
       stream.dispose(); batches.dispose(); keptCar.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose(); convolution.dispose();

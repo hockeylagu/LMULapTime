@@ -3,7 +3,7 @@
  * track lights and the headlight beams are dropped (`on`) or scaled by the emissive map's alpha (`emissiveAlpha`), and at night the
  * material's own cockpit light (`parameters.cockpitLight`, the car's model frame) joins the diffuse light:
  * `colour · N·L · (1 − d / range)² · intensity`. Glass drops the track lights there too and has no cockpit light; glass and the
- * windscreens never take the beams. The light sits in the frame of the car whose cabin the cameras ride in (`setCockpitFrame`): its
+ * windscreens never take the beams, and the screens (dashboard, external monitor) take neither. The light sits in the frame of the car whose cabin the cameras ride in (`setCockpitFrame`): its
  * reach (at most 1.3 m) keeps it inside that car, so another car of the body sharing the material stays dark inside.
  */
 import { Matrix4 } from 'three';
@@ -13,6 +13,8 @@ import { list, value, type ShaderContext } from '../scenery/materials/shaderCont
 import type { SurfaceConfig } from '../scenery/materials/surfaceConfig.js';
 
 const GLASS_KINDS = new Set<SurfaceConfig['kind']>(['glass', 'windscreen', 'windscreenInside']);
+/** The screens: their light is their own glow alone (the game's screen shaders take neither the track lights nor the beams). */
+const SCREEN_KINDS = new Set<SurfaceConfig['kind']>(['dashboard', 'externalMonitor']);
 
 /** GLSL factors on a surface's track lights and beams, and its cockpit light term (null for none). */
 export interface LampShares { omni: string; spot: string; cockpit: string | null }
@@ -35,7 +37,7 @@ export function setCockpitFrame(frame: Matrix4 | null): void {
 export function lampShares(config: SurfaceConfig, {sample, number, vec}: ShaderContext): LampShares {
   const mode = config.flags.cockpitMode, glass = GLASS_KINDS.has(config.kind);
   if (mode !== undefined && mode !== 'on' && mode !== 'emissiveAlpha') throw Error(`Unsupported cockpit mode ${mode}: ${config.name ?? '?'}`);
-  const omni = mode === 'on' ? '0.0' : mode === 'emissiveAlpha' ? `${sample('emissive')}.a` : '1.0';
+  const omni = mode === 'on' || SCREEN_KINDS.has(config.kind) ? '0.0' : mode === 'emissiveAlpha' ? `${sample('emissive')}.a` : '1.0';
   const light = config.parameters.cockpitLight, intensity = light ? value(light, 'intensity') : 0;
   const cockpit = mode && !glass && light && intensity > 0
     ? `cockpitLightTerm(${vec(list(light, 'position'))},${number(value(light, 'range'))},${vec(list(light, 'colour').map(c => c * intensity))},lampPoint,lampNormal)` : null;

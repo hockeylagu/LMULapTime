@@ -231,6 +231,8 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
       // The blended parts draw in the game's order: the lamp glows before the glass, the outside windscreen over them.
       object.renderOrder = carPartOrder(Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]);
     });
+    // The car's reflection box in its native frame, the model's own (car/carPaint.ts `setPaintBox`).
+    if (kind === 'body') model.userData.reflectionBox = appearance.reflectionBox;
     return model;
   };
   /**

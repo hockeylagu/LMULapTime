@@ -17,6 +17,7 @@ import { PAINT_MAPS } from './paintLayers.js';
 import { bindCarSurfaceReflection, CAR_SURFACE_OVERHEAD_UNITS } from './carReflection.js';
 import { GUARANTEED_TEXTURE_UNITS } from '../cars/carBatching.js';
 import { bindCockpitOcclusion } from './cockpitOcclusion.js';
+import { numberPlateGlow, patchNumberPlateGlow } from './numberPlateGlow.js';
 
 const UV_CHANNEL: Record<string, number> = { uv0: 0, uv1: 1, uv2: 2, uv3: 3 };
 
@@ -205,17 +206,19 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   }
   if (config.kind === 'carPaint' && material.map) configureCarPaint(material as MeshPhysicalMaterial, config, texture, shading);
   else if (!surface) {
-    // Three's own program otherwise: the same ambient lookup as every other surface of the scene.
+    // Three's own program otherwise: the same ambient lookup as every other surface of the scene, and a lit race number's glow.
+    const plate = config.kind === 'numberPlate' ? numberPlateGlow(recipe.surface) : null;
     material.onBeforeCompile = shader => {
       patchTrackLights(shader, 'near');
       patchAmbientLookup(shader);
       // Written out: the albedo's lookup fades in as it sharpens.
       shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', ShaderChunk.map_fragment);
       patchTextureFocus(shader, ['map']);
+      if (plate) patchNumberPlateGlow(shader, plate);
     };
     // three shares a program between materials with the same key: the key names every hook these materials get, the cascade
     // shadow added below included, so no material with other hooks takes this program.
-    material.customProgramCacheKey = () => 'lmu-car-ambient-cascade';
+    material.customProgramCacheKey = () => plate ? 'lmu-car-ambient-cascade-plate' : 'lmu-car-ambient-cascade';
   }
   if (!surface) {
     // Paint and the materials on three's light loop take the sun's shadow from the cascades too (the surface program patches itself).

@@ -1,12 +1,12 @@
 /**
- * The track lights at night (docs/SCENE_PACKAGE.md "Night", track lights and light lists). The game adds them per vertex, diffuse
- * only, under the ambient occlusion: a vertex of a capped instance (its `NIGHT_LIGHT_LIST_ATTRIBUTE` names a list of the layout) takes
- * that list, any other vertex every light in reach. Scenery and lights never move, so each chunk vertex's sum is worked out once when
- * the chunk loads and replaces its light-list id: `TRACK_LIGHT_ATTRIBUTE`, the same four bytes. Every light in reach is found through a
- * grid of cells over the lights' reach (ours: the game lists the lights per draw).
+ * The track lights at night (docs/SCENE_PACKAGE.md "Night", track lights and nodes). The game adds them per vertex, diffuse only,
+ * under the ambient occlusion: a vertex of a scene node (its `SCENE_NODE_ATTRIBUTE`) takes the node's lights (`nodeTrackLights`), any
+ * other vertex every light in reach. Scenery and lights never move, so each chunk vertex's sum is worked out once when the chunk loads
+ * and replaces its node id: `TRACK_LIGHT_ATTRIBUTE`, the same four bytes. Every light in reach is found through a grid of cells over
+ * the lights' reach (ours: the game lists the lights per draw).
  */
 import { BufferAttribute, Matrix3, Mesh, Vector3, type BufferGeometry, type Object3D } from 'three';
-import { NIGHT_LIGHT_LIST_ATTRIBUTE, NIGHT_LIGHT_LIST_NONE, type SceneryNight } from '../../../../../shared/packageContract/index.js';
+import { SCENE_NODE_ATTRIBUTE, SCENE_NODE_NONE, type SceneryNight } from '../../../../../shared/packageContract/index.js';
 
 type Vec3 = readonly [number, number, number];
 
@@ -80,24 +80,44 @@ export function cellLights(grid: TrackLightGrid, x: number, z: number): readonly
 }
 
 export interface TrackLighting {
-  /** Gives each mesh under `root` (a chunk in the scenery frame) its track light sums, in place of its light-list ids. Before the chunk is batched. */
+  /** Gives each mesh under `root` (a chunk in the scenery frame) its track light sums, in place of its node ids. Before the chunk is batched. */
   prepare(root: Object3D): void;
 }
 
-const LIGHT_LIST_ATTRIBUTE = NIGHT_LIGHT_LIST_ATTRIBUTE.toLowerCase(); // three's glTF loader names a custom attribute in lower case.
+const NODE_ATTRIBUTE = SCENE_NODE_ATTRIBUTE.toLowerCase(); // three's glTF loader names a custom attribute in lower case.
 
-export function createTrackLighting(night: Pick<SceneryNight, 'lights' | 'lightLists'>): TrackLighting {
-  const lights = night.lights, grid = trackLightGrid(lights), lists = new Map(night.lightLists.map(list => [list.id, list.lights]));
+/** The lights one scene node takes: the game's 20. */
+export const NODE_TRACK_LIGHTS = 20;
+
+/**
+ * Each node's lights, by node id, as the game picks them per draw: the lights whose range reaches the node's mesh sphere (distance from the
+ * centre under range plus radius), nearest the centre first, up to `NODE_TRACK_LIGHTS`.
+ */
+export function nodeTrackLights(lights: readonly TrackLight[], nodes: SceneryNight['nodes']): Map<number, number[]> {
+  const lists = new Map<number, number[]>(), reach: {index: number; d: number}[] = [];
+  for (const [id, , , , , x, y, z, radius] of nodes) {
+    reach.length = 0;
+    lights.forEach(({position, rangeM}, index) => {
+      const d = Math.hypot(position[0] - x, position[1] - y, position[2] - z);
+      if (d < rangeM + radius) reach.push({index, d});
+    });
+    lists.set(id, reach.sort((a, b) => a.d - b.d).slice(0, NODE_TRACK_LIGHTS).map(({index}) => index));
+  }
+  return lists;
+}
+
+export function createTrackLighting(night: Pick<SceneryNight, 'lights' | 'nodes'>): TrackLighting {
+  const lights = night.lights, grid = trackLightGrid(lights), lists = nodeTrackLights(lights, night.nodes);
   const point = new Vector3(), normal = new Vector3(), normalMatrix = new Matrix3(), sum = [0, 0, 0];
   const light = (geometry: BufferGeometry, matrixWorld: Mesh['matrixWorld']) => {
-    const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), ids = geometry.getAttribute(LIGHT_LIST_ATTRIBUTE);
+    const positions = geometry.getAttribute('position'), normals = geometry.getAttribute('normal'), ids = geometry.getAttribute(NODE_ATTRIBUTE);
     const out = new Uint8Array(positions.count * 4);
     normalMatrix.getNormalMatrix(matrixWorld);
     for (let i = 0; lights.length && i < positions.count; i++) {
       point.fromBufferAttribute(positions, i).applyMatrix4(matrixWorld);
       if (normals) normal.fromBufferAttribute(normals, i).applyMatrix3(normalMatrix).normalize(); else normal.set(0, 1, 0);
-      const id = ids ? Math.round(ids.getX(i)) : NIGHT_LIGHT_LIST_NONE;
-      const reaching = (id === NIGHT_LIGHT_LIST_NONE ? undefined : lists.get(id)) ?? cellLights(grid, point.x, point.z);
+      const id = ids ? Math.round(ids.getX(i)) : SCENE_NODE_NONE;
+      const reaching = (id === SCENE_NODE_NONE ? undefined : lists.get(id)) ?? cellLights(grid, point.x, point.z);
       sum[0] = sum[1] = sum[2] = 0;
       for (const index of reaching) addTrackLight(lights[index], point.x, point.y, point.z, normal.x, normal.y, normal.z, sum);
       encodeTrackLight(sum, out, 4 * i);
@@ -115,7 +135,7 @@ export function createTrackLighting(night: Pick<SceneryNight, 'lights' | 'lightL
         if (done.has(geometry) || !geometry.getAttribute('position')) return;
         done.add(geometry);
         geometry.setAttribute(TRACK_LIGHT_ATTRIBUTE, new BufferAttribute(light(geometry, child.matrixWorld), 4, true));
-        geometry.deleteAttribute(LIGHT_LIST_ATTRIBUTE);
+        geometry.deleteAttribute(NODE_ATTRIBUTE);
       });
     },
   };
