@@ -182,3 +182,30 @@ describe('laps left', () => {
     });
   });
 });
+
+describe('leader pace', () => {
+  const own: LiveOwnPace = { lapSeconds: 133, stopSeconds: 0, stopCostSeconds: 0, stopsMade: 0, lapFraction: 0 };
+  it('takes the qualifying pole before the leader\'s second lap when faster than the estimate (Spa race 2026-11-26)', () => {
+    // At the green: the leader's estimate 133.81 s, the same for every car all race; pole 131.19 s, laps of 131.4-131.9 s.
+    const session = { kind: 'race' as const, endSeconds: 1334, elapsedSeconds: 134, gamePhase: 5 };
+    const leader = vehicleReading({ id: 1, totalLaps: 0, lapStartEt: 133.9, estimatedLapTime: 133.81 });
+    const player = vehicleReading({ id: 3, totalLaps: 0, lapStartEt: 134, estimatedLapTime: 133.81 });
+    const start = { ...own, lapSeconds: null };
+    // The estimate: 9 laps; the pole: the flag at 133.9 + 10 x 131.19 = 1445.8 s, 10 laps, as run.
+    expect(computeLapsLeft(session, player, leader, leader, start)).toEqual({ laps: 9, estimated: true });
+    expect(computeLapsLeft(session, player, leader, leader, start, { laps: [], poleSeconds: 131.19 })).toEqual({ laps: 10, estimated: true });
+    // A pole slower than the estimate is not taken.
+    expect(computeLapsLeft(session, player, leader, leader, start, { laps: [], poleSeconds: 135 })).toEqual({ laps: 9, estimated: true });
+  });
+
+  it('takes the median of the leader\'s last three laps, not one slow lap (Spa race 2026-11-26, second event)', () => {
+    // Lap 4: the leader from 662.1 s after 131.84, 131.59 and 133.3 s, the clock ending at 1328 s; it crossed at 1319.0 s.
+    const session = { kind: 'race' as const, endSeconds: 1328, elapsedSeconds: 668, gamePhase: 5 };
+    const leader = vehicleReading({ id: 7, totalLaps: 4, lapStartEt: 662.1, estimatedLapTime: 133.81, lastLapTime: 133.3 });
+    const player = vehicleReading({ id: 3, totalLaps: 4, lapStartEt: 668, estimatedLapTime: 133.81 });
+    // The last lap alone: 662.1 + 5 x 133.3 = 1328.6 s, past the clock, so 9 in all; the median: 6 left, 10 in all, as run.
+    expect(computeLapsLeft(session, player, leader, null, own)).toEqual({ laps: 5, estimated: true });
+    expect(computeLapsLeft(session, player, leader, null, own, { laps: [131.84, 131.59, 133.3], poleSeconds: 131.37 }))
+      .toEqual({ laps: 6, estimated: true });
+  });
+});

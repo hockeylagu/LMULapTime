@@ -147,6 +147,9 @@ export class LiveStrategyTracker {
   /** The car's plugin deployment settings in kW (`deploymentKw`); null without any, then the advice uses map positions. */
   public setDeploymentKw(kw: readonly number[] | null): void { this.deployment.setPluginKw(kw); }
 
+  /** The event's qualifying pole lap, for the race leader's pace before its second lap; null without one. */
+  public qualifyingPole(): number | null { return this.qualifyingBest; }
+
   public tyreCompound(): string | null { return this.usage?.selected?.compound ?? this.car?.compound ?? null; }
   /** The stored pit lane loss of the layout and class (`setPitLaneLoss`), for the race plan's stop time. */
   private pitLaneLoss: number | null = null;

@@ -133,3 +133,18 @@ function damageOf() {
   return { wheel: null, body: 0.2, suspension: 0, partsDetached: false, impactLap: 2, lapsSinceImpact: 0,
     paceLossPerLap: null, lossToFinish: null, repairSeconds: 0, significant: false };
 }
+
+it('follows the leader\'s laps from its second and passes the pole (Spa race 2026-11-26, second event)', () => {
+  const tracker = new LiveSessionTracker();
+  const reading = (et: number, totalLaps: number, lapStartEt: number, lastLapTime: number) => {
+    const scoring = scoringReading({ currentEt: et, endEt: 1328, trackLength: TRACK, classLeader: null,
+      leader: vehicleReading({ id: 7, totalLaps, lapStartEt, estimatedLapTime: 133.81, lastLapTime }),
+      player: vehicleReading({ id: 3, totalLaps: 4, lapStartEt: 668, lapDist: 0, estimatedLapTime: 133 }) });
+    return tracker.apply(scoring, deriveLiveState(scoring, 'driving'), null, 131.37).lapsLeft;
+  };
+  // The start lap (137.36 s) is not its pace; 131.84, 131.59 and the slow 133.3 s are, by their median.
+  reading(266, 1, 265.4, 137.36);
+  reading(398, 2, 397.2, 131.84);
+  reading(529, 3, 528.8, 131.59);
+  expect(reading(668, 4, 662.1, 133.3)).toEqual({ laps: 6, estimated: true });
+});

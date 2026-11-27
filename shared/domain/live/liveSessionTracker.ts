@@ -2,7 +2,7 @@ import type { LiveSnapshot, LiveTiming } from '../../types/live.js';
 import type { LiveStrategy } from '../../types/liveStrategy.js';
 import { LiveLapTiming } from './liveLapTiming.js';
 import { computeLapsLeft } from './liveLapsLeft.js';
-import type { LiveOwnPace } from './liveLapsLeft.js';
+import type { LiveLeaderPace, LiveOwnPace } from './liveLapsLeft.js';
 import type { LiveScoringReading, LiveState } from './liveLifecycle.js';
 import { LivePitLaneMeter } from './livePitLane.js';
 import type { PitLaneMeasurement } from './livePitLane.js';
@@ -35,6 +35,10 @@ export class LiveSessionTracker {
   private stopPlanned = false;
   /** Stops the player made with one planned for fuel or VE; a stop with none planned (a repair) is not one the leader makes too. */
   private stopsMade = 0;
+  /** The overall leader followed, and its laps from its second, the newest last (`leaderLapSeconds` takes three). */
+  private leaderId: number | null = null;
+  private leaderLaps: number[] = [];
+
   /** Clock and lap share at the pit lane entry of the stop in progress; null outside the lane. */
   private laneEntry: { et: number; fraction: number } | null = null;
 
@@ -48,8 +52,12 @@ export class LiveSessionTracker {
     return measured;
   }
 
-  /** `strategy`: the previous snapshot's, for the planned stop and the damage at a pit entry. */
-  public apply(reading: LiveScoringReading | null, state: LiveState, strategy: LiveStrategy | null = null): LiveSessionDetails {
+  /**
+   * `strategy`: the previous snapshot's, for the planned stop and the damage at a pit entry; `poleSeconds`: the event's
+   * qualifying pole lap, the leader's pace before its second lap.
+   */
+  public apply(reading: LiveScoringReading | null, state: LiveState, strategy: LiveStrategy | null = null,
+    poleSeconds: number | null = null): LiveSessionDetails {
     if (!state.session) {
       if (state.lifecycle !== 'loading') { this.laps.reset(); this.weather.reset(); this.resetLane(null); }
       return NO_SESSION_DETAILS;
@@ -86,8 +94,9 @@ export class LiveSessionTracker {
       stopsMade: this.stopsMade,
       lapFraction,
     };
+    const leaderPace: LiveLeaderPace = { laps: this.followLeader(reading.leader), poleSeconds };
     return {
-      lapsLeft: computeLapsLeft(state.session, player, reading.leader, reading.classLeader, own),
+      lapsLeft: computeLapsLeft(state.session, player, reading.leader, reading.classLeader, own, leaderPace),
       weather,
       recentLaps: this.laps.recentLaps,
       sessionBest: this.laps.sessionBest,
@@ -95,6 +104,18 @@ export class LiveSessionTracker {
   }
 
   public timing(): LiveTiming | null { return this.laps.timing(); }
+
+  /** Each new last lap of the leader from its second; another leader starts from its own last lap. */
+  private followLeader(leader: LiveScoringReading['leader']): readonly number[] {
+    const last = leader && leader.totalLaps >= 2 && leader.lastLapTime > 0 ? leader.lastLapTime : null;
+    if (leader?.id !== this.leaderId) {
+      this.leaderId = leader?.id ?? null;
+      this.leaderLaps = last === null ? [] : [last];
+    } else if (last !== null && last !== this.leaderLaps[this.leaderLaps.length - 1]) {
+      this.leaderLaps = [...this.leaderLaps, last].slice(-3);
+    }
+    return this.leaderLaps;
+  }
 
   /**
    * What the stop in progress still costs: its cost less the time lost so far, the time since the lane entry beyond
@@ -111,5 +132,5 @@ export class LiveSessionTracker {
   }
 
   private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; this.stopCost = null; this.laneEntry = null;
-    this.pitStops = null; this.stopPlanned = false; this.stopsMade = 0; }
+    this.pitStops = null; this.stopPlanned = false; this.stopsMade = 0; this.leaderId = null; this.leaderLaps = []; }
 }

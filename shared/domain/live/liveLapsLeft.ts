@@ -18,22 +18,33 @@ export function raceClockRunning(gamePhase: number, elapsedSeconds: number): boo
 
 const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
 
-/** A last lap more than this much off the estimate is a pit, incident or start lap, not the leader's pace. */
+/** A lap more than this much off the estimate is a pit, incident or start lap, not the leader's pace. */
 const LEADER_LAST_LAP_MAX_RATIO = 1.1;
 
 /**
- * The leader's lap time for the flag: its last lap, slower or faster than the game's estimate, which does not follow its
- * pace (Barcelona race 2026-11-12: estimate about 88.6 s, last laps 89.6 s, laps left one short all race; Le Mans race
- * 2026-11-24: estimate about 241-244 s, last laps 236.5-238.3 s, laps left one short to lap 4, then switching 5 <-> 6).
- * A last lap off the estimate by more than `LEADER_LAST_LAP_MAX_RATIO` is not its pace, nor is its start lap (Sebring
- * School races 2026-11-17: 69-70.7 s against about 64 s, inside the ratio; it moved the flag a lap later and laps left
- * read one too many until its second lap).
+ * The leader's lap time for the flag: the median of its last three laps from its second (`laps`, oldest first), slower
+ * or faster than the game's estimate, which does not follow its pace (Barcelona race 2026-11-12: estimate about 88.6 s,
+ * last laps 89.6 s, laps left one short all race; Le Mans race 2026-11-24: estimate about 241-244 s, last laps
+ * 236.5-238.3 s, laps left one short to lap 4, then switching 5 <-> 6). A lap off the estimate by more than
+ * `LEADER_LAST_LAP_MAX_RATIO` is not its pace, nor is its start lap (Sebring School races 2026-11-17: 69-70.7 s against
+ * about 64 s, inside the ratio; it moved the flag a lap later and laps left read one too many until its second lap).
+ * The median, not the last lap: one 133.3 s lap among 131.6-131.8 s moved the flag 7.5 s, past the clock's end by 0.6 s,
+ * and laps left read 9 for the 10 run (Spa race 2026-11-26, second event). Before its second lap the faster of the
+ * estimate and the event's qualifying pole lap, as the garage: online, the estimate is the same for every car and never
+ * moves (Spa races 2026-11-25 and -26: 133.81 s all race against laps of 130.4-131.9 s and poles of 130.4-131.4 s;
+ * laps left one short until its second lap).
  */
-function leaderLapSeconds(leader: LiveVehicleReading): number {
+export function leaderLapSeconds(leader: LiveVehicleReading, laps: readonly number[], poleSeconds: number | null): number {
   const estimate = leader.estimatedLapTime;
-  const last = leader.lastLapTime;
-  return leader.totalLaps >= 2 && positive(estimate) && positive(last)
-    && last >= estimate / LEADER_LAST_LAP_MAX_RATIO && last <= estimate * LEADER_LAST_LAP_MAX_RATIO ? last : estimate;
+  const paced = positive(estimate)
+    ? laps.slice(-3).filter(lap => positive(lap) && lap >= estimate / LEADER_LAST_LAP_MAX_RATIO && lap <= estimate * LEADER_LAST_LAP_MAX_RATIO)
+    : [];
+  if (paced.length > 0) {
+    const sorted = [...paced].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  return poleSeconds !== null && positive(poleSeconds) && (!positive(estimate) || poleSeconds < estimate) ? poleSeconds : estimate;
 }
 
 /** The class leader's estimated lap time when it races in the player's (known) class, else null. */
@@ -80,6 +91,13 @@ export interface LiveOwnPace {
   lapFraction: number | null;
 }
 
+/** The leader's side of the race distance (`LiveSessionTracker`): its laps from its second, oldest first, and the pole. */
+export interface LiveLeaderPace {
+  laps: readonly number[];
+  /** The event's qualifying pole lap (`LiveStrategyTracker`); null without a qualifying session. */
+  poleSeconds: number | null;
+}
+
 /**
  * Race laps left, counting the lap in progress. LMU races are always timed, so the clock is converted to laps:
  * the leader gets the flag at the first line crossing after the clock ends. With `L` its lap start
@@ -103,6 +121,7 @@ export function computeLapsLeft(
   leader: LiveVehicleReading | null,
   classLeader: LiveVehicleReading | null = null,
   own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, stopsMade: 0, lapFraction: null },
+  leaderPace: LiveLeaderPace | null = null,
 ): LiveLapsLeft | null {
   if (!session || !player || player.finishStatus === FINISHED) return null;
   if (session.kind === 'qualifying') return ownLapsLeft(session, player);
@@ -123,7 +142,8 @@ export function computeLapsLeft(
   }
   const leaderStops = (leader.pitStops ?? 0) < own.stopsMade + (stop > 0 ? 1 : 0);
   const leaderStop = leaderStops && Number.isFinite(own.stopCostSeconds) ? Math.max(0, own.stopCostSeconds) : 0;
-  const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leaderLapSeconds(leader), leaderStop);
+  const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leaderLapSeconds(leader,
+    leaderPace?.laps ?? (leader.totalLaps >= 2 ? [leader.lastLapTime] : []), leaderPace?.poleSeconds ?? null), leaderStop);
   if (flag === null) return null;
   const pace = ownPace ?? classLeaderLapSeconds(player, classLeader) ?? player.estimatedLapTime;
   if (!(player.lapStartEt >= 0) || !positive(pace)) return null;

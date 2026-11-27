@@ -560,7 +560,7 @@ export class LiveService {
     this.identity.update(isLiveSessionLoaded(state.lifecycle) ? state.session : null);
     const identity = this.identity.identity;
     // The previous strategy: the planned stop it holds shortens the race distance (`LiveSessionTracker`).
-    const details = this.tracker.apply(reading, state, previous.strategy ?? null);
+    const details = this.tracker.apply(reading, state, previous.strategy ?? null, this.strategy.qualifyingPole());
     this.followPitLane(identity?.layoutKey ?? null, identity?.carClass ?? null);
     this.followRaceHistory(identity?.layoutKey ?? null, identity?.carClass ?? null);
     this.followTyreWear(identity?.layoutKey ?? null, identity?.vehicleModel ?? null,
