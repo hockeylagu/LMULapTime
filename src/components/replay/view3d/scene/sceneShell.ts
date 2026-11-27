@@ -334,7 +334,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   lit = Promise.resolve().then(() => {
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), rig.gameCamera?.shadow ?? null, sun);
     reflection = createCarReflection(renderer, scene, layout.shading,
-      {notReflected: () => [...batches.notReflected(), ...ownNotReflected], clipM: layout.reflection.observedClipM});
+      {*notReflected() { yield* batches.notReflected(); yield* ownNotReflected; }, clipM: layout.reflection.observedClipM});
   });
   lit.then(() => report({lighting: 1}), () => {}); // Awaited by the content.
   // Convert the native left-handed frame once, including meshes, car bodies and trails.

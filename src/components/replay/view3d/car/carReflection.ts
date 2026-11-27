@@ -154,6 +154,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   /** What stands over the scenery around the car, and the shown probe's face eyes: the paint tells where the probe is stale. */
   const map = createOverheadMap(renderer, scene), overhead: CarOverhead = {map, eyes: new Float32Array(18)}, drawnEyes = new Float32Array(18);
   let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, deferred = false;
+  /** The parts a face pass hid, reused from pass to pass. */
+  const left: Object3D[] = [];
   /** The paint of the cars sharing the probe (`share`), until each material is disposed. */
   const sharedPaint = new Set<Material>();
   const forget = (event: {target: Material}) => { sharedPaint.delete(event.target); };
@@ -222,7 +224,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       camera.position.copy(at); camera.position.y += eyeAbove; camera.updateMatrixWorld();
       for (let each = face; each < face + FACES_PER_FRAME; each++) camera.position.toArray(drawnEyes, each * 3);
       const previous = renderer.getRenderTarget(), shown = hidden?.visible ?? false;
-      const left = [...faces.notReflected()].filter(object => object.visible);
+      left.length = 0;
+      for (const object of faces.notReflected()) if (object.visible) left.push(object);
       try {
         if (hidden) hidden.visible = false;
         for (const object of left) object.visible = false;
