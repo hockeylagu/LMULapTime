@@ -153,7 +153,7 @@ export function planSequencePasses(
 export async function refreshReplayCornerPasses(
   store: CornerPassStore,
   filename: string,
-  metadata: Pick<ReplayMetadata, 'sceneDesc' | 'trackVenue' | 'trackCourse' | 'drivers'>,
+  metadata: Pick<ReplayMetadata, 'sceneDesc' | 'trackVenue' | 'trackCourse' | 'drivers' | 'privateSession'>,
   build: Build = buildCornerPassesInWorker,
   loadTrack: TrackLoader = getTrackDefinition
 ): Promise<CornerPassOutcome> {
@@ -167,7 +167,8 @@ export async function refreshReplayCornerPasses(
   // Only the stale build is worked out: a map change leaves the turn passes as they are.
   const sequences = sequencesCurrent ? [] : sequencePlan.maps.map(({ slots, map }) => ({ slots, segments: sequenceSegments(map, plan.lengthM) }));
   const segments = turnsCurrent ? [] : plan.turns.map(({ id, startM, endM }) => ({ id, startM, endM }));
-  const result = await build({ laps: store.listReplayLapRows(filename), centerline: plan.centerline, startStationM: plan.startStationM, segments, sequences });
+  const result = await build({ laps: store.listReplayLapRows(filename), centerline: plan.centerline, startStationM: plan.startStationM, segments, sequences,
+    privateSession: metadata.privateSession === true });
   if (!turnsCurrent) store.replaceCornerPasses(filename, { versionKey: plan.versionKey, layoutKey: plan.layoutKey }, result.passes);
   if (!sequencesCurrent) store.replaceCornerPasses(filename, { versionKey: sequenceKey, layoutKey: plan.layoutKey }, result.sequencePasses, 'sequences');
   return { status: 'built', passCount: result.passes.length, sequencePassCount: result.sequencePasses.length };

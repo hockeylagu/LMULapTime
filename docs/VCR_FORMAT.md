@@ -61,7 +61,8 @@ Immediately following String 6 (`trackPath`):
     - `5` - `8`: Qualifying (Q1, Q2, Q3, Q4)
     - `9`: Warmup
     - `10` - `13`: Race (R1, R2, R3, R4)
-  - `(sessionInfo >> 7) & 0x01`: Private / Dedicated session flag (`true` / `false`).
+  - `(sessionInfo >> 7) & 0x01`: Private session: each driver runs alone and the replay overlays cars that never shared
+    the road (LMU's private qualifying and practice; `SESSSET_private_qual` / `SESSSET_private_prac` live).
 - **Bytes 2..3 (`raceStartMinute`, UInt16LE)**: The event's race start as minutes past local midnight (Le Mans
   `0x04EC` = 21:00, Fuji `0x030C` = 13:00, Daytona `0x0348` = 14:00); `0xFFFF` in offline sessions. An online practice
   whose event info has no `splitNo` carries `630` (10:30) whatever the event. The session's own start time of day is

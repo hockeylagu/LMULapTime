@@ -362,6 +362,11 @@ describe('buildCornerPasses', () => {
     expect(last.aheadSlot).toBeNull();
   });
 
+  it('records no car ahead in a private session, where no other car shared the road', () => {
+    const cars = [{ slot: 1, laps: [lap(1)] }, { slot: 2, laps: [lap(1, 1)] }];
+    expect(buildCornerPasses(cars, SEGMENTS, LENGTH, false).map(p => p.aheadSlot)).toEqual([null, null, null, null]);
+  });
+
   it('is no one\'s traffic while stopped: a parked car beside the track', () => {
     // Car 9 sits at 600 m for the whole lap (a parked safety car); car 1 drives past it in segment 1.
     const parked: PassLapSamples = { lapNumber: 1, times: [], stations: [], speedKmh: [], throttle: [], brake: [], steer: [], usable: [] };

@@ -18,6 +18,8 @@ export interface CornerPassInput {
   startStationM: number;
   segments: PassSegment[];
   sequences: Array<{ slots: number[]; segments: PassSegment[] }>;
+  /** The replay is of a private session (the replay header's flag): no car was on the driver's road. */
+  privateSession: boolean;
 }
 
 /** A replay's turn passes and sequence passes (a sequence's segment id is its first turn's). */
@@ -135,9 +137,9 @@ export function buildReplayCornerPasses(input: CornerPassInput): CornerPassResul
   const cars = [...bySlot.values()];
   const sequenceSegments = new Map(input.sequences.flatMap(({ slots, segments }) => slots.map(slot => [slot, segments])));
   return {
-    passes: input.segments.length ? buildCornerPasses(cars, input.segments, index.totalLengthM) : [],
+    passes: input.segments.length ? buildCornerPasses(cars, input.segments, index.totalLengthM, !input.privateSession) : [],
     sequencePasses: sequenceSegments.size
-      ? buildCornerPasses(cars.map(car => ({ ...car, segments: sequenceSegments.get(car.slot) ?? [] })), [], index.totalLengthM)
+      ? buildCornerPasses(cars.map(car => ({ ...car, segments: sequenceSegments.get(car.slot) ?? [] })), [], index.totalLengthM, !input.privateSession)
       : [],
   };
 }

@@ -8,7 +8,7 @@
 import type { CornerPass } from '../../shared/types/corners/cornerPasses.js';
 
 /** Bumped when the pass rule or the stored pass row changes: every replay's passes are rebuilt offline. */
-export const CORNER_PASS_VERSION = 21;
+export const CORNER_PASS_VERSION = 22;
 
 /** Samples further apart than this are a gap in the recording: no crossing is read across it. */
 const MAX_SAMPLE_GAP_SEC = 1.5;
@@ -619,9 +619,10 @@ export function lineBorrowM(segments: readonly PassSegment[], lengthM: number): 
 
 /**
  * Every car's passes through every segment (the build's, or the car's own) of every lap it drove through
- * completely. Traffic counts every car.
+ * completely. Traffic counts every car, and none in a private session: LMU's private qualifying and practice run each
+ * driver alone, and the replay overlays cars that never shared the road.
  */
-export function buildCornerPasses(cars: CarLaps[], segments: PassSegment[], lengthM: number): CornerPass[] {
+export function buildCornerPasses(cars: CarLaps[], segments: PassSegment[], lengthM: number, traffic = true): CornerPass[] {
   const passes: CornerPass[] = [];
   const traces: CarTrace[] = [];
   for (const car of cars) {
@@ -635,6 +636,6 @@ export function buildCornerPasses(cars: CarLaps[], segments: PassSegment[], leng
     });
     traces.push(carTrace(car.slot, tracks, lengthM));
   }
-  addTraffic(passes, traces, lengthM);
+  if (traffic) addTraffic(passes, traces, lengthM);
   return passes;
 }

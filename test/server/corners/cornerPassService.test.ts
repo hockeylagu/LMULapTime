@@ -69,6 +69,13 @@ describe('refreshReplayCornerPasses', () => {
     const { turns } = placeTurns(SQUARE, LAYOUT_TURN_LISTS.sebring_full, 50);
     expect(input.segments).toEqual(turns.map(({ id, startM, endM }) => ({ id, startM, endM })));
     expect(input.sequences).toEqual([]);
+    expect(input.privateSession).toBe(false);
+  });
+
+  it('builds a private session\'s passes as private (no traffic)', async () => {
+    const build = vi.fn((_input: CornerPassInput) => Promise.resolve(result()));
+    await refreshReplayCornerPasses(store(database()), 'q.Vcr', { ...METADATA, privateSession: true }, build, loadTrack);
+    expect(build.mock.calls[0][0].privateSession).toBe(true);
   });
 
   it('skips a replay without stored laps or a known layout', async () => {
