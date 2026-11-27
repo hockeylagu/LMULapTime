@@ -4,18 +4,23 @@
  * reference lap `--runs` times, interleaved, and prints the medians. Compare suite results only with each other (same machine,
  * same viewport). See README.md for the method.
  *
- *   npm run benchmark:replay3d:suite -- --package <label> [--runs 3] [--seconds 40] [--laps fuji,silverstone] [--width 1920 --height 1080]
+ *   npm run benchmark:replay3d:suite -- --package <label> [--runs 3] [--seconds 40] [--laps fuji,silverstone] [--width 1920 --height 1080] [--real-clock]
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { build, preview } from 'vite';
 import { measureLap, round } from './measure.js';
+import { PASSES } from './probe.js';
 
 /** Reference laps: a layout with a textured car in every package, driven by a car whose body validates. */
 const REFERENCE_LAPS = {
   fuji: {layoutKey: 'fuji_chicane', session: '2026_11_03_16_37_20-02R1', driver: 8, lap: 10, car: 'ADESS AD25 LMP3'},
   silverstone: {layoutKey: 'silverstone_international', session: '2026_10_30_12_58_04-48R1', driver: 1, lap: 20, car: 'BMW M4 LMGT3'},
+  // Night: the Algarve race of the night picture set (Q1–Q9), lap 3 of the car the Q1/Q2 frames follow.
+  algarveNight: {layoutKey: 'portimao_wec', session: '2026_10_29_09_37_07-18R1', driver: 4, lap: 2, car: 'GT3 (Yoo Hyunwon)'},
+  // A race lap in traffic at Spa, the player's best: the scenery-heavy stretches (La Source exit, Eau Rouge) made its slowest frames (2026-11-27).
+  spaRace: {layoutKey: 'spa_gp', session: '2026_11_26_21_53_52-83R1', driver: 5, lap: 6, car: 'LMP3 (player)'},
 } as const;
 type LapName = keyof typeof REFERENCE_LAPS;
 const isLapName = (name: string): name is LapName => Object.hasOwn(REFERENCE_LAPS, name);
@@ -29,7 +34,7 @@ const packageLabel = option('package', '');
 if (!packageLabel) throw Error('Name the package the backend serves: --package <label> (for example debug-perf or personal-v2).');
 const runs = Number(option('runs', '3')), seconds = Number(option('seconds', '40'));
 const width = Number(option('width', '1920')), height = Number(option('height', '1080')), port = Number(option('port', '4173'));
-const laps = option('laps', Object.keys(REFERENCE_LAPS).join(',')).split(',');
+const laps = option('laps', Object.keys(REFERENCE_LAPS).join(',')).split(','), realClock = args.includes('--real-clock');
 if (!laps.every(isLapName)) throw Error(`Unknown lap in --laps; known: ${Object.keys(REFERENCE_LAPS).join(', ')}`);
 if (![runs, seconds, width, height, port].every(value => Number.isInteger(value) && value > 0)) throw Error('Invalid numeric option');
 
@@ -49,7 +54,7 @@ try {
   for (let run = 1; run <= runs; run++) {
     for (const name of laps) {
       const {session, driver, lap} = REFERENCE_LAPS[name];
-      const {result} = await measureLap({session, driver, lap, seconds, width, height, base, label: `suite-${packageLabel}-${name}`, skipOffscreenDraws: false, cpuProfile: false, loadProfile: true});
+      const {result} = await measureLap({session, driver, lap, seconds, width, height, base, label: `suite-${packageLabel}-${name}`, skipOffscreenDraws: false, cpuProfile: false, loadProfile: true, realClock});
       if (result.errors.length) throw Error(`${name} run ${run}: page errors: ${result.errors.join('; ')}`);
       (results[name] ??= []).push(result);
       console.log(`${name} run ${run}/${runs}: first frame ${(result.load.readyMs / 1000).toFixed(1)} s, p50 ${result.frames.ms.p50} ms, p99 ${result.frames.ms.p99} ms`);
@@ -67,12 +72,17 @@ try {
     loadLongTaskMs: median(rows.map(row => row.load.longTasks.totalMs)),
     p50Ms: median(rows.map(row => row.frames.ms.p50)), p99Ms: median(rows.map(row => row.frames.ms.p99)),
     over16ms: median(rows.map(row => row.frames.over16ms)), heapMiB: median(rows.map(row => row.heapMiB)),
+    callbackP50Ms: median(rows.map(row => row.frames.callbackMs.p50)),
+    // Main-thread ms per pass (p50 of the drawn frames) and the run's draws per pass: the steadier figures for an A/B.
+    passCpuP50Ms: Object.fromEntries(PASSES.map(pass => [pass, median(rows.map(row => row.passes[pass].cpuMs.p50))])),
+    passGpuP50Ms: Object.fromEntries(PASSES.map(pass => [pass, median(rows.map(row => row.passes[pass].gpuMs.p50))])),
+    passDraws: Object.fromEntries(PASSES.map(pass => [pass, median(rows.map(row => row.passes[pass].totals.draws))])),
   }]));
   const first = Object.values(results)[0][0];
   const method = {
     package: packageLabel, commit: dirty ? `${commit} + uncommitted changes` : commit, build: 'production (vite build + vite preview)',
     browser: `${process.env.REPLAY3D_BROWSER ?? 'msedge'} ${first.browser}, headless, ANGLE D3D11, vsync and frame-rate limit off`,
-    gpu: first.gpu, viewport: `${width}x${height} at device pixel ratio 1`, runs, playedSeconds: seconds,
+    gpu: first.gpu, viewport: `${width}x${height} at device pixel ratio 1`, runs, playedSeconds: seconds, clock: first.clock,
     laps: Object.fromEntries(laps.map(name => [name, REFERENCE_LAPS[name]])),
   };
   const timestamp = new Date().toISOString();
