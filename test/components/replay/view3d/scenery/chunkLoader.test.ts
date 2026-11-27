@@ -39,13 +39,13 @@ it('hides the virtual screen framebuffer', () => {
   expect(screen.visible).toBe(false);
 });
 
-it("draws a switched node by day only as its day state: the night state and the track lights' glow card stay hidden", () => {
+it('leaves every switched state visible for the warm-up: the night switch shows the current one afterwards', () => {
   const states = ['day', 'night', 'lightsOn'].map(lmuVisibility => mesh('FERRISWHEEL', {lmuVisibility}));
   // A node of several primitives carries the flag on its group.
   const card = mesh('NIGHTLIGHT001GLOW', {});
   new Group().add(card).userData.lmuVisibility = 'lightsOn';
   [...states, card].forEach(prepareSceneryMesh);
-  expect([...states, card].map(part => part.visible)).toEqual([true, false, false, false]);
+  expect([...states, card].map(part => part.visible)).toEqual([true, true, true, true]);
 });
 
 it('skips the glTF texture slots of materials with a surface description, and keeps them on the others', async () => {

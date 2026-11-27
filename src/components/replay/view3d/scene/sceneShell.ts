@@ -291,12 +291,14 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       });
       realRoad.prepare(root); trackLighting.prepare(root); prepareLampSizes(root);
       const created = batches.add(root);
-      nightSwitch.add(root);
       // The parts left out of the batches that the car's reflection does not draw either.
       root.traverse(object => { if ((object as Partial<Mesh>).isMesh === true && object.layers.mask !== 0 && !reflects(object)) ownNotReflected.push(object); });
       await lit; // A chunk's programs depend on the scene's environment.
+      // Every day/night state warms (prepareSceneryMesh leaves them visible), so a switch uploads and links nothing; then the switch
+      // shows the current one, before the chunk is shown.
       await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), grounded]);
       signal.throwIfAborted();
+      nightSwitch.add(root);
       return root;
     },
     changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
