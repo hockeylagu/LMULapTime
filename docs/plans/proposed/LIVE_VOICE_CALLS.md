@@ -60,7 +60,12 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
     ("Michelin Chicane. Slow car on track, right, clear of your line." took 3.9 s and ended after the pass). The game's sector yellow
     with no slow car to explain it after 2 s: "Yellow, sector 2.", green once it holds 10 s, only for a yellow said
     and while the sector is ahead within 15 s or the player is in it (Spa races 2026-11-26: greens for sectors
-    behind, and for a yellow whose call was too late to make). Turns are named from
+    behind, and for a yellow whose call was too late to make). A car beyond the track edge on the pit lane's side,
+    within 300 m past its fork or before its merge, is on the pit road: pit traffic, never slow or off. The ends and
+    the side are the track package's pit lane centre line projected onto the lap (`server/live/radio/layoutPitLane.ts`;
+    the game's in-pits flag comes on only well into the lane). Cars on the track itself are always said, at the Bus
+    Stop just before Spa's fork and La Source after its merge too (the same race: "Turn 19. Car off right." 28 m past
+    the fork, on the pit road). Turns are named from
     the layout's placed turns (`server/live/radio/layoutTurns.ts`), else the sector.
   - Traffic (said at once, not slotted): a faster class closing within 3 s with the pass landing in a corner
     ("Hyper Porsche behind.", "Two Hypers behind.") as a P2, one call per train (the cars it named keep its key

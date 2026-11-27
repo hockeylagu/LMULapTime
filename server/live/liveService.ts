@@ -26,6 +26,8 @@ import { writeSseEvent } from './sse.js';
 import { RadioScheduler, type RadioLogEntry } from './radio/radioScheduler.js';
 import { liveCalls } from '../../shared/domain/live/radio/liveCalls.js';
 import { FieldWatch } from '../../shared/domain/live/radio/field/fieldCalls.js';
+import type { PitLaneEnds } from '../../shared/domain/live/radio/field/fieldTrack.js';
+import { layoutPitLane } from './radio/layoutPitLane.js';
 import { layoutTurnNamer } from './radio/layoutTurns.js';
 import type { SseSink } from './sse.js';
 import type { LiveCaptureController } from './capture/controller.js';
@@ -158,7 +160,8 @@ export class LiveService {
   /** The loaded layout's turn names for the incident calls, placed once per layout. */
   /** The event's private qualifying and practice, from the last settings read; null until one answers. */
   private privateSessions: LivePrivateSessions | null = null;
-  private turns: { layoutKey: string | null; name: ((lapDist: number, trackLength: number) => string | null) | null } = { layoutKey: null, name: null };
+  private turns: { layoutKey: string | null; name: ((lapDist: number, trackLength: number) => string | null) | null; pitLane: PitLaneEnds | null } =
+    { layoutKey: null, name: null, pitLane: null };
   private pedals: LivePedalSample[] = [];
   private worker: LiveWorker | null = null;
   private stopped = true;
@@ -392,18 +395,20 @@ export class LiveService {
       } }));
   }
 
-  /** The whole field into the radio's incident, traffic and rejoin calls, with the layout's turns and the lane loss. */
+  /** The whole field into the radio's incident, traffic and rejoin calls, with the layout's turns, pit lane and lane loss. */
   private followField(reading: LiveScoringReading): void {
     if (!this.radio || !reading.field) return;
     const layoutKey = this.snapshot.identity?.layoutKey ?? null;
     if (layoutKey !== this.turns.layoutKey) {
       let name: typeof this.turns.name = null;
+      let pitLane: PitLaneEnds | null = null;
       try { name = layoutKey ? layoutTurnNamer(layoutKey) : null; } catch (error) { console.warn('[Live] Turn placement failed:', error); }
-      this.turns = { layoutKey, name };
+      try { pitLane = layoutKey ? layoutPitLane(layoutKey) : null; } catch (error) { console.warn('[Live] Pit lane placement failed:', error); }
+      this.turns = { layoutKey, name, pitLane };
     }
     const turns = this.turns.name;
     this.radio.observeField(this.field.observe(reading.currentEt, reading.trackLength, reading.gamePhase, reading.field, {
-      snapshot: this.snapshot, pitLaneSeconds: this.pitLaneSeconds, privateSessions: this.privateSessions,
+      snapshot: this.snapshot, pitLaneSeconds: this.pitLaneSeconds, privateSessions: this.privateSessions, pitLane: this.turns.pitLane,
       turnAt: lapDist => turns?.(lapDist, reading.trackLength) ?? null,
     }));
   }

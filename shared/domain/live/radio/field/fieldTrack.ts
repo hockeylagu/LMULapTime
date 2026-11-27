@@ -21,8 +21,18 @@ const CONFIRM_S = 1.5;
 const LAGGING_CONFIRM_S = 4.5;
 /** A jump this far in one reading after a stall is a freeze catching up, not driving. */
 const JUMP_M = 80;
+/**
+ * A car beyond the track edge on the pit lane's side (the track package's lane, `server/live/radio/layoutPitLane.ts`)
+ * within this far past the fork, or before the merge, is on the pit road, where the game's in-pits flag is not on
+ * yet: pit traffic, neither slow nor off (Spa race 2026-11-26: "Turn 19. Car off right." 28 m past the fork). Cars on
+ * the track itself are always watched, at the Bus Stop before the fork and La Source after the merge too.
+ */
+const PIT_ROAD_M = 300;
 /** Beyond the track edge by more than this is off track (online `pathLateral` noise and kerbs, 2026-10-29). */
 const OFF_MARGIN_M = 3;
+
+/** Where the pit lane leaves and rejoins the track, as shares of the lap from the start line (0..1), and its side. */
+export interface PitLaneEnds { entry: number; exit: number; side: 'left' | 'right' }
 
 export interface CarMotion {
   car: LiveFieldCar;
@@ -63,6 +73,8 @@ export class FieldTrack {
   public playerTop = 0;
   /** Where sectors 2 and 3 start: the least lap distance a car was seen in them. */
   public sectorStart: [number, number] = [Infinity, Infinity];
+  /** The layout's pit lane ends; null for a layout without one. */
+  public pitLane: PitLaneEnds | null = null;
   private lapStartedAt: number | null = null;
   private playerLaps: number | null = null;
   public readonly lapTimes: number[] = [];
@@ -99,6 +111,15 @@ export class FieldTrack {
     this.playerLaps = null;
   }
 
+  /** Off the track on the pit lane's side just past its fork or before its merge: on the pit road. */
+  public onPitRoad(car: LiveFieldCar): boolean {
+    if (!this.pitLane || this.length <= 0) return false;
+    const pitSide = this.pitLane.side === 'right' ? car.pathLateral : -car.pathLateral;
+    if (pitSide <= Math.abs(car.trackEdge)) return false;
+    return aheadOf(this.pitLane.entry * this.length, car.lapDist, this.length) <= PIT_ROAD_M
+      || aheadOf(car.lapDist, this.pitLane.exit * this.length, this.length) <= PIT_ROAD_M;
+  }
+
   private bin(lapDist: number): number {
     const at = ((lapDist % this.length) + this.length) % this.length;
     return Math.min(this.fieldSpeed.length - 1, Math.floor(at / BIN_M));
@@ -126,7 +147,7 @@ export class FieldTrack {
     while (motion.history.length > 2 && t - motion.history[1].t >= SPEED_WINDOW_S) motion.history.shift();
     const first = motion.history[0];
     motion.speed = t - first.t >= SPEED_WINDOW_S * 0.5 ? (motion.progress - first.progress) / (t - first.t) : car.speed;
-    const running = !car.inPits && !car.inGarage && car.finishStatus === 0 && car.lapDist >= 0;
+    const running = !car.inPits && !car.inGarage && car.finishStatus === 0 && car.lapDist >= 0 && !this.onPitRoad(car);
     const reference = this.fieldSpeedAt(car.lapDist);
     const slow = running && (motion.speed < STOPPED_MS || (reference !== null && motion.speed < reference * SLOW_SHARE));
     motion.slowSince = slow ? motion.slowSince ?? t : null;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LiveCall } from '../../../../../shared/domain/live/radio/liveCalls.js';
 import { FieldWatch } from '../../../../../shared/domain/live/radio/field/fieldCalls.js';
-import { FieldTrack } from '../../../../../shared/domain/live/radio/field/fieldTrack.js';
+import { FieldTrack, type PitLaneEnds } from '../../../../../shared/domain/live/radio/field/fieldTrack.js';
 import { rejoinText } from '../../../../../shared/domain/live/radio/field/rejoinCall.js';
 import { spokenCar } from '../../../../../shared/domain/live/radio/field/spokenCar.js';
 import type { LiveFieldCar, LivePrivateSessions } from '../../../../../shared/types/liveField.js';
@@ -28,6 +28,7 @@ function race(cars: Driven[], snapshot: LiveSnapshot = liveSnapshot({ audit: { r
   const watch = new FieldWatch();
   let t = 0;
   let flags: [number, number, number] = [11, 11, 11];
+  let pitLane: PitLaneEnds | null = null;
   const heard: LiveCall[] = [];
   const step = (seconds: number) => {
     for (let index = 0; index < Math.round(seconds * HZ); index += 1) {
@@ -41,12 +42,13 @@ function race(cars: Driven[], snapshot: LiveSnapshot = liveSnapshot({ audit: { r
         driven.car = { ...driven.car, lapDist, totalLaps, speed, sector };
       }
       const calls = watch.observe(t, LENGTH, 5, { sectorFlags: flags, cars: cars.map(driven => driven.car) }, {
-        snapshot, pitLaneSeconds: 30, privateSessions, turnAt: lapDist => (lapDist > 1400 && lapDist < 1600 ? 'Turn 6' : null),
+        snapshot, pitLaneSeconds: 30, privateSessions, pitLane, turnAt: lapDist => (lapDist > 1400 && lapDist < 1600 ? 'Turn 6' : null),
       });
       for (const call of calls) if (!heard.some(entry => entry.key === call.key)) heard.push(call);
     }
   };
-  return { step, heard, texts: () => heard.map(call => call.text), setFlags: (next: [number, number, number]) => { flags = next; } };
+  return { step, heard, texts: () => heard.map(call => call.text), setFlags: (next: [number, number, number]) => { flags = next; },
+    setPitLane: (next: PitLaneEnds) => { pitLane = next; } };
 }
 
 const steady = (speed: number) => () => speed;
@@ -249,6 +251,27 @@ describe('field calls', () => {
     late.setFlags([11, 11, 11]);
     late.step(11);
     expect(late.texts().filter(text => text.startsWith('Green'))).toEqual([]);
+  });
+
+  it("leaves cars on the pit road alone, from the track package's lane, and still calls the track by it", () => {
+    // Spa race 2026-11-26: "Turn 19. Car off right." 28 m past the fork, on the pit road; the Bus Stop is just before it.
+    const heardAt = (others: (entryM: number) => Driven[]) => {
+      const player: Driven = { car: car(1, 100, { isPlayer: true }), speed: steady(50) };
+      const cars = [player, ...Array.from({ length: 10 }, (_, index): Driven => ({ car: car(10 + index, index * 300), speed: steady(50) }))];
+      const radio = race(cars);
+      radio.setPitLane({ entry: 2800 / LENGTH, exit: 200 / LENGTH, side: 'right' });
+      radio.step(100);
+      // 9-13 s ahead of the player.
+      player.car = { ...player.car, lapDist: 2250 };
+      cars.push(...others(2800));
+      radio.step(4);
+      return radio.texts();
+    };
+    // Off on the pit side, stopped 100 m past the fork: pit traffic.
+    expect(heardAt(entry => [{ car: car(31, entry + 100, { pathLateral: 10, trackEdge: 6 }), speed: steady(0) }])).toEqual([]);
+    // Stopped on the track 100 m before the fork, or off the other side past it: incidents.
+    expect(heardAt(entry => [{ car: car(31, entry - 100), speed: steady(0) }])).toHaveLength(1);
+    expect(heardAt(entry => [{ car: car(31, entry + 100, { pathLateral: -10, trackEdge: -6 }), speed: steady(0) }])).toHaveLength(1);
   });
 
   it('says a faster car catching into a corner, and a group of them as one call', () => {

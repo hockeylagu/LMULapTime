@@ -2,7 +2,7 @@ import type { LiveSessionKind, LiveSnapshot } from '../../../../types/live.js';
 import type { LiveFieldReading, LivePrivateSessions } from '../../../../types/liveField.js';
 import type { LiveCall } from '../liveCalls.js';
 import { racePlanMode } from '../racePlanMode.js';
-import { FieldTrack } from './fieldTrack.js';
+import { FieldTrack, type PitLaneEnds } from './fieldTrack.js';
 import { IncidentWatch, type TurnNamer } from './incidentCalls.js';
 import { rejoinText } from './rejoinCall.js';
 import { TrafficWatch } from './trafficCalls.js';
@@ -18,6 +18,8 @@ export interface FieldContext {
   pitLaneSeconds: number | null;
   /** The event's private qualifying and practice (`GET /rest/sessions`); null until read. */
   privateSessions?: LivePrivateSessions | null;
+  /** The layout's pit lane ends from the track package; null without one. */
+  pitLane?: PitLaneEnds | null;
 }
 
 /**
@@ -51,6 +53,7 @@ export class FieldWatch {
       this.traffic.reset();
     }
     if (!snapshot || !session || gamePhase !== GREEN_PHASE || !session.inRealtime || trackLength <= 0) return [];
+    this.track.pitLane = context.pitLane ?? null;
     this.track.observe(t, trackLength, field.cars);
     if (snapshot.lifecycle !== 'driving' || alone(session.kind, context.privateSessions ?? null)) return [];
     const key = (event: string) => [snapshot.identity?.layoutKey, session.sessionCode, snapshot.audit?.runId, event].join('|');
