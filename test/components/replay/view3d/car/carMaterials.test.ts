@@ -49,6 +49,13 @@ it('loads every map of a standard material, with the livery albedo in place of i
   expect(materialTexturePaths(standard, livery)[0]).toBe('textures/livery');
 });
 
+it('draws a rear-view mirror as dark glass: no maps, no reflection', () => {
+  const mirror: CarMaterialRecipe = { ...standard, name: 'MIRROR', surface: { ...standardSurface, rearView: true } };
+  expect(materialTexturePaths(mirror, appearance)).toEqual([]);
+  const material = createCarMaterial(mirror, appearance, () => { throw Error('no texture expected'); }, testShading());
+  expect([material.name, material.color.getHex(), material.envMapIntensity, material.map]).toEqual(['MIRROR', 0, 0, null]);
+});
+
 it('draws a standard material with its metal/roughness, AO/specular and normal maps at their own scales', () => {
   const material = createCarMaterial(standard, appearance, () => new Texture(), testShading());
   const shader = { uniforms: {} as Record<string, IUniform>, vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>\n#include <fog_pars_vertex>\n#include <fog_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <aomap_fragment>\n#include <shadowmap_pars_fragment>\n#include <lights_physical_pars_fragment>\n#include <lights_fragment_begin>\n#include <fog_pars_fragment>\n#include <fog_fragment>' };

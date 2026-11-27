@@ -32,6 +32,12 @@ function albedoPath(recipe: CarMaterialRecipe, appearance: CarAppearance): strin
   return recipe.paint ? appearance.albedo : appearance.materialTextures?.[recipe.name] ?? recipe.surface?.maps.albedo?.texture;
 }
 
+/**
+ * A mirror the game fills with the rear view (its surface `rearView`): drawn as dark glass, without the live view, its maps or a
+ * reflection. The car probe is taken from the car's centre, so a reflection would show the wrong view.
+ */
+const isRearView = (recipe: CarMaterialRecipe): boolean => recipe.surface?.rearView === true;
+
 /** Car kinds whose package description reads as a scenery surface, drawn with the scenery's program. */
 const SURFACE_KINDS = ['standard', 'standardBlend', 'glass', 'tyre', 'dashboard', 'externalMonitor', 'windscreen', 'windscreenInside'] as const;
 const isSurfaceKind = (kind: string): kind is typeof SURFACE_KINDS[number] => (SURFACE_KINDS as readonly string[]).includes(kind);
@@ -89,6 +95,7 @@ export function carPartOrder(materials: readonly Material[]): number {
 
 /** Every texture path a recipe's material samples for an appearance: its albedo, its surface maps, plus the paint maps for car paint. */
 export function materialTexturePaths(recipe: CarMaterialRecipe, appearance: CarAppearance): string[] {
+  if (isRearView(recipe)) return [];
   const surface = nativeSurface(recipe, appearance);
   if (surface) return Object.values(surface.maps).map(map => map!.texture);
   const albedo = albedoPath(recipe, appearance), paint = recipe.paint && appearance.paint.kind === 'carPaint' ? appearance.paint : null;
@@ -126,6 +133,11 @@ function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Textur
 export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture, shading: SceneryShading, volume?: (path: string) => Data3DTexture, vertexColour = true): MeshStandardMaterial {
   const config = recipe.paint ? appearance.paint : recipe.surface;
   if (!config) throw Error(`Car material ${recipe.name} has no shader configuration`);
+  if (isRearView(recipe)) {
+    const glass = new MeshStandardMaterial({ name: recipe.name, color: 0x000000, roughness: 1, metalness: 0, envMapIntensity: 0 });
+    hazeProgram(glass);
+    return glass;
+  }
   const surface = nativeSurface(recipe, appearance);
   const albedo = config.maps.albedo, path = albedoPath(recipe, appearance);
   let material: MeshStandardMaterial;
