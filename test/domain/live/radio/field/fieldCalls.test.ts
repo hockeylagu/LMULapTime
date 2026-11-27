@@ -219,6 +219,38 @@ describe('field calls', () => {
     expect(radio.texts()).toEqual(['Yellow, sector 2.', 'Green, sector 2.']);
   });
 
+  it('says no green for a sector already driven through, nor for a yellow never said', () => {
+    // Spa race 2026-11-26: "Green, sector 3." with the player in sector 1, and for a yellow never heard.
+    const player: Driven = { car: car(1, 100, { isPlayer: true }), speed: steady(50) };
+    const others = Array.from({ length: 10 }, (_, index): Driven => ({ car: car(10 + index, index * 300), speed: steady(50) }));
+    const radio = race([player, ...others]);
+    radio.step(130);
+    player.car = { ...player.car, lapDist: 600 };
+    radio.setFlags([11, 1, 11]);
+    radio.step(2.4);
+    expect(radio.texts()).toEqual(['Yellow, sector 2.']);
+    // Through sector 2 and into sector 3 before the flag turns green.
+    radio.step(28);
+    radio.setFlags([11, 11, 11]);
+    radio.step(11);
+    expect(radio.texts()).toEqual(['Yellow, sector 2.']);
+    // A car stopped too close to say in time under a yellow: neither the car nor its green is said.
+    let stopped = false;
+    const driver: Driven = { car: car(1, 100, { isPlayer: true }), speed: steady(50) };
+    const victim: Driven = { car: car(30, 200), speed: () => (stopped ? 0 : 50) };
+    const late = race([driver, ...others, victim]);
+    late.step(130);
+    driver.car = { ...driver.car, lapDist: 1000 };
+    victim.car = { ...victim.car, lapDist: 1100 };
+    stopped = true;
+    late.setFlags([11, 1, 11]);
+    late.step(3);
+    expect(late.texts()).toEqual([]);
+    late.setFlags([11, 11, 11]);
+    late.step(11);
+    expect(late.texts().filter(text => text.startsWith('Green'))).toEqual([]);
+  });
+
   it('says a faster car catching into a corner, and a group of them as one call', () => {
     // A GT3 driver: flat out on the first half of the lap, 25 m/s through the second.
     const pace = (target: LiveFieldCar) => (target.lapDist < 1500 ? 50 : 25);

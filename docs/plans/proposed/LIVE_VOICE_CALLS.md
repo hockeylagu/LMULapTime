@@ -58,7 +58,9 @@ Proposed 2026-10-26, reviewed 2026-11-21. Steps 1b, 2, 3 and 4 built 2026-11-22,
     a car said off is not said again as it comes back on track or rejoins (Le Mans 2026-11-24: one car said three
     times in 4 s), and a call is made only if it ends a second before the car is reached, at 16 characters a second
     ("Michelin Chicane. Slow car on track, right, clear of your line." took 3.9 s and ended after the pass). The game's sector yellow
-    with no slow car to explain it after 2 s: "Yellow, sector 2.", green once it holds 10 s. Turns are named from
+    with no slow car to explain it after 2 s: "Yellow, sector 2.", green once it holds 10 s, only for a yellow said
+    and while the sector is ahead within 15 s or the player is in it (Spa races 2026-11-26: greens for sectors
+    behind, and for a yellow whose call was too late to make). Turns are named from
     the layout's placed turns (`server/live/radio/layoutTurns.ts`), else the sector.
   - Traffic (said at once, not slotted): a faster class closing within 3 s with the pass landing in a corner
     ("Hyper Porsche behind.", "Two Hypers behind.") as a P2, one call per train (the cars it named keep its key

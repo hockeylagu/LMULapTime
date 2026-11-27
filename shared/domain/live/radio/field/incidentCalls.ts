@@ -84,13 +84,10 @@ export class IncidentWatch {
     this.followFlags(sectorFlags, now);
     if (player.car.inPits || player.car.inGarage) return [];
     const where = (lapDist: number) => turnAt(lapDist) ?? (track.sectorOf(lapDist) ? `sector ${track.sectorOf(lapDist)}` : null);
-    /** The game's yellow over the spot; an incident said with it counts as that yellow's call. */
-    const yellowAt = (lapDist: number) => {
+    /** The game's yellow over the spot, its sector's index; an incident said with it counts as that yellow's call. */
+    const yellowAt = (lapDist: number): number | null => {
       const sector = track.sectorOf(lapDist);
-      if (sector === null || sectorFlags[sector - 1] !== YELLOW) return false;
-      const yellow = this.yellows[sector - 1];
-      if (yellow) yellow.called = true;
-      return true;
+      return sector !== null && sectorFlags[sector - 1] === YELLOW ? sector - 1 : null;
     };
     const calls: LiveCall[] = [];
     for (const incident of this.incidents(track)) {
@@ -108,6 +105,7 @@ export class IncidentWatch {
       if (spot) spot.at = now;
       const event = spot?.key ?? `${onTrack.length > 0 ? 'incident' : 'off'}-${spotKey}`;
       let text: string;
+      let yellow: number | null = null;
       if (onTrack.length > 0) {
         const stopped = onTrack.every(motion => motion.speed < STOPPED_MS);
         const what = onTrack.length === 1 ? (stopped ? 'Car stopped' : 'Slow car')
@@ -115,7 +113,8 @@ export class IncidentWatch {
         // Short, so it ends well before the car (Sebring race 2026-11-25, driver: "Car stopped on track, left, in your
         // path." and "Slow car on track, right, clear of your line." ran 3.6-3.8 s): "on track" is what the call is (a
         // car off says "off"), and only a car in the path adds a sentence.
-        text = sentence(`${yellowAt(incident.lapDist) ? 'Yellow, ' : ''}${place}.`) + ` ${sentence(what)}, ${sideOf(onTrack)}.`
+        yellow = yellowAt(incident.lapDist);
+        text = sentence(`${yellow !== null ? 'Yellow, ' : ''}${place}.`) + ` ${sentence(what)}, ${sideOf(onTrack)}.`
           + (this.inPath(track, onTrack) ? ' In your path.' : '');
         if (spot) spot.onTrack = true;
       } else {
@@ -126,6 +125,10 @@ export class IncidentWatch {
       // scheduler says it once however the car moves.
       const waitSeconds = inTime(text, seconds);
       if (waitSeconds === null) continue;
+      // Only a yellow said gets its green (Spa race 2026-11-26: an incident call too late to make had marked it, and
+      // "Green, sector 3." came for a yellow never heard).
+      const covered = yellow === null ? null : this.yellows[yellow];
+      if (covered) covered.called = true;
       calls.push({ key: key(event), text, priority: onTrack.length > 0 ? 1 : 2, family: 'incident', waitSeconds });
       if (!spot) this.announced.push({ key: event, lapDist: incident.lapDist, where: place, at: now, cleared: false, onTrack: onTrack.length > 0 });
     }
@@ -222,7 +225,8 @@ export class IncidentWatch {
 
   /**
    * The game's sector yellow when no slow car explains it, by the sector's distance; "Green, sector 2." once a
-   * yellow that was called holds green.
+   * yellow that was called holds green, while the player is in the sector or reaches it within 15 s: a green for a
+   * sector already driven through says nothing (Spa race 2026-11-26, driver: greens behind me).
    */
   private sectors(track: FieldTrack, flags: readonly number[], key: (event: string) => string): LiveCall[] {
     const calls: LiveCall[] = [];
@@ -232,17 +236,17 @@ export class IncidentWatch {
       const yellow = this.yellows[index];
       if (!yellow || !Number.isFinite(starts[index])) continue;
       const sector = index + 1;
+      const inSector = track.sectorOf(player.car.lapDist) === sector;
+      const near = inSector || track.secondsAhead(aheadOf(player.car.lapDist, starts[index], track.length)) <= NEAR_S;
       if (yellow.greenSince !== null && track.now - yellow.greenSince >= GREEN_HOLD_S) {
-        if (yellow.called) calls.push({ key: key(`green-${sector}-${Math.round(yellow.since)}`), text: `Green, sector ${sector}.`, priority: 2, family: 'incident', waitSeconds: 20 });
+        if (yellow.called && near) calls.push({ key: key(`green-${sector}-${Math.round(yellow.since)}`), text: `Green, sector ${sector}.`, priority: 2, family: 'incident', waitSeconds: 20 });
         if (track.now - yellow.greenSince > 30) this.yellows[index] = null;
         continue;
       }
       if (flags[index] !== YELLOW || track.now - yellow.since < SECTOR_ALONE_S) continue;
-      const inSector = track.sectorOf(player.car.lapDist) === sector;
-      const ahead = aheadOf(player.car.lapDist, starts[index], track.length);
       const explained = [...track.cars.values()].some(motion => !motion.car.isPlayer && motion.slowSince !== null && track.sectorOf(motion.car.lapDist) === sector);
       if (explained) continue;
-      if (!inSector && track.secondsAhead(ahead) > NEAR_S) continue;
+      if (!near) continue;
       yellow.called = true;
       calls.push({ key: key(`sector-${sector}-${Math.round(yellow.since)}`), text: `Yellow, sector ${sector}.`, priority: 1, family: 'incident' });
     }
