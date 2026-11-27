@@ -434,7 +434,7 @@ Labels, from the 2026-10-27 sessions (see the grip mapping notes):
 - Forecast calls respect a minimum-rain-chance cutoff (a 5 % node is not "rain"; `liveForecast.ts`
   currently checks `rainChance > 0`, so add the threshold there or in the call engine).
 - Tyre choice for the change ("Box this lap for wets") comes from the strategy engine:
-  `strategy.crossover` ([implemented rule](../../CODE_MAP.md#live-race-dashboard)). First-version P1 calls:
+  `strategy.crossover` (rule in `shared/domain/live/liveTyreCrossover.ts`). First-version P1 calls:
   "Box this lap for wets" when MFD matches, "Box for wets. Set new wets" when it does not, and
   "Box this lap for slicks" on the dry return. Unify `when: now` with `strategy.resource.race`
   (`pitInLaps === 0`) under a single `box-now` call so a wet crossover on the planned pit lap never

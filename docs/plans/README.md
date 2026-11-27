@@ -49,7 +49,7 @@ the lap view's corner conclusion. Rules, thresholds and their validation sit in 
 Capture, learning lifecycle and the dashboard are implemented. [Live capture format](../LIVE_CAPTURE_FORMAT.md)
 owns channels, schema, clocks, recording ownership and correction gates; it supersedes old inventories.
 Tyre crossover is locally implemented (wetness-step rule, race plan/MFD, garage check and demo scenarios;
-see [code map](../CODE_MAP.md#live-race-dashboard)). Voice integration remains in the voice proposal.
+rule in `shared/domain/live/liveTyreCrossover.ts`). Voice integration remains in the voice proposal.
 Confirm Slightly wet = 0.125 and the game's tyre-message timing in the next wet race; compare advice and actual
 stops/lap times using the race-review skill. Thresholds change only when several races agree.
 
