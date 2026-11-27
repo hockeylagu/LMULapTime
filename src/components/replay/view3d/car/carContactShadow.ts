@@ -9,6 +9,12 @@ const STRENGTH = 0.6, CORNER_M = 0.3, TEXELS_PER_M = 24;
 /** The share of its darkening the shade keeps where the sun reaches the road: the sky's share of the light, which the car still hides. */
 const SUN_LIT_SHARE = 0.25;
 const ALPHA_MAP = '#include <alphamap_fragment>';
+/**
+ * How far toward the eye the shade draws, metres: the quad is flat and rides the body's roll and pitch, so on a cambered or bumpy road
+ * most of it lay under the surface, and which part cleared it changed every frame (the shade popped). The car's body still hides it.
+ */
+export const CONTACT_SHADOW_PULL_M = 0.15;
+const PROJECT_VERTEX = '#include <project_vertex>';
 /** Drawn after the road and before the racing line (renderOrder 2), which stays readable over it. */
 export const CONTACT_SHADOW_ORDER = 1;
 
@@ -32,12 +38,16 @@ export function contactShadowQuad(halfX: number, halfZ: number): {geometry: Plan
   }
   const alpha = new DataTexture(data, width, height, RGBAFormat);
   alpha.magFilter = LinearFilter; alpha.minFilter = LinearFilter; alpha.needsUpdate = true;
-  const material = new MeshBasicMaterial({color: 0x000000, alphaMap: alpha, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4});
+  const material = new MeshBasicMaterial({color: 0x000000, alphaMap: alpha, transparent: true, depthWrite: false});
   // The shade under the car takes the sky's light: where the sun reaches the road (under an overhang, around the body) it keeps
   // SUN_LIT_SHARE of its darkening. Without sun shadows (none, or past their fade), the shade grounds the car whole, as before.
   material.onBeforeCompile = shader => {
     patchCascadeShadowLookup(shader);
     if (!shader.fragmentShader.includes(ALPHA_MAP)) throw Error('The contact shadow program has no alpha map to fade in the sun');
+    if (!shader.vertexShader.includes(PROJECT_VERTEX)) throw Error('The contact shadow program has no projection to pull toward the eye');
+    shader.vertexShader = shader.vertexShader.replace(PROJECT_VERTEX, () => `${PROJECT_VERTEX}
+    mvPosition.xyz *= max( 0.0, 1.0 - ${CONTACT_SHADOW_PULL_M.toFixed(2)} / length( mvPosition.xyz ) );
+    gl_Position = projectionMatrix * mvPosition;`);
     shader.fragmentShader = shader.fragmentShader.replace(ALPHA_MAP, () => `${ALPHA_MAP}
     {
       float sunLit = surfaceCascadeShadow( vCascadeViewDepth );

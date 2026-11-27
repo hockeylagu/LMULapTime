@@ -51,6 +51,14 @@ it("keeps a quarter of its darkening where the sun reaches the road, all of it p
   expect(shader.fragmentShader.indexOf('sunLit = surfaceCascadeShadow')).toBeGreaterThan(shader.fragmentShader.indexOf('#include <alphamap_fragment>'));
 });
 
+it('draws pulled toward the eye, so a cambered road under the flat quad does not cut it frame by frame', () => {
+  const {material} = createContactShadow(carModel(), 'a', createUnderCarBaker());
+  const shader = {uniforms: {} as Record<string, unknown>, vertexShader: ShaderLib.basic.vertexShader, fragmentShader: ShaderLib.basic.fragmentShader};
+  material.onBeforeCompile(shader as never, null as never);
+  expect(material.polygonOffset).toBe(false);
+  expect(shader.vertexShader).toMatch(/#include <project_vertex>\s*mvPosition\.xyz \*= max\( 0\.0, 1\.0 - 0\.15 \/ length\( mvPosition\.xyz \) \);\s*gl_Position = projectionMatrix \* mvPosition;/);
+});
+
 it('refuses a model without measured parts', () => {
   expect(() => createContactShadow(new Group().add(new Mesh(new BoxGeometry())), 'a')).toThrow('no measured parts');
 });
