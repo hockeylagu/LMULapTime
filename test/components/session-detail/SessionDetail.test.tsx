@@ -30,6 +30,24 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     expect(onBack).toHaveBeenCalled();
   });
 
+  it('names the online event and its split in the header, and neither without event info', async () => {
+    const { unmount } = render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+    await screen.findByRole('heading', { name: /^Laps\s*3$/ });
+    expect(screen.queryByText(/^Split \d+$/)).not.toBeInTheDocument();
+    unmount();
+
+    (global.fetch as Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        ...mockDetailedSession,
+        matchingReplayFile: { ...mockDetailedSession.matchingReplayFile, eventTitle: 'LMP3 Fixed', splitNo: 2 },
+      }),
+    });
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+    expect(await screen.findByText('Split 2')).toBeInTheDocument();
+    expect(screen.getByText('LMP3 Fixed')).toBeInTheDocument();
+  });
+
   it('sorts lap timing columns while keeping the direction icon on the active column', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 

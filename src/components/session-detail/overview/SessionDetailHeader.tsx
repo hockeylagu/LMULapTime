@@ -78,6 +78,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     ? `${settings.durationMinutes} min`
     : settings?.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640 ? `${settings.raceLaps} Laps` : undefined;
 
+  // The online event and its split, as the replay's event info names them; absent offline or without a replay.
+  const replay = session.matchingReplayFile;
   const hasConditions = hasSessionConditions(session.matchingReplayFile);
   const hasDuckDb = Boolean(session.duckdbFilename);
 
@@ -158,6 +160,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 </span>
                 <span className="font-mono shrink-0">{session.timeString}</span>
                 {hasSettings && modeLabel && <><span aria-hidden="true">·</span><span className="text-lmu-text-soft shrink-0">{modeLabel}</span></>}
+                {replay?.eventTitle && <><span aria-hidden="true">·</span><span className="text-lmu-text-soft shrink-0">{replay.eventTitle}</span></>}
+                {typeof replay?.splitNo === 'number' && <><span aria-hidden="true">·</span><span className="text-lmu-text-soft shrink-0">Split {replay.splitNo}</span></>}
                 {durationLabel && <><span aria-hidden="true">·</span><span className="font-mono text-lmu-text-soft shrink-0">{durationLabel}</span></>}
                 {hasConditions && session.matchingReplayFile && (
                   <><span aria-hidden="true">·</span><SessionConditions replay={session.matchingReplayFile} /></>
