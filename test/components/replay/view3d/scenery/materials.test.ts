@@ -89,11 +89,12 @@ describe('shaderParts', () => {
   it('drives the luminous kinds by emission only, with their native multipliers in the game light unit, the bright panels brightest head-on', () => {
     const maps = { albedo: map('A', true) };
     const unit = (k: number) => (k * GAME_LIGHT_UNIT).toFixed(8);
-    expect(shaderParts(surface('highLumSun', { maps })).emissive).toBe(`lum.rgb*${unit(500)}*(1.0+2.0*pow(clamp(vSurfaceFacing,0.0,1.0),64.0))*lum.a`);
-    expect(shaderParts(surface('highLumTrackside', { maps })).emissive).toBe(`lum.rgb*${unit(100)}*(1.0+2.0*pow(clamp(vSurfaceFacing,0.0,1.0),8.0))*lum.a`);
+    expect(shaderParts(surface('highLumSun', { maps })).emissive).toBe(`lum.rgb*${unit(500)}*(1.0+2.0*pow(clamp(vSurfaceFacing,0.0,1.0),64.0))*vSurfaceLampShare*lum.a`);
+    expect(shaderParts(surface('highLumTrackside', { maps })).emissive).toBe(`lum.rgb*${unit(100)}*(1.0+2.0*pow(clamp(vSurfaceFacing,0.0,1.0),8.0))*vSurfaceLampShare*lum.a`);
+    expect(shaderParts(surface('lowLumEmissive', { maps })).declarations).toContain('varying float vSurfaceLampShare;');
     expect(shaderParts(surface('highLumSun', { maps })).declarations).toContain('varying float vSurfaceFacing;');
     expect(shaderParts(surface('lowLumEmissive', { maps })).declarations).not.toContain('vSurfaceFacing');
-    expect(shaderParts(surface('lowLumEmissive', { maps })).emissive).toBe(`lum.rgb*${unit(20)}*clamp(vSurfaceColour.rgb,0.0,1.0)*lum.a`);
+    expect(shaderParts(surface('lowLumEmissive', { maps })).emissive).toBe(`lum.rgb*${unit(20)}*vSurfaceLampShare*clamp(vSurfaceColour.rgb,0.0,1.0)*lum.a`);
     expect(shaderParts(surface('highLumSun', { maps })).albedo).toContain('diffuseColor.rgb=vec3(0.0)');
   });
   it('lays a dashboard decal over the screen with its own roughness, and multiplies a monitor by its decal', () => {
@@ -254,6 +255,9 @@ describe('patchSurfaceShader', () => {
     expect(bright).toContain('varying float vSurfaceFacing;');
     expect(bright).toMatch(/#include <project_vertex>\nvSurfaceFacing = max\(0\.0, dot\(normalize\(transformedNormal\), normalize\(-mvPosition\.xyz\)\)\);/);
     expect(shaderOf('lowLumEmissive')).not.toContain('vSurfaceFacing');
+    // Grown on screen when far (lampSize.ts), after the facing cosine is taken.
+    expect(bright.indexOf('vSurfaceLampShare = 1.0 / (growth * growth);')).toBeGreaterThan(bright.indexOf('vSurfaceFacing = max('));
+    expect(shaderOf('lowLumEmissive')).toContain('attribute vec4 _lmu_lamp;');
   });
   it('reads white for geometry without the vertex colour', () => {
     const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: fragment } as unknown as Parameters<typeof patchSurfaceShader>[0];

@@ -1,8 +1,9 @@
-import { Box3, Group, MathUtils, Matrix4, Mesh, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type Ray } from 'three';
+import { Box3, Group, MathUtils, Matrix4, Mesh, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector2, Vector3, WebGLRenderer, type Object3D, type Ray } from 'three';
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
 import { createRealRoadSurface } from '../scenery/realRoad.js';
+import { prepareLampSizes, trackLampPixel } from '../scenery/lampSize.js';
 import type { RenderPose } from './replayPose.js';
 import type { CarTextures } from '../cars/carModels.js';
 import { createCarTemplates, type CarTemplates } from '../cars/carTemplates.js';
@@ -288,7 +289,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
         grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
         grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
       });
-      realRoad.prepare(root); trackLighting.prepare(root);
+      realRoad.prepare(root); trackLighting.prepare(root); prepareLampSizes(root);
       const created = batches.add(root);
       nightSwitch.add(root);
       // The parts left out of the batches that the car's reflection does not draw either.
@@ -347,7 +348,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     if (!viewMoved(streamView, next, route)) return;
     streamView = next; stream.update(next);
   };
-  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3();
+  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), drawingSize = new Vector2();
   const drawnCameras = {perspective: new PerspectiveCamera(), orthographic: new OrthographicCamera()};
   let drawnView: DrawnCamera = drawnCameras.perspective;
   const pointer = createPointerSurface(renderer);
@@ -387,7 +388,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       carSpots.update(spotCars, camera.position);
       placeCockpitLight(content?.reflected ?? null);
       updateShownMatrices(scene, isFrozen);
-      trackCardFacing(camera);
+      trackCardFacing(camera); trackLampPixel(renderer.getDrawingBufferSize(drawingSize).y);
       // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.
       const seen = meter?.step(cloudEye()) ?? null;
       if (seen !== null) seeSun(seen);

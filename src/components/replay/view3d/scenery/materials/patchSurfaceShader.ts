@@ -13,6 +13,7 @@ import { readsRealRoad, readsTrackRubber } from './roadSurface.js';
 import { REALROAD_VERTEX_DECLARATIONS, REALROAD_VERTEX_MAIN, realRoadUniforms } from '../realRoad.js';
 import { patchTrackLights } from '../../night/trackLightProgram.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
+import { LAMP_VERTEX_DECLARATIONS, LAMP_VERTEX_MAIN, isLampKind, lampPixel } from '../lampSize.js';
 
 const hasTranslucency = (config: SurfaceConfig) => !!config.flags.translucency;
 
@@ -156,6 +157,12 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     varying float vSurfaceRandom;
     varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;${axle ? '\n    varying float vSurfaceAxle;' : ''}${facing ? '\n    varying float vSurfaceFacing;' : ''}
   `).replace('#include <begin_vertex>', `#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;${axle ? ' vSurfaceAxle = objectNormal.x;' : ''}${realRoad ? REALROAD_VERTEX_MAIN : ''}`);
+  // A lamp far away keeps a size on screen (lampSize.ts), grown after the facing cosine below is taken.
+  if (isLampKind(config.kind)) {
+    Object.assign(shader.uniforms, {surface_lampPixel: lampPixel, surface_lampDay: sceneDayLight});
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>${LAMP_VERTEX_DECLARATIONS}`)
+      .replace('#include <project_vertex>', `#include <project_vertex>${LAMP_VERTEX_MAIN}`);
+  }
   // A bright luminous panel's facing cosine, per vertex (`luminousFacingPower`): the vertex's own normal, never turned to a back face.
   if (facing) shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvSurfaceFacing = max(0.0, dot(normalize(transformedNormal), normalize(-mvPosition.xyz)));');
   if (config.billboard) {

@@ -11,6 +11,7 @@ import { glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type E
 import { standardShaderParts } from './standardSurface.js';
 import { TERRAIN_WEIGHTS, terrainLayerCount, type SurfaceConfig } from './surfaceConfig.js';
 import { vegetationShaderParts } from './vegetationSurface.js';
+import { isLampKind } from '../lampSize.js';
 import { lampShares, type LampShares } from '../../night/cockpitLight.js';
 /** The GLSL a surface config contributes: declarations plus one chunk per patched `MeshStandardMaterial` include. */
 export interface ShaderParts {
@@ -121,7 +122,7 @@ function luminousParts(config: SurfaceConfig, { sample }: ShaderContext): Extend
   return {
     albedo: `vec4 lum=${sample('albedo')}; diffuseColor.rgb=vec3(0.0); diffuseColor.a*=lum.a; surfaceSpecular=0.0;`,
     normals: '', physical: '', occlusion: '',
-    emissive: `lum.rgb*${mult}${view}*${kind === 'lowLumEmissive' ? 'clamp(vSurfaceColour.rgb,0.0,1.0)*' : ''}lum.a`,
+    emissive: `lum.rgb*${mult}${view}*vSurfaceLampShare*${kind === 'lowLumEmissive' ? 'clamp(vSurfaceColour.rgb,0.0,1.0)*' : ''}lum.a`,
   };
 }
 
@@ -225,7 +226,7 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
     + (maps[key]!.uvAnimation ? `\nuniform vec2 surface_shift_${key};` : '')).join('\n');
   return {
     declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (config.kind === 'digitalFlag' ? '\nuniform float surface_time;' : '') + (readsDayLight(config) ? '\nuniform float surface_dayLight;' : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
-      + (readsRealRoad(config) ? '\nvarying vec2 vSurfaceRealRoad;' : '') + (luminousFacingPower(config) ? '\nvarying float vSurfaceFacing;' : '') + (readsTrackRubber(config) ? '\nuniform float surface_realRoadMedian;' : '')
+      + (readsRealRoad(config) ? '\nvarying vec2 vSurfaceRealRoad;' : '') + (luminousFacingPower(config) ? '\nvarying float vSurfaceFacing;' : '') + (isLampKind(config.kind) ? '\nvarying float vSurfaceLampShare;' : '') + (readsTrackRubber(config) ? '\nuniform float surface_realRoadMedian;' : '')
       + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);
