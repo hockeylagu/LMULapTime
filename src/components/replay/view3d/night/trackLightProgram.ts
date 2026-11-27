@@ -54,14 +54,15 @@ export function createNearTrackLights(lights: readonly TrackLight[]): NearTrackL
 
 /**
  * The fragment's share, before the occlusion: the lit diffuse of the vertices' track light, the pixel's headlight beams (carSpots.ts)
- * and a cabin's cockpit light, each by the surface's share (cockpitLight.ts).
+ * and a cabin's cockpit light, each by the surface's share (cockpitLight.ts). Lit by the diffuse share of the albedo (three's
+ * `diffuseContribution`), so a metal takes none: its lamps show only in its reflection.
  */
 export function trackLightFragment({omni, spot, cockpit}: LampShares): string {
   const share = (term: string, by: string) => by === '0.0' ? [] : [by === '1.0' ? term : `${term}*${by}`];
   const terms = [...share('vTrackLight', omni), ...share(CAR_SPOT_TERM, spot), ...(cockpit ? [cockpit] : [])];
   if (!terms.length) return '';
   return `{vec3 lampPoint=(vec4(-vViewPosition,0.0)*viewMatrix).xyz+cameraPosition;vec3 lampNormal=inverseTransformDirection(normal,viewMatrix);
-reflectedLight.indirectDiffuse+=(${terms.join('+')})*BRDF_Lambert(material.diffuseColor);}`;
+reflectedLight.indirectDiffuse+=(${terms.join('+')})*BRDF_Lambert(material.diffuseContribution);}`;
 }
 export const TRACK_LIGHT_FRAGMENT = trackLightFragment(ALL_LAMPS);
 

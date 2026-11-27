@@ -22,6 +22,9 @@ it("reads the scenery's baked sums, and a car's nearest lights, into the diffuse
     expect(shader.fragmentShader).toContain(`${TRACK_LIGHT_FRAGMENT}\n#include <aomap_fragment>`);
     expect(shader.uniforms.trackLight_scale).toBe(trackLightUniforms.trackLight_scale);
   }
+  // The diffuse share of the albedo: a metal (a mirror, chrome) takes no lamp light.
+  expect(TRACK_LIGHT_FRAGMENT).toContain('*BRDF_Lambert(material.diffuseContribution);');
+  expect(ShaderChunk.lights_physical_fragment).toContain('material.diffuseContribution = diffuseColor.rgb * ( 1.0 - metalnessFactor );');
 });
 
 it('lights by GAME_LIGHT_UNIT while switched on, and not while the venue is captured', () => {
