@@ -44,8 +44,10 @@ Tools: `npm run benchmark:replay3d:suite -- --package personal-v18 --runs 2 --se
 is only a label, the backend's `LMU_PLUGIN_ROOT` decides what is measured. The race-start bench (Le Mans
 `2026_10_22_14_49_23-99R1`, t = 190, 62 cars) is still a scratch script, not in the repo.
 
-Look checks: the 8 views F13 F17 F18 F22 N1 N15 N16 N21 for each change, the full 61-view capture after a batch, scored by
-`docs/local/replay-3d-reference/inputs/score.py` and `compare.py` against the game frames. The capture hooks are a local patch
+Look checks: the 10 views F13 F17 F18 F22 N1 N15 N16 N21 and night Q1 Q2 for each change, the full 70-view capture (61 day,
+9 night) after a batch, scored by `docs/local/replay-3d-reference/inputs/score.py` and `compare.py` against the game frames. The
+night set Q1–Q9 (`inputs/night.json`, captured by `night.mjs`) is the Algarve race replay at the game's RenderDoc night frames;
+the scorer summarises it in its own `night` group, so the day `all` numbers stay comparable with the freezes. The capture hooks are a local patch
 (`inputs/capture-hooks.patch`), applied to a scratch copy of the tree, never committed. Silverstone F17/F18/F22 flip between two
 states run to run (stand chunk in the cached far cascade or not); the 10-view subsets over-weight Daytona.
 

@@ -103,11 +103,16 @@ Then export `personal-v30` (schema bump) and sync `shared/packageContract`.
   often differ and whether the game copies the GEN's over the material's is not traced (user, 2026-11-25).
 
 ### 7. Bloom (viewer: `nightBloom.ts`, the chain from capture 135627, after the tone curve)
+Built (2026-11-26, `view3d/bloom.ts`, uncommitted) on `personal-v30` with the package's bloom (pipeline 474c5d9): the halo around the
+Mustang's tail lamps at capture 21459 lands within 2–7 % of the game's ring by ring; one day chase view changes 1,190 pixels by
+at most 16 levels. Left: the 8-view day check, then the full set with the other night changes.
 In scope (user, 2026-11-25). It also changes the day picture: the day set's crops go to the user. Its values are game
 config (`pplib_base_0.json` TimeOfDayProfile 0–6: glare threshold 1.5, bloom luminance 1.5 night / 1.0 day, remap
 factor), so they come through the package's rendering profile, blended like the exposure profiles. Not traced: the
-1.68 gain factor, the knee formula, the blur sizes, and what switches bloom off (on in the TV capture 135627, off in the
-chase 133205 and the Silverstone cockpit 18207): find that before shipping, or the app blooms where the game does not.
+1.68 gain factor, the knee formula and the blur sizes. Bloom is always on: in all 7 Algarve night captures of one session
+(2026-10-29, chase, cockpit and TV) the full-frame composite (3440 × 1440) has strength `afRGBA_Modulate[0].y` = 1; the
+draws with 0 are a 3440 × 215 strip and 128 × 54 images, not the scene (the 0 read for 133205 and 18207 is likely one of
+those). The bright pass knee moves with the time of day (14.95 at 16227 and 17986, 14.0 at the later five).
 
 ## Checks
 - Night frames: the research frames above, each within the viewer's figures (`referenceBundles.ts`, `referenceCompare.ts`).
