@@ -1,5 +1,6 @@
 import { Box3, Euler, Matrix4, Mesh, Ray, Vector3, type Object3D } from 'three';
 import { CONTACT_SHADOW_NAME } from '../car/underCarBake.js';
+import { frameWithin } from '../cars/carParts.js';
 
 /** A car where it was drawn: native metres and the body's rotations (race pose channels `x` to `rotZ`). */
 export interface DrawnPlace {
@@ -119,12 +120,11 @@ export async function envelopeParts(car: Object3D, step: () => Promise<void>): P
 function eachPart(car: Object3D, visit: (geometry: Mesh['geometry'], matrix: Matrix4) => void): void {
   const envelope = car.getObjectByName('body-envelope');
   if (!envelope) return;
-  envelope.updateWorldMatrix(true, true);
   const walk = (object: Object3D) => {
     if (((object.userData.lod as {inM: number} | undefined)?.inM ?? 0) > 0) return;
     // The contact shadow lies flat under the body, wider and longer than it.
     if (object instanceof Mesh && object.name !== CONTACT_SHADOW_NAME) {
-      visit(object.geometry as Mesh['geometry'], toEnvelope.copy(envelope.matrixWorld).invert().multiply(object.matrixWorld));
+      visit(object.geometry as Mesh['geometry'], frameWithin(object, envelope, toEnvelope));
     }
     for (const child of object.children) walk(child);
   };

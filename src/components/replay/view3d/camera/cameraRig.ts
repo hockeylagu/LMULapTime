@@ -105,7 +105,7 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
   /** Puts the camera on the posed primary car's game camera. */
   const placeDriverCamera = () => {
     if (!layer || !isDriverCamera(mode)) return;
-    const {eye, target: focus, up} = driverPose(layer.primary.getObjectByName('body-envelope')!, driverCamera(layer.cameras, mode), driver);
+    const {eye, target: focus, up} = driverPose(layer.primary, driverCamera(layer.cameras, mode), driver);
     camera.position.copy(eye); camera.up.copy(up); controls.target.copy(focus); camera.lookAt(focus);
   };
   const positionCamera = () => {

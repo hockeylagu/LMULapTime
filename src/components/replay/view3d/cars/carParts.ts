@@ -1,4 +1,4 @@
-import { Matrix4, Mesh, type BatchedMesh, type Object3D } from 'three';
+import { Box3, Matrix4, Mesh, type BatchedMesh, type BufferGeometry, type Object3D } from 'three';
 
 export type CockpitView = 'in' | 'out';
 
@@ -67,8 +67,10 @@ function bandOf(thresholds: readonly number[], distanceM: number): number {
 }
 
 /**
- * The car's part table, built once from its model (a car of `makeCar`, its option parts already chosen). The car leaves the
- * renderer's matrix walk: its parts take their matrices from `sync` alone. The nodes marked with a distance range or a cockpit view
+ * The car's part table, built once from its model (a car of `makeCar`, its option parts already chosen). The table owns every world
+ * matrix in the car: `sync` writes them, and three's matrix updates (the renderer's walk, a scene-wide `updateMatrixWorld`, a
+ * `Box3.setFromObject`) leave the whole car alone, so `sync` may skip what did not change. Whatever measures the model reads its local
+ * matrices (`frameWithin`), never a world matrix it forced up to date. The nodes marked with a distance range or a cockpit view
  * stay visible; their parts show by the car's view and camera distance (`setCockpitView`, `setCameraDistance`) instead. With
  * `within`, the table holds only the meshes under those nodes (a cabin added to a car that has its table): a car's tables share
  * its view and distance.
@@ -95,8 +97,8 @@ export function buildCarParts(car: Object3D, within?: ReadonlySet<Object3D>): Ca
     }
   };
   walk(car, 0, new Matrix4(), [], [], !within);
-  // Out of the renderer's matrix walk, which runs on each of a frame's render passes: `sync` sets the matrices once per frame.
-  car.matrixWorldAutoUpdate = false;
+  // Every node's, not the car's alone: three updates the children of an object it does not update.
+  car.traverse(object => { object.matrixWorldAutoUpdate = false; });
   const levels: Levels = levelsOf.get(car) ?? {view: 'out', distanceM: 0, band: 0, thresholds: [], version: 0};
   levelsOf.set(car, levels);
   levels.thresholds = [...new Set([...levels.thresholds, ...thresholds])].sort((a, b) => a - b);
@@ -164,13 +166,38 @@ export function buildCarParts(car: Object3D, within?: ReadonlySet<Object3D>): Ca
 }
 
 /**
- * The car's own matrices from its position and rotation: the renderer's matrix walk leaves a car with a part table out, so whatever
- * reads its frame between placing it and its next `sync` (the driver cameras, the reflection probe) needs this first.
+ * The car's own matrices from its position and rotation: three's matrix updates leave a car with a part table out, so whatever reads
+ * its frame between placing it and its next `sync` (the driver cameras, the reflection probe) needs this first.
  */
 export function placeCarFrame(car: Object3D): void {
   car.updateMatrix();
   if (car.parent) { car.parent.updateWorldMatrix(true, false); car.matrixWorld.multiplyMatrices(car.parent.matrixWorld, car.matrix); }
   else car.matrixWorld.copy(car.matrix);
+}
+
+/**
+ * `node`'s matrix in `ancestor`'s frame (`node` itself or below it), from the local matrices between them: a measure of the model that
+ * holds whatever its world matrices are (a car's part table owns them).
+ */
+export function frameWithin(node: Object3D, ancestor: Object3D, out: Matrix4): Matrix4 {
+  out.identity();
+  for (let at: Object3D | null = node; at && at !== ancestor; at = at.parent) {
+    if (at.matrixAutoUpdate) at.updateMatrix();
+    out.premultiply(at.matrix);
+  }
+  return out;
+}
+
+/** The box of `root`'s meshes in its own frame, without the pose marker (`frameWithin`). */
+export function modelBox(root: Object3D): Box3 {
+  const box = new Box3(), part = new Box3(), frame = new Matrix4();
+  root.traverse(object => {
+    if (!(object instanceof Mesh) || object.name === 'pose-marker') return;
+    const geometry = object.geometry as BufferGeometry;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    box.union(part.copy(geometry.boundingBox!).applyMatrix4(frameWithin(object, root, frame)));
+  });
+  return box;
 }
 
 /** Driver-camera (`in`) and exterior (`out`) cockpit meshes are alternatives: the GLB marks them with `extras.cockpitView`. */

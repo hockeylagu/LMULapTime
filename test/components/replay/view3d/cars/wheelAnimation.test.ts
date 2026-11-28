@@ -137,6 +137,15 @@ it("measures a wheel in its car's frame: a car placed at an angle keeps its radi
   for (const each of attachWheelRigs(car.getObjectByName('body-envelope') as Group)) expect(each.radiusM).toBeCloseTo(0.33);
 });
 
+it("leaves the car's world matrices alone: a kept car's part table owns them", () => {
+  const car = makeCar('#fff', false, rigModel()), envelope = car.getObjectByName('body-envelope') as Group;
+  const worlds: Array<[Group, number[]]> = [];
+  car.traverse(object => { object.matrixWorld.elements[13] = 7; worlds.push([object as Group, [...object.matrixWorld.elements]]); });
+  envelope.position.y = -0.25; // A rigged car's body, lowered since its parts were placed.
+  attachWheelRigs(envelope);
+  for (const [object, elements] of worlds) expect(object.matrixWorld.elements).toEqual(elements);
+});
+
 it('queries road contact once per sample and interpolates wheel travel without per-frame lookups', () => {
   const car = makeCar('#38bdf8', false, rigModel());
   let height: (point: {z: number}) => number | null = () => 0;

@@ -1,4 +1,4 @@
-import { Box3, CubeCamera, HalfFloatType, LinearMipmapLinearFilter, PMREMGenerator, Vector3, WebGLCubeRenderTarget, type IUniform, type Material, type Mesh, type Object3D, type Scene, type Texture, type WebGLRenderer } from 'three';
+import { CubeCamera, HalfFloatType, LinearMipmapLinearFilter, PMREMGenerator, Vector3, WebGLCubeRenderTarget, type IUniform, type Material, type Mesh, type Object3D, type Scene, type Texture, type WebGLRenderer } from 'three';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import { convolveReflection, type ReflectionCubes } from '../reflectionCube.js';
 import { reflectionPart, sceneryReflectionUniforms } from '../scenery/materials/sceneryReflection.js';
@@ -8,6 +8,7 @@ import { isPlainSurface } from '../shaders/plainSurface.js';
 import { withoutCarSpots } from '../night/carSpots.js';
 import type { CarAppearance } from '../../../../../shared/types/scenes/car.js';
 import { isCarPaint, setPaintBox, setPaintReflection } from './carPaint.js';
+import { modelBox } from '../cars/carParts.js';
 import { createOverheadMap, OVERHEAD_GLSL, overheadUniforms, type CarOverhead } from './overheadMap.js';
 
 /**
@@ -178,7 +179,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   /** The faces are drawn and prefiltered: the next update convolves them for the paint. */
   let convolving = false;
   let cubes: ReflectionCubes | null = null, eyeAbove = EYE_ABOVE_CENTRE_M;
-  const at = new Vector3(), probed = new Vector3(), box = new Box3(), measure = new Vector3();
+  const at = new Vector3(), probed = new Vector3(), measure = new Vector3();
   const takeReflection = () => {
     for (const material of materials) {
       setSurfaceReflection(material, cubes, overhead);
@@ -201,8 +202,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       car.traverse(object => { if (!framed && Array.isArray(object.userData.reflectionBox)) framed = object; });
       setPaintBox(framed ?? null, framed?.userData.reflectionBox as CarAppearance['reflectionBox'] | undefined);
       // The eye sits over the car's bounding-box centre, wherever the car's origin is within it.
-      car.updateWorldMatrix(true, true); box.setFromObject(car);
-      eyeAbove = EYE_ABOVE_CENTRE_M + (box.isEmpty() ? 0 : box.getCenter(measure).y - car.getWorldPosition(measure).y);
+      const box = modelBox(car);
+      eyeAbove = EYE_ABOVE_CENTRE_M + (box.isEmpty() ? 0 : box.getCenter(measure).y);
       takeReflection();
     },
     share(car) {

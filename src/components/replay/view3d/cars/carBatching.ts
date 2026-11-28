@@ -133,6 +133,10 @@ export async function batchCars(tables: readonly CarParts[]): Promise<CarBatchSe
   /** The livery batches' layer textures. */
   const layerTextures: DataTexture[] = [];
   let warmed = false;
+  // A car's own batch is the car's table's, as each node of the car (`buildCarParts`): its `sync` places it.
+  const addBatch = (batch: BatchedMesh) => {
+    if (single) { batch.matrixWorldAutoUpdate = false; single.car.add(batch); } else shared.add(batch);
+  };
   const counts = createShownCounts((batch, visible) => { if (warmed) batch.visible = visible; });
   for (const members of groups.values()) {
     const first = members[0].mesh as Mesh<BufferGeometry, Material>, livery = liveryLayerOf(first) !== undefined;
@@ -164,7 +168,7 @@ export async function batchCars(tables: readonly CarParts[]): Promise<CarBatchSe
     if (livery) layerTextures.push(liveryLayers(batch, members));
     for (const geometry of geometries) copied.add(geometry);
     computeBatchBounds(batch); releaseBatchOnUpload(batch);
-    if (single) single.car.add(batch); else shared.add(batch);
+    addBatch(batch);
     batches.push(batch);
     // oxlint-disable-next-line no-await-in-loop -- yields between batches
     await slice();
@@ -191,7 +195,7 @@ export async function batchCars(tables: readonly CarParts[]): Promise<CarBatchSe
     for (const part of casting) part.shadow = {batch, instance: addHiddenInstance(batch, ids.get(part.mesh.geometry)!)};
     for (const copy of copies.values()) copy.dispose();
     computeBatchBounds(batch); releaseBatchOnUpload(batch);
-    if (single) single.car.add(batch); else shared.add(batch);
+    addBatch(batch);
     batches.push(batch);
   }
   for (const table of tables) { table.onShown = counts.change; table.own = single ? batches : []; }

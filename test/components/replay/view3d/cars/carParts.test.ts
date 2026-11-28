@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BoxGeometry, Group, Matrix4, Mesh, MeshStandardMaterial } from 'three';
+import { Box3, BoxGeometry, Group, Matrix4, Mesh, MeshStandardMaterial } from 'three';
 import { buildCarParts, setCameraDistance, setCockpitView } from '../../../../../src/components/replay/view3d/cars/carParts.js';
 import { makeCar } from '../../../../../src/components/replay/view3d/cars/carObject.js';
 import { rigModel } from '../../../../helpers/scenes/rigModel.js';
@@ -16,12 +16,20 @@ function marked(userData: Record<string, unknown>): { group: Group; mesh: Mesh }
 const expectClose = (actual: Matrix4, expected: Matrix4) => actual.elements.forEach((value, index) => expect(value).toBeCloseTo(expected.elements[index], 6));
 
 describe('buildCarParts', () => {
-  it('takes the car out of the renderer matrix walk and keeps its own matrix updated', () => {
-    const car = makeCar('#38bdf8', false, rigModel());
-    expect(car.matrixWorldAutoUpdate).toBe(true);
-    buildCarParts(car);
-    expect(car.matrixWorldAutoUpdate).toBe(false);
-    expect(car.matrixAutoUpdate).toBe(true);
+  it("owns every world matrix in the car: three's updates leave a placed part where its sync put it", () => {
+    const world = new Group(), car = makeCar('#38bdf8', false, rigModel()), envelope = car.getObjectByName('body-envelope')!;
+    world.add(car);
+    const table = buildCarParts(car), mesh = table.parts.find(part => part.mesh.name !== 'pose-marker')!.mesh;
+    let nodes = 0;
+    car.traverse(object => { nodes++; expect(object.matrixWorldAutoUpdate).toBe(false); });
+    expect(nodes).toBeGreaterThan(2); expect(car.matrixAutoUpdate).toBe(true);
+    car.position.set(5, 1, -3); envelope.position.y = -0.25; table.sync();
+    const placed = mesh.matrixWorld.clone();
+    // A kept car's rebuild has the body at rest for a moment, and anything may update the scene's matrices meanwhile.
+    envelope.position.y = 0;
+    world.updateMatrixWorld(true); car.updateWorldMatrix(true, true); new Box3().setFromObject(car);
+    envelope.position.y = -0.25; table.sync();
+    expectClose(mesh.matrixWorld, placed);
   });
 
   it('switches the driver-camera and exterior cockpit meshes at the next sync', () => {

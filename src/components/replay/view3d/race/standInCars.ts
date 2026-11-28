@@ -1,5 +1,6 @@
 import { BufferAttribute, BufferGeometry, InstancedMesh, Matrix4, Mesh, Vector3, type Group, type Object3D } from 'three';
 import { plainSurfaceMaterial } from '../shaders/plainSurface.js';
+import { frameWithin } from '../cars/carParts.js';
 import { createBlobShadows } from './blobShadows.js';
 
 /** A stand-in's colour: plain grey, no livery, so it does not pass for the car it stands in for. */
@@ -30,13 +31,12 @@ export interface StandInCars {
 export function standInGeometry(car: Group): BufferGeometry {
   const body = car.getObjectByName('body-envelope') ?? car, meshes: Mesh[] = [];
   body.traverse(object => { if (object instanceof Mesh) meshes.push(object as Mesh); });
-  car.updateMatrixWorld(true);
-  const toCar = new Matrix4().copy(car.matrixWorld).invert(), local = new Matrix4(), point = new Vector3();
+  const local = new Matrix4(), point = new Vector3();
   const positions: number[] = [], indices: number[] = [];
   for (const mesh of meshes) {
     const geometry = mesh.geometry, position = geometry.getAttribute('position');
     if (!position) continue;
-    local.multiplyMatrices(toCar, mesh.matrixWorld);
+    frameWithin(mesh, car, local);
     const base = positions.length / 3;
     for (let i = 0; i < position.count; i++) positions.push(...point.fromBufferAttribute(position, i).applyMatrix4(local).toArray());
     const index = geometry.getIndex();

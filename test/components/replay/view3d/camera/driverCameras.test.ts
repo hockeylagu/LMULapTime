@@ -1,18 +1,19 @@
 import { expect, it } from 'vitest';
 import { Euler, Group, Quaternion, Vector3 } from 'three';
 import type { CarCamera } from '../../../../../shared/types/scenes/car.js';
+import { placeCarFrame } from '../../../../../src/components/replay/view3d/cars/carParts.js';
 import { driverCamera, driverPose, isDriverCamera } from '../../../../../src/components/replay/view3d/camera/driverCameras.js';
 
 const camera = (name: CarCamera['name'], position: [number, number, number], orientation: [number, number, number] = [0, 0, 0]): CarCamera =>
   ({ name, position, orientation, fov: [89, 49], clipPlanes: [0.1, 700], cockpitView: name === 'cockpit' ? 'in' : 'out', lodMultiplier: 1, shadow: null });
 const cockpit = camera('cockpit', [0.3, 0.95, 0.31]), hood = camera('hood', [0.3, 0.92, -0.96]), roof = camera('roof', [0.3, 1.5, 0.4]);
 
-/** The scene graph of the 3D view: a z-mirrored world, the posed car and its body model offset by the ground fit. */
+/** The scene graph of the 3D view: a z-mirrored world, the placed car and its body model offset by the ground fit. */
 function posedCar(at: Vector3, orientation = new Quaternion()) {
   const world = new Group(), car = new Group(), body = new Group();
-  world.scale.z = -1; car.position.copy(at); car.quaternion.copy(orientation); body.position.set(0, 0.05, 0);
-  world.add(car); car.add(body);
-  return body;
+  world.scale.z = -1; car.position.copy(at); car.quaternion.copy(orientation); body.position.set(0, 0.05, 0); body.name = 'body-envelope';
+  world.add(car); car.add(body); placeCarFrame(car);
+  return car;
 }
 const pose = () => ({ eye: new Vector3(), target: new Vector3(), up: new Vector3() });
 

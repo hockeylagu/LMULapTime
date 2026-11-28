@@ -1,4 +1,5 @@
-import { Box3, Matrix4, Mesh, Vector3, type BufferGeometry, type Camera, type Material, type Object3D } from 'three';
+import { Mesh, Vector3, type Box3, type Camera, type Material, type Object3D } from 'three';
+import { modelBox } from './carParts.js';
 
 /** How far outside the ghost's body the camera starts to fade it (m): gone with the camera at or inside its body. */
 export const GHOST_FADE_M = 1;
@@ -13,7 +14,7 @@ export function ghostFader(ghost: Object3D): (camera: Camera) => void {
   const base = new Map<Material, number>(), eye = new Vector3();
   return camera => {
     if (!box) {
-      box = carBox(ghost);
+      box = modelBox(ghost);
       ghost.traverse(object => {
         if (object instanceof Mesh) for (const material of [object.material as Material | Material[]].flat()) base.set(material, material.opacity);
       });
@@ -29,17 +30,4 @@ export function ghostFader(ghost: Object3D): (camera: Camera) => void {
       material.visible = share > 0;
     }
   };
-}
-
-/** The car's parts in its own frame, without the pose marker. */
-function carBox(car: Object3D): Box3 {
-  car.updateWorldMatrix(true, true);
-  const toCar = car.matrixWorld.clone().invert(), toPart = new Matrix4(), part = new Box3(), box = new Box3();
-  car.traverse(object => {
-    if (!(object instanceof Mesh) || object.name === 'pose-marker') return;
-    const { geometry } = object as Mesh<BufferGeometry>;
-    if (!geometry.boundingBox) geometry.computeBoundingBox();
-    box.union(part.copy(geometry.boundingBox as Box3).applyMatrix4(toPart.multiplyMatrices(toCar, object.matrixWorld)));
-  });
-  return box;
 }
