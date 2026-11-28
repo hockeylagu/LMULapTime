@@ -8,6 +8,7 @@ import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp 
 import { flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { createReadoutCanvas, type ReadoutCanvas } from '../car/readoutCanvas.js';
+import { createSlicer } from '../batching/batchedParts.js';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { makeCar } from './carObject.js';
 import type { CarTemplates } from './carTemplates.js';
@@ -156,8 +157,11 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
     }
     return pending;
   };
-  /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
-  const loadModel = async (car: LoadedBody, kind: ModelKind = 'body'): Promise<Group> => {
+  /**
+   * A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. Made in the
+   * slices of `slice` (`createSlicer`), a mesh's materials at a time: a race car's model took 20-30 ms in one task as it came near.
+   */
+  const loadModel = async (car: LoadedBody, kind: ModelKind = 'body', slice = createSlicer()): Promise<Group> => {
     const {template, appearance, recipeOf, white, isGlow, drawn, glows, surfaces, rainFlashes, textures, volumes, readout, interiorPaths, hiddenNames} = await partsOf(car, kind);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
@@ -170,9 +174,10 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
       if (!original) throw Error(`Car ${car.vehicleId} declares no cabin volume ${path}`);
       return original.clone();
     };
-    const model = template.clone(true), glowMeshes: Object3D[] = [];
+    const model = template.clone(true), glowMeshes = new Set<Object3D>();
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
-    model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
+    model.traverse(object => { if (isGlow(object)) glowMeshes.add(object); });
+    await slice();
     // One material per lamp, and one per distinct material content: a car file repeats a material under many names.
     const lampMaterials = new Map<CarLamp, Material>();
     let materials = shareMaterials ? sharedMaterials.get(template) : undefined;
@@ -220,17 +225,20 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
       lampMaterials.set(lamp, created);
       return created;
     })) mesh.removeFromParent();
-    model.traverse(object => {
-      if (!(object instanceof Mesh)) return;
-      if (!glowMeshes.includes(object)) {
-        const screen = (Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]).some(showsReadout);
-        object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);
+    const meshes: Mesh[] = [];
+    model.traverse(object => { if (object instanceof Mesh) meshes.push(object as Mesh); });
+    for (const object of meshes) {
+      // oxlint-disable-next-line no-await-in-loop -- yields between meshes, the build's slices
+      await slice();
+      if (!glowMeshes.has(object)) {
+        const screen = (Array.isArray(object.material) ? object.material : [object.material]).some(showsReadout);
+        object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material);
         if (screen) object.userData.readoutCanvas = canvas;
         object.castShadow = true; object.receiveShadow = true;
       }
       // The blended parts draw in the game's order: the lamp glows before the glass, the outside windscreen over them.
-      object.renderOrder = carPartOrder(Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]);
-    });
+      object.renderOrder = carPartOrder(Array.isArray(object.material) ? object.material : [object.material]);
+    }
     // The car's reflection box in its native frame, the model's own (car/carPaint.ts `setPaintBox`).
     if (kind === 'body') model.userData.reflectionBox = appearance.reflectionBox;
     return model;
@@ -240,7 +248,8 @@ export function createCarModels(templates: CarTemplates, carTextures: CarTexture
    * included, so many cars in one scene would hold that copy each.
    */
   const car = async (body: LoadedBody) => {
-    const model = await loadModel(body), built = makeCar(MAP_COLORS.carBody, false, model);
+    const slice = createSlicer(), model = await loadModel(body, 'body', slice), built = makeCar(MAP_COLORS.carBody, false, model);
+    await slice();
     model.add(createContactShadow(model, body.resource.folder));
     return built;
   };

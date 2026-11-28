@@ -84,6 +84,10 @@ describe('createFarCarLoader', () => {
     expect(Array.from(geometry.index!.array)).toEqual([0, 1, 2, 6, 7, 8]);
     expect(geometry.getAttribute('_lmu_option')).toBeUndefined();
     expect(geometry.getAttribute('position')).toBeDefined();
+    // Its vertices are the far model's, so are its bounds: three's own, from every vertex of the position attribute.
+    const own = geometry.clone();
+    own.computeBoundingBox(); own.computeBoundingSphere();
+    expect([geometry.boundingBox, geometry.boundingSphere]).toEqual([own.boundingBox, own.boundingSphere]);
   });
 
   it("draws blended primitives in the game's order (their extras' sortOffset), the others at 0", async () => {

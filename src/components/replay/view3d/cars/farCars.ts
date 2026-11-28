@@ -143,20 +143,30 @@ function paintShadowInfluence(body: LoadedBody): number {
   return value;
 }
 
-/** The geometry without the triangles of option parts the appearance hides (`_LMU_OPTION`: 0 always shown, else 1 + option index). */
+/**
+ * The geometry without the triangles of option parts the appearance hides (`_LMU_OPTION`: 0 always shown, else 1 + option index).
+ * Each vertex is tested once and the triangles copied into a typed index: a triangle by triangle test with an array grown per index
+ * took 40 ms of a frame as a race car's far model was made. Its vertices are the source's, so are its bounds.
+ */
 function optionGeometry(geometry: BufferGeometry, shown: ReadonlySet<number>): BufferGeometry {
   const option = geometry.getAttribute('_lmu_option'), index = geometry.index;
   if (!option || !index) throw Error('Far model primitive has no _LMU_OPTION or index');
-  const kept: number[] = [];
-  for (let at = 0; at < index.count; at += 3) {
-    const a = index.getX(at), b = index.getX(at + 1), c = index.getX(at + 2);
-    if ([a, b, c].every(vertex => { const value = option.getX(vertex); return value === 0 || shown.has(value - 1); })) kept.push(a, b, c);
+  const visible = new Uint8Array(option.count);
+  for (let vertex = 0; vertex < option.count; vertex++) { const value = option.getX(vertex); visible[vertex] = value === 0 || shown.has(value - 1) ? 1 : 0; }
+  const from = index.array, wide = index.count > 65535 || geometry.attributes.position.count > 65535;
+  const kept = wide ? new Uint32Array(index.count) : new Uint16Array(index.count);
+  let count = 0;
+  for (let at = 0; at + 2 < index.count; at += 3) {
+    const a = from[at], b = from[at + 1], c = from[at + 2];
+    if (visible[a] && visible[b] && visible[c]) { kept[count++] = a; kept[count++] = b; kept[count++] = c; }
   }
   const result = new BufferGeometry();
   for (const [name, attribute] of Object.entries(geometry.attributes)) if (name !== '_lmu_option') result.setAttribute(name, attribute);
-  result.setIndex(new BufferAttribute(index.count > 65535 || geometry.attributes.position.count > 65535 ? new Uint32Array(kept) : new Uint16Array(kept), 1));
+  result.setIndex(new BufferAttribute(kept.slice(0, count), 1));
   result.userData.sharedAsset = true;
-  result.computeBoundingBox(); result.computeBoundingSphere();
+  if (!geometry.boundingBox) geometry.computeBoundingBox();
+  if (!geometry.boundingSphere) geometry.computeBoundingSphere();
+  result.boundingBox = geometry.boundingBox!.clone(); result.boundingSphere = geometry.boundingSphere!.clone();
   return result;
 }
 
