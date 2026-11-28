@@ -42,6 +42,8 @@ export function drawsOnCore(config: SurfaceConfig): boolean {
   if (Object.entries(maps).some(([key, map]) => !map || !isCoreMap(key) || map.uvAnimation)) return false;
   if ((flags.blendMask ?? 'none') !== 'none' || OWN_PROGRAM_FLAGS.some(flag => flags[flag])) return false;
   if (maps.emissive && flags.cockpitMode === 'emissiveAlpha') return false;
+  // With both an emissive and a detail map the core would stand in for a sixth map (`leftOut`): only one with every map draws on it.
+  if (maps.emissive && maps.detail && CORE_MAPS.some(key => !maps[key])) return false;
   const maskedColour = flags.vertexColour === 'albedoMultiplyMasked' || flags.vertexColour === 'albedoOverlayMasked';
   return !(maps.albedo && !maps.metalRough && flags.roughnessFromAlbedoAlpha && !maskedColour);
 }

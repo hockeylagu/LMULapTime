@@ -27,6 +27,9 @@ it('draws a standard surface on the core maps without its own program code throu
   expect(drawsOnCore(surface({albedo: map('a')}, {emissive: 'night'}))).toBe(true);
   expect(drawsOnCore(surface({...full, alternate: map('x')}))).toBe(false);
   expect(drawsOnCore(surface({}))).toBe(false); // Map-less materials already share their program.
+  // Five stood-in maps at most: an emissive and a detail map draw on the core only with every other map.
+  expect(drawsOnCore(surface({albedo: map('a'), detail: map('d'), emissive: map('e')}))).toBe(false);
+  expect(drawsOnCore(surface({...full, detail: map('d'), emissive: map('e')}))).toBe(true);
   expect(drawsOnCore(surface({albedo: map('a')}, {}, 'glass'))).toBe(false);
   expect(drawsOnCore(surface(full, {blendMask: 'vertexAlpha'}))).toBe(false);
   expect(drawsOnCore(surface(full, {normalBlend: 'overlay'}))).toBe(false);
