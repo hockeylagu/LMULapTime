@@ -16,6 +16,8 @@ const DEFAULT_CHASE_DISTANCE_M = 7.8;
 const DEFAULT_CHASE_HEIGHT_M = 2.2;
 const CHASE_LOOK_ELEVATION_M = 0.5;
 const DEFAULT_FOV_DEG = 48, DEFAULT_NEAR_M = 0.5, FAR_M = 15000;
+/** The trackside view's frame height at the car, metres (the zoom keeps it), and its narrowest lens, degrees. */
+const TRACKSIDE_FRAME_M = 9, TRACKSIDE_MIN_FOV_DEG = 3;
 /** Half the overhead view's height, metres. */
 const OVERHEAD_HALF_M = 80;
 const FOLLOW_POLAR_LIMIT = Math.PI * 0.49;
@@ -84,7 +86,7 @@ export interface CameraRig {
   readonly gameCamera: LoadedBody['descriptor']['cameras']['list'][number] | null;
   /**
    * The factor the view scales every LOD distance by (the reference divides the distance by it): the primary car's game camera in a
-   * car-mounted view, its chase camera's in the follow and chase views, 1 in the others.
+   * car-mounted view, its chase camera's in the follow and chase views, the zoom's in trackside, 1 in the others.
    */
   readonly lodMultiplier: number;
   /** The lap's cars: trackside spots along its line, and the game cameras and cockpit mesh of its primary car. */
@@ -170,6 +172,9 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
     const eye = spots?.candidates(spot)[places[spot] ?? 0];
     if (!eye) return;
     camera.position.copy(eye); controls.target.copy(target); camera.lookAt(target); controls.update();
+    // A TV lens zooms with the car: it keeps about the same size in the frame from far away to the pass.
+    const fov = MathUtils.clamp(MathUtils.radToDeg(2 * Math.atan(TRACKSIDE_FRAME_M / 2 / eye.distanceTo(target))), TRACKSIDE_MIN_FOV_DEG, DEFAULT_FOV_DEG);
+    if (perspective.fov !== fov) { perspective.fov = fov; perspective.updateProjectionMatrix(); }
   };
   /** Car-mounted views use the game camera's cockpit mesh variant, vertical FOV and near plane (the dash sits closer than 0.5 m). */
   const syncDriverCamera = () => {
@@ -301,12 +306,13 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
     get lodMultiplier() {
       if (!layer) return 1;
       if (isDriverCamera(mode)) return driverCamera(layer.cameras, mode).lodMultiplier;
+      // The zoomed trackside lens scales distances as it narrows: the car keeps the detail its size on screen asks for.
+      if (mode === 'trackside') return Math.tan(MathUtils.degToRad(DEFAULT_FOV_DEG) / 2) / Math.tan(MathUtils.degToRad(perspective.fov) / 2);
       return mode === 'follow' || mode === 'chase' ? layer.chaseLodMultiplier : 1;
     },
     setLayer(next) {
       layer = next; lapScene = null; reachedFrom.set(NaN, NaN, NaN);
-      spots = createTracksideCameras(next.trajectory.points, next.primaryDistances, origin); spot = -1; places = [];
-      syncDriverCamera();
+      spots = createTracksideCameras(next.trajectory.points, next.primaryDistances, origin); spot = -1; places = [];      syncDriverCamera();
     },
     follow(pose) {
       currentYaw = pose.yaw; currentTime = pose.timeSec;
