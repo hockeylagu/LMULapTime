@@ -357,7 +357,13 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   let drawnView: DrawnCamera = drawnCameras.perspective;
   const pointer = createPointerSurface(renderer);
   /** Keeps the trackside camera's view of the car clear: one pixel drawn from each place it may stand (`tracksideSight.ts`). */
-  const sight = createTracksideSight((view, spans) => pointer.within(scene, view, 500, 500, 1001, 1001, spans));
+  const sight = createTracksideSight((view, spans) => {
+    // The scenery alone: a car passing in front of the followed one (a pack in a race) hid it for a moment and cut the view to another
+    // place each time, from one side of the road to the other. The content's cars are drawn again by the frame.
+    const root = content?.root, shown = root?.visible ?? false;
+    if (root) root.visible = false;
+    try { return pointer.within(scene, view, 500, 500, 1001, 1001, spans); } finally { if (root) root.visible = shown; }
+  });
   let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
   /** What waits for the next frame to be drawn (`afterFrame`). */
   const afterFrames: Array<{run: () => void; fail: (error: Error) => void}> = [];
