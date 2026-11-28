@@ -1,11 +1,11 @@
-import { Box3, CompressedTexture, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, RGBA_BPTC_Format, Scene, Texture, Vector3, type Object3D, type WebGLRenderer } from 'three';
+import { Box3, CompressedTexture, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, RGBA_BPTC_Format, Scene, Texture, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { isStreaming, startStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
-import { trackSurfaceTextures } from '../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
-import { createSceneWarmup } from '../../../../../src/components/replay/view3d/scenery/sceneWarmup.js';
-import { carMapPart } from '../../../../../src/components/replay/view3d/car/carStandardSurface.js';
-import { composedMaterial } from '../../../../../src/components/replay/view3d/shaders/composer.js';
-import { litTemplate } from '../../../../../src/components/replay/view3d/shaders/litTemplate.js';
+import { isStreaming, startStreaming } from '../../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
+import { trackSurfaceTextures } from '../../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
+import { createSceneWarmup } from '../../../../../../src/components/replay/view3d/scenery/warmup/sceneWarmup.js';
+import { carMapPart } from '../../../../../../src/components/replay/view3d/car/carStandardSurface.js';
+import { composedMaterial } from '../../../../../../src/components/replay/view3d/shaders/composer.js';
+import { litTemplate } from '../../../../../../src/components/replay/view3d/shaders/litTemplate.js';
 
 /** A material reading map as its own texture, as a car part does. */
 const mapped = (map: Texture) => composedMaterial(litTemplate, [carMapPart(map, false)]);
@@ -33,7 +33,7 @@ function fixture() {
     texture.onUpdate?.(texture);
   };
   const renderer = {getRenderTarget: () => null, setRenderTarget: () => {}, compile: () => {}, compileAsync: () => Promise.resolve(), initTexture, render: () => {}} as unknown as WebGLRenderer;
-  const changed = vi.fn(), warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, changed);
+  const changed = vi.fn(), warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, changed, () => Promise.resolve(), () => {});
   /** A `size` px texture (1024 by default) read from its start file, a quarter of its size: the two levels above come when it sharpens. */
   const texture = (size = 1024) => {
     const levels = Array.from({length: Math.log2(size) + 1}, (_, i) => ({data: new Uint8Array(Math.ceil((size >> i) / 4) ** 2 * 16), width: size >> i, height: size >> i}));
@@ -175,7 +175,7 @@ it("uploads a composed material's own textures and any other material's texture 
   const uploaded: Texture[] = [];
   const renderer = {getRenderTarget: () => null, setRenderTarget: () => {}, initTexture: (texture: Texture) => { uploaded.push(texture); }, render: () => {}, compile: () => {},
     compileAsync: () => Promise.resolve()} as unknown as WebGLRenderer;
-  const warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, () => {});
+  const warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, () => {}, () => Promise.resolve(), () => {});
   const canvas = new Texture(), map = new Texture(), root = new Group();
   root.add(new Mesh(new PlaneGeometry(), new MeshBasicMaterial({map: canvas})), new Mesh(new PlaneGeometry(), mapped(map)));
   try {
@@ -185,16 +185,59 @@ it("uploads a composed material's own textures and any other material's texture 
   } finally { warmup.dispose(); }
 });
 
+it("links and draws a shown warm-up's materials one a frame before it ends; behind the loading screen all link at once and the first frame draws", async () => {
+  let target: WebGLRenderTarget | null = null;
+  const part = () => new Mesh(new PlaneGeometry(), new MeshBasicMaterial());
+  const loaded = new Group(), shown = new Group(), first = part(), second = part(), parts = new Set<Object3D>([first, second, loaded.add(part()).children[0]]);
+  shown.add(first, second);
+  // The draws of the parts (the geometry warm-up draws its own probe), with the frame each was in.
+  const drawn: [Object3D, number][] = [], frameTarget = new WebGLRenderTarget(8, 8);
+  const render = (scene: Scene) => { scene.traverseVisible(object => { if (parts.has(object)) drawn.push([object, clock]); }); };
+  // The parts each compile walked, with its frame.
+  const linked: [Object3D[], number][] = [];
+  const compileAsync = (object: Object3D) => {
+    const walked: Object3D[] = [];
+    object.traverse(child => { if (parts.has(child)) walked.push(child); });
+    linked.push([walked, clock]);
+    return Promise.resolve();
+  };
+  const renderer = {getRenderTarget: () => target, setRenderTarget: (next: WebGLRenderTarget | null) => { target = next; }, initTexture: () => {}, compile: () => {},
+    compileAsync, render} as unknown as WebGLRenderer;
+  const shadows = vi.fn();
+  const warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => { target = frameTarget; }, () => {}, () => Promise.resolve(), shadows);
+  try {
+    await warmup.warm(loaded, new AbortController().signal);
+    expect([drawn, shadows.mock.calls, linked.length]).toEqual([[], [], 1]);
+    linked.length = 0;
+    warmup.shown();
+    let ended = false;
+    const done = warmup.warm(shown, new AbortController().signal).then(() => { ended = true; });
+    await vi.waitFor(async () => { await settledFrame(); expect(drawn).toHaveLength(1); });
+    expect([drawn[0][0], ended]).toEqual([first, false]);
+    while (!ended) await settledFrame();
+    await done;
+    expect(drawn.map(([object]) => object)).toEqual([first, second]);
+    expect(drawn[1][1]).toBeGreaterThan(drawn[0][1]);
+    expect(shadows.mock.calls.map(([root]) => root as Object3D)).toEqual([shown, shown]);
+    // Shown, the links went one material a frame, as the draws did; loading, all at once.
+    expect(linked.map(([walked]) => walked)).toEqual([[first], [second]]);
+    expect(linked[1][1]).toBeGreaterThan(linked[0][1]);
+  } finally { warmup.dispose(); }
+});
+
 it('compiles what a camera layer draws, hidden or not, and no stand-in in no layer', async () => {
   const compiled: Object3D[] = [];
   const renderer = {getRenderTarget: () => null, setRenderTarget: () => {}, initTexture: () => {}, render: () => {}, compile: () => {},
     compileAsync: (object: Object3D) => { object.traverse(child => { compiled.push(child); }); return Promise.resolve(); }} as unknown as WebGLRenderer;
-  const warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, () => {});
+  const shadows = vi.fn(() => Promise.resolve());
+  const warmup = createSceneWarmup(renderer, new Scene(), new PerspectiveCamera(), () => {}, () => {}, shadows, () => {});
   const root = new Group(), drawn = new Mesh(new PlaneGeometry(), new MeshBasicMaterial()), hidden = drawn.clone(), standIn = drawn.clone();
   hidden.visible = false; standIn.layers.disableAll();
   root.add(drawn, hidden, standIn);
   try {
     await warmup.warm(root, new AbortController().signal);
     expect(compiled).toEqual([root, drawn, hidden]); // A hidden part may show later (a cockpit, a chunk); a stand-in never draws.
+    // The sun shadow's depth programs of the same roots link with them, not at their first cast.
+    expect(shadows).toHaveBeenCalledWith([root]);
   } finally { warmup.dispose(); }
 });

@@ -59,6 +59,13 @@ export interface CascadeShadows {
   update(view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[], castersAt: readonly Vector3[]): boolean;
   /** Whether the last update redrew static depth (a held cascade that drifted, or a cached one): a frame's heaviest shadow work. */
   readonly redrewStatic: boolean;
+  /** Links the depth programs the casters under `roots` draw with, before their first shadow draw (`ShadowCasterPass.compile`). */
+  compile(roots: readonly Object3D[]): Promise<unknown>;
+  /**
+   * Draws what shows of the scene, and of `root` (in it) on its own, into a texel, as `update` draws the cars: their depth programs'
+   * first draws (`FirstDraws`), which cost the GPU process more than the links. `view` turns camera-facing cards.
+   */
+  drawFirst(root: Object3D, view: PerspectiveCamera): void;
   dispose(): void;
 }
 
@@ -92,9 +99,11 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   lightTravel: Vector3): CascadeShadows {
   const {sizePx, tilePx, count} = shadows.atlas, heightPx = count * sizePx;
   if (heightPx > renderer.capabilities.maxTextureSize) throw Error(`The shadow atlases need a ${sizePx} x ${heightPx} depth texture; the GPU allows ${renderer.capabilities.maxTextureSize}`);
+  /** A depth target of the atlas' kind: a program drawn into one serves them all. */
+  const atlasTarget = (widthPx: number, rowsPx: number, depthTexture: DepthTexture) => new WebGLRenderTarget(widthPx, rowsPx, {format: RedFormat, depthTexture, generateMipmaps: false});
   const depth = new DepthTexture(sizePx, heightPx, UnsignedIntType);
   depth.compareFunction = LessEqualCompare; depth.minFilter = LinearFilter; depth.magFilter = LinearFilter;
-  const target = new WebGLRenderTarget(sizePx, heightPx, {format: RedFormat, depthTexture: depth, generateMipmaps: false});
+  const target = atlasTarget(sizePx, heightPx, depth);
   // A sampler needs its depth texture to exist before the first draw.
   renderer.initRenderTarget(target);
   const lightCamera = () => {
@@ -122,7 +131,10 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   });
   // The static depth of the held and cached cascades, in the atlas' own tiles, of the atlas' depth type: the shadow pass copies it as stored.
   const staticDepth = cascades.some(row => row.held || !row.live) ? new DepthTexture(sizePx, heightPx, UnsignedIntType) : null;
-  const staticTarget = staticDepth && new WebGLRenderTarget(sizePx, heightPx, {format: RedFormat, depthTexture: staticDepth, generateMipmaps: false});
+  const staticTarget = staticDepth && atlasTarget(sizePx, heightPx, staticDepth);
+  /** What a first draw (`drawFirst`) draws into: a texel of the atlas' kind, from a camera that sees what the cascades' cameras see. */
+  let firstTarget: WebGLRenderTarget | null = null;
+  const firstLayer = [{viewport: new Vector4(0, 0, 1, 1), light: lightCamera(), depthBias: {slope: 0, units: 0}}];
   if (staticTarget) renderer.initRenderTarget(staticTarget);
   const state: CascadeShadowState = {
     atlas: depth,
@@ -189,8 +201,17 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
       if (bare.length) casters.drawRoots(target, layersOf(bare), view, [], staticTarget!);
       return settled && order.length > 1;
     },
+    // The atlas and the static target share a format: one program serves both.
+    compile: roots => casters.compile(target, roots),
+    drawFirst(root, view) {
+      firstTarget ??= atlasTarget(1, 1, new DepthTexture(1, 1, UnsignedIntType));
+      // As `update` draws a car: with the whole scene into a whole live cascade, on its own over a held or cached one (three keys
+      // the two programs apart: the scene's lights are in one and not the other).
+      if (cascades.some(row => row.live && !row.held)) casters.draw(firstTarget, firstLayer, view, [], 0);
+      if (cascades.some(row => row.held || !row.live)) casters.drawRoots(firstTarget, firstLayer, view, [root]);
+    },
     dispose() {
-      depth.dispose(); target.dispose(); staticDepth?.dispose(); staticTarget?.dispose(); casters.dispose();
+      depth.dispose(); target.dispose(); staticDepth?.dispose(); staticTarget?.dispose(); firstTarget?.depthTexture?.dispose(); firstTarget?.dispose(); casters.dispose();
     },
   };
 }

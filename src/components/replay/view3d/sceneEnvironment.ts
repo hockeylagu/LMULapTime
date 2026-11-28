@@ -91,6 +91,10 @@ export interface SceneEnvironment {
   setSunVisibility(sun: SceneSun): void;
   /** Writes this scene's haze into the scene block hazed materials read (haze.ts); each of the scene's renders does it too. */
   applyHaze(): void;
+  /** Links the sun shadow's depth programs for the casters under `roots` before they first cast (the warm-up's compile). */
+  compileShadows(roots: readonly Object3D[]): Promise<unknown>;
+  /** Draws the shadow casters that show, `root` among them, into a texel as the sun shadow draws them (`CascadeShadows.drawFirst`). */
+  drawShadowsFirst(root: Object3D, view: PerspectiveCamera): void;
   /**
    * Before a frame renders: colours the haze toward the view and draws the shadow cascades that are due, the cars into the far ones
    * whose slice holds one of `casters` (where the cars that cast are, world). True while cached cascades are still due: the caller
@@ -314,6 +318,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       cascades = startCascades(set, own); previous.dispose();
     },
     applyHaze: () => applyHaze(),
+    compileShadows: roots => cascades.pass.compile(roots),
+    drawShadowsFirst: (root, view) => cascades.pass.drawFirst(root, view),
     captureVenue,
     setSun(next) {
       light(next);

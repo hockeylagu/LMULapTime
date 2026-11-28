@@ -70,6 +70,15 @@ describe('cascade shadows', () => {
   // A car 150 m down the view line, in the cached cascade's 80 to 300 m slice.
   const far = new Vector3(0, 1, -150);
 
+  it('draws a first draw as the held and cached cascades draw a car: the car alone, into a texel of its own, no tile touched', () => {
+    const {cascades, draws, view, car, scene} = setUp();
+    cascades.drawFirst(car, view);
+    // The test layout has no whole live cascade: no scene draw, the car drawn on its own over nothing (no depth copy).
+    expect([draws.renders.map(draw => [draw.root === car, draw.viewport.toArray()]), sceneRenders(draws, scene), draws.copies]).toEqual([[[true, [0, 0, 1, 1]]], [], []]);
+    expect(car.visible).toBe(true);
+    cascades.dispose();
+  });
+
   it('draws every cascade into its tile first, then only redraws the held ones from their static depth while the view stays put', () => {
     const {cascades, draws, view, scene} = setUp();
     expect(cascades.update(view, [], [])).toBe(false);

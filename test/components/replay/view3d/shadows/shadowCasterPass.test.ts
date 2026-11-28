@@ -187,3 +187,31 @@ it('frees its depth materials and depth-copy quad on dispose, and lets go of the
   expect(freed.map(spy => spy.mock.calls.length)).toEqual([1, 1]);
   expect(unlisten).toHaveBeenCalledWith('dispose', expect.any(Function));
 });
+
+it('compiles the depth programs of the casters into its target on plain depth, then puts every material and setting back', async () => {
+  const scene = new Scene(), fence = new Texture();
+  const body = new Mesh(new BoxGeometry(), new MeshStandardMaterial()), grille = new Mesh(new BoxGeometry(), new MeshStandardMaterial({alphaTest: 0.5, map: fence}));
+  const glass = new Mesh(new BoxGeometry(), new MeshStandardMaterial({transparent: true})), standIn = new Mesh(new BoxGeometry(), new MeshStandardMaterial()), shade = new Mesh(new BoxGeometry(), new MeshStandardMaterial());
+  for (const mesh of [body, grille, glass, standIn]) mesh.castShadow = true;
+  standIn.layers.disableAll();
+  scene.add(body, grille, glass, standIn, shade);
+  const target = new WebGLRenderTarget(4, 4), calls: string[] = [], walked: Material[] = [];
+  let reversed = true, current: WebGLRenderTarget | null = null;
+  const renderer = {
+    state: {buffers: {depth: {getReversed: () => reversed, setReversed(value: boolean) { reversed = value; }}}},
+    getRenderTarget: () => current, setRenderTarget(next: WebGLRenderTarget | null) { current = next; },
+    compileAsync(view: Mesh) {
+      calls.push(`compile ${current === target} reversed ${reversed}`);
+      view.traverse(object => { walked.push((object as Mesh).material as Material); });
+      return Promise.resolve();
+    },
+  } as unknown as WebGLRenderer;
+  const originals = [body, grille, glass, standIn, shade].map(mesh => mesh.material);
+  await createShadowCasterPass(renderer, scene).compile(target, [scene]);
+  expect(calls).toEqual(['compile true reversed false']);
+  // Only the casters, each with its depth material (glass casts none; a stand-in in no layer never draws).
+  expect(walked.map(material => material.type)).toEqual(['MeshDepthMaterial', 'MeshDepthMaterial', 'MeshDepthMaterial']);
+  expect(walked.map(material => material.visible)).toEqual([true, true, false]);
+  expect([body, grille, glass, standIn, shade].map(mesh => mesh.material)).toEqual(originals);
+  expect([reversed, current]).toEqual([true, null]);
+});

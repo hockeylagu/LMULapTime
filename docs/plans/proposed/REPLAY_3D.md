@@ -59,7 +59,9 @@ states run to run (stand chunk in the cached far cascade or not); the 10-view su
 - three.js through its public API only (`onBeforeCompile` on our own materials included); never patch three. Remaining
   borderline use: `batching/batchedParts.ts` releases buffer arrays after upload.
 - Anything that changes `scene.environment` or an `envMap`'s size or presence after the warm-up recompiles every lit material;
-  anything that never draws needs `layers.mask` 0, or r187's `compile()` builds a program for it.
+  anything that never draws needs `layers.mask` 0, or r187's `compile()` builds a program for it. The warm-up also links the
+  shadow pass's depth programs (`shadowCasterPass.compile`); a caster's first shadow draw linked its program in the frame
+  (Spa ~frame 390, 49–122 ms, removed 2026-11-27).
 - A sampler more silently unbatches a material (texture units against `maxTextures`); count units before adding a map.
 - Measure load with stage marks in a side build before proposing a load fix; estimates from waterfalls were wrong before.
 

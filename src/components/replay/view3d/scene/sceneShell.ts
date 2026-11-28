@@ -36,7 +36,7 @@ import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 import { createSceneryGround, type SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { StreamView } from '../scenery/residency.js';
 import { createSceneryStream } from '../scenery/sceneryStream.js';
-import { createSceneWarmup } from '../scenery/sceneWarmup.js';
+import { createSceneWarmup } from '../scenery/warmup/sceneWarmup.js';
 import { startStreaming } from '../scenery/materials/mipStreaming.js';
 import { focusing } from '../scenery/textureFocus.js';
 import { trackCardFacing } from '../scenery/materials/billboardCard.js';
@@ -261,7 +261,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // Each `render` call (main, shadow layers, probe, environment) would walk the whole graph: `draw` updates it once per frame.
   scene.matrixWorldAutoUpdate = false;
   const warmup = createSceneWarmup(renderer, scene, rig.perspective,
-    () => { renderer.setRenderTarget(exposure.target); environment.applyHaze(); }, () => invalidate());
+    () => { renderer.setRenderTarget(exposure.target); environment.applyHaze(); }, () => invalidate(), roots => environment.compileShadows(roots),
+    (root, view) => environment.drawShadowsFirst(root, view));
   // The loading screen's progress (the layout and cars were fetched before this ran), then the scenery still streaming in.
   const progress: SceneLoadProgress = {...NO_LOAD_PROGRESS, track: 1};
   let loading = true;

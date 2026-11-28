@@ -1,8 +1,9 @@
 import { Box3, Mesh, Object3D, Vector3, type Material, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
-import { composedTextures } from '../shaders/composer.js';
+import { composedTextures } from '../../shaders/composer.js';
+import { trackSurfaceTextures } from '../materials/configureSurfaceMaterial.js';
+import { fullPixels, isStreaming, streamTexture, whenUploaded } from '../materials/mipStreaming.js';
+import { createFirstDraws, materialMeshes } from './firstDraws.js';
 import { createGeometryWarmup, type UploadSlice } from './geometryWarmup.js';
-import { trackSurfaceTextures } from './materials/configureSurfaceMaterial.js';
-import { fullPixels, isStreaming, streamTexture, whenUploaded } from './materials/mipStreaming.js';
 
 /** Upload slice while the scene shows (a frame each), and behind the loading screen (a task each). */
 const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
@@ -76,13 +77,16 @@ export interface SceneWarmup {
 /**
  * A chunk compiles its programs and uploads its textures before it joins the scene: a texture per frame while the scene shows, in
  * long slices behind the loading screen. Scenery textures join on their reduced levels; once the first frame is out, they sharpen
- * whole, one texture after another within the frame's byte budget: the car's first, then the scenery nearest the camera, the
- * largest first within the same chunk. `changed` asks for a frame.
+ * one texture after another within the frame's byte budget: the car's first, then the scenery nearest the camera, the
+ * largest first within the same chunk. `changed` asks for a frame. `compileShadows` links the sun shadow's depth programs of the same
+ * roots, which the shadow pass would otherwise link at their first cast, in a frame; `drawShadowsFirst` draws them once as that
+ * pass does (`FirstDraws`).
  */
 export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera: PerspectiveCamera, prepare: () => void,
-  changed: () => void): SceneWarmup {
+  changed: () => void, compileShadows: (roots: readonly Object3D[]) => Promise<unknown>,
+  drawShadowsFirst: (root: Object3D, view: PerspectiveCamera) => void): SceneWarmup {
   const nextTask = () => new Promise<void>(resolve => { setTimeout(resolve, 0); });
-  const geometryWarmup = createGeometryWarmup(renderer);
+  const geometryWarmup = createGeometryWarmup(renderer), firstDraws = createFirstDraws(renderer, scene, drawShadowsFirst);
   const sent = new WeakSet<Texture>();
   const held = new Set<Texture>(), cars = new WeakSet<Texture>(), fieldCars = new WeakSet<Texture>(), places = new WeakMap<Texture, Box3[]>(), eye = new Vector3();
   const blurry = new Set<Texture>();
@@ -157,11 +161,38 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
     const previous = renderer.getRenderTarget();
     prepare();
-    const compiled = renderer.compileAsync(drawnView(roots), camera, scene);
+    const compiled = Promise.all([renderer.compileAsync(drawnView(roots), camera, scene), compileShadows(roots)]);
     renderer.setRenderTarget(previous);
     return compiled;
   };
-  const warm = async (roots: readonly Object3D[], signal: AbortSignal, compiled: Promise<unknown> = compile(roots), where?: Box3) => {
+  /**
+   * While the scene shows, one material's programs a frame: links run in the GPU process, and a GT3 body's 21 at once held the
+   * next frame there 230-330 ms (Barcelona race, 2026-11-27). Behind the loading screen everything links at once.
+   */
+  const paced = async (roots: readonly Object3D[], signal: AbortSignal) => {
+    const links: Promise<unknown>[] = [];
+    for (const {mesh} of materialMeshes(roots)) {
+      // oxlint-disable-next-line no-await-in-loop -- one material's links a frame
+      await nextFrame();
+      signal.throwIfAborted();
+      // A failed link rejects at the end, as an abort may leave the loop first.
+      const link = compile([mesh]);
+      link.catch(() => {});
+      links.push(link);
+    }
+    await Promise.all(links);
+  };
+  /** Whether a frame draws into a target (`prepare` sets it), as the passes the first draws mirror do: a renderer double's may not. */
+  const framesIntoTarget = () => {
+    const previous = renderer.getRenderTarget();
+    prepare();
+    const target = renderer.getRenderTarget();
+    renderer.setRenderTarget(previous);
+    return target !== null;
+  };
+  const warm = async (roots: readonly Object3D[], signal: AbortSignal, given?: Promise<unknown>, where?: Box3) => {
+    // While the scene shows, the links and the first draws go one material a frame; behind the loading screen, the first frame pays them.
+    const pacing = shown && framesIntoTarget(), compiled = given ?? (pacing ? paced(roots, signal) : compile(roots));
     // The programs link off the main thread while the textures and geometry upload (a followed car's 0.1-0.6 s of links and
     // 0.3-1 s of uploads one after the other, 2026-11-17); a failed link rejects at the end.
     compiled.catch(() => {});
@@ -203,6 +234,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     // oxlint-disable-next-line no-await-in-loop -- one root's geometry after another, in the same slices
     for (const root of roots) await geometryWarmup.upload(root, camera, signal, next);
     await compiled;
+    if (pacing) await firstDraws.draw(roots, camera, prepare, nextFrame, signal);
     for (const texture of textures) {
       if (!isStreaming(texture)) continue;
       if (where) places.set(texture, [...places.get(texture) ?? [], used.get(texture) ?? where]);
@@ -239,6 +271,6 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
       for (const texture of released) { cars.add(texture); whenUploaded(texture, () => { blurry.add(texture); startSharpen(); }); }
     },
     sharpening: () => ({sharp, total: sharp + blurry.size}),
-    dispose() { disposed = true; held.clear(); blurry.clear(); geometryWarmup.dispose(); },
+    dispose() { disposed = true; held.clear(); blurry.clear(); geometryWarmup.dispose(); firstDraws.dispose(); },
   };
 }

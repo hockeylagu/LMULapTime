@@ -1,6 +1,6 @@
 import { BoxGeometry, Group, Mesh, PerspectiveCamera, type Scene, type WebGLRenderer, type WebGLRenderTarget } from 'three';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createGeometryWarmup } from '../../../../../src/components/replay/view3d/scenery/geometryWarmup.js';
+import { createGeometryWarmup } from '../../../../../../src/components/replay/view3d/scenery/warmup/geometryWarmup.js';
 
 afterEach(() => vi.restoreAllMocks());
 

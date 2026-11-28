@@ -1,6 +1,6 @@
 import {
-  AlwaysDepth, BackSide, BatchedMesh, DoubleSide, FrontSide, GLSL3, InstancedMesh, Line, Mesh, MeshDepthMaterial, OrthographicCamera, PlaneGeometry, Points, Scene,
-  ShaderMaterial, Sprite, type BufferGeometry, type Material, type Object3D, type PerspectiveCamera, type Side, type Texture, type Vector4,
+  AlwaysDepth, BackSide, BatchedMesh, DoubleSide, FrontSide, GLSL3, InstancedMesh, Line, Mesh, MeshDepthMaterial, Object3D, OrthographicCamera, PlaneGeometry, Points, Scene,
+  ShaderMaterial, Sprite, type BufferGeometry, type Material, type PerspectiveCamera, type Side, type Texture, type Vector4,
   type WebGLRenderer, type WebGLRenderTarget,
 } from 'three';
 import { trackShadowEye } from '../scenery/materials/billboardCard.js';
@@ -28,6 +28,11 @@ export interface ShadowCasterPass {
    */
   drawRoots(target: WebGLRenderTarget, layers: readonly ShadowLayer[], view: PerspectiveCamera | OrthographicCamera, roots: readonly Object3D[],
     base?: WebGLRenderTarget): void;
+  /**
+   * Links, off the main thread where the context can, the depth programs the casters under `roots` draw with into `target`: a
+   * caster's first shadow draw would otherwise link its program in the frame (a cut-out's 30-45 ms shadow pass at Spa).
+   */
+  compile(target: WebGLRenderTarget, roots: readonly Object3D[]): Promise<unknown>;
   /** Frees the pass's depth materials and depth-copy quad, and lets go of the textures they cut by. */
   dispose(): void;
 }
@@ -117,10 +122,11 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
     for (const texture of [map, alphaMap]) if (texture) { texture.addEventListener('dispose', drop); listening.push(() => texture.removeEventListener('dispose', drop)); }
     return depth;
   };
-  // The pass draws only shadow casters, each with its depth material; everything else is hidden for it, then restored.
-  const render = (target: WebGLRenderTarget, layers: readonly ShadowLayer[], view: PerspectiveCamera | OrthographicCamera,
-    roots: readonly Object3D[], hide: readonly Object3D[], minCasterM: number, clear: boolean, base?: WebGLRenderTarget) => {
-    if (!layers.length || (!roots.length && !base)) return;
+  /**
+   * Gives each shadow caster under `roots` its depth material and hides everything else (`hide`, other meshes, lines, points,
+   * sprites) for the pass; `restore` puts them back. `casters` are the meshes that draw.
+   */
+  const swapCasters = (roots: readonly Object3D[], hide: readonly Object3D[], minCasterM: number) => {
     const hidden: Object3D[] = [], swapped: [Mesh, Material | Material[]][] = [];
     for (const object of hide) if (object.visible) { object.visible = false; hidden.push(object); }
     for (const root of roots) root.traverseVisible(object => {
@@ -139,6 +145,19 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
       } else if (object instanceof Line || object instanceof Points || object instanceof Sprite) hidden.push(object);
     });
     for (const object of hidden) object.visible = false;
+    return {
+      casters: swapped.map(([mesh]) => mesh),
+      restore: () => {
+        for (const [mesh, material] of swapped) mesh.material = material;
+        for (const object of hidden) object.visible = true;
+      },
+    };
+  };
+  // The pass draws only shadow casters, each with its depth material; everything else is hidden for it, then restored.
+  const render = (target: WebGLRenderTarget, layers: readonly ShadowLayer[], view: PerspectiveCamera | OrthographicCamera,
+    roots: readonly Object3D[], hide: readonly Object3D[], minCasterM: number, clear: boolean, base?: WebGLRenderTarget) => {
+    if (!layers.length || (!roots.length && !base)) return;
+    const {restore} = swapCasters(roots, hide, minCasterM);
     // The frame has updated the world matrices before its shadow passes; a root rendered on its own would have three walk its tree
     // again for every layer (render() updates a root whose auto update is on), the cars' whole tree each time.
     const updating = roots.filter(root => root.matrixWorldAutoUpdate);
@@ -169,14 +188,33 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
     } finally {
       depth.setReversed(reversed);
       renderer.setRenderTarget(previous); renderer.autoClear = autoClear; renderer.setScissorTest(scissorTest);
-      for (const [mesh, material] of swapped) mesh.material = material;
-      for (const object of hidden) object.visible = true;
+      restore();
       for (const root of updating) root.matrixWorldAutoUpdate = true;
     }
   };
+  // Any camera serves a compile: a depth program reads no light; the sun cameras are the pass's caller's.
+  const compileCamera = new OrthographicCamera();
   return {
     draw: (target, layers, view, dynamic, minCasterM) => render(target, layers, view, [scene], dynamic, minCasterM, true),
     drawRoots: (target, layers, view, roots, base) => render(target, layers, view, roots, [], 0, false, base),
+    compile(target, roots) {
+      // The programs as the pass draws them: into its target (the output colour space), on plain depth, every caster whatever its
+      // size; the materials and the depth range go back once the compile has read them (the links then finish off the frame).
+      // three's compile links a program for every mesh it walks, hidden or not: it walks only the casters, with their depth materials,
+      // and not a batch's stand-in parts (in no camera layer: no pass draws them).
+      const {casters, restore} = swapCasters(roots, [], 0), depth = renderer.state.buffers.depth, reversed = depth.getReversed(), previous = renderer.getRenderTarget();
+      const view = new Object3D();
+      view.traverse = callback => { for (const caster of casters) if (caster.layers.mask !== 0) callback(caster); };
+      try {
+        depth.setReversed(false);
+        renderer.setRenderTarget(target);
+        return renderer.compileAsync(view, compileCamera, scene);
+      } finally {
+        depth.setReversed(reversed);
+        renderer.setRenderTarget(previous);
+        restore();
+      }
+    },
     dispose() {
       for (const stopListening of listening) stopListening();
       listening.length = 0;

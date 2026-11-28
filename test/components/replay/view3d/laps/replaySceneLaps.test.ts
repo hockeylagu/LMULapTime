@@ -26,7 +26,7 @@ vi.mock('three-mesh-bvh/worker', async () => {
   const {MeshBVH} = await import('three-mesh-bvh');
   return {GenerateMeshBVHWorker: class {async generate(geometry: BufferGeometry) { return new MeshBVH(geometry, {indirect: true}); } dispose() {}}};
 });
-vi.mock('../../../../../src/components/replay/view3d/scenery/geometryWarmup.js', () => ({createGeometryWarmup: () => ({upload: gpu.upload, dispose() {}})}));
+vi.mock('../../../../../src/components/replay/view3d/scenery/warmup/geometryWarmup.js', () => ({createGeometryWarmup: () => ({upload: gpu.upload, dispose() {}})}));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
   // A PMREM as three's generator makes one: its levels.
