@@ -94,7 +94,7 @@ describe('carsUnder', () => {
     expect(insideHull([[0, 0], [10, 10], [20, 20]], 10, 10)).toBe(false);
   });
 
-  it("keeps a model's body in cells: the parts in one (the cockpit in the shell, a detail level's copy) share its box", () => {
+  it("keeps a model's body in cells: the parts in one (the cockpit in the shell, a detail level's copy) share its box", async () => {
     const car = new Group(), envelope = new Group(), aerial = new Mesh(new BoxGeometry(0.04, 0.4, 0.1));
     envelope.name = 'body-envelope';
     aerial.position.set(0, 0.7, -1.85);
@@ -102,14 +102,14 @@ describe('carsUnder', () => {
     car.add(envelope);
     // The shell's 8 by 16 quarter-metre cells, and 16 + 8 flat ones for its right side and front, on cells' edges; the two cells the
     // aerial stands in (either side of the middle) reach its top.
-    const parts = envelopeParts(car);
+    const parts = await envelopeParts(car, async () => {});
     expect(parts).toHaveLength(128 + 16 + 8);
     expect(parts.filter(part => part.max.y > 0.6).map(part => [part.min.x, part.max.x, part.min.z, part.max.y].map(value => Number(value.toFixed(3)))))
       .toEqual([[-0.25, 0, -2, 0.9], [0, 0.25, -2, 0.9]]);
     expect(envelopeBounds(car).max.y).toBeCloseTo(0.9);
   });
 
-  it("cuts a part in cells along and across the car: the roof's height stands over neither the hood nor the windscreen's foot", () => {
+  it("cuts a part in cells along and across the car: the roof's height stands over neither the hood nor the windscreen's foot", async () => {
     // One mesh: a hood 0.6 m high from 1 to 2 m forward, a windscreen of one triangle from it up to a roof 1.2 m high at 0 m.
     const geometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute([
       -1, 0.6, 1, 1, 0.6, 1, 0, 0.6, 2,
@@ -119,13 +119,25 @@ describe('carsUnder', () => {
     envelope.name = 'body-envelope';
     envelope.add(new Mesh(geometry));
     car.add(envelope);
-    const parts = envelopeParts(car), top = (from: number) => Math.max(...parts.filter(part => part.min.z >= from - 1e-6).map(part => part.max.y));
+    const parts = await envelopeParts(car, async () => {}), top = (from: number) => Math.max(...parts.filter(part => part.min.z >= from - 1e-6).map(part => part.max.y));
     expect(top(1)).toBeCloseTo(0.6);
     // The windscreen climbs 0.15 m a quarter metre back from its foot.
     expect(top(0.75)).toBeCloseTo(0.75);
     expect(top(0.25)).toBeCloseTo(1.2 - 0.15);
     expect(Math.max(...parts.map(part => part.max.y))).toBeCloseTo(1.2);
     expect(envelopeBounds(car).max.y).toBeCloseTo(1.2);
+  });
+
+  it('cuts a body in steps, yielding between them, with the same cells as in one go', async () => {
+    // 5000 triangles, each in its own place: three steps of 2048.
+    const count = 5000, positions = Array.from({length: count}, (_, i) => [i * 0.01, 0, 0, i * 0.01 + 0.005, 0.5, 0, i * 0.01, 0, 0.1]).flat();
+    const car = new Group(), envelope = new Group();
+    envelope.name = 'body-envelope';
+    envelope.add(new Mesh(new BufferGeometry().setAttribute('position', new Float32BufferAttribute(positions, 3))));
+    car.add(envelope);
+    let steps = 0;
+    const stepped = await envelopeParts(car, async () => { steps++; }), whole = await envelopeParts(car, async () => {});
+    expect([steps, stepped]).toEqual([3, whole]);
   });
 
   it('finds a car off the centre where the camera draws it', () => {

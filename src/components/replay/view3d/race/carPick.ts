@@ -56,11 +56,16 @@ function clip(polygon: Vector3[], axis: 'x' | 'z', at: number, keep: 1 | -1): Ve
   return kept;
 }
 
+/** Triangles cut into cells between two calls of the build's yield point. */
+const TRIANGLES_PER_STEP = 2048;
+
 /**
  * A mesh's triangles, through `matrix`, into `cells` of PART_CELL_M across and along the car: each cell widened over the part of
- * each triangle in it (a windscreen's few triangles give the cells by the hood the hood's height, not the roof's).
+ * each triangle in it (a windscreen's few triangles give the cells by the hood the hood's height, not the roof's). Awaits `step`
+ * every `TRIANGLES_PER_STEP` triangles: a body's full level took 50-60 ms in one task, a frame's stall as a race car came near.
+ * The scratch vectors are used only within a triangle, so cars cut at once share them safely.
  */
-function addToCells(cells: Map<number, Box3>, geometry: Mesh['geometry'], matrix: Matrix4): void {
+async function addToCells(cells: Map<number, Box3>, geometry: Mesh['geometry'], matrix: Matrix4, step: () => Promise<void>): Promise<void> {
   const position = geometry.getAttribute('position'), index = geometry.getIndex();
   if (!position) return;
   const count = index ? index.count : position.count, points = [a, b, c];
@@ -72,6 +77,8 @@ function addToCells(cells: Map<number, Box3>, geometry: Mesh['geometry'], matrix
   // Measured while the followed car builds, before its first frame: a body's levels hold hundreds of thousands of triangles, so the
   // loop allocates nothing for a triangle within one cell (most of them).
   for (let corner = 0; corner + 2 < count; corner += 3) {
+    // oxlint-disable-next-line no-await-in-loop -- yields between steps of triangles, the build's slices
+    if (corner % (3 * TRIANGLES_PER_STEP) === 0) await step();
     a.fromBufferAttribute(position, index ? index.getX(corner) : corner).applyMatrix4(matrix);
     b.fromBufferAttribute(position, index ? index.getX(corner + 1) : corner + 1).applyMatrix4(matrix);
     c.fromBufferAttribute(position, index ? index.getX(corner + 2) : corner + 2).applyMatrix4(matrix);
@@ -93,11 +100,14 @@ function addToCells(cells: Map<number, Box3>, geometry: Mesh['geometry'], matrix
 /**
  * A car model's body in its envelope's frame (the car's, without the envelope's lift), where its parts hang, as boxes over cells
  * of `PART_CELL_M` across and along it, its contact shadow left out: the parts in a cell (the shell, the cockpit inside it) share
- * its box. The followed car's model holds its full detail level alone (`CarSets.build`).
+ * its box. The followed car's model holds its full detail level alone (`CarSets.build`). Measured in steps between `step` calls
+ * (the build's yield point, `createSlicer`); the meshes' geometry must not change meanwhile.
  */
-export function envelopeParts(car: Object3D): Box3[] {
-  const cells = new Map<number, Box3>();
-  eachPart(car, (geometry, matrix) => addToCells(cells, geometry, matrix));
+export async function envelopeParts(car: Object3D, step: () => Promise<void>): Promise<Box3[]> {
+  const cells = new Map<number, Box3>(), meshes: [Mesh['geometry'], Matrix4][] = [];
+  eachPart(car, (geometry, matrix) => meshes.push([geometry, matrix.clone()]));
+  // oxlint-disable-next-line no-await-in-loop -- one mesh after another, in the build's slices
+  for (const [geometry, matrix] of meshes) await addToCells(cells, geometry, matrix, step);
   return [...cells.values()];
 }
 

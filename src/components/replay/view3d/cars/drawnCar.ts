@@ -56,7 +56,8 @@ export async function createDrawnCars(models: readonly Group[], surfaceHeight: S
   let shape: DrawnCar['pickShape'] | undefined;
   for (const car of models) {
     const parts = buildCarParts(car);
-    shape ??= {box: envelopeBounds(car), parts: envelopeParts(car)};
+    // oxlint-disable-next-line no-await-in-loop -- the first car's shape, measured in the build's slices
+    shape ??= {box: envelopeBounds(car), parts: await envelopeParts(car, slice)};
     cars.push({car, parts, motion: createCarMotion(car, surfaceHeight), pickShape: shape});
     // oxlint-disable-next-line no-await-in-loop -- yields between cars
     await slice();
