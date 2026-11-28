@@ -118,12 +118,20 @@ per-file catalog facts; no live recording is required for this detection path. R
 force contributions can affect measured G, so it does not establish tyre saturation on its own.
 
 Both native-telemetry and VCR handling balance use the selected vehicle's optional plugin wheelbase
-and base-default steering calibration ([plugin contract](PLUGINS.md)). Steering input retains the
+and base-default steering calibration ([plugin contract](PLUGINS.md)); a DuckDB lap uses its run's own lock instead
+(`setupSteering`, below). Steering input retains the
 normalized ±270° chart scale; road-wheel angle is `steerYaw / 270 * defaultSteeringLockDeg`,
 equivalently `steerYaw * defaultSteeringWheelRangeDeg / 540 / steeringRatio`. Wheelbase enters
 the kinematic turning demand. Missing plugin fields use the historical approximate calibration.
-The selected runtime setup/steering upgrade is not supplied by these files: plugin steering is
-explicitly labeled `plugin-default`, not a measured wheel angle. No per-class equality is assumed.
+Plugin steering is labeled `plugin-default`, not a measured wheel angle. No per-class equality is assumed.
+
+A DuckDB recording's `CarSetup` metadata (a JSON object of setup entries) holds the run's steering lock in
+`VM_STEER_LOCK.stringValue`: the steering wheel's rotation lock to lock, then the road wheels' lock in brackets,
+written as `524deg (18.5deg)`, `440 (17) deg` or `516 deg(19.7 )`. The reader turns it into one calibration,
+`setupSteering = { steeringWheelRangeDeg: 524, steeringRatio: 524 / 2 / 18.5 }`, carried on the lap (and its cache
+row) and labeled `setup`; replay-only laps keep the plugin default, since a rival's setup is unknown. The
+recording holds no in-game FFB strength (metadata keys checked 2026-11-26), so `ffbPct` compares two laps only at
+the same FFB setting.
 
 Normalized vehicle dynamics follow ISO 8855:2011 vehicle axes (x forward, y left, z up), and ASAM OpenDRIVE's
 `t` (positive left of the reference line, the same sense as ISO 8855 y) for the offset from the track
@@ -166,11 +174,14 @@ acceleration signs. Screen coordinates are display coordinates, not vehicle axes
 
 | Field | Positive | Source and conversion |
 | --- | --- | --- |
-| `accelLonG` | Accelerating (braking is negative) | DuckDB `G Force Lat` negated; replays: computed from speed |
-| `accelLatG` | Left turn (a_y toward the car's left) | DuckDB `G Force Long` as is; replays: `v · r / g` |
-| `yawRateDeg` | Turning left (counter-clockwise seen from above) | Computed: minus the rate of LMU's heading |
-| `slipAngleDeg` | Velocity left of the nose (nose right of travel, a right-hander at speed) | Computed: nose heading minus velocity heading |
+| `accelLonG` | Accelerating (braking is negative) | DuckDB `G Force Lat` negated; replays (cache v10): the recorded acceleration on the car's x axis; computed from speed only for older rows |
+| `accelLatG` | Left turn (a_y toward the car's left) | DuckDB `G Force Long` as is; replays (cache v10): the recorded acceleration on the car's y axis (`replayPose.ts`); `v · r / g` only for older rows |
+| `yawRateDeg` | Turning left (counter-clockwise seen from above) | Replays (cache v10): the recorded angular velocity, negated; computed from the heading's rate only for older rows and DuckDB laps |
+| `slipAngleDeg` | Velocity left of the nose (nose right of travel, a right-hander at speed) | Replays (cache v10): `atan2(velocityLat, velocityLon)` from the recorded velocity; nose heading minus velocity heading only for older rows |
 | `steerYaw` | Steering left | VCR wheel position and DuckDB `Steering Pos` negated at decode |
+| `steerTorqueNm` | Column torque turning the wheel left | DuckDB `Steering Shaft Torque` (Nm) negated at decode |
+| `ffbPct` | Force feedback turning the wheel left | DuckDB `FFB Output` (% of the wheel base's peak, ±100) negated at decode |
+| `driverForcePct` | The driver's hands pushing the wheel left | `-ffbPct` after a centred 0.15 s mean, on the full-rate lap (`shared/domain/vehicles/steeringForce.ts`); `steerHoldStill` and `passiveCounterSteer` mark its two moments, set only where true |
 | `lateralOffsetM` | Left of the centerline | Track projection onto the left-hand normal |
 | `understeerDeg` | Understeer (oversteer negative) | Not an axis; independent of turn direction |
 
@@ -188,6 +199,8 @@ not match their content:
 | DuckDB `G Force Long` | Lateral G, positive in a left turn | `accelLatG = value` (`normalizeDuckDbGForces`) |
 | DuckDB `G Force Lat` | Longitudinal G, positive under braking | `accelLonG = -value` |
 | DuckDB `Steering Pos` (%) | Steering, positive to the right | `steerYaw = -value / 100` |
+| DuckDB `Steering Shaft Torque` (Nm) | Car-side column torque, positive to the right | `steerTorqueNm = -value` |
+| DuckDB `FFB Output` (%) | Force sent to the wheel base, positive to the right | `ffbPct = -value` |
 | VCR `steer10` | Steering wheel, positive to the right | `steerYaw = (512 - steer10) / 512` |
 | Heading `atan2(dx, dz)`, `rotY` | Grows clockwise seen from above (turning right) | Yaw rate negated |
 

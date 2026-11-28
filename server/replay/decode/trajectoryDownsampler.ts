@@ -2,12 +2,16 @@ import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 /**
  * Channels whose shape the downsampler preserves, with the swing that counts as "one unit":
- * a full pedal stroke weighs the same as 100 km/h of speed.
+ * a full pedal stroke weighs the same as 100 km/h of speed, the driver's whole steering force, or a steering
+ * marker's start or end (DuckDB laps; replay laps carry none of the three).
  */
 const FEATURE_CHANNELS: Array<{ read: (p: ReplayTrajectoryPoint) => number | undefined; scale: number }> = [
   { read: p => p.throttle, scale: 100 },
   { read: p => p.brake, scale: 100 },
   { read: p => p.speedKmh, scale: 100 },
+  { read: p => p.driverForcePct, scale: 100 },
+  { read: p => (p.steerHoldStill ? 1 : 0), scale: 1 },
+  { read: p => (p.passiveCounterSteer ? 1 : 0), scale: 1 },
 ];
 
 /**

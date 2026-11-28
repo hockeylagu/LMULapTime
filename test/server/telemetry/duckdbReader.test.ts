@@ -43,6 +43,7 @@ describe('DuckDbReader', () => {
           ('session', 'Practice'),
           ('driver', 'Samuel Lague'),
           ('car', 'Ferrari 499P'),
+          ('CarSetup', '{"VM_STEER_LOCK":{"stringValue":"524deg (18.5deg)","value":5}}'),
           ('start_time', '2026-09-13T20:33:32Z');
 
         CREATE TABLE channelsList (channelName VARCHAR NOT NULL, frequency INTEGER, unit VARCHAR);
@@ -64,7 +65,9 @@ describe('DuckDbReader', () => {
           ('Fuel Level', 20, 'L'),
           ('Virtual Energy', 20, '%'),
           ('SoC', 20, '%'),
-          ('Regen Rate', 100, 'kW');
+          ('Regen Rate', 100, 'kW'),
+          ('Steering Shaft Torque', 100, 'Nm'),
+          ('FFB Output', 100, '%');
 
         CREATE TABLE eventsList (eventName VARCHAR NOT NULL, unit VARCHAR);
         INSERT INTO eventsList VALUES
@@ -92,6 +95,8 @@ describe('DuckDbReader', () => {
         CREATE TABLE "Virtual Energy" (value FLOAT);
         CREATE TABLE "SoC" (value FLOAT);
         CREATE TABLE "Regen Rate" (value FLOAT);
+        CREATE TABLE "Steering Shaft Torque" (value FLOAT);
+        CREATE TABLE "FFB Output" (value FLOAT);
 
         CREATE TABLE "Lap" (ts DOUBLE, value INTEGER);
         CREATE TABLE "Current Sector" (ts DOUBLE, value INTEGER);
@@ -124,6 +129,8 @@ describe('DuckDbReader', () => {
         INSERT INTO "Virtual Energy" SELECT (95.0 - (i * 0.02))::FLOAT FROM range(240) t(i);
         INSERT INTO "SoC" SELECT (88.0)::FLOAT FROM range(240) t(i);
         INSERT INTO "Regen Rate" SELECT (120.0)::FLOAT FROM range(1200) t(i);
+        INSERT INTO "Steering Shaft Torque" SELECT (-42.5)::FLOAT FROM range(1200) t(i);
+        INSERT INTO "FFB Output" SELECT (37.25)::FLOAT FROM range(1200) t(i);
       `);
 
     db.closeSync();
@@ -185,9 +192,10 @@ describe('DuckDbReader', () => {
     expect(metadata.track).toBe('Bahrain International Circuit');
     expect(metadata.driver).toBe('Samuel Lague');
     expect(metadata.car).toBe('Ferrari 499P');
+    expect(metadata.carType).toBe('Ferrari 499P');
 
     const channels = await reader.getChannelsList();
-    expect(channels.length).toBe(18);
+    expect(channels.length).toBe(20);
     expect(channels.find(c => c.channelName === 'Ground Speed')?.frequency).toBe(100);
     expect(channels.find(c => c.channelName === 'TyresWear')?.frequency).toBe(100);
 
@@ -234,6 +242,10 @@ describe('DuckDbReader', () => {
     expect(p0.virtualEnergy).toBeCloseTo(94.6, 1);
     expect(p0.soc).toBeCloseTo(88.0, 1);
     expect(p0.regenRate).toBeCloseTo(120.0, 1);
+    // The column channels read right-positive; the points carry them ISO (positive left).
+    expect(p0.steerTorqueNm).toBe(42.5);
+    expect(p0.ffbPct).toBe(-37.3);
+    expect(lapTelemetry!.setupSteering).toEqual({ steeringWheelRangeDeg: 524, steeringRatio: 14.162 });
 
     await reader.close();
   });

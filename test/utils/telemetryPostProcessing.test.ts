@@ -146,6 +146,10 @@ describe('applyTelemetryPostProcessingToTrajectory', () => {
     expect(fallback.handlingCalibration?.steeringSource).toBe('fallback');
     expect(fallback.points[5].understeerDeg).toBeGreaterThan(result.points[5].understeerDeg!);
     expect(trajectory.points[5].steerYaw).toBe(0.5);
+    // The run's lock (524° wheel, 18.5° road wheels) replaces the plugin's: half input = 9.25° at the road.
+    const setup = applyTelemetryPostProcessingToTrajectory({ ...trajectory, setupSteering: { steeringWheelRangeDeg: 524, steeringRatio: 262 / 18.5 } });
+    expect(setup.handlingCalibration?.steeringSource).toBe('setup');
+    expect(setup.points[5].understeerDeg).toBeCloseTo(9.25 - 3.1 * 11.5 / 30, 2);
   });
 
   it('passes through null/undefined without throwing', () => {

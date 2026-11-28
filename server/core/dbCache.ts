@@ -23,7 +23,10 @@ export const REPLAY_CACHE_VERSION = 'v10';
 // pedal passing through 0-1 % into a 0-100 % spike).
 // v11: the gear, ABS and TC state at the lap start is the last change before it, however long ago
 // (v10 looked back 5 s for gear and 1 s for ABS/TC, and started a lap on a long straight in gear 1).
-export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v11';
+// v12: the steering column channels (steerTorqueNm, ffbPct) and the
+// run's steering lock from the car setup (setupSteering).
+// v13: the driver's steering force and its holding-still and passive counter-steer markers, on the full-rate lap.
+export const DUCKDB_TELEMETRY_CACHE_VERSION = 'v13';
 
 // Replay JSON blobs (esp. full-resolution trajectories with thousands of points) are
 // large and highly repetitive, so brotli gives a much better ratio than gzip for a

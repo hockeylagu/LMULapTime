@@ -6,6 +6,7 @@ import {
   DuckDbLapTelemetry,
 } from './duckdbTypes.js';
 import { ReplayTrajectoryPoint, type StrategyLapState } from '../../shared/types/index.js';
+import { FFB_OUTPUT_TABLE, STEERING_TORQUE_TABLE, addSteeringForce, ffbPctOf, parseSetupSteering, steerTorqueNmOf } from './steeringChannels.js';
 
 export interface DuckDbSessionMetadata {
   trackName?: string;
@@ -127,7 +128,8 @@ export class DuckDbReader {
       if (lowerKey.includes('track')) result.trackName = r.value;
       if (lowerKey.includes('session')) result.sessionType = r.value;
       if (lowerKey.includes('driver')) result.driverName = r.value;
-      if (lowerKey.includes('car')) result.carType = r.value;
+      // `CarSetup` (the setup JSON) also holds 'car' and sorts after `CarName`.
+      if (lowerKey.includes('car') && lowerKey !== 'carsetup') result.carType = r.value;
       if (lowerKey.includes('start') || lowerKey.includes('time')) result.startTime = r.value;
     }
     return result;
@@ -563,9 +565,12 @@ export class DuckDbReader {
     const settingTables = {tcMap: 'TCLevel', tcCut: 'TCCut', tcSlip: 'TCSlipAngle', absMap: 'ABSLevel', engineMixture: 'FuelMixtureMap', brakeBiasRear: 'Brake Bias Rear'} as const;
     const settingEvents = Object.fromEntries(await Promise.all(Object.entries(settingTables).map(async ([key, table]) =>
       [key, (await this.hasTable(table)) && (await this.hasColumn(table, 'ts')) ? await fetchEventChannel(table, 1) : []] as const)));
-    const [oilTempData, waterTempData] = await Promise.all([
+    const [oilTempData, waterTempData, steerTorqueData, ffbData, metadata] = await Promise.all([
       fetchContinuousChannel<{ value: number }>((await this.hasTable('Engine Oil Temp')) ? 'Engine Oil Temp' : null, 'value', 7),
       fetchContinuousChannel<{ value: number }>((await this.hasTable('Engine Water Temp')) ? 'Engine Water Temp' : null, 'value', 7),
+      fetchContinuousChannel<{ value: number }>((await this.hasTable(STEERING_TORQUE_TABLE)) ? STEERING_TORQUE_TABLE : null, 'value'),
+      fetchContinuousChannel<{ value: number }>((await this.hasTable(FFB_OUTPUT_TABLE)) ? FFB_OUTPUT_TABLE : null, 'value'),
+      this.getMetadata(),
     ]);
     /** A setting's value at `ts`: its last event at or before it (none before the first). */
     const settingAt = (key: keyof typeof settingTables, ts: number): number | undefined => {
@@ -847,6 +852,7 @@ export class DuckDbReader {
       const regenRow = getChannelRow(regenRateData, i);
       const regenRate = regenRow?.value !== undefined ? parseFloat(regenRow.value.toFixed(1)) : undefined;
       const oilTemp = getChannelRow(oilTempData, i)?.value, waterTemp = getChannelRow(waterTempData, i)?.value;
+      const steerTorqueNm = steerTorqueNmOf(getChannelRow(steerTorqueData, i)?.value), ffbPct = ffbPctOf(getChannelRow(ffbData, i)?.value);
       const settings = Object.fromEntries((Object.keys(settingTables) as Array<keyof typeof settingTables>)
         .flatMap(key => { const value = settingAt(key, pointTime); return value === undefined ? [] : [[key, value]]; }));
 
@@ -878,9 +884,13 @@ export class DuckDbReader {
         ...settings,
         ...(oilTemp === undefined ? {} : { oilTemp: parseFloat(oilTemp.toFixed(1)) }),
         ...(waterTemp === undefined ? {} : { waterTemp: parseFloat(waterTemp.toFixed(1)) }),
+        ...(steerTorqueNm === undefined ? {} : { steerTorqueNm }),
+        ...(ffbPct === undefined ? {} : { ffbPct }),
       });
     }
 
+    const setupSteering = parseSetupSteering(metadata.CarSetup);
+    addSteeringForce(points, setupSteering);
     return {
       lapNumber,
       lapTimeSec,
@@ -888,6 +898,7 @@ export class DuckDbReader {
       sampleRateHz: declaredHz,
       points,
       signConvention: 'iso8855',
+      setupSteering,
     };
   }
 }

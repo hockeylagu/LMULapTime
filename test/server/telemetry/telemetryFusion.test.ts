@@ -49,6 +49,19 @@ describe('telemetryFusion', () => {
     expect({ vcr, duck }).toEqual(snapshot);
   });
 
+  it('carries the run steering lock and the column channels onto the fused lap', () => {
+    const setupSteering = { steeringWheelRangeDeg: 524, steeringRatio: 14.162 };
+    const vcr: ReplayTrajectoryData = { replayName: 'Lock.Vcr', pointsCount: 2,
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      points: [{ x: 0, y: 0, z: 0, timeSec: 0 }, { x: 1, y: 0, z: 0, timeSec: 1 }] };
+    const duck: DuckDbLapTelemetry = { lapNumber: 1, lapTimeSec: 1, pointsCount: 1, sampleRateHz: 100, setupSteering,
+      points: [{ x: 0, y: 0, z: 0, timeSec: 0.5, ffbPct: -20, steerTorqueNm: 30 }] };
+    const fused = fuseDuckDbWithVcrTrajectory(duck, vcr);
+    expect(fused.setupSteering).toEqual(setupSteering);
+    expect(fused.points[0]).toMatchObject({ ffbPct: -20, steerTorqueNm: 30 });
+    expect(fuseDuckDbWithVcrTrajectory(duck, { ...vcr, points: [], pointsCount: 0 }).setupSteering).toEqual(setupSteering);
+  });
+
   it('keeps native false states and zero weather values instead of overwriting them from replay', () => {
     const vcr: ReplayTrajectoryData = {
       replayName: 'Status.Vcr', pointsCount: 1,

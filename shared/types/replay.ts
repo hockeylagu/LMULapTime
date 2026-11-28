@@ -1,5 +1,5 @@
 import type { NonRepresentativeReason } from './session.js';
-import type { VehicleDataRecord, VehicleHandlingCalibration } from './dataPlugin.js';
+import type { SetupSteeringCalibration, VehicleDataRecord, VehicleHandlingCalibration } from './dataPlugin.js';
 import type { TrackTimingGates } from './trackGeometry.js';
 import type { ScenerySessionId } from './scenes/scenery.js';
 import type { WeatherCondition } from './session.js';
@@ -136,6 +136,16 @@ export interface ReplayTrajectoryPoint {
   /** Replay FL/FR/RL/RR tyre sliding speed over the road in m/s. */
   tireSlideSpeeds?: [number, number, number, number];
   engineRpm?: number;
+  /** DuckDB `Steering Shaft Torque`: the car-side column torque in Nm, ISO sign (positive turns the wheel left). */
+  steerTorqueNm?: number;
+  /** DuckDB `FFB Output`: the force sent to the wheel base in % of its peak (±100), ISO sign. */
+  ffbPct?: number;
+  /** The driver's steering force in % of the wheel base's peak, ISO sign, from the FFB (`shared/domain/vehicles/steeringForce.ts`). */
+  driverForcePct?: number;
+  /** The hands hold the wheel still in a corner while the force changes ("light hands"); absent when not. */
+  steerHoldStill?: true;
+  /** The hands push against the wheel's angle (passive counter-steer); absent when not. */
+  passiveCounterSteer?: true;
   distM?: number;
   stationM?: number;
   /** Metres left of the reference centerline (positive left, OpenDRIVE t). */
@@ -296,8 +306,10 @@ export interface ReplayTrajectoryData {
   lapOrdinal?: number;
   vehicleIdentity?: { vehicleId?: string; carType?: string; carClass?: string; livery?: string };
   vehicleData?: VehicleDataRecord;
-  /** Applied client calibration; plugin steering uses base defaults, not a recorded setup. */
+  /** Applied client calibration: the run's setup steering when the lap carries it, else the plugin's base defaults. */
   handlingCalibration?: VehicleHandlingCalibration;
+  /** DuckDB laps: the run's steering lock from the recording's car setup (`VM_STEER_LOCK`). */
+  setupSteering?: SetupSteeringCalibration;
   dataPluginRevision?: string;
   replayName: string;
   driverSlot?: number;

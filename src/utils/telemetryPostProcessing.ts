@@ -160,6 +160,6 @@ export function applyTelemetryPostProcessing(points: ReplayTrajectoryPoint[], ca
  */
 export function applyTelemetryPostProcessingToTrajectory<T extends ReplayTrajectoryData | null | undefined>(trajectory: T): T {
   if (!trajectory) return trajectory;
-  const handlingCalibration = resolveVehicleHandling(trajectory.vehicleData);
+  const handlingCalibration = resolveVehicleHandling(trajectory.vehicleData, trajectory.setupSteering);
   return { ...trajectory, handlingCalibration, points: applyTelemetryPostProcessing(trajectory.points, handlingCalibration) };
 }

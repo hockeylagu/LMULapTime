@@ -21,4 +21,11 @@ describe('vehicle handling calibration', () => {
     });
     expect(resolveVehicleHandling({ ...vehicle, handling: { steeringRatio: 12 } }).steeringSource).toBe('fallback');
   });
+
+  it('takes the run setup lock as the whole steering calibration', () => {
+    const setup = { steeringWheelRangeDeg: 524, steeringRatio: 14.162 };
+    expect(resolveVehicleHandling({ ...vehicle, handling: { wheelbaseM: 3.1, steeringRatio: 12, defaultSteeringWheelRangeDeg: 480 } }, setup))
+      .toEqual({ wheelbaseM: 3.1, wheelbaseSource: 'plugin', ...setup, steeringSource: 'setup' });
+    expect(resolveVehicleHandling(undefined, setup)).toEqual({ ...DEFAULT_VEHICLE_HANDLING, ...setup, steeringSource: 'setup' });
+  });
 });

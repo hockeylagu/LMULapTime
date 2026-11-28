@@ -32,6 +32,14 @@ describe('selectFeatureSamples', () => {
     expect(Math.max(...gaps)).toBeLessThanOrEqual(3 * evenSpacing + 1e-9);
   });
 
+  it('keeps the start and end of a short steering marker', () => {
+    // A 0.3 s holding-still moment on a steady 100 s lap, 1 sample in 10 kept.
+    const points = lap(1000, i => (i >= 500 && i < 503 ? { steerHoldStill: true } : {}));
+    const kept = selectFeatureSamples(points, 100);
+    expect(kept).toContain(500);
+    expect(kept).toContain(502);
+  });
+
   it('spends the samples where the traces change', () => {
     // Full throttle except a 2 s braking zone in the middle of a 100 s lap.
     const points = lap(1000, i => (i >= 490 && i < 510 ? { brake: 80, throttle: 0, speedKmh: 200 - (i - 490) * 5 } : {}));

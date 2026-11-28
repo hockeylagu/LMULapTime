@@ -10,7 +10,14 @@ export interface VehicleHandlingCalibration {
   steeringRatio: number;
   steeringWheelRangeDeg: number;
   wheelbaseSource: 'plugin' | 'fallback';
-  steeringSource: 'plugin-default' | 'fallback';
+  /** `setup`: the run's own steering lock, read from its telemetry recording (`SetupSteeringCalibration`). */
+  steeringSource: 'setup' | 'plugin-default' | 'fallback';
+}
+
+/** A run's steering lock from its car setup: the steering wheel's rotation (lock to lock) and the ratio it gives. */
+export interface SetupSteeringCalibration {
+  steeringWheelRangeDeg: number;
+  steeringRatio: number;
 }
 
 export interface DataPluginCounts {
