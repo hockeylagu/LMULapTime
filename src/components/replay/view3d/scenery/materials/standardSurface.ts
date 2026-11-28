@@ -17,7 +17,7 @@ function vertexColourAlbedo(mode: unknown): string {
 }
 
 /** Standard and StandardBlend materials, from the package's material flags, maps and parameters. */
-export function standardShaderParts(config: SurfaceConfig, { sample, uv, number, vec, uniforms }: ShaderContext): SurfaceParts {
+export function standardShaderParts(config: SurfaceConfig, { sample, uv, number, vec, uniforms, core }: ShaderContext): SurfaceParts {
   const { maps, parameters: p, flags: f } = config;
   const adjust = p.adjust, base = p.base, detail = p.detail;
   const on = (flag: string) => !!f[flag];
@@ -134,9 +134,12 @@ export function standardShaderParts(config: SurfaceConfig, { sample, uv, number,
   const emissiveMask = ['rgb', 'rgba'].includes(f.emissiveMask ?? '') ? `${sample('emissive')}.rgb` : f.emissiveMask === 'rg' || f.emissiveMask === 'map' ? `vec3(${sample('emissive')}.g)` : 'vec3(1.0)';
   // A surface lit at night only glows while the scene's day share is under full day (the scene block's `lit_dayLight`).
   const lit = f.emissive === 'always' ? '' : f.emissive === 'night' ? '*(1.0-step(1.0,lit_dayLight))' : null;
-  const emissive = lit !== null
-    ? `${vec(list(p.emissive, 'colour').map(x => x * x))}*${n(p.emissive, 'strength')}*${emissiveMask}*diffuseColor.rgb*${glslNumber(GAME_LIGHT_UNIT / Math.PI)}*(1.0-surfaceMetallic)*(1.0-surfaceSpecular*${glslNumber(f0)})${lit}`
-    : 'vec3(0.0)';
+  const glow = `*diffuseColor.rgb*${glslNumber(GAME_LIGHT_UNIT / Math.PI)}*(1.0-surfaceMetallic)*(1.0-surfaceSpecular*${glslNumber(f0)})`;
+  // A core surface's emission by its uniforms (coreSurface.ts `coreEmission`): a colour of 0 without one, the mask by its mode
+  // (1 rgb, 2 green, 0 none) and the night factor where `surface_emissiveNight` is 1 (mix by 0 or 1 is either side exactly).
+  const emissive = core
+    ? `surface_emissiveColour*surface_emissiveStrength*(surface_emissiveMask>1.5?vec3(${sample('emissive')}.g):surface_emissiveMask>0.5?${sample('emissive')}.rgb:vec3(1.0))${glow}*mix(1.0,1.0-step(1.0,lit_dayLight),surface_emissiveNight)`
+    : lit !== null ? `${vec(list(p.emissive, 'colour').map(x => x * x))}*${n(p.emissive, 'strength')}*${emissiveMask}${glow}${lit}` : 'vec3(0.0)';
   const physical = `material.specularColor=vec3(${glslNumber(f0)}); material.specularColorBlended=vec3(${glslNumber(f0)});`;
   return { albedo, normals, emissive, physical, occlusion: maps.aoSpec ? 'reflectedLight.indirectSpecular*=aoSpec.r;' : '' };
 }

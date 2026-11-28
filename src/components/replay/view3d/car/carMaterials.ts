@@ -4,6 +4,7 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import { hazePart } from '../atmosphere/haze.js';
 import { ALL_LAMPS } from '../night/cockpitLight.js';
 import { trackLightPart } from '../night/trackLightProgram.js';
+import { coreSurface, drawsOnCore } from '../scenery/materials/coreSurface.js';
 import { REFLECTING_KINDS } from '../scenery/materials/sceneryReflection.js';
 import { shaderParts, surfaceSamplers, surfaceTextureUnits, surfaceUniforms } from '../scenery/materials/shaderParts.js';
 import { isUvAnimation } from '../scenery/materials/surfaceAnimation.js';
@@ -142,11 +143,13 @@ interface CarFamily {
  * A car material drawn by the scenery's surface program (`SURFACE_KINDS`): the family's GLSL on the material's own values (its
  * colour, roughness and metalness from the surface's `adjust`, no emission of its own) and the loaded maps, its own car's probe read
  * (`carSurfaceProbe`), and the cockpit occlusion of a cabin part with `occluded`. A cabin part with nine maps and the cabin volume
- * has no room left for the overhead correction: past the limit its program fails to link and the part is not drawn.
+ * has no room left for the overhead correction: past the limit its program fails to link and the part is not drawn. A standard
+ * material on the core maps draws through the core surface's program of its flags (coreSurface.ts).
  */
-function surfaceFamily(surface: SurfaceConfig, loaded: Record<string, Texture>, vertexColour: boolean, occluded: boolean): CarFamily {
-  const code = shaderParts(surface, { uniforms: true });
-  const uniforms = { ...surfaceUniforms(surface, loaded), ...surfaceValues(surface, new Color(0, 0, 0)) };
+function surfaceFamily(own: SurfaceConfig, loaded: Record<string, Texture>, vertexColour: boolean, occluded: boolean): CarFamily {
+  const core = drawsOnCore(own) ? coreSurface(own, loaded) : null, surface = core?.config ?? own;
+  const code = shaderParts(surface, { uniforms: true, core: core !== null });
+  const uniforms = { ...surfaceUniforms(surface, core?.textures ?? loaded, core !== null), ...surfaceValues(surface, new Color(0, 0, 0)), ...core?.switches };
   const units = surfaceTextureUnits(surface) + (occluded ? 1 : 0);
   const overhead = units + CAR_SURFACE_OVERHEAD_UNITS <= GUARANTEED_TEXTURE_UNITS;
   const probe = carSurfaceProbe(REFLECTING_KINDS.has(surface.kind), overhead);

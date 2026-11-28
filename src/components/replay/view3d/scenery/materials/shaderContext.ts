@@ -23,6 +23,8 @@ export interface ShaderContext {
   vec: (a: readonly number[]) => string;
   /** Tunables are shader uniforms (shared program) instead of baked literals. */
   uniforms: boolean;
+  /** A core surface (coreSurface.ts): its switched code reads its own uniforms. */
+  core?: boolean;
 }
 
 export function glslNumber(n: number): string {

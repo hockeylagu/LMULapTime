@@ -4,6 +4,7 @@ import { focusedLookup } from '../textureFocus.js';
 import { uvShiftUniform } from './surfaceAnimation.js';
 import { tyreReadsAxle, tyreShaderParts } from '../../car/tyreSurface.js';
 import { clearcoatShaderParts } from './clearcoatSurface.js';
+import { CORE_DECLARATIONS, CORE_MAPS } from './coreSurface.js';
 import { digitalFlagShaderParts, flagShaderParts } from './flagSurface.js';
 import { glassShaderParts, windscreenInsideShaderParts } from './glassSurface.js';
 import { roadDecalShaderParts } from './roadDecalSurface.js';
@@ -202,11 +203,14 @@ export function surfaceTextureUnits(config: SurfaceConfig): number {
 /**
  * GLSL for a surface config. `uniforms: false` bakes every tunable into the source (used to compare programs). With `uniforms`, a
  * family's values (`number`, `vec`) read from a uniform array instead of literals: the source then depends only on the surface's
- * shape (family, maps, modes), so the materials of one shape share a program, each with its own `constants`.
+ * shape (family, maps, modes), so the materials of one shape share a program, each with its own `constants`. With `core` (a core
+ * surface with every core map, `coreSurface`), each core map's lookup and the normal mapping read the map only where its
+ * `surface_hasMap` switch is on, else the lookup's fallback and the geometry's normal.
  */
-export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean } = { uniforms: true }): ShaderParts {
+export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean; core?: boolean } = { uniforms: true }): ShaderParts {
   const { maps } = config;
-  const useUniforms = options.uniforms;
+  const useUniforms = options.uniforms, core = options.core === true;
+  if (core && !useUniforms) throw Error('A core surface reads its values from uniforms');
   const constants: number[] = [];
   const constant = (n: number) => {
     glslNumber(n); // Rejects a non-finite value, as a literal would.
@@ -224,17 +228,22 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
     return `(${source} * ${vec(alternateScale ?? map.scale)}${shift})`;
   };
   // With uniforms, every lookup fades in as its texture sharpens (textureFocus.ts).
-  const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => !maps[key] ? fallback
+  const lookup = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => !maps[key] ? fallback
     : useUniforms ? focusedLookup(`surface_${key}`, uv(key, scale)) : `texture2D(surface_${key}, ${uv(key, scale)})`;
-  const context: ShaderContext = { sample, uv, number, vec, uniforms: useUniforms };
+  const switched = (key: string) => core ? (CORE_MAPS as readonly string[]).indexOf(key) : -1;
+  const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => switched(key) < 0 ? lookup(key, fallback, scale)
+    : `(surface_hasMap[${switched(key)}] > 0.5 ? ${lookup(key, fallback, scale)} : ${fallback})`;
+  const context: ShaderContext = { sample, uv, number, vec, uniforms: useUniforms, core };
   const tint = useUniforms ? 'diffuse' : glslVec(list(config.parameters.adjust, 'tint'));
-  const parts = familyParts(config, context, tint), lamps = lampShares(config, context);
+  const parts = familyParts(config, context, tint), lamps = lampShares(config, context, core);
+  if (core) parts.normals = `if (surface_hasMap[${switched('normal')}] > 0.5) { ${parts.normals} }`;
   const mapDeclarations = surfaceMapKeys(config).map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};\nuniform vec4 surface_uv_${key};` : ''}`
     + (maps[key]!.uvAnimation ? `\nuniform vec2 surface_shift_${key};` : '')).join('\n');
   return {
     declarations: HELPERS + (useUniforms ? UNIFORM_DECLARATIONS : '') + (tyreReadsAxle(config) ? '\nvarying float vSurfaceAxle;' : '')
       + (readsRealRoad(config) ? '\nvarying vec2 vSurfaceRealRoad;' : '') + (luminousFacingPower(config) ? '\nvarying float vSurfaceFacing;' : '') + (isLampKind(config.kind) ? '\nvarying float vSurfaceLampShare;' : '')
-      + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '') + mapDeclarations,
+      + (constants.length ? `\nuniform vec4 surface_constants[${Math.ceil(constants.length / 4)}];` : '')
+      + (core ? `\n${CORE_DECLARATIONS}` : '') + mapDeclarations,
     albedo: `float surfaceRoughness = roughness, surfaceMetallic = metalness, surfaceStandardBlend = 1.0, surfaceAO = 1.0, surfaceSpecular = 1.0, surfaceDetailCoverage = 1.0, surfaceAltBlend = 0.0;
       vec4 surfaceWeights = vec4(1.0,0.0,0.0,0.0);
       ${parts.albedo}`,
@@ -328,10 +337,10 @@ const vector3 = (group: ParameterGroup | undefined, key: string) => !group ? new
  * A surface material's own uniforms (its program's values, `shaderParts` with uniforms): the family's tunables (each one the
  * surface carries; the names are the same for every surface, so they never split a program), its packed constants, normal scale,
  * every map's sampler (`textures`, by map key), scale, UV set weights and UV shift. The clock, day share, track rubber, alpha cut and
- * emission switch it reads are the scene and pass blocks' (shaders/sceneBlock.ts).
+ * emission switch it reads are the scene and pass blocks' (shaders/sceneBlock.ts). `core` as `shaderParts`'.
  */
-export function surfaceUniforms(config: SurfaceConfig, textures: Readonly<Record<string, Texture>>): Record<string, IUniform> {
-  const code = shaderParts(config, { uniforms: true }), p = config.parameters;
+export function surfaceUniforms(config: SurfaceConfig, textures: Readonly<Record<string, Texture>>, core = false): Record<string, IUniform> {
+  const code = shaderParts(config, { uniforms: true, core }), p = config.parameters;
   const uniforms: Record<string, IUniform> = {};
   // A value the surface carries is checked (`value`: a finite number); 0 for one it does not, whose uniform its program never reads.
   for (const [name, group, key] of TUNABLES) uniforms[name] = { value: p[group]?.[key] === undefined ? 0 : value(p[group], key) };
