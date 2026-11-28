@@ -14,6 +14,7 @@ import { usePlaybackPosition } from '../inspector/replayPlaybackCursor.js';
 import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
 import { SURFACE_FOCUS_RING } from '../../common/buttonStyles.js';
 import { MarkerAButton, TelemetryDeltaMarker, measureMarkerSpan } from './TelemetryDeltaMarker.js';
+import type { SteeringWheelRanges } from './channels/inputs/steerDegrees.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -51,6 +52,8 @@ export interface TelemetryStripChartsProps {
   duckdbUnavailableReason?: string;
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
   trackLengthM?: number;
+  /** Each lap's steering wheel range, for the steering chart's degree scale. */
+  steeringWheelRanges?: SteeringWheelRanges;
 }
 
 export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
@@ -58,7 +61,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   selectedCornerNumber, onSelectCorner, className = '', isLoading = false, headerContent,
   baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
-  hasDuckDb, duckdbUnavailableReason, onSelectSource, trackLengthM,
+  hasDuckDb, duckdbUnavailableReason, onSelectSource, trackLengthM, steeringWheelRanges,
 }) => {
   const {
     containerRef,
@@ -196,6 +199,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       )}
 
       <TelemetryStripView
+        steeringWheelRanges={steeringWheelRanges}
         points={points}
         currentPoint={currentPoint}
         safeIndex={safeIndex}

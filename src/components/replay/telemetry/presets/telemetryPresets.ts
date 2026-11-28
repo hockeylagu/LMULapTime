@@ -7,6 +7,7 @@ export type TelemetryChannelId =
   | 'brake'
   | 'gear'
   | 'steer'
+  | 'steer-force'
   | 'rpm'
   | 'brake-temps'
   | 'ride-height'
@@ -112,6 +113,17 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     description: 'Signed steering input percentage with center zero reference line',
     badgeColor: 'text-lmu-indigo bg-lmu-indigo-strong/20',
     lineColor: TELEMETRY_COLORS.steer,
+  },
+  {
+    id: 'steer-force',
+    name: 'Steering Force',
+    shortName: 'STEER FORCE',
+    unit: '% FFB',
+    category: 'inputs',
+    isComputed: true,
+    description: 'Driver steering force from the force feedback, with light-hands and counter-steer moments (DuckDB laps)',
+    badgeColor: 'text-lmu-azure bg-lmu-azure-strong/20',
+    lineColor: TELEMETRY_COLORS.steerForce,
   },
   {
     id: 'rpm',
@@ -353,7 +365,7 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     id: 'handling',
     name: 'Handling & Line',
     isBuiltIn: true,
-    channels: ['speed', 'delta', 'steer', 'lateral-offset', 'accel-lat', 'under-over-steer', 'slip-angle', 'throttle', 'brake'],
+    channels: ['speed', 'delta', 'steer', 'steer-force', 'lateral-offset', 'accel-lat', 'under-over-steer', 'slip-angle', 'throttle', 'brake'],
   },
   {
     id: 'energy-fuel',
@@ -372,6 +384,7 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'brake',
       'gear',
       'steer',
+      'steer-force',
       'rpm',
       'brake-temps',
       'ride-height',
@@ -395,10 +408,10 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
   },
 ];
 
-const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v9';
-const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v9';
-const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v8';
-const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v8';
+const PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v10';
+const ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v10';
+const LEGACY_PRESETS_STORAGE_KEY = 'lmu_telemetry_presets_v9';
+const LEGACY_ACTIVE_PRESET_STORAGE_KEY = 'lmu_telemetry_active_preset_v9';
 
 export function loadTelemetryPresets(): TelemetryPreset[] {
   try {

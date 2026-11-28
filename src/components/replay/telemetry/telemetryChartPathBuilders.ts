@@ -3,96 +3,72 @@ import type { BaselineChartSample, PointComparison } from '../../../utils/replay
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import type { CornerPaths } from './telemetryCornerChartPaths.js';
 import type { DeltaGradientStop, TelemetryChartPathsResult } from './telemetryChartTypes.js';
+import { chartY, scalarChannel, type ChartBounds, type TracePoint } from './telemetryChannels.js';
+import type { TelemetryChannelId } from './presets/telemetryPresets.js';
 
 /** Gear position in the full-height SVG coordinate system (0–100). */
 export function gearTraceY(gear: number, maxGear: number = 7): number {
   return 95 - (gear / maxGear) * 80;
 }
 
-/** The scales the single-value traces are normalised against. */
-export interface ChartBounds {
-  maxSpd: number;
-  maxRpm: number;
-  maxFuel: number;
-  maxRegen: number;
-  maxGear: number;
-}
-
 /** The SVG path of every single-value channel of one lap (the primary or the baseline). */
 export interface ScalarTraces {
   spd: string; thr: string; brk: string; str: string; gr: string; rpm: string; lat: string;
   accLat: string; accLon: string; accTot: string; slipAng: string; uSteer: string; tireSlp: string; yawRt: string;
-  fuel: string; ve: string; soc: string; regen: string;
+  fuel: string; ve: string; soc: string; regen: string; force: string;
+  /** The balance line clipped to understeer (above the centre) and to oversteer (below), for the fill by sign. */
+  uSteerPos: string; uSteerNeg: string;
 }
 
 export const emptyScalarTraces = (): ScalarTraces => ({
   spd: '', thr: '', brk: '', str: '', gr: '', rpm: '', lat: '',
   accLat: '', accLon: '', accTot: '', slipAng: '', uSteer: '', tireSlp: '', yawRt: '',
-  fuel: '', ve: '', soc: '', regen: '',
+  fuel: '', ve: '', soc: '', regen: '', force: '', uSteerPos: '', uSteerNeg: '',
 });
-
-/** The channels a sample of either lap (a trajectory point or an interpolated one) can carry. */
-export interface TracePoint {
-  speedKmh?: number;
-  throttle?: number;
-  brake?: number;
-  steerYaw?: number;
-  engineRpm?: number;
-  lateralOffsetM?: number;
-  accelLatG?: number;
-  accelLonG?: number;
-  accelTotalG?: number;
-  slipAngleDeg?: number;
-  understeerDeg?: number;
-  tireSlipPct?: number;
-  yawRateDeg?: number;
-  fuel?: number;
-  virtualEnergy?: number;
-  soc?: number;
-  regenRate?: number;
-}
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 const step = (cmd: string, x: number, y: number): string => `${cmd} ${x.toFixed(1)} ${y.toFixed(1)} `;
 
-/** 0..max -> 95 down to 10 (bottom to top of the chart). */
-const upFromBottom = (v: number, max: number): number => 95 - clamp01(v / max) * 85;
-
-/** -limit..+limit -> `span` above and below the centre line at 50 (positive is up). */
-const aroundCentre = (v: number, limit: number, span: number): number => 50 - (Math.max(-limit, Math.min(limit, v)) / limit) * span;
-
-interface ScalarChannel {
+interface ScalarTrace {
   key: keyof ScalarTraces;
   /** The sample's value, undefined when it does not carry the channel (nothing is added). */
-  read: (p: TracePoint, b: ChartBounds) => number | undefined;
+  read: (p: TracePoint) => number | undefined;
   y: (v: number, b: ChartBounds) => number;
   /** Starts at the first sample that has the value, not at the view's first sample. */
   startsWhenDrawn?: boolean;
 }
 
-const SCALAR_CHANNELS: ScalarChannel[] = [
-  { key: 'spd', read: (p) => p.speedKmh || 0, y: (v, b) => upFromBottom(v, b.maxSpd) },
-  { key: 'thr', read: (p) => p.throttle || 0, y: (v) => upFromBottom(v, 100) },
-  { key: 'brk', read: (p) => p.brake || 0, y: (v) => upFromBottom(v, 100) },
-  // Steering (ISO 8855, positive left): left is up (+100% -> 10), right is down (-100% -> 90)
-  { key: 'str', read: (p) => p.steerYaw || 0, y: (v) => aroundCentre((v / 270) * 100, 100, 40) },
-  { key: 'rpm', read: (p) => p.engineRpm, y: (v, b) => upFromBottom(v, b.maxRpm) },
-  // Lateral offset (positive left of the centerline): -10 m to +10 m -> 90 to 10
-  { key: 'lat', read: (p) => p.lateralOffsetM, y: (v) => aroundCentre(v, 10, 40) },
-  // Accelerations: -3 G to +3 G -> 92 to 8; combined 0 G to 4 G -> 95 to 10
-  { key: 'accLat', read: (p) => p.accelLatG, y: (v) => aroundCentre(v, 3.0, 42) },
-  { key: 'accLon', read: (p) => p.accelLonG, y: (v) => aroundCentre(v, 3.0, 42) },
-  { key: 'accTot', read: (p) => p.accelTotalG, y: (v) => 95 - (Math.max(0, Math.min(4.0, v)) / 4.0) * 85 },
-  // Slip angle +/-12 deg, understeer/oversteer balance +/-8 deg, yaw rate +/-90 deg/s -> 92 to 8
-  { key: 'slipAng', read: (p) => p.slipAngleDeg, y: (v) => aroundCentre(v, 12, 42) },
-  { key: 'uSteer', read: (p) => p.understeerDeg, y: (v) => aroundCentre(v, 8, 42) },
-  // Tire slip saturation: 0% to 100% -> 95 to 10
-  { key: 'tireSlp', read: (p) => p.tireSlipPct, y: (v) => 95 - (Math.max(0, Math.min(100, v)) / 100) * 85 },
-  { key: 'yawRt', read: (p) => p.yawRateDeg, y: (v) => aroundCentre(v, 90, 42) },
-  { key: 'fuel', read: (p) => p.fuel, y: (v, b) => upFromBottom(v, b.maxFuel), startsWhenDrawn: true },
-  { key: 've', read: (p) => p.virtualEnergy, y: (v) => upFromBottom(v, 100), startsWhenDrawn: true },
-  { key: 'soc', read: (p) => p.soc, y: (v) => upFromBottom(v, 100), startsWhenDrawn: true },
-  { key: 'regen', read: (p) => p.regenRate, y: (v, b) => upFromBottom(v, b.maxRegen), startsWhenDrawn: true },
+/** A channel's trace by the channel table (`telemetryChannels.ts`); a centred one spans `span` either side of the centre line. */
+const tableTrace = (key: keyof ScalarTraces, id: TelemetryChannelId, span = 42, startsWhenDrawn = false): ScalarTrace => {
+  const channel = scalarChannel(id);
+  return { key, read: channel.read, y: (v, b) => chartY(channel.scale(b), v, span), startsWhenDrawn };
+};
+const BALANCE = scalarChannel('under-over-steer');
+
+const SCALAR_CHANNELS: ScalarTrace[] = [
+  tableTrace('spd', 'speed'),
+  tableTrace('thr', 'throttle'),
+  tableTrace('brk', 'brake'),
+  // Steering and lateral offset span 40 either side of the centre, the other centred channels 42.
+  tableTrace('str', 'steer', 40),
+  tableTrace('rpm', 'rpm'),
+  tableTrace('lat', 'lateral-offset', 40),
+  tableTrace('accLat', 'accel-lat'),
+  tableTrace('accLon', 'accel-lon'),
+  tableTrace('accTot', 'accel-total'),
+  tableTrace('slipAng', 'slip-angle'),
+  tableTrace('uSteer', 'under-over-steer'),
+  // The balance line clipped to each side of the centre, for the fill by sign.
+  { key: 'uSteerPos', read: (p) => (p.understeerDeg === undefined ? undefined : Math.max(0, p.understeerDeg)), y: (v, b) => chartY(BALANCE.scale(b), v, 42) },
+  { key: 'uSteerNeg', read: (p) => (p.understeerDeg === undefined ? undefined : Math.min(0, p.understeerDeg)), y: (v, b) => chartY(BALANCE.scale(b), v, 42) },
+  tableTrace('force', 'steer-force'),
+  // Tire slip saturation (the combined-g chart's overlay): 0% to 100% -> 95 to 10
+  { key: 'tireSlp', read: (p) => p.tireSlipPct, y: (v) => 95 - clamp01(v / 100) * 85 },
+  tableTrace('yawRt', 'yaw-rate'),
+  tableTrace('fuel', 'fuel', 42, true),
+  tableTrace('ve', 'virtual-energy', 42, true),
+  tableTrace('soc', 'soc', 42, true),
+  tableTrace('regen', 'regen-rate', 42, true),
 ];
 
 /**
@@ -103,7 +79,7 @@ export function appendScalarPoint(
   t: ScalarTraces, p: TracePoint, gear: number, prevGear: number, x: number, isFirst: boolean, bounds: ChartBounds
 ): void {
   for (const channel of SCALAR_CHANNELS) {
-    const v = channel.read(p, bounds);
+    const v = channel.read(p);
     if (v === undefined) continue;
     const starts = channel.startsWhenDrawn ? t[channel.key] === '' : isFirst;
     t[channel.key] += step(starts ? 'M' : 'L', x, channel.y(v, bounds));
@@ -157,6 +133,31 @@ export function computeChartBounds(
     maxRegen: Math.ceil(rawMaxRegen / 50) * 50,
     maxGear,
   };
+}
+
+/** Full-height bands (x in view units) where a flag is set, as one SVG path of rectangles. */
+export class FlagBands {
+  path = '';
+  private startX: number | null = null;
+  private lastX = 0;
+
+  public push(flag: boolean, x: number): void {
+    if (flag && this.startX === null) this.startX = x;
+    if (!flag && this.startX !== null) this.close(x);
+    this.lastX = x;
+  }
+
+  /** Ends a band still open at the view's last sample. */
+  public finish(): string {
+    if (this.startX !== null) this.close(this.lastX);
+    return this.path;
+  }
+
+  private close(endX: number): void {
+    const x0 = (this.startX ?? endX).toFixed(1), x1 = Math.max(endX, (this.startX ?? endX) + 1).toFixed(1);
+    this.path += `M ${x0} 0 L ${x1} 0 L ${x1} 100 L ${x0} 100 Z `;
+    this.startX = null;
+  }
 }
 
 /** Delta rate (s per s) below which a stretch counts as steady: no shading and no gradient colour. */
@@ -287,7 +288,8 @@ export function emptyChartPaths(): TelemetryChartPathsResult {
     lateralOffsetPath: '', baselineLateralOffsetPath: '', hasLateralOffset: false,
     accelLatPath: '', baselineAccelLatPath: '', accelLonPath: '', baselineAccelLonPath: '',
     accelTotalPath: '', accelTotalArea: '', baselineAccelTotalPath: '',
-    slipAnglePath: '', baselineSlipAnglePath: '', understeerPath: '', baselineUndersteerPath: '',
+    slipAnglePath: '', baselineSlipAnglePath: '', understeerPath: '', baselineUndersteerPath: '', understeerArea: '', oversteerArea: '',
+    steerForcePath: '', baselineSteerForcePath: '', holdStillBands: '', counterSteerBands: '', hasSteerForce: false,
     tireSlipPath: '', tireSlipArea: '', baselineTireSlipPath: '', yawRatePath: '', baselineYawRatePath: '',
     fuelPath: '', fuelArea: '', baselineFuelPath: '', hasFuel: false, maxFuel: 100,
     virtualEnergyPath: '', virtualEnergyArea: '', baselineVirtualEnergyPath: '', hasVirtualEnergy: false,

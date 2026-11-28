@@ -8,6 +8,9 @@ import { TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 export interface TelemetryUndersteerChannelProps {
   understeerPath: string;
   baselineUndersteerPath?: string;
+  /** The lap's balance filled by sign (understeer above the centre, oversteer below), as the 3D curtain colours it. */
+  understeerArea?: string;
+  oversteerArea?: string;
   currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
@@ -17,6 +20,8 @@ export interface TelemetryUndersteerChannelProps {
 export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProps> = React.memo(({
   understeerPath,
   baselineUndersteerPath,
+  understeerArea,
+  oversteerArea,
   currentPoint,
   currentComparison,
   isCursorInView,
@@ -24,6 +29,8 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
 }) => {
   const chartSvg = useMemo(() => (
     <svg viewBox="0 8 1000 84" preserveAspectRatio="none" className="w-full h-full">
+      {understeerArea && <path d={understeerArea} fill={TELEMETRY_COLORS.understeer} fillOpacity={0.3} />}
+      {oversteerArea && <path d={oversteerArea} fill={TELEMETRY_COLORS.oversteer} fillOpacity={0.3} />}
       {/* Neutral zero centerline */}
       <line x1="0" y1="50" x2="1000" y2="50" stroke={CHART_COLORS.playerHighlight} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
       {baselineUndersteerPath && (
@@ -49,7 +56,7 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
         />
       )}
     </svg>
-  ), [understeerPath, baselineUndersteerPath]);
+  ), [understeerPath, baselineUndersteerPath, understeerArea, oversteerArea]);
 
   const balance = currentPoint?.understeerDeg;
   const hasBalance = balance !== undefined || Boolean(understeerPath);
@@ -60,9 +67,9 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
       return { text: '0.00° Neutral', colorClass: 'text-lmu-warn-soft' };
     }
     if (deg > 0) {
-      return { text: `+${deg.toFixed(2)}° Understeer (Push)`, colorClass: 'text-lmu-warn' };
+      return { text: `+${deg.toFixed(2)}° Understeer (Push)`, colorClass: 'text-lmu-info' };
     }
-    return { text: `${deg.toFixed(2)}° Oversteer (Loose)`, colorClass: 'text-lmu-loss' };
+    return { text: `${deg.toFixed(2)}° Oversteer (Loose)`, colorClass: 'text-lmu-warn' };
   };
 
   const currentFormatted = formatBalance(balance);
@@ -83,9 +90,9 @@ export const TelemetryUndersteerChannel: React.FC<TelemetryUndersteerChannelProp
       </div>
 
       <TelemetryStaticTrace chart={chartSvg} gridClassName="absolute inset-0 pointer-events-none opacity-20" gridLines={[
-        { label: '+8° Understeer (Front Push)', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
+        { label: '+8° Understeer (Front Push)', borderClassName: 'border-b border-lmu-info/30', labelClassName: 'text-[10px] text-lmu-info font-mono' },
         { label: '0° Neutral Balance', borderClassName: 'border-b border-lmu-warn/50', labelClassName: 'text-[10px] text-lmu-warn-soft font-mono' },
-        { label: '-8° Oversteer (Rear Loose)', borderClassName: 'border-b border-lmu-loss/30', labelClassName: 'text-[10px] text-lmu-loss font-mono' },
+        { label: '-8° Oversteer (Rear Loose)', borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
       ]} />
 
       {isCursorInView && hasBalance && (

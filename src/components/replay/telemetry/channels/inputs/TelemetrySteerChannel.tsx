@@ -11,11 +11,12 @@ import {
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 import { TelemetrySteerOverlayToggles } from './TelemetrySteerOverlayToggles.js';
+import { fittedSteerDegrees, formatSteer, steerTraceScale, type SteerScaleMode, type SteeringWheelRanges } from './steerDegrees.js';
 
-const steerGridLines = (range: number): readonly TelemetryGridLine[] => [
-  { label: `+${range}% L`, yPercent: 0, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
-  { label: '0% Center', yPercent: 50, borderClassName: 'border-b border-lmu-indigo/50', labelClassName: 'text-[10px] text-lmu-indigo-soft font-mono' },
-  { label: `-${range}% R`, yPercent: 100, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
+const steerGridLines = (range: number, unit: string): readonly TelemetryGridLine[] => [
+  { label: `+${range}${unit} L`, yPercent: 0, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
+  { label: `0${unit} Center`, yPercent: 50, borderClassName: 'border-b border-lmu-indigo/50', labelClassName: 'text-[10px] text-lmu-indigo-soft font-mono' },
+  { label: `-${range}${unit} R`, yPercent: 100, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
 ];
 
 export interface TelemetrySteerChannelProps {
@@ -31,7 +32,11 @@ export interface TelemetrySteerChannelProps {
   cumDists?: number[];
   viewStart?: number;
   viewEnd?: number;
+  /** Each lap's wheel range, for the degree scale. */
+  steeringWheelRanges?: SteeringWheelRanges;
 }
+
+const NO_RANGES: SteeringWheelRanges = {};
 
 export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React.memo(({
   steerPath,
@@ -46,8 +51,9 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
   cumDists,
   viewStart,
   viewEnd,
+  steeringWheelRanges = NO_RANGES,
 }) => {
-  const [scaleMode, setScaleMode] = useState('fit');
+  const [scaleMode, setScaleMode] = useState<SteerScaleMode>('fit');
   const fittedRange = useMemo(() => {
     if (!points?.length) return 100;
     let peak = 0;
@@ -55,8 +61,13 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
     for (const comparison of pointComparisons ?? []) peak = Math.max(peak, Math.abs(getSteerPercent(comparison.baseline.steerYaw)));
     return Math.min(100, Math.max(25, Math.ceil(peak * 1.1 / 5) * 5));
   }, [points, pointComparisons]);
-  const range = scaleMode === 'fit' ? fittedRange : Number(scaleMode);
-  const gridLines = useMemo(() => steerGridLines(range), [range]);
+  const fittedDegrees = useMemo(() => fittedSteerDegrees(points, pointComparisons, steeringWheelRanges),
+    [points, pointComparisons, steeringWheelRanges]);
+  const range = scaleMode === 'fit' || scaleMode === 'deg' ? fittedRange : Number(scaleMode);
+  const gridLines = useMemo(() => (scaleMode === 'deg' ? steerGridLines(fittedDegrees, '°') : steerGridLines(range, '%')),
+    [scaleMode, fittedDegrees, range]);
+  const lapScale = steerTraceScale(scaleMode, range, fittedDegrees, steeringWheelRanges.lap);
+  const baselineScale = steerTraceScale(scaleMode, range, fittedDegrees, steeringWheelRanges.baseline);
 
   const [showBalance, setShowBalance] = useState<boolean>(() => {
     try {
@@ -129,19 +140,18 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
       {/* Zero centerline */}
       <line x1="0" y1="50" x2="1000" y2="50" stroke={TELEMETRY_COLORS.steer} strokeWidth="0.8" strokeDasharray="3 3" opacity="0.35" />
 
-      <g transform={`translate(0 50) scale(1 ${100 / range}) translate(0 -50)`}>
       {baselineSteerPath && (
-        <path d={baselineSteerPath} fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+        <g transform={`translate(0 50) scale(1 ${baselineScale}) translate(0 -50)`}>
+          <path d={baselineSteerPath} fill="none" stroke={TELEMETRY_COLORS.baseline} strokeWidth="1.2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" opacity="0.85" />
+        </g>
       )}
       {steerPath && (
-        <path d={steerPath} fill="none" stroke={TELEMETRY_COLORS.steer} strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+        <g transform={`translate(0 50) scale(1 ${lapScale}) translate(0 -50)`}>
+          <path d={steerPath} fill="none" stroke={TELEMETRY_COLORS.steer} strokeWidth="1.2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
       )}
-      </g>
     </svg>
-  ), [steerPath, baselineSteerPath, showScrub, visibleBands, range]);
-
-  const steerPercent = getSteerPercent(currentPoint?.steerYaw);
-  const baseSteerPercent = getSteerPercent(currentComparison?.baseline.steerYaw);
+  ), [steerPath, baselineSteerPath, showScrub, visibleBands, lapScale, baselineScale]);
 
   // Active handling balance state under the cursor
   const cursorBalance = useMemo(() => {
@@ -188,6 +198,7 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
       <TelemetrySteerOverlayToggles
         scaleMode={scaleMode}
         fittedRange={fittedRange}
+        fittedDegrees={fittedDegrees}
         onScaleChange={setScaleMode}
         showBalance={showBalance}
         showScrub={showScrub}
@@ -238,11 +249,11 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
           style={{ left: `${cursorPct}%` }}
         >
           <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-indigo/80 font-mono font-bold text-[11px] text-lmu-indigo-soft shadow-marker-lift whitespace-nowrap">
-            {steerPercent > 0 ? `+${steerPercent.toFixed(0)}%` : `${steerPercent.toFixed(0)}%`}
+            {formatSteer(scaleMode, currentPoint?.steerYaw, steeringWheelRanges.lap)}
           </span>
           {currentComparison && (
             <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-marker-lift whitespace-nowrap">
-              B: {baseSteerPercent.toFixed(0)}%
+              B: {formatSteer(scaleMode, currentComparison.baseline.steerYaw, steeringWheelRanges.baseline)}
             </span>
           )}
         </div>

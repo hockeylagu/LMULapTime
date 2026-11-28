@@ -38,6 +38,9 @@ export const ReplayInspectorTelemetryColumn: React.FC<ReplayInspectorTelemetryCo
   selectedCornerMarkers, cornerSegments, lapSegments, selectedCornerNumber, handleSelectCorner,
   hasDuckDbTelemetry, duckdbUnavailableReason, onSelectSource,
 }) => {
+  const lapRangeDeg = trajectory?.handlingCalibration?.steeringWheelRangeDeg;
+  const baselineRangeDeg = isCompareMode ? baselineTrajectory?.handlingCalibration?.steeringWheelRangeDeg : undefined;
+  const steeringWheelRanges = useMemo(() => ({ lap: lapRangeDeg, baseline: baselineRangeDeg }), [lapRangeDeg, baselineRangeDeg]);
   const initialStraight = useMemo(() => {
     const first = lapSegments.find(s => s.type === 'straight' && s.entryDistM <= 50);
     return first && first.lengthM >= 30 ? (first as StraightSegmentComparison) : null;
@@ -89,6 +92,7 @@ export const ReplayInspectorTelemetryColumn: React.FC<ReplayInspectorTelemetryCo
           duckdbUnavailableReason={duckdbUnavailableReason}
           onSelectSource={onSelectSource}
           trackLengthM={trajectory?.trackLengthM}
+          steeringWheelRanges={steeringWheelRanges}
         />
       </div>
     </div>

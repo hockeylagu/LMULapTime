@@ -10,6 +10,7 @@ import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 import { TelemetryChannelId, TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryResolution } from './telemetryResolution.js';
 import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
+import type { SteeringWheelRanges } from './channels/inputs/steerDegrees.js';
 
 /** Where a marker line sits; one on the strip's last point hugs the right edge so it stays visible. */
 const edgeStyle = (pct: number): React.CSSProperties => (pct >= 100 ? { right: 0 } : { left: `${pct}%` });
@@ -72,6 +73,7 @@ export interface TelemetryStripViewProps {
   hasDuckDb?: boolean;
   duckdbUnavailableReason?: string;
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
+  steeringWheelRanges?: SteeringWheelRanges;
 }
 
 const DEFAULT_CHANNELS: TelemetryChannelId[] = ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'];
@@ -85,7 +87,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
   activeChannels = DEFAULT_CHANNELS,
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
-  hasDuckDb, duckdbUnavailableReason, onSelectSource,
+  hasDuckDb, duckdbUnavailableReason, onSelectSource, steeringWheelRanges,
 }) => {
   const { s1Pct, s2Pct, cornerEntryPct, cornerMinPct, cornerExitPct } = markerPcts;
   const markerName = selectedCornerMarkers ? cornerName(selectedCornerMarkers) : '';
@@ -144,6 +146,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
             cumDists={cumDists}
             viewStart={viewStart}
             viewEnd={viewEnd}
+            steeringWheelRanges={steeringWheelRanges}
           />
         ))}
 

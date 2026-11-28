@@ -89,6 +89,15 @@ export interface TelemetryChartPathsResult {
   baselineSlipAnglePath: string;
   understeerPath: string;
   baselineUndersteerPath: string;
+  /** The lap's balance filled by sign: understeer above the centre line, oversteer below, each closed along it. */
+  understeerArea: string;
+  oversteerArea: string;
+  /** The driver's steering force (DuckDB laps only) and the lap's holding-still and passive counter-steer bands. */
+  steerForcePath: string;
+  baselineSteerForcePath: string;
+  holdStillBands: string;
+  counterSteerBands: string;
+  hasSteerForce: boolean;
   tireSlipPath: string;
   tireSlipArea: string;
   baselineTireSlipPath: string;

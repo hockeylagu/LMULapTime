@@ -97,7 +97,7 @@ describe('telemetryPresets - Management and Storage', () => {
   });
 
   it('ignores non-object stored entries while retaining a valid custom preset', () => {
-    store['lmu_telemetry_presets_v9'] = JSON.stringify([
+    store['lmu_telemetry_presets_v10'] = JSON.stringify([
       null, 42, 'invalid', ['speed'],
       { id: 'custom', name: 'Custom', channels: ['rpm'] },
     ]);
@@ -105,7 +105,7 @@ describe('telemetryPresets - Management and Storage', () => {
   });
 
   it('uses defaults when every stored preset entry is invalid', () => {
-    store['lmu_telemetry_presets_v9'] = JSON.stringify([null, 42, 'invalid', []]);
+    store['lmu_telemetry_presets_v10'] = JSON.stringify([null, 42, 'invalid', []]);
     expect(loadTelemetryPresets()).toEqual(DEFAULT_TELEMETRY_PRESETS);
   });
 
@@ -127,7 +127,7 @@ describe('telemetryPresets - Management and Storage', () => {
   });
 
   it('migrates v8 presets updating defaults while preserving custom presets', () => {
-    store['lmu_telemetry_presets_v8'] = JSON.stringify([
+    store['lmu_telemetry_presets_v9'] = JSON.stringify([
       { id: 'default', name: 'Standard Telemetry', isBuiltIn: true, channels: ['speed', 'delta', 'throttle', 'brake', 'gear', 'steer'] },
       { id: 'custom-old', name: 'My Old Setup', isBuiltIn: false, channels: ['speed', 'rpm'] },
     ]);
@@ -137,6 +137,6 @@ describe('telemetryPresets - Management and Storage', () => {
 
     expect(defaultPreset?.channels).toEqual(['speed', 'delta', 'throttle', 'brake', 'steer', 'gear']);
     expect(customPreset?.channels).toEqual(['speed', 'rpm']);
-    expect(store['lmu_telemetry_presets_v9']).toBeDefined();
+    expect(store['lmu_telemetry_presets_v10']).toBeDefined();
   });
 });

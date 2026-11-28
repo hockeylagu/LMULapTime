@@ -10,6 +10,8 @@ import { TelemetryThrottleChannel } from './channels/inputs/TelemetryThrottleCha
 import { TelemetryBrakeChannel } from './channels/inputs/TelemetryBrakeChannel.js';
 import { TelemetryGearChannel } from './channels/inputs/TelemetryGearChannel.js';
 import { TelemetrySteerChannel } from './channels/inputs/TelemetrySteerChannel.js';
+import { TelemetrySteerForceChannel } from './channels/inputs/TelemetrySteerForceChannel.js';
+import type { SteeringWheelRanges } from './channels/inputs/steerDegrees.js';
 import { TelemetryRpmChannel } from './channels/powertrain/TelemetryRpmChannel.js';
 import { TelemetryLateralOffsetChannel } from './channels/dynamics/TelemetryLateralOffsetChannel.js';
 import { TelemetryAccelLatChannel } from './channels/dynamics/TelemetryAccelLatChannel.js';
@@ -44,6 +46,7 @@ export interface TelemetryChannelRendererProps {
   cumDists?: number[];
   viewStart?: number;
   viewEnd?: number;
+  steeringWheelRanges?: SteeringWheelRanges;
 }
 
 export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> = React.memo(({
@@ -60,6 +63,7 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
   cumDists,
   viewStart,
   viewEnd,
+  steeringWheelRanges,
 }) => {
   const cursorProps = { currentPoint, currentComparison, isCursorInView, cursorPct, source };
 
@@ -95,8 +99,14 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
           cumDists={cumDists}
           viewStart={viewStart}
           viewEnd={viewEnd}
+          steeringWheelRanges={steeringWheelRanges}
           {...cursorProps}
         />
+      );
+    case 'steer-force':
+      return (
+        <TelemetrySteerForceChannel steerForcePath={paths.steerForcePath} baselineSteerForcePath={paths.baselineSteerForcePath}
+          holdStillBands={paths.holdStillBands} counterSteerBands={paths.counterSteerBands} hasSteerForce={paths.hasSteerForce} {...cursorProps} />
       );
     case 'rpm':
       return <TelemetryRpmChannel rpmPath={paths.rpmPath} rpmArea={paths.rpmArea} baselineRpmPath={paths.baselineRpmPath} maxRpm={paths.maxRpm} {...cursorProps} />;
@@ -125,7 +135,8 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
     case 'slip-angle':
       return <TelemetrySlipAngleChannel slipAnglePath={paths.slipAnglePath} baselineSlipAnglePath={paths.baselineSlipAnglePath} {...cursorProps} />;
     case 'under-over-steer':
-      return <TelemetryUndersteerChannel understeerPath={paths.understeerPath} baselineUndersteerPath={paths.baselineUndersteerPath} {...cursorProps} />;
+      return <TelemetryUndersteerChannel understeerPath={paths.understeerPath} baselineUndersteerPath={paths.baselineUndersteerPath}
+        understeerArea={paths.understeerArea} oversteerArea={paths.oversteerArea} {...cursorProps} />;
     case 'yaw-rate':
       return <TelemetryYawRateChannel yawRatePath={paths.yawRatePath} baselineYawRatePath={paths.baselineYawRatePath} {...cursorProps} />;
     case 'fuel':

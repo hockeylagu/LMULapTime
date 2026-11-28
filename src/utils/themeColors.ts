@@ -70,6 +70,8 @@ export const TELEMETRY_COLORS = {
   slipAngle: '#A78BFA',
   yawRate: '#22D3EE',
   fuel: '#10B981',
+  /** The driver's steering force (blue-400, the lmu-azure family). */
+  steerForce: '#60A5FA',
 } as const;
 
 export const WHEEL_CORNER_COLORS = {

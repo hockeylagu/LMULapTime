@@ -1,11 +1,14 @@
 import React from 'react';
 import { FOCUS_RING } from '../../../../common/buttonStyles.js';
 import { Select } from '../../../../common/dropdown/Select.js';
+import type { SteerScaleMode } from './steerDegrees.js';
 
 export interface TelemetrySteerOverlayTogglesProps {
-  scaleMode?: string;
+  scaleMode?: SteerScaleMode;
   fittedRange?: number;
-  onScaleChange?: (value: string) => void;
+  /** The fitted scale in steering-wheel degrees (each lap by its own wheel range). */
+  fittedDegrees?: number;
+  onScaleChange?: (value: SteerScaleMode) => void;
   showBalance: boolean;
   showScrub: boolean;
   onToggleBalance: () => void;
@@ -16,6 +19,7 @@ export interface TelemetrySteerOverlayTogglesProps {
 export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayTogglesProps> = ({
   scaleMode = 'fit',
   fittedRange = 100,
+  fittedDegrees = 270,
   onScaleChange,
   showBalance,
   showScrub,
@@ -30,6 +34,7 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
           { value: '25', label: '±25%' },
           { value: '50', label: '±50%' },
           { value: '100', label: '±100%' },
+          { value: 'deg', label: `Fit ±${fittedDegrees}° wheel` },
         ]} />
     )}
     <button

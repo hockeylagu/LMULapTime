@@ -45,7 +45,11 @@ function wholeLap(): { points: ReplayTrajectoryPoint[]; comparisons: PointCompar
   return { points, comparisons, baseline };
 }
 
-const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
+// The traces added after the digests (balance fill by sign, steering force and its bands, 2026-11-28) are checked on
+// their own below, so the digests keep covering every trace drawn before them.
+const LATER_FIELDS = new Set(['understeerArea', 'oversteerArea', 'steerForcePath', 'baselineSteerForcePath', 'holdStillBands', 'counterSteerBands', 'hasSteerForce']);
+const digest = (value: Record<string, unknown>): string => createHash('sha256')
+  .update(JSON.stringify(Object.fromEntries(Object.entries(value).filter(([key]) => !LATER_FIELDS.has(key))))).digest('hex').slice(0, 16);
 
 // The digests were taken from computeTelemetryChartPaths before it was split into its builders
 // (main, 2026-09-29): the whole-lap output must stay byte-identical. Update them only for an
@@ -73,6 +77,28 @@ describe('computeTelemetryChartPaths - whole lap golden output', () => {
     expect(result.wheelSlipPaths.fr.trim().split(/ (?=[ML])/).map(command => command[0])).toEqual(['M', 'L', 'M']);
     expect(result.wheelSlipPaths.rl).toContain(' 52.5');
     expect(result.wheelSlipPaths.rr).toContain(' 10.0'); // Clamped at +30 %.
+  });
+
+  it('fills the balance by sign along the centre line', () => {
+    const result = computeTelemetryChartPaths(points, comparisons, 0, 80, distances);
+    expect(result.understeerArea.endsWith('L 1000 50 L 0 50 Z')).toBe(true);
+    // Understeer stays at or above the centre line (y <= 50), oversteer at or below it.
+    const ys = (path: string) => [...path.matchAll(/[ML] [\d.]+ ([\d.]+)/g)].map(match => Number(match[1]));
+    expect(Math.max(...ys(result.understeerArea))).toBeLessThanOrEqual(50);
+    expect(Math.min(...ys(result.oversteerArea))).toBeGreaterThanOrEqual(50);
+    expect(result.hasSteerForce).toBe(false);
+    expect(result.steerForcePath).toBe('');
+  });
+
+  it('draws the steering force and bands its two moments', () => {
+    const forcePoints = points.slice(0, 10).map((point, i) => ({ ...point, driverForcePct: i * 10 - 50,
+      ...(i >= 2 && i < 4 ? { steerHoldStill: true as const } : {}), ...(i === 9 ? { passiveCounterSteer: true as const } : {}) }));
+    const forceDistances = getTrajectoryDistances(forcePoints);
+    const result = computeTelemetryChartPaths(forcePoints, [], 0, 9, forceDistances);
+    expect(result.hasSteerForce).toBe(true);
+    expect(result.steerForcePath.startsWith('M 0.0 71.0 ')).toBe(true); // -50 % is below the centre.
+    expect(result.holdStillBands.match(/M /g)).toHaveLength(1);
+    expect(result.counterSteerBands).toMatch(/^M 1000\.0 0 L 1001\.0 0 /); // Open at the view's end: a 1-unit band.
   });
 
   it('draws a zoomed window with the baseline lap on its own samples', () => {

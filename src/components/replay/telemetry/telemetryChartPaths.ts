@@ -2,7 +2,7 @@ import type { TelemetryChartPathsResult } from './telemetryChartTypes.js';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { BaselineChartSample, InterpolatedPoint, PointComparison } from '../../../utils/replayComparison.js';
 import {
-  appendScalarPoint, buildDeltaGradientStops, computeChartBounds, computeDeltaScale, DeltaTrace, emptyChartPaths, emptyScalarTraces,
+  appendScalarPoint, buildDeltaGradientStops, computeChartBounds, computeDeltaScale, DeltaTrace, emptyChartPaths, emptyScalarTraces, FlagBands,
 } from './telemetryChartPathBuilders.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
@@ -44,6 +44,7 @@ export function computeTelemetryChartPaths(
   const bCornerBuilders = createCornerChannelBuilders();
   const { maxDelta, rates } = computeDeltaScale(points, pointComparisons, viewStart, viewEnd);
   const delta = new DeltaTrace(maxDelta);
+  const holdStill = new FlagBands(), counterSteer = new FlagBands();
 
   // Baseline traces, one sample at a time (x in 0-1000 view units).
   const appendBaseline = (bp: InterpolatedPoint, prevBp: InterpolatedPoint, x: number, isFirst: boolean): void => {
@@ -59,6 +60,8 @@ export function computeTelemetryChartPaths(
     // Neutral and reverse are clamped to 1: the chart's gear scale spans forward gears only.
     appendScalarPoint(primary, p, resolveGear(p, bounds.maxGear), i > 0 ? resolveGear(points[i - 1], bounds.maxGear) : 0, x, isFirst, bounds);
     appendCornerPoint(cornerBuilders, p, x, isFirst, cornerExtrema);
+    holdStill.push(p.steerHoldStill === true, x);
+    counterSteer.push(p.passiveCounterSteer === true, x);
 
     const comp = pointComparisons[i];
     if (comp) {
@@ -82,6 +85,7 @@ export function computeTelemetryChartPaths(
   }
 
   const closed = (path: string): string => (path ? `${path} L 1000 95 L 0 95 Z` : '');
+  const closedOnCentre = (path: string): string => (path ? `${path} L 1000 50 L 0 50 Z` : '');
   const { bt, sp, ws, tp, tw, tt, wsl } = cornerBuilders;
   const { bt: bBt, sp: bSp, ws: bWs, tp: bTp, tw: bTw, tt: bTt, wsl: bWsl } = bCornerBuilders;
 
@@ -155,6 +159,13 @@ export function computeTelemetryChartPaths(
     baselineSlipAnglePath: baseline.slipAng,
     understeerPath: primary.uSteer,
     baselineUndersteerPath: baseline.uSteer,
+    understeerArea: closedOnCentre(primary.uSteerPos),
+    oversteerArea: closedOnCentre(primary.uSteerNeg),
+    steerForcePath: primary.force,
+    baselineSteerForcePath: baseline.force,
+    holdStillBands: holdStill.finish(),
+    counterSteerBands: counterSteer.finish(),
+    hasSteerForce: points.some(p => p.driverForcePct !== undefined),
     tireSlipPath: primary.tireSlp,
     tireSlipArea: closed(primary.tireSlp),
     baselineTireSlipPath: baseline.tireSlp,
