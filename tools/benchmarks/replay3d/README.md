@@ -42,7 +42,8 @@ frames during playback. Build into any folder, serve it with `npx vite preview -
 `/api` like the dev server) and pass `--base http://localhost:4173`.
 
 `PLAYWRIGHT_NODE_MODULES` is any directory whose `node_modules` holds `playwright` or `playwright-core` (the app does not depend
-on it). Options: `--seconds` of replay played (default 40; wall seconds with `--real-clock`), `--real-clock`, `--base` UI URL, `--width`/`--height` viewport (default 1920×1080, device pixel
+on it). Options: `--seconds` of replay played (default 40; wall seconds with `--real-clock`), `--real-clock`, `--race` (the
+session's race replay, every car on its clock) with `--race-time` its opening session second, `--base` UI URL, `--width`/`--height` viewport (default 1920×1080, device pixel
 ratio 1), `REPLAY3D_BROWSER` channel (default `msedge`). The page runs at the app's own pixel-ratio cap; a 2560 monitor at
 fullscreen is `--width 2560 --height 1440`.
 

@@ -41,6 +41,8 @@ export interface LapOptions {
   uniformNames?: boolean;
   /** Race mode: every car of the session on its clock, as the session's race replay opens it (`mode=race`). */
   race?: boolean;
+  /** Race mode only: the session second the race replay opens at (its `t`), else the session's start. */
+  raceTime?: number;
 }
 
 /** Playwright (or playwright-core) from `PLAYWRIGHT_NODE_MODULES`: the app does not depend on it. */
@@ -123,7 +125,7 @@ export async function measureLap(options: LapOptions) {
     const stopProfile = async () => (await cdp.send<{profile: CpuProfile}>('Profiler.stop')).profile;
     if (profileLoad) await startProfile();
     const started = Date.now();
-    const query = new URLSearchParams({sessionId: session, driverOrdinal: String(driver), lapOrdinal: String(lap), view: '3d', fullscreen: '1', ...(options.race ? {mode: 'race'} : {})});
+    const query = new URLSearchParams({sessionId: session, driverOrdinal: String(driver), lapOrdinal: String(lap), view: '3d', fullscreen: '1', ...(options.race ? {mode: 'race'} : {}), ...(options.race && options.raceTime !== undefined ? {t: String(options.raceTime)} : {})});
     await page.goto(`${base}/#/telemetry?${query.toString()}`);
     // The renderer's canvas joins the page only once the first view is resident and warmed; a failed scene shows an alert instead.
     await page.waitForFunction(`document.querySelector('[data-replay-view="3d"] [role="alert"]')

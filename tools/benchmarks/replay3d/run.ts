@@ -4,7 +4,7 @@
  *
  *   npm run benchmark:replay3d -- --session <id> --driver <ordinal> --lap <ordinal> [--seconds 40] [--label name]
  *     [--base http://localhost:5173] [--width 1920 --height 1080] [--real-clock] [--skip-offscreen-draws] [--cpu-profile] [--uniform-names]
- *     [--race]
+ *     [--race [--race-time <session second>]]
  */
 import { measureLap } from './measure.js';
 
@@ -26,6 +26,7 @@ const {result, file} = await measureLap({
   session, driver, lap, seconds, width, height, label: option('label', session)!, base: option('base', 'http://localhost:5173')!,
   skipOffscreenDraws: args.includes('--skip-offscreen-draws'), cpuProfile: args.includes('--cpu-profile'), realClock: args.includes('--real-clock'),
   uniformNames: args.includes('--uniform-names'), race: args.includes('--race'),
+  raceTime: option('race-time') === undefined ? undefined : Number(option('race-time')),
 });
 console.log(JSON.stringify(result, null, 1));
 console.log(`Saved ${file}`);
