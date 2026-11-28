@@ -511,6 +511,24 @@ it("lights the scene by the clock's moment, once the sun has moved a quarter of 
   scene.dispose();
 });
 
+it('leaves the sun through the clouds to the meter: a camera moving under them lights nothing again', async () => {
+  const cloudField = {cells: '0ffff', upperDrift: 0, lowerDrift: 0, startUpperDrift: -10, startLowerDrift: -10};
+  const clock = {session: 'race' as const, startMinute: null, sessionTimeSec: 0, cloudCover: 0, cloudField};
+  const shell = createSceneShell(layout, {daylightClock: clock, firstView: {kind: 'lap', lapDistanceM: lapFirstStation(lap, layout)}});
+  shells.push(shell);
+  const scene = await openScene(document.createElement('div'), layout, {...lap, daylightClock: clock}, null, vi.fn(), assets, shell);
+  const environment = shell.scene.environment, sun = shell.scene.getObjectsByProperty('name', 'sun').find(object => object instanceof DirectionalLight)!;
+  const start = sun.position.clone(), seenFrom = (x: number) => sceneSun(layout, shell.origin.y, clock, [x, 0, 0]).clouds.sunVisibility!;
+  // Under the cloud and 20 km away, the sun's visibility differs far more than a step...
+  expect(Math.abs(seenFrom(-500) - seenFrom(20000))).toBeGreaterThan(0.1);
+  shell.rig.camera.position.set(20000 - shell.origin.x, 0, 0);
+  // ...yet a clock step without a sun step or a new cover neither redraws the shadows nor captures the venue again.
+  shell.setDaylight({...clock, sessionTimeSec: 30});
+  expect(sun.position.equals(start)).toBe(true);
+  expect(shell.scene.environment).toBe(environment);
+  scene.dispose();
+});
+
 it("lights a shell another view made by the lap's own moment, and a new lap's", async () => {
   const shell = createSceneShell(layout, {firstView: {kind: 'lap', lapDistanceM: lapFirstStation(lap, layout)}});
   shells.push(shell);

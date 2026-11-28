@@ -12,7 +12,7 @@ import { disposeObjects } from './disposeObjects.js';
 import { updateShownMatrices } from './shownMatrices.js';
 import { exposureType, followsCar, shadowCascadeSet, type CameraMode } from '../camera/cameraModes.js';
 import { createCameraRig, type CameraRig } from '../camera/cameraRig.js';
-import { addSceneEnvironment, cloudSun, sceneSun, sunSeenFrom, type SceneSun } from '../sceneEnvironment.js';
+import { addSceneEnvironment, cloudSun, sceneCloudCover, sceneLighting, sceneSun, sunSeenFrom, type SceneSun } from '../sceneEnvironment.js';
 import type { CloudEye } from '../atmosphere/clouds.js';
 import { createSunMeter } from '../atmosphere/sunMeter.js';
 import { assertHazed } from '../atmosphere/haze.js';
@@ -171,7 +171,7 @@ export interface SceneShell {
 
 /** How far the sun moves before `setDaylight` lights the scene again, degrees: a quarter of a degree is a minute of the day. */
 export const SUN_STEP_DEG = 0.25;
-/** How far the cloud cover or the sun's visibility through the clouds moves before `setDaylight` lights the scene again. */
+/** How far the cloud cover moves before `setDaylight` lights the scene again, and the sun's visibility before the meter's shows. */
 const WEATHER_STEP = 0.01;
 /** A frame's time budget, from its start: past it the car's reflection probe draws no further face (car/carReflection.ts). */
 const FRAME_BUDGET_MS = 8;
@@ -448,11 +448,13 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const keptCar = createKeptCar();
   /** Lights the scene by `clock`; a small move of the sun or the weather changes nothing unless `force` (timeOfDay.ts switched). */
   const light = (clock: ReplayDaylightClock | undefined, force = false) => {
-    const eye = cloudEye(), next = sceneSun(layout, origin.y, clock, eye), weather = (at: typeof sun) => [at.weather.cloudCover, at.clouds.sunVisibility ?? 1];
-    const turnedDeg = MathUtils.radToDeg(next.lighting.sunDirection.angleTo(sun.lighting.sunDirection));
-    const [cover, seen] = weather(next), [shownCover, shownSeen] = weather(sun);
-    if (!force && turnedDeg < SUN_STEP_DEG && Math.abs(cover - shownCover) < WEATHER_STEP && Math.abs(seen - shownSeen) < WEATHER_STEP) return;
-    sun = next; meter = sunMeter(sun, eye); switchNight(nightSwitch, nightState(sun));
+    // The sun's turn and the cloud cover decide, both cheap to work out. The sun's visibility through the clouds is the meter's
+    // (`seeSun`): measured here too, from the camera's exact place at each clock step, it stood more than WEATHER_STEP off the meter's
+    // as the camera drove, and every few seconds relit everything (shadows, the venue capture: 40-50 ms frames, Barcelona 2026-11-28).
+    const turnedDeg = MathUtils.radToDeg(sceneLighting(layout, clock).sunDirection.angleTo(sun.lighting.sunDirection));
+    if (!force && turnedDeg < SUN_STEP_DEG && Math.abs(sceneCloudCover(layout, clock) - sun.clouds.cloudCover) < WEATHER_STEP) return;
+    const eye = cloudEye();
+    sun = sceneSun(layout, origin.y, clock, eye); meter = sunMeter(sun, eye); switchNight(nightSwitch, nightState(sun));
     exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
     // Before the environment exists, it is made from this sun. The car's probe saw the old light: a paused car kept a day probe at night.
     if (environment) { environment.setSun(sun); reflection.stale(); invalidate(); }

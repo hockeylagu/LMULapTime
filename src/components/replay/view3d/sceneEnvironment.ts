@@ -115,10 +115,16 @@ export type SceneVenue = Pick<SceneryLayout, 'daylight' | 'sky' | 'environmentPr
  * its cloud cover figure and has no sun visibility or sheets of its own.
  */
 export function sceneClouds(venue: Pick<SceneVenue, 'sky' | 'shading'>, lighting: SceneLighting, originY: number, clock?: ReplayDaylightClock, eye: CloudEye = [0, 0, 0]): {cloudCover: number; sunVisibility?: number; sheets?: CloudSheet[]} {
-  const field = clock?.cloudField;
-  if (!field) return {cloudCover: clock?.cloudCover ?? 0};
+  const field = clock?.cloudField, cloudCover = sceneCloudCover(venue, clock);
+  if (!field) return {cloudCover};
   const sheets = cloudSheets(venue.sky.clouds, field, originY);
-  return {cloudCover: cloudCoverage(venue.sky.clouds, field), sunVisibility: sunVisibility(venue.shading.sunVisibility, venue.sky.clouds, sheets, cloudSun(lighting), eye), sheets};
+  return {cloudCover, sunVisibility: sunVisibility(venue.shading.sunVisibility, venue.sky.clouds, sheets, cloudSun(lighting), eye), sheets};
+}
+
+/** The replay moment's cloud coverage alone (`sceneClouds`' without placing the sheets or measuring the sun through them). */
+export function sceneCloudCover(venue: Pick<SceneVenue, 'sky'>, clock?: ReplayDaylightClock): number {
+  const field = clock?.cloudField;
+  return field ? cloudCoverage(venue.sky.clouds, field) : clock?.cloudCover ?? 0;
 }
 
 /** Toward the body that lights the scene (the sun, or the moon at night) in the cloud field's axes (LMU local): the scene's z is the opposite one. */
