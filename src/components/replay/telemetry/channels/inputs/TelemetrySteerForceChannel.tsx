@@ -4,6 +4,7 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export interface TelemetrySteerForceChannelProps {
   steerForcePath: string;
@@ -20,11 +21,6 @@ export interface TelemetrySteerForceChannelProps {
 /** Signed % of the wheel base's peak, positive left (ISO). */
 export const formatSteerForce = (pct: number | undefined): string =>
   pct === undefined ? '—' : `${pct > 0 ? '+' : ''}${pct.toFixed(0)}%${Math.abs(pct) < 1 ? '' : pct > 0 ? ' L' : ' R'}`;
-
-const TOOLTIP = 'The driver\'s steering force, from the force feedback: % of the wheel base\'s peak, positive pushing left. '
-  + 'Two laps compare only at the same in-game FFB strength (the recording does not hold it). '
-  + 'Amber bands: the hands hold the wheel still while the force changes (light hands). '
-  + 'Red bands: the hands push against the wheel\'s angle (passive counter-steer).';
 
 export const TelemetrySteerForceChannel: React.FC<TelemetrySteerForceChannelProps> = React.memo(({
   steerForcePath,
@@ -55,19 +51,20 @@ export const TelemetrySteerForceChannel: React.FC<TelemetrySteerForceChannelProp
 
   const force = currentPoint?.driverForcePct;
   const baseForce = currentComparison?.baseline.driverForcePct;
+  const estimated = (point?: { driverForceEstimated?: true }) => (point?.driverForceEstimated ? '≈ ' : '');
   const moment = currentPoint?.passiveCounterSteer ? { label: 'COUNTER-STEER', className: 'text-lmu-loss-soft' }
     : currentPoint?.steerHoldStill ? { label: 'LIGHT HANDS', className: 'text-lmu-warn-soft' } : null;
 
   return (
-    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-azure-deep/20" title={TOOLTIP}>
+    <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-azure-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-azure font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-azure">
           <Hand className="w-3 h-3" />
           STEER FORCE
-        </span>
-        <span className="text-[10px] font-mono text-lmu-muted">% of FFB</span>
+        </ChannelTitle>
+        <span className="text-[10px] font-mono text-lmu-muted">% of FFB{currentPoint?.driverForceEstimated ? ' · estimated' : ''}</span>
         {!hasSteerForce && (
-          <span className="text-[10px] font-mono text-lmu-muted italic">Needs DuckDB telemetry for this lap</span>
+          <span className="text-[10px] font-mono text-lmu-muted italic">Needs DuckDB telemetry or a fit for this car</span>
         )}
       </div>
 
@@ -83,11 +80,11 @@ export const TelemetrySteerForceChannel: React.FC<TelemetrySteerForceChannelProp
           style={{ left: `${cursorPct}%` }}
         >
           <span className="px-2 py-0.5 rounded-md bg-lmu-badge border border-lmu-azure/80 font-mono font-bold text-[11px] text-lmu-azure-soft shadow-marker-lift whitespace-nowrap">
-            {formatSteerForce(force)}
+            {estimated(currentPoint)}{formatSteerForce(force)}
           </span>
           {baseForce !== undefined && (
             <span className="px-1.5 py-0.5 rounded-md bg-lmu-badge border border-lmu-warn-strong/80 font-mono font-bold text-[10px] text-lmu-warn-soft shadow-marker-lift whitespace-nowrap">
-              B: {formatSteerForce(baseForce)}
+              B: {estimated(currentComparison?.baseline)}{formatSteerForce(baseForce)}
             </span>
           )}
           {moment && (

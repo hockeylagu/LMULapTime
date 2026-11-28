@@ -4,6 +4,7 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export interface TelemetryLateralOffsetChannelProps {
   lateralOffsetPath: string;
@@ -57,10 +58,10 @@ export const TelemetryLateralOffsetChannel: React.FC<TelemetryLateralOffsetChann
   return (
     <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-teal-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-teal font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-teal">
           <GitCommit className="w-3 h-3" />
           LATERAL OFFSET
-        </span>
+        </ChannelTitle>
         {!(hasOffset) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             No corridor offset recorded
           </span>)}

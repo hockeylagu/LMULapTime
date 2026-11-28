@@ -24,7 +24,7 @@ describe('steering force chart', () => {
 
   it('says a replay-only lap has no steering force', () => {
     render(<TelemetrySteerForceChannel steerForcePath="" holdStillBands="" counterSteerBands="" hasSteerForce={false} isCursorInView cursorPct={0} />);
-    expect(screen.getByText('Needs DuckDB telemetry for this lap')).toBeInTheDocument();
+    expect(screen.getByText('Needs DuckDB telemetry or a fit for this car')).toBeInTheDocument();
     expect(formatSteerForce(undefined)).toBe('—');
     expect(formatSteerForce(0.4)).toBe('+0%');
   });

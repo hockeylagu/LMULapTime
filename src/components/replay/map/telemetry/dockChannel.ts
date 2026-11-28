@@ -35,3 +35,41 @@ export function useDockChannel(): DockChannel {
 
 /** The channel the dock shows: delta needs a comparison lap, so speed shows without one (the pick stays for the next compare). */
 export const shownDockChannel = (channel: DockChannel, hasBaseline: boolean): DockChannel => (channel === 'delta' && !hasBaseline ? 'speed' : channel);
+
+/**
+ * Whether the 3D view stands the channel as curtains in place of the racing line: the dock's 3D trace button, the Line menu and a
+ * chart's title set it, remembered. Chart titles offer it only while a 3D view is open (`openTraceView`).
+ */
+const SHOWN_KEY = 'lmu-3d-trace-shown-v1';
+let shown = (() => {
+  try { return localStorage.getItem(SHOWN_KEY) === 'true'; } catch { return false; }
+})();
+let openViews = 0;
+
+export function setTraceShown(next: boolean): void {
+  shown = next;
+  try { localStorage.setItem(SHOWN_KEY, String(next)); } catch { /* Storage may be disabled. */ }
+  listeners.forEach(listener => listener());
+}
+
+export function useTraceShown(): boolean {
+  return useSyncExternalStore(subscribe, () => shown);
+}
+
+/** A 3D view is open while the returned close has not run. */
+export function openTraceView(): () => void {
+  openViews++;
+  listeners.forEach(listener => listener());
+  return () => { openViews--; listeners.forEach(listener => listener()); };
+}
+
+export function useTraceViewOpen(): boolean {
+  return useSyncExternalStore(subscribe, () => openViews > 0);
+}
+
+/** Stands a channel as the 3D trace, or turns the trace off when it is the one shown. */
+export function toggleTraceChannel(channel: DockChannel): void {
+  if (shown && chosen === channel) { setTraceShown(false); return; }
+  setDockChannel(channel);
+  setTraceShown(true);
+}

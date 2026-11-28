@@ -6,6 +6,7 @@ import { cornerName } from '../../../utils/cornerAnalysis/helpers.js';
 import type { TelemetryChartPathsResult } from './telemetryChartTypes.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';
+import { ChannelTitleContext } from './channels/ChannelTitle.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';
 import { TelemetryChannelId, TelemetryPreset } from './presets/telemetryPresets.js';
 import { TelemetryResolution } from './telemetryResolution.js';
@@ -131,8 +132,8 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
       <div className="relative flex-1 min-h-0 h-full">
         <div className="relative h-full overflow-y-auto overflow-x-hidden bg-lmu-strip flex flex-col [&>*:not(.telemetry-corner-strip)]:flex-1 [&>*:not(.telemetry-corner-strip)]:min-h-[84px]">
         {activeChannels.map(channelId => (
-          <TelemetryChannelRenderer
-            key={channelId}
+          // Each chart's title stands it as the 3D trace beside it (`ChannelTitle`).
+          <ChannelTitleContext.Provider key={channelId} value={channelId}><TelemetryChannelRenderer
             channelId={channelId}
             currentPoint={currentPoint}
             currentComparison={currentComparison}
@@ -147,7 +148,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
             viewStart={viewStart}
             viewEnd={viewEnd}
             steeringWheelRanges={steeringWheelRanges}
-          />
+          /></ChannelTitleContext.Provider>
         ))}
 
         {cornerEntryPct !== null && (

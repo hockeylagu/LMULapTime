@@ -12,6 +12,7 @@ import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js
 import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../../src/components/replay/inspector/replayPlaybackCursor.js';
 import { ReplayFullscreenControlsContext, type ReplayFullscreenControls } from '../../../../../src/components/replay/inspector/replayFullscreenControls.js';
 import type { CornerSegmentComparison } from '../../../../../src/utils/cornerAnalysis/types.js';
+import { setDockChannel, setTraceShown } from '../../../../../src/components/replay/map/telemetry/dockChannel.js';
 
 const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), overview: vi.fn(), frameStretch: vi.fn(), showMarks: vi.fn(), center: vi.fn(), zoom: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), showTrace: vi.fn(), pickTrace: vi.fn(async () => null), hoverTrace: vi.fn(), holdKey: vi.fn(), releaseKeys: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
 vi.mock('../../../../../src/components/replay/view3d/laps/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene), lapFirstStation: () => 0}));
@@ -264,7 +265,8 @@ it('supports top control buttons (return to 2D, color modes, primary/baseline li
   const line = screen.getByRole('combobox', {name: 'Racing line'});
   expect(line).toHaveTextContent('Speed');
   fireEvent.click(line);
-  expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['Off', 'Plain', 'Pedal', 'Speed', 'Delta', 'Gain / Loss']);
+  // The lines, then every chart channel as a 3D trace.
+  expect(screen.getAllByRole('option').map(option => option.textContent).slice(0, 7)).toEqual(['Off', 'Plain', 'Pedal', 'Speed', 'Delta', 'Gain / Loss', 'Throttle + Brake']);
   fireEvent.click(screen.getByRole('option', {name: 'Plain'}));
   expect(onChangeColorBy).toHaveBeenCalledWith('default');
 
@@ -442,7 +444,7 @@ it('repeats a picked corner from its entry, keeping the camera until the corner 
 });
 
 it('stands the bottom trace as curtains in place of the lines with its 3D button, remembered; off brings the lines back', async () => {
-  localStorage.removeItem('lmu-3d-trace-shown-v1'); localStorage.setItem('lmu-map-trace-channel-v1', 'speed');
+  setTraceShown(false); setDockChannel('speed');
   const {map} = await setup();
   fireEvent.keyDown(map, {key: 'm'});
   const button = screen.getByRole('button', {name: '3D trace'});
@@ -461,7 +463,11 @@ it('stands the bottom trace as curtains in place of the lines with its 3D button
   expect(screen.getByTestId('trace-legend')).toHaveTextContent('data on this lap: the racing line shows instead');
   // The Line menu says the trace stands in place of the line; picking a line there turns the trace off.
   const line = screen.getByRole('combobox', {name: 'Racing line'});
-  expect(line).toHaveTextContent('3D trace');
+  expect(line).toHaveTextContent('3D: Steering Force');
+  // The Line menu picks another channel to stand, the bottom trace's too.
+  fireEvent.click(line); fireEvent.click(screen.getByRole('option', {name: 'Lateral Acceleration (G)'}));
+  expect(line).toHaveTextContent('3D: Lateral Acceleration (G)');
+  expect(screen.getByRole('combobox', {name: 'More telemetry channels'})).toHaveTextContent('Lateral Acceleration (G)');
   fireEvent.click(line); fireEvent.click(screen.getByRole('option', {name: 'Plain'}));
   expect(button).toHaveAttribute('aria-pressed', 'false');
   expect(screen.getByRole('combobox', {name: 'Racing line'})).toHaveTextContent('Plain');

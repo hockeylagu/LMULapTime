@@ -4,6 +4,7 @@ import { PointComparison } from '../../../../../utils/replayComparison.js';
 import type { DeltaGradientStop } from '../../telemetryChartTypes.js';
 import { CHART_COLORS, TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export interface TelemetryDeltaChannelProps {
   deltaTimePath: string;
@@ -95,10 +96,10 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
     <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-lmu-purple-deep/20">
       <div className="absolute top-1 left-3 h-5 right-3 z-20 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2">
-          <span className="text-lmu-purple-soft font-black text-[10px] tracking-wider flex items-center gap-1">
+          <ChannelTitle className="text-lmu-purple-soft">
             <Timer className="w-3 h-3" />
             TIME DELTA (Δt)
-          </span>
+          </ChannelTitle>
         </div>
 
         <div className="hidden sm:flex items-center gap-3 text-[10px] font-mono">

@@ -4,6 +4,7 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 const speedGridLines = (maxSpeed: number): readonly TelemetryGridLine[] => [
   { label: `${Number(maxSpeed.toFixed(1))} km/h`, borderClassName: 'border-b border-lmu-info/40', labelClassName: 'text-[10px] text-lmu-info' },
@@ -58,10 +59,10 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = React
   return (
     <div className="relative flex-1 basis-0 min-h-0 border-b border-lmu-border/40 group bg-lmu-info-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-info font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-info">
           <Gauge className="w-3 h-3" />
           SPEED
-        </span>
+        </ChannelTitle>
 
       </div>
 

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import type { TrackBoundaryGeometry } from '../../../../../shared/types/trackGeometry.js';
@@ -29,7 +29,9 @@ import { useCornerFocus } from './useCornerFocus.js';
 import { CornerFocusBar } from './CornerFocusBar.js';
 import { CornerCardButton, CORNER_CARD_UNDER_FULLSCREEN_MINIMAP, CORNER_CARD_UNDER_MINIMAP } from '../../cornerCard/CornerInsightCard.js';
 import { LapCornerCard } from '../../cornerCard/LapCornerCard.js';
-import { shownDockChannel, useDockChannel } from '../../map/telemetry/dockChannel.js';
+import {
+  openTraceView, setDockChannel, setTraceShown, shownDockChannel, useDockChannel, useTraceShown, type DockChannel,
+} from '../../map/telemetry/dockChannel.js';
 import { lapCurtains } from './traceValues.js';
 import { TraceLegend } from './TraceLegend.js';
 import { TraceHover } from './TraceHover.js';
@@ -69,9 +71,13 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   const [showLines, toggleLines] = useStoredToggle('lmu-3d-racing-lines-v1', true);
   const ghostSync = useGhostSync(), syncControls = ghostSyncControls(ghostSync);
   // The curtain stands the bottom trace's channel while its 3D button is on (driver, 2026-11-28).
-  const [traceShown, toggleTraceShown] = useStoredToggle('lmu-3d-trace-shown-v1', false);
+  const traceShown = useTraceShown(), toggleTraceShown = () => setTraceShown(!traceShown);
+  useEffect(() => openTraceView(), []);
   const dockChannel = shownDockChannel(useDockChannel(), Boolean(baseline)), traceChannel = traceShown ? dockChannel : null;
-  const traceControls = {traceShown, onHideTrace: toggleTraceShown};
+  const traceControls = {traceShown, traceChannel: dockChannel, onHideTrace: () => setTraceShown(false),
+    onShowTrace: (channel: DockChannel) => { setDockChannel(channel); setTraceShown(true); }};
+  const estimatedForce = useMemo(() => traceChannel === 'steer-force'
+    && [trajectory, baseline].some(lap => lap?.points.some(point => point.driverForceEstimated)), [traceChannel, trajectory, baseline]);
   const shownTrace = useMemo(() => (traceChannel ? lapCurtains(traceChannel, trajectory, baseline) : null), [traceChannel, trajectory, baseline]);
   // The scene takes the values worked out here for the laps shown, and works them out for laps it shows before the next render.
   const trace = useMemo(() => (traceChannel ? (lap: ReplayTrajectoryData, compared: ReplayTrajectoryData | null) => (
@@ -127,7 +133,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
         </div>
       )}
       overlays={<>
-        {traceChannel && showLines ? <TraceLegend trace={traceChannel} scale={shownTrace?.scale ?? null} compared={Boolean(baseline)} />
+        {traceChannel && showLines ? <TraceLegend trace={traceChannel} scale={shownTrace?.scale ?? null} compared={Boolean(baseline)} estimated={estimatedForce} />
           : <HeatmapLegendBar colorBy={showLines ? colorBy : 'default'} />}
         {cornerFocus.focused && focusCorner && onLeaveCorner && <CornerFocusBar corner={focusCorner} compared={Boolean(baseline)}
           looping={cornerFocus.looping} onToggleLoop={cornerFocus.toggleLoop} onFrame={cornerFocus.frame} onClose={onLeaveCorner} />}

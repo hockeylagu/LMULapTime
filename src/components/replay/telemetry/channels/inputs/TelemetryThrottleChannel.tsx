@@ -4,6 +4,7 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 const THROTTLE_GRID_LINES: readonly TelemetryGridLine[] = [
   { label: '100%', yPercent: 2 / 89 * 100, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },
@@ -67,10 +68,10 @@ export const TelemetryThrottleChannel: React.FC<TelemetryThrottleChannelProps> =
   return (
     <div className="relative flex-1 basis-0 min-h-[68px] border-b border-lmu-border/40 group bg-lmu-gain-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-gain font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-gain">
           <Activity className="w-3 h-3" />
           THROTTLE
-        </span>
+        </ChannelTitle>
         {currentPoint?.tcActive && (
           <span className="px-1.5 py-px rounded bg-lmu-warn-strong text-black font-black text-[10px] tracking-wider">
             TC CUT

@@ -6,6 +6,7 @@ import type { WheelPosition } from '../../../../../../shared/types/liveEvidence.
 import { CornerPaths } from '../../telemetryCornerChartPaths.js';
 import { TelemetryWheelTrace } from '../TelemetryWheelTrace.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export interface TelemetryWheelSlipChannelProps {
   wheelSlipPaths: CornerPaths;
@@ -53,10 +54,10 @@ export const TelemetryWheelSlipChannel: React.FC<TelemetryWheelSlipChannelProps>
   return (
     <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-loss-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-loss font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-loss">
           <Disc className="w-3 h-3" />
           WHEEL SLIP
-        </span>
+        </ChannelTitle>
         {slip && slip.lockup.length > 0 && (
           <span className="px-1.5 py-px rounded bg-lmu-loss-strong text-lmu-deep font-black text-[10px] tracking-wider flex items-center gap-0.5">
             <AlertTriangle className="w-2.5 h-2.5" /> LOCKUP {wheels(slip.lockup)}

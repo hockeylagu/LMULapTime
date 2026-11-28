@@ -12,6 +12,7 @@ import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 import { TelemetrySteerOverlayToggles } from './TelemetrySteerOverlayToggles.js';
 import { fittedSteerDegrees, formatSteer, steerTraceScale, type SteerScaleMode, type SteeringWheelRanges } from './steerDegrees.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 const steerGridLines = (range: number, unit: string): readonly TelemetryGridLine[] => [
   { label: `+${range}${unit} L`, yPercent: 0, borderClassName: 'border-b border-lmu-indigo/30', labelClassName: 'text-[10px] text-lmu-indigo font-mono' },
@@ -183,10 +184,10 @@ export const TelemetrySteerChannel: React.FC<TelemetrySteerChannelProps> = React
     <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-indigo-deep/20">
       {/* Top Left Channel Title & Live Telemetry Values */}
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-indigo font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-indigo">
           <Compass className="w-3 h-3" />
           STEERING
-        </span>
+        </ChannelTitle>
 
         {cursorBalance && (
           <span className={`text-[10px] font-mono font-bold px-1.5 py-px rounded bg-lmu-card/90 border border-white/10 ${cursorBalance.color}`}>

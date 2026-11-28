@@ -4,6 +4,7 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export interface TelemetryAccelLatChannelProps {
   accelLatPath: string;
@@ -67,10 +68,10 @@ export const TelemetryAccelLatChannel: React.FC<TelemetryAccelLatChannelProps> =
   return (
     <div className="relative flex-1 basis-0 min-h-[64px] border-b border-lmu-border/40 group bg-lmu-info-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-info font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-info">
           <Compass className="w-3 h-3" />
           LATERAL G
-        </span>
+        </ChannelTitle>
         {source !== 'duckdb' && <span className="px-1 py-px rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
           <Sparkles className="w-2.5 h-2.5" /> COMPUTED
         </span>}

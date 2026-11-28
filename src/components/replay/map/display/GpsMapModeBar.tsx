@@ -4,9 +4,15 @@ import type { MapColorMode } from '../replayMapUtils.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { Select } from '../../../common/dropdown/Select.js';
 import { nextGhostSyncMode, type GhostSyncMode } from '../ghostSync.js';
+import { AVAILABLE_TELEMETRY_CHANNELS } from '../../telemetry/presets/telemetryPresets.js';
+import type { DockChannel } from '../telemetry/dockChannel.js';
 
 const MODE_LABELS = { pedal: 'Pedal', speed: 'Speed', delta: 'Delta', gainLoss: 'Gain / Loss' } as const;
-type LineChoice = 'off' | 'default' | 'trace' | keyof typeof MODE_LABELS;
+type LineChoice = 'off' | 'default' | `trace:${DockChannel}` | keyof typeof MODE_LABELS;
+const TRACE_CHOICES: ReadonlyArray<{channel: DockChannel; label: string}> = [
+  {channel: 'pedals', label: 'Throttle + Brake'}, ...AVAILABLE_TELEMETRY_CHANNELS.map(channel => ({channel: channel.id, label: channel.name})),
+];
+const isTraceChoice = (choice: LineChoice): choice is `trace:${DockChannel}` => choice.startsWith('trace:');
 
 const SYNC_LABELS: Record<GhostSyncMode, string> = { distance: 'Distance', time: 'Time', anchored: 'From A' };
 const syncTitle = (mode: GhostSyncMode, anchorSet: boolean) => (mode === 'distance'
@@ -30,10 +36,12 @@ export interface GpsMapModeBarProps {
   showRacingLines?: boolean;
   onToggleRacingLines?: () => void;
   /**
-   * The 3D trace stands in place of the line (the bottom trace's 3D button): the Line menu says so, and picking a line there turns
-   * the trace off.
+   * The 3D trace stands a chart channel in place of the line: with `onShowTrace`, the Line menu lists the channels under 3D trace,
+   * and picking a line there turns the trace off.
    */
   traceShown?: boolean;
+  traceChannel?: DockChannel;
+  onShowTrace?: (channel: DockChannel) => void;
   onHideTrace?: () => void;
   /** Where the ghost follows the primary car; the toggle shows with a baseline and a handler. */
   ghostSync?: GhostSyncMode;
@@ -57,6 +65,8 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   showRacingLines = true,
   onToggleRacingLines,
   traceShown = false,
+  traceChannel = 'speed',
+  onShowTrace,
   onHideTrace,
   ghostSync = 'distance',
   onChangeGhostSync,
@@ -66,7 +76,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
 }) => {
   const modes = ['pedal', 'speed', ...(isCompareMode && hasBaseline ? (['delta', 'gainLoss'] as const) : [])] as const;
   const chooseLine = (choice: LineChoice) => {
-    if (choice === 'trace') return;
+    if (isTraceChoice(choice)) { onShowTrace?.(choice.slice('trace:'.length) as DockChannel); return; }
     if (traceShown) onHideTrace?.();
     if ((choice === 'off') === showRacingLines) onToggleRacingLines?.();
     if (choice !== 'off') onChangeColorBy?.(choice);
@@ -82,9 +92,12 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
     >
       {onChangeColorBy && onToggleRacingLines && (
         <Select<LineChoice> aria-label="Racing line" title="Show the racing line plain or coloured, or hide it" size="compact"
-          icon={<Route className="w-3.5 h-3.5" />} caption="Line:" value={!showRacingLines ? 'off' : traceShown ? 'trace' : colorBy} onChange={chooseLine}
-          options={[{value: 'off', label: 'Off'}, {value: 'default', label: 'Plain'}, ...modes.map(mode => ({value: mode, label: MODE_LABELS[mode]})),
-            ...(traceShown ? [{value: 'trace' as const, label: '3D trace'}] : [])]} />
+          icon={<Route className="w-3.5 h-3.5" />} caption="Line:" value={!showRacingLines ? 'off' : traceShown ? `trace:${traceChannel}` : colorBy}
+          onChange={chooseLine} renderValue={option => (option && String(option.value).startsWith('trace:') ? <>3D: {option.label}</> : option?.label)}
+          options={[{group: 'Line', options: [{value: 'off', label: 'Off'}, {value: 'default', label: 'Plain'},
+            ...modes.map(mode => ({value: mode, label: MODE_LABELS[mode]}))]},
+          ...(onShowTrace ? [{group: '3D trace', options: TRACE_CHOICES.map(({channel, label}) => ({value: `trace:${channel}` as const, label,
+            disabled: channel === 'delta' && !hasBaseline}))}] : [])]} />
       )}
       {onChangeColorBy && !onToggleRacingLines && (
         <div className="flex items-center gap-1">

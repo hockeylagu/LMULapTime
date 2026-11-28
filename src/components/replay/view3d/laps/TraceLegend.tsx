@@ -12,6 +12,8 @@ interface Props {
   scale: ChannelScale | null;
   /** A comparison lap stands its own curtain. */
   compared: boolean;
+  /** A shown lap's steering force is estimated from its replay. */
+  estimated?: boolean;
 }
 
 const number = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(Math.abs(value) < 10 ? 1 : 0));
@@ -30,7 +32,7 @@ const swatch = (colour: string, label: string) => (
 );
 
 /** The trace curtain's legend in the 3D view's corner: the channel, its scale and its colours, or why the lap has no curtain. */
-export function TraceLegend({trace, scale, compared}: Props) {
+export function TraceLegend({trace, scale, compared, estimated = false}: Props) {
   if (trace === 'pedals') {
     return <LegendBox name="Throttle + Brake" scale={scale} unit="%" factor={1} missing="pedal"
       colours={[swatch(TELEMETRY_COLORS.throttle, 'Throttle'), swatch(TELEMETRY_COLORS.brake, 'Brake'),
@@ -38,7 +40,7 @@ export function TraceLegend({trace, scale, compared}: Props) {
   }
   const info = AVAILABLE_TELEMETRY_CHANNELS.find(channel => channel.id === trace), channel = CHANNEL_VALUES[trace];
   // The chart panel's own title (STEER FORCE, BALANCE): short enough for the corner.
-  const name = info?.shortName ?? trace;
+  const name = `${info?.shortName ?? trace}${estimated ? ' ≈ estimated' : ''}`;
   const colours = channel.kind === 'wheels'
     ? [...(['fl', 'fr', 'rl', 'rr'] as const).map(wheel => swatch(WHEEL_CORNER_COLORS[wheel], wheel.toUpperCase())),
       ...(compared ? [<span key="faint" className="text-lmu-muted">baseline fainter</span>] : [])]

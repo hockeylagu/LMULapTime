@@ -5,6 +5,7 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { CornerPaths } from '../../telemetryCornerChartPaths.js';
 import { TelemetryWheelTrace } from '../TelemetryWheelTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export interface TelemetrySuspPosChannelProps {
   suspPosPaths: CornerPaths;
@@ -37,10 +38,10 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
   return (
     <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-gain-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
-        <span className="text-lmu-gain font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-gain">
           <Activity className="w-3 h-3" />
           RIDE HEIGHT
-        </span>
+        </ChannelTitle>
         {!(hasData && susp) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             No ride-height stream recorded
           </span>)}

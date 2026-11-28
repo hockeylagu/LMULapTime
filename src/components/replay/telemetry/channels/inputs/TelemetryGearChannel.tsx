@@ -5,6 +5,7 @@ import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 import { gearTraceY } from '../../telemetryChartPathBuilders.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export function gearGridLines(maxGear: number): readonly TelemetryGridLine[] {
   const minY = 13;
@@ -82,10 +83,10 @@ export const TelemetryGearChannel: React.FC<TelemetryGearChannelProps> = React.m
   return (
     <div className="relative flex-1 basis-0 min-h-[60px] border-b border-lmu-border/40 group bg-lmu-warn-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 pointer-events-none">
-        <span className="text-lmu-warn font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-warn">
           <Layers className="w-3 h-3" />
           GEAR
-        </span>
+        </ChannelTitle>
 
       </div>
 

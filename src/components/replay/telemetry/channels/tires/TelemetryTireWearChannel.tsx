@@ -5,6 +5,7 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { CornerPaths } from '../../telemetryCornerChartPaths.js';
 import { TelemetryWheelTrace } from '../TelemetryWheelTrace.js';
+import { ChannelTitle } from '../ChannelTitle.js';
 
 export interface TelemetryTireWearChannelProps {
   tireWearPaths: CornerPaths;
@@ -37,10 +38,10 @@ export const TelemetryTireWearChannel: React.FC<TelemetryTireWearChannelProps> =
   return (
     <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-warn-deep/20">
       <div className="absolute top-1 left-3 h-5 z-20 flex items-center gap-2 flex-wrap pointer-events-none">
-        <span className="text-lmu-warn font-black text-[10px] tracking-wider flex items-center gap-1">
+        <ChannelTitle className="text-lmu-warn">
           <Layers className="w-3 h-3" />
           TIRE WEAR
-        </span>
+        </ChannelTitle>
         {!(hasData && tw) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             No tire degradation stream recorded
           </span>)}
