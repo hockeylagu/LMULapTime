@@ -42,6 +42,8 @@ export interface ProbeFrame {
   intervalMs: number;
   /** Bytes passed to buffer and texture upload calls during the frame. */
   uploadBytes: number;
+  /** The part of `uploadBytes` sent to buffers (`bufferData`, `bufferSubData`); the rest went to textures. */
+  bufferUploadBytes: number;
   /** Shader programs linked during the frame (D3D11 ANGLE may finish compiling at the first draw that uses one). */
   programLinks: number;
   /** Cube-map faces drawn as a scene: level 0 faces that took more than one draw (the reflection probe's faces, not the
@@ -60,6 +62,8 @@ export interface ProbeState {
   longTasks: {startMs: number; durationMs: number}[];
   /** Programs linked while recording. */
   programLinks: number;
+  /** Each program linked while recording: the recorded frame it fell in, the pass it linked in and its `SHADER_NAME`. */
+  linkNames: {frame: number; pass: string; name: string}[];
   /** The fixed step (ms) the animation-frame timestamps advance by, or 0 for real time. */
   stepMs: number;
   /** Puts the fixed clock back on real time (the bench calls it as it starts recording). */
@@ -80,6 +84,8 @@ export interface ProbeState {
 export interface UniformStats {
   callsByPass: Record<Pass, Record<string, number>>;
   programs: {
+    /** The program's `SHADER_NAME` and composed parts. */
+    name: string;
     /** Active uniforms, samplers among them, and floats in array uniforms (three flattens an array to compare it). */
     uniforms: number; samplers: number; arrayFloats: number;
     /** A few names, to tell the programs apart. */
@@ -97,11 +103,11 @@ interface ProbeWindow { replay3dProbe: ProbeState }
 export function installProbe(skipOffscreenDraws: boolean, stepMs: number, uniformNames = false): void {
   const PASS_NAMES = ['script', 'main', 'probe', 'depth', 'other'] as const;
   const empty = () => ({calls: 0, draws: 0, kIndices: 0, uniforms: 0, textureBinds: 0, cpuMs: 0, gpuMs: 0});
-  const fresh = () => ({uploadBytes: 0, programLinks: 0, cubeFaces: 0, callbackMs: 0,
+  const fresh = () => ({uploadBytes: 0, bufferUploadBytes: 0, programLinks: 0, cubeFaces: 0, callbackMs: 0,
     passes: Object.fromEntries(PASS_NAMES.map(name => [name, empty()])) as Record<typeof PASS_NAMES[number], ReturnType<typeof empty>>});
   // The fixed clock: one step per animation frame, every callback of a frame seeing the same time.
   let virtual = performance.now(), lastNative = -1;
-  const state: ProbeState = {recording: false, frames: [], longTasks: [], programLinks: 0, stepMs, syncClock() { virtual = performance.now(); }, gpuTimer: false, gpuDropped: 0};
+  const state: ProbeState = {recording: false, frames: [], longTasks: [], programLinks: 0, linkNames: [], stepMs, syncClock() { virtual = performance.now(); }, gpuTimer: false, gpuDropped: 0};
   (window as unknown as ProbeWindow).replay3dProbe = state;
   // The default buffer keeps 250 resource entries: a first view fetches several hundred package files, so the rest would go uncounted.
   performance.setResourceTimingBufferSize(10_000);
@@ -199,6 +205,13 @@ export function installProbe(skipOffscreenDraws: boolean, stepMs: number, unifor
     boundDraw = args[1]; drawPass = passOf(args[1]);
     enter(drawPass);
   });
+  /** A program's `SHADER_NAME` and, for a composed one, the parts its source names in comments (`// part`): an unnamed material is told apart by them. */
+  const programName = (context: unknown, linked: unknown) => {
+    const gl = context as {getAttachedShaders(p: unknown): unknown[] | null; getShaderSource(s: unknown): string | null};
+    const source = (gl.getAttachedShaders(linked) ?? []).map(shader => gl.getShaderSource(shader) ?? '').join('\n');
+    const parts = [...new Set(source.match(/^\/\/ [\w-]+$/gm) ?? [])].map(line => line.slice(3)).join('+');
+    return `${/#define SHADER_NAME (.*)/.exec(source)?.[1] || '(unnamed)'}${parts ? ` [${parts}]` : ''}`;
+  };
   // The uniform diagnostic: names of uniform locations, each program's inventory, the program in use.
   const byPass = () => Object.fromEntries(PASS_NAMES.map(name => [name, 0])) as Record<typeof PASS_NAMES[number], number>;
   const stats: UniformStats = {callsByPass: Object.fromEntries(PASS_NAMES.map(name => [name, {}])) as UniformStats['callsByPass'], programs: []};
@@ -220,7 +233,7 @@ export function installProbe(skipOffscreenDraws: boolean, stepMs: number, unifor
       if (!program) {
         const gl = this as {getProgramParameter(p: unknown, name: number): unknown; getActiveUniform(p: unknown, i: number): {name: string; type: number; size: number} | null};
         const active = Number(gl.getProgramParameter(args[0], GL.ACTIVE_UNIFORMS));
-        program = {uniforms: active, samplers: 0, arrayFloats: 0, sample: [], switches: byPass(), calls: byPass(), draws: byPass()};
+        program = {name: programName(this, args[0]), uniforms: active, samplers: 0, arrayFloats: 0, sample: [], switches: byPass(), calls: byPass(), draws: byPass()};
         const floats: Record<number, number> = {[GL.FLOAT]: 1, [GL.FLOAT_VEC2]: 2, [GL.FLOAT_VEC3]: 3, [GL.FLOAT_VEC4]: 4, [GL.FLOAT_MAT3]: 9, [GL.FLOAT_MAT4]: 16};
         for (let i = 0; i < active; i++) {
           const info = gl.getActiveUniform(args[0], i);
@@ -290,9 +303,18 @@ export function installProbe(skipOffscreenDraws: boolean, stepMs: number, unifor
     return 0;
   };
   for (const name of ['bufferData', 'bufferSubData', 'texImage2D', 'texSubImage2D', 'compressedTexImage2D', 'compressedTexSubImage2D', 'texSubImage3D', 'compressedTexSubImage3D']) {
-    wrap(proto, name, args => { current.uploadBytes += bytesOf(args, name); });
+    wrap(proto, name, args => {
+      const bytes = bytesOf(args, name);
+      current.uploadBytes += bytes;
+      if (name.startsWith('buffer')) current.bufferUploadBytes += bytes;
+    });
   }
-  wrap(proto, 'linkProgram', () => { current.programLinks++; if (state.recording) state.programLinks++; });
+  wrap(proto, 'linkProgram', (args, context) => {
+    current.programLinks++;
+    if (!state.recording) return;
+    state.programLinks++;
+    state.linkNames.push({frame: state.frames.length, pass, name: programName(context, args[0])});
+  });
 
   const nativeFrame = window.requestAnimationFrame.bind(window);
   window.requestAnimationFrame = callback => nativeFrame(now => {

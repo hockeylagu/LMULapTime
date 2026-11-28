@@ -39,6 +39,8 @@ export interface LapOptions {
   loadProfile?: boolean;
   /** The uniform diagnostic (`UniformStats` in probe.ts): uniform calls by name and pass, and each program's inventory. */
   uniformNames?: boolean;
+  /** Race mode: every car of the session on its clock, as the session's race replay opens it (`mode=race`). */
+  race?: boolean;
 }
 
 /** Playwright (or playwright-core) from `PLAYWRIGHT_NODE_MODULES`: the app does not depend on it. */
@@ -121,7 +123,7 @@ export async function measureLap(options: LapOptions) {
     const stopProfile = async () => (await cdp.send<{profile: CpuProfile}>('Profiler.stop')).profile;
     if (profileLoad) await startProfile();
     const started = Date.now();
-    const query = new URLSearchParams({sessionId: session, driverOrdinal: String(driver), lapOrdinal: String(lap), view: '3d', fullscreen: '1'});
+    const query = new URLSearchParams({sessionId: session, driverOrdinal: String(driver), lapOrdinal: String(lap), view: '3d', fullscreen: '1', ...(options.race ? {mode: 'race'} : {})});
     await page.goto(`${base}/#/telemetry?${query.toString()}`);
     // The renderer's canvas joins the page only once the first view is resident and warmed; a failed scene shows an alert instead.
     await page.waitForFunction(`document.querySelector('[data-replay-view="3d"] [role="alert"]')
@@ -141,7 +143,7 @@ export async function measureLap(options: LapOptions) {
     await page.waitForTimeout(1500);
     await page.focus('[data-replay-view="3d"]');
     // The fixed clock restarts from real time here, so the play key's first step is at most one step long.
-    await page.evaluate(`(() => { const probe = window.replay3dProbe; probe.longTasks = []; probe.frames = []; probe.programLinks = 0; probe.syncClock(); probe.recording = true; })()`);
+    await page.evaluate(`(() => { const probe = window.replay3dProbe; probe.longTasks = []; probe.frames = []; probe.programLinks = 0; probe.linkNames = []; probe.syncClock(); probe.recording = true; })()`);
     if (cpuProfile) await startProfile();
     const metric = async () => Object.fromEntries((await cdp.send<{metrics: {name: string; value: number}[]}>('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
     const before = await metric(), playStarted = Date.now();
@@ -187,7 +189,9 @@ export async function measureLap(options: LapOptions) {
       },
       passes: passSummary(drawn),
       gpuTimer: play.gpuTimer, gpuDropped: play.gpuDropped,
-      playLongTasks: longTaskSummary(play.longTasks), playProgramLinks: play.programLinks, mainThread: busy,
+      playLongTasks: longTaskSummary(play.longTasks), playProgramLinks: play.programLinks,
+      // By series frame (the five skipped frames off), so a link lines up with its row in `series`.
+      playLinks: play.linkNames.map(link => ({...link, frame: link.frame - 5})), mainThread: busy,
       ...(profile && loadProfile ? {cpuTopLoad: topFunctions(loadProfile), cpuTopPlay: topFunctions(profile)} : {}),
       ...(play.uniformStats ? {uniformStats: play.uniformStats} : {}),
     };
@@ -196,9 +200,10 @@ export async function measureLap(options: LapOptions) {
     fs.mkdirSync(directory, {recursive: true});
     const file = path.join(directory, `${label.replace(/[^\w.-]+/g, '_')}-${result.timestamp.replace(/[:.]/g, '-')}.json`);
     // The whole series, compact: per frame [interval ms, callback ms, upload KiB, program links, cube faces], then per pass (`seriesPasses`
-    // order) [draws, main-thread ms], then each pass's GPU ms (appended, so the earlier columns keep their places).
+    // order) [draws, main-thread ms], then each pass's GPU ms, then the buffer upload KiB (appended, so the earlier columns keep their places).
     const series = frames.map(frame => [round(frame.intervalMs, 1), round(frame.callbackMs, 2), Math.round(frame.uploadBytes / 1024), frame.programLinks, frame.cubeFaces,
-      ...PASSES.flatMap(name => [frame.passes[name].draws, round(frame.passes[name].cpuMs, 2)]), ...PASSES.map(name => round(frame.passes[name].gpuMs, 2))]);
+      ...PASSES.flatMap(name => [frame.passes[name].draws, round(frame.passes[name].cpuMs, 2)]), ...PASSES.map(name => round(frame.passes[name].gpuMs, 2)),
+      Math.round(frame.bufferUploadBytes / 1024)]);
     fs.writeFileSync(file, JSON.stringify({...result, worstFrames, seriesPasses: PASSES, series}));
     // The raw profiles open in DevTools (Performance > Load profile) for a timeline of the load and of the played frames.
     if (loadProfile) fs.writeFileSync(file.replace(/\.json$/, '.load.cpuprofile'), JSON.stringify(loadProfile));
