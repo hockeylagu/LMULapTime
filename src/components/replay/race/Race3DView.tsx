@@ -44,12 +44,12 @@ export default function Race3DView({ sessionId, overview, index, clock, poses, f
   const cam = cameraActions(scene, mode, setMode, 'chase');
   useRaceMapKeys({
     zoomIn: cam.onZoomIn, zoomOut: cam.onZoomOut, resetPanZoom: cam.onReset,
-    centerOnCar: cam.onCenter, setFollowCar: cam.onToggleFollow, panBy: cam.onPan,
+    centerOnCar: cam.onCenter, setFollowCar: cam.onToggleFollow, overview: cam.onOverview, heldKeys: cam,
   }, onToggleView, active);
 
   return (
     <Scene3DFrame surface={map} host={host} scene={scene} state={state} mode={mode} onModeChange={setMode} followMode="chase"
-      onRetry={() => setRetry(value => value + 1)} onToggleView={onToggleView} active={active} ariaLabel="Race 3D view" hostLabel="3D track. Drag to orbit, scroll to zoom." className={className}
+      onRetry={() => setRetry(value => value + 1)} onToggleView={onToggleView} active={active} ariaLabel="Race 3D view" hostLabel="3D track. In Orbit, drag to orbit and right-drag to pan. Wheel or plus/minus zooms. WASD moves level, E/Q up/down, Shift faster." className={className}
       controlsBefore={<><CornerCardButton /><ReplayShortcutHelp view="race3d" enabled={active} /></>}>
       {/* As the lap view's 3D page: the minimap top left with the corner card under it, the camera controls top right with the
           timing under them, 14 px apart (beside them once they stand in a column). */}

@@ -1,4 +1,5 @@
 import { Matrix4, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import type { HeldKey } from '../camera/heldKeys.js';
 import type { SpotCar } from '../night/carSpots.js';
 import { isBraking } from '../car/lampStates.js';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
@@ -27,11 +28,15 @@ export interface ReplaySceneHandle {
   beforeFrame(hook: ((frameTime: number) => void) | null): void;
   mode(mode: CameraMode): void;
   reset(): void;
+  /** The whole lap from the air at an angle, in orbit view (`CameraRig.overview`). */
+  overview(): void;
   /** Frames a lap's samples `start` to `end` (`points`) from the free camera, outside the turn at `apex` (orbit mode only). */
   frameStretch(points: ReplayTrajectoryPoint[], start: number, end: number, apex: number): void;
   center(): void;
   zoom(direction: number): void;
-  pan(horizontal: number, vertical: number): void;
+  /** A held camera key went down or up: the camera moves each frame while held (`heldKeys.ts`). */
+  holdKey(key: HeldKey, down: boolean): void;
+  releaseKeys(): void;
   /** Draws a corner's driving marks on each lap's line (null clears them); laps shown later keep them. */
   showMarks(marks: DrivingMark[] | null): void;
   /** Recolour both racing lines with a 2D map heat-map mode. */
@@ -184,6 +189,7 @@ export async function createReplayScene(
       shell.invalidate();
     },
     reset: () => rig.reset(),
+    overview() { if (shell.setMode('orbit')) layer.syncLines(); rig.overview(); shell.invalidate(); },
     frameStretch(points, start, end, apex) {
       const at = (index: number) => new Vector3(...nativeToScene(points[index], origin));
       const last = Math.min(end, points.length - 1);
@@ -195,7 +201,8 @@ export async function createReplayScene(
     },
     center: () => rig.center(),
     zoom: direction => rig.zoom(direction),
-    pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
+    holdKey: (key, down) => rig.holdKey(key, down),
+    releaseKeys: () => rig.releaseKeys(),
     showMarks(marks) {
       shownMarks = marks; layer.showMarks(marks);
       shell.invalidate();

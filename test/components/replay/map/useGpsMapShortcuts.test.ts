@@ -135,8 +135,9 @@ describe('useGpsMapShortcuts', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '0' }));
     expect(onResetZoom).toHaveBeenCalledTimes(1);
 
+    // R is the 2D / 3D switch now: 0 alone resets.
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r' }));
-    expect(onResetZoom).toHaveBeenCalledTimes(2);
+    expect(onResetZoom).toHaveBeenCalledTimes(1);
   });
 
   it('toggles playback with Space when in full screen', () => {
@@ -302,7 +303,7 @@ describe('useGpsMapShortcuts target scoping', () => {
     map.remove();
   });
 
-  it('switches 2D / 3D with E from the chart, map or unfocused page, and drops marker A with X on the map', () => {
+  it('switches 2D / 3D with R from the chart, map or unfocused page, and drops marker A with X on the map', () => {
     const map = document.createElement('div'); map.dataset.replaySurface = 'map';
     const chart = document.createElement('div'); chart.dataset.replaySurface = 'chart';
     document.body.append(map, chart);
@@ -310,7 +311,8 @@ describe('useGpsMapShortcuts target scoping', () => {
     renderHook(() => useGpsMapShortcuts({ isExpanded: false, containerRef: { current: map }, points: pts, currentIndex: 1,
       onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetZoom: vi.fn(), onToggleView, onToggleMarker }));
     const key = (el: Element, init: KeyboardEventInit) => el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
-    key(chart, { key: 'e' }); key(map, { key: 'E' }); key(map, { key: 'e', repeat: true }); key(document.body, { key: 'e' });
+    key(chart, { key: 'r' }); key(map, { key: 'R' }); key(map, { key: 'r', repeat: true }); key(document.body, { key: 'r' });
+    key(map, { key: 'e' }); key(map, { key: 'b' });
     expect(onToggleView).toHaveBeenCalledTimes(3);
     key(chart, { key: 'x' });
     expect(onToggleMarker).not.toHaveBeenCalled();

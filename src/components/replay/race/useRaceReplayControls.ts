@@ -1,6 +1,8 @@
 import { useEffect, useEffectEvent } from 'react';
 import { useReplayKeys } from '../../../utils/replayShortcuts.js';
 import { RACE_SPEEDS, type RaceClock } from './raceClock.js';
+import { heldKeyOf } from '../view3d/camera/heldKeys.js';
+import { useHeldCameraKeys, type HeldKeyActions } from '../view3d/camera/useHeldCameraKeys.js';
 
 /** Seconds an arrow key moves the clock; Shift moves it further, Ctrl less. */
 const SEEK_SEC = 5;
@@ -32,25 +34,36 @@ export interface RaceMapCamera {
   resetPanZoom: () => void;
   centerOnCar: () => void;
   setFollowCar: (value: boolean | ((current: boolean) => boolean)) => void;
-  panBy: (horizontal: number, vertical: number) => void;
+  panBy?: (horizontal: number, vertical: number) => void;
+  /** 9, the 3D view: the whole circuit from the air at an angle. */
+  overview?: () => void;
+  /** The 3D view's held movement and zoom controls. */
+  heldKeys?: HeldKeyActions;
 }
 
 const PAN_KEYS: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] };
 
 /**
- * The lap map's keys on the race map or 3D camera, from anywhere on the race replay: + and − zoom, 0 or R shows the circuit (resets
- * the camera), C centres and F follows the followed car, W/A/S/D pan, E switches between the 2D map and the 3D view. The camera's own
+ * The lap map's keys on the race map or 3D camera, from anywhere on the race replay: + and − zoom, 0 shows the circuit (resets the
+ * camera), C centres and F follows the followed car, W/A/S/D pan (3D: fly, with E/Q up/down and Shift faster), R switches between the 2D map and the
+ * 3D view, 9 (3D) shows the whole circuit from the air. The camera's own
  * C and F (map focused) and these act once: the first prevents the other. Off while `active` is false (a view kept loaded, hidden).
  */
 export function useRaceMapKeys(camera: RaceMapCamera, onToggleView?: () => void, active = true): void {
-  const pan = (event: KeyboardEvent) => camera.panBy(...PAN_KEYS[event.key.toLowerCase()]);
+  const pan = camera.panBy;
   const reset = { run: () => camera.resetPanZoom(), repeat: true };
+  const { heldKeys } = camera;
+  useHeldCameraKeys(heldKeys, active);
+  const hold = heldKeys && { run: (event: KeyboardEvent) => { const key = heldKeyOf(event.key); if (key) heldKeys.onHoldKey(key, true); } };
+  const panKey = hold ?? (pan && { run: (event: KeyboardEvent) => pan(...PAN_KEYS[event.key.toLowerCase()]), repeat: true });
+  const zoomIn = hold ?? { run: () => camera.zoomIn(), repeat: true }, zoomOut = hold ?? { run: () => camera.zoomOut(), repeat: true };
   useReplayKeys({
-    w: { run: pan, repeat: true }, a: { run: pan, repeat: true }, s: { run: pan, repeat: true }, d: { run: pan, repeat: true },
-    '+': { run: () => camera.zoomIn(), repeat: true }, '=': { run: () => camera.zoomIn(), repeat: true },
-    '-': { run: () => camera.zoomOut(), repeat: true }, '0': reset, r: reset,
+    w: panKey, a: panKey, s: panKey, d: panKey,
+    ...(hold && { q: hold, e: hold, Shift: hold }),
+    '+': zoomIn, '=': zoomIn, '-': zoomOut, '_': hold ? zoomOut : undefined, '0': reset,
     c: () => camera.centerOnCar(), f: () => camera.setFollowCar(value => !value),
-    ...(onToggleView && { e: onToggleView }),
+    ...(onToggleView && { r: onToggleView }),
+    ...(camera.overview && { '9': camera.overview }),
   }, 'page', active);
 }
 

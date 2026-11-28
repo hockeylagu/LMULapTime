@@ -1,4 +1,5 @@
-import { useEffect, type Dispatch, type ReactNode, type RefObject, type SetStateAction } from 'react';
+import { useEffect, useRef, type Dispatch, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject, type SetStateAction } from 'react';
+import { movesCamera, type HeldKey } from '../camera/heldKeys.js';
 import { MapViewSwitchButton } from '../../map/display/MapViewSwitchButton.js';
 import { MapControlsOverlay } from '../../map/MapControlsOverlay.js';
 import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from '../camera/cameraModes.js';
@@ -11,6 +12,8 @@ import type { SceneHostState } from './useSceneHost.js';
  * map's do: their row (about 370 px from the right) would cover the minimap (about 190 px from the left).
  */
 const NARROW_SCENE_CONTROLS = '@max-[600px]:flex-col @max-[600px]:gap-1 @max-[600px]:p-1';
+/** How far a press moves (px) before it is a drag. */
+const DRAG_THRESHOLD_PX = 4;
 /** A panel under the controls' row (the race timing) moves beside their column in a narrow scene. */
 export const NARROW_SCENE_BESIDE_CONTROLS = '@max-[600px]:top-2 @max-[600px]:right-[58px]';
 
@@ -19,7 +22,9 @@ interface CameraControls {
   zoom(direction: number): void;
   reset(): void;
   center(): void;
-  pan?(horizontal: number, vertical: number): void;
+  overview?(): void;
+  holdKey(key: HeldKey, down: boolean): void;
+  releaseKeys(): void;
 }
 
 /** Shared camera actions for `Scene3DFrame` and the lap/race keyboard shortcuts. */
@@ -34,11 +39,15 @@ export function cameraActions(
     onZoomOut: () => scene.current?.zoom(-1),
     onReset: () => scene.current?.reset(),
     onCenter: () => scene.current?.center(),
-    onPan: (horizontal: number, vertical: number) => {
-      if (carLockedCamera(mode)) onModeChange('orbit');
-      scene.current?.pan?.(horizontal, vertical);
-    },
+    /** The whole lap from the air (orbit view; the scene switches its own camera first, the view's mode follows). */
+    onOverview: () => { onModeChange('orbit'); scene.current?.overview?.(); },
     onToggleFollow: () => onModeChange(value => (followsCar(value) ? 'orbit' : followMode)),
+    /** A movement key switches a car-locked camera to Orbit. */
+    onHoldKey: (key: HeldKey, down: boolean) => {
+      if (down && movesCamera(key) && carLockedCamera(mode)) onModeChange('orbit');
+      scene.current?.holdKey(key, down);
+    },
+    onReleaseKeys: () => scene.current?.releaseKeys(),
   };
 }
 
@@ -80,25 +89,33 @@ interface Props {
 /** The 3D view's frame, for lap and race: the host the scene draws into, the camera controls, and the loading and streaming cards; each view's own panels go in the slots. */
 export function Scene3DFrame({
   surface, host, scene, state, mode, onModeChange, followMode, onRetry, onToggleView, active = true, expanded, className = '', ariaLabel,
-  hostLabel = '3D track. Drag to orbit, scroll to zoom. Left/Right: step replay. WASD: pan camera.',
+  hostLabel = '3D track. In Orbit, drag to orbit and right-drag to pan. Wheel or plus/minus zooms. Left/Right steps replay. WASD moves level, E/Q up/down, Shift faster.',
   top, children, overlays, controlsBefore, controlsAfter, bottom, streamingClassName = 'bottom-2',
 }: Props) {
   useCameraModeShortcuts(surface, onModeChange);
   useEffect(() => { if (active) surface.current?.focus({preventScroll: true}); }, [active, surface]);
   const actions = cameraActions(scene, mode, onModeChange, followMode);
+  // A drag in trackside hands the camera over to orbit, as a movement key does; a click stays a click.
+  const press = useRef<{x: number; y: number} | null>(null);
+  const handOver = (event: ReactPointerEvent) => {
+    if (mode !== 'trackside' || !press.current || !event.buttons) return;
+    if (Math.hypot(event.clientX - press.current.x, event.clientY - press.current.y) >= DRAG_THRESHOLD_PX) { press.current = null; onModeChange('orbit'); }
+  };
   return (
     <div ref={surface} data-replay-surface="map" data-replay-view="3d" data-map-expanded={expanded ? '' : undefined} tabIndex={0} aria-label={ariaLabel}
       className={`relative flex flex-col overflow-hidden bg-lmu-deep outline-none ${className}`}>
       {top}
       <div className="@container relative flex-1 min-h-0 overflow-hidden">
-        <div ref={host} tabIndex={0} onPointerDown={event => event.currentTarget.focus({preventScroll: true})}
+        <div ref={host} tabIndex={0} onPointerMove={handOver}
+          onPointerDown={event => { press.current = {x: event.clientX, y: event.clientY}; event.currentTarget.focus({preventScroll: true}); }}
+          onPointerUp={() => { press.current = null; }} onPointerCancel={() => { press.current = null; }}
           aria-label={hostLabel} className="relative w-full h-full outline-none" />
         {children}
         <MapControlsOverlay onZoomIn={actions.onZoomIn} onZoomOut={actions.onZoomOut} onReset={actions.onReset}
           followCar={followsCar(mode)} onToggleFollowCar={actions.onToggleFollow}
           onCenterCar={actions.onCenter}
           orientation="horizontal" className={`top-2 right-3 bottom-auto ${NARROW_SCENE_CONTROLS}`}>
-          <CameraModeControl mode={mode} onChange={onModeChange} />
+          <CameraModeControl mode={mode} onChange={onModeChange} onOverview={actions.onOverview} />
           <TimeOfDayButton />
           {controlsBefore}
           <MapViewSwitchButton view="3d" onToggleView={onToggleView} />

@@ -194,7 +194,7 @@ describe('RaceReplayView', () => {
     const before = zoom();
     act(() => { fireEvent.keyDown(window, { key: '+' }); });
     expect(zoom()).not.toBe(before);
-    act(() => { fireEvent.keyDown(window, { key: 'r' }); });
+    act(() => { fireEvent.keyDown(window, { key: '0' }); });
     expect(zoom()).toBe(before);
     const slider = screen.getAllByLabelText('Session time').find(element => element.tagName === 'INPUT') as HTMLInputElement;
     act(() => { fireEvent.keyDown(window, { key: 'End' }); });
@@ -208,10 +208,10 @@ describe('RaceReplayView', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Switch to the 3D view');
   });
 
-  it('switches to the 3D view with E', async () => {
+  it('switches to the 3D view with R', async () => {
     view();
     await screen.findByTestId('map-controls-overlay');
-    act(() => { fireEvent.keyDown(window, { key: 'e' }); });
+    act(() => { fireEvent.keyDown(window, { key: 'r' }); });
     expect((await screen.findByTestId('race-3d')).closest('[hidden]')).toBeNull();
   });
 

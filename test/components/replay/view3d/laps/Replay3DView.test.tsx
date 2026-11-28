@@ -13,7 +13,7 @@ import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../.
 import { ReplayFullscreenControlsContext, type ReplayFullscreenControls } from '../../../../../src/components/replay/inspector/replayFullscreenControls.js';
 import type { CornerSegmentComparison } from '../../../../../src/utils/cornerAnalysis/types.js';
 
-const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), frameStretch: vi.fn(), showMarks: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
+const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), overview: vi.fn(), frameStretch: vi.fn(), showMarks: vi.fn(), center: vi.fn(), zoom: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), showTrace: vi.fn(), pickTrace: vi.fn(async () => null), hoverTrace: vi.fn(), holdKey: vi.fn(), releaseKeys: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
 vi.mock('../../../../../src/components/replay/view3d/laps/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene), lapFirstStation: () => 0}));
 vi.mock('../../../../../src/components/replay/view3d/scene/sceneShell.js', () => ({createSceneShell: () => ({started: false, broken: false, detach() {}, dispose() {}})}));
 const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
@@ -105,35 +105,44 @@ it('steps the replay exactly once without moving the camera, including half-seco
   fireEvent.keyDown(map, {key: 'ArrowLeft', shiftKey: true}); expect(onSelectIndex).toHaveBeenLastCalledWith(0);
   fireEvent.keyDown(map, {key: 'Home'}); expect(onSelectIndex).toHaveBeenLastCalledWith(0);
   fireEvent.keyDown(map, {key: 'End'}); expect(onSelectIndex).toHaveBeenLastCalledWith(6);
-  expect(onSelectIndex).toHaveBeenCalledTimes(6); expect(scene.pan).not.toHaveBeenCalled();
+  expect(onSelectIndex).toHaveBeenCalledTimes(6); expect(scene.holdKey).not.toHaveBeenCalled();
 });
 
-it('binds camera zoom, pan, reset, center and follow, keeping chart arrow/zoom keys independent', async () => {
+it('binds camera zoom, fly, reset, overview and follow, keeping chart arrow/zoom keys independent', async () => {
   const {map, chart, onSelectIndex} = await setup();
-  for (const key of ['+', '=', '-']) fireEvent.keyDown(map, {key});
-  expect(scene.zoom.mock.calls).toEqual([[1], [1], [-1]]);
-  for (const key of ['w', 'A', 's', 'D']) fireEvent.keyDown(map, {key});
-  expect(scene.pan.mock.calls).toEqual([[0, -1], [-1, 0], [0, 1], [1, 0]]);
-  fireEvent.keyDown(map, {key: '0'}); fireEvent.keyDown(map, {key: 'r'}); expect(scene.reset).toHaveBeenCalledTimes(2);
+  // Held keys: a press starts the move, its release (anywhere, + released as = after Shift) ends it, a repeat changes nothing.
+  for (const key of ['+', '=', '-', '_']) fireEvent.keyDown(map, {key});
+  fireEvent.keyDown(map, {key: '+', repeat: true}); fireEvent.keyUp(window, {key: '='});
+  expect(scene.holdKey.mock.calls).toEqual([['in', true], ['in', true], ['out', true], ['out', true], ['in', false]]);
+  scene.holdKey.mockClear();
+  // E up, Q down, Shift faster; a letter under Shift is still its own key.
+  for (const key of ['w', 'A', 's', 'D', 'q', 'E', 'Shift']) fireEvent.keyDown(map, {key});
+  fireEvent.keyUp(window, {key: 'Shift'}); fireEvent.keyUp(window, {key: 'E'});
+  expect(scene.holdKey.mock.calls).toEqual([['w', true], ['a', true], ['s', true], ['d', true],
+    ['q', true], ['e', true], ['shift', true], ['shift', false], ['e', false]]);
+  fireEvent.blur(window); expect(scene.releaseKeys).toHaveBeenCalled();
+  expect(scene.zoom).not.toHaveBeenCalled();
+  fireEvent.keyDown(map, {key: '0'}); expect(scene.reset).toHaveBeenCalledOnce();
+  fireEvent.keyDown(map, {key: '9'}); expect(scene.overview).toHaveBeenCalledOnce(); // The whole circuit from the air.
   fireEvent.keyDown(chart, {key: 'C'}); expect(scene.center).toHaveBeenCalledOnce();
-  expect(scene.mode).toHaveBeenLastCalledWith('orbit'); // Panning hands the locked follow camera over to orbit.
+  expect(scene.mode).toHaveBeenLastCalledWith('orbit'); // Flying hands the locked follow camera over to orbit.
   fireEvent.keyDown(map, {key: 'f'}); expect(scene.mode).toHaveBeenLastCalledWith('follow');
   fireEvent.keyDown(chart, {key: 'F'}); expect(scene.mode).toHaveBeenLastCalledWith('orbit');
-  onSelectIndex.mockClear(); scene.zoom.mockClear();
+  onSelectIndex.mockClear(); scene.holdKey.mockClear();
   fireEvent.keyDown(chart, {key: 'ArrowRight'}); fireEvent.keyDown(chart, {key: '+'});
-  expect(onSelectIndex).not.toHaveBeenCalled(); expect(scene.zoom).not.toHaveBeenCalled();
+  expect(onSelectIndex).not.toHaveBeenCalled(); expect(scene.holdKey).not.toHaveBeenCalled();
 });
 
-it('defaults to Chase, keeps it through zoom and center, and hands a pan over to Orbit so the car never drifts off-centre', async () => {
+it('defaults to Chase, keeps it through zoom and center, and hands a move over to Orbit so the car never drifts off-centre', async () => {
   const {map} = await setup();
   expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Chase');
   expect(scene.mode).toHaveBeenLastCalledWith('chase'); scene.mode.mockClear();
   for (const key of ['+', '-', 'c']) fireEvent.keyDown(map, {key});
-  expect(scene.zoom).toHaveBeenCalledTimes(2); expect(scene.center).toHaveBeenCalledOnce();
+  expect(scene.holdKey).toHaveBeenCalledTimes(2); expect(scene.center).toHaveBeenCalledOnce();
   expect(scene.mode).not.toHaveBeenCalled();
   expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Chase');
   for (const key of ['w', 'a']) fireEvent.keyDown(map, {key});
-  expect(scene.pan).toHaveBeenCalledTimes(2); expect(scene.mode).toHaveBeenLastCalledWith('orbit');
+  expect(scene.holdKey).toHaveBeenCalledTimes(4); expect(scene.mode).toHaveBeenLastCalledWith('orbit');
   expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Orbit');
 });
 
@@ -226,6 +235,10 @@ it('supports floating map controls overlay buttons (zoom, center, follow, reset,
   expect(switchBtn).toHaveTextContent('2D');
   fireEvent.click(switchBtn);
   expect(onReturnTo2D).toHaveBeenCalledOnce();
+  // R switches back to 2D; E is the camera's turn now.
+  const map = document.querySelector<HTMLElement>('[data-replay-view="3d"]')!;
+  fireEvent.keyDown(map, {key: 'e'}); expect(onReturnTo2D).toHaveBeenCalledOnce();
+  fireEvent.keyDown(map, {key: 'r'}); expect(onReturnTo2D).toHaveBeenCalledTimes(2);
 });
 
 it('supports top control buttons (return to 2D, color modes, primary/baseline line fading)', async () => {
@@ -304,6 +317,31 @@ it('opens camera mode popover from the HUD button and changes camera mode on sel
   fireEvent.click(chaseOption);
   expect(scene.mode).toHaveBeenLastCalledWith('chase');
   expect(screen.queryByRole('group', {name: 'Camera modes'})).not.toBeInTheDocument();
+});
+
+it('shows the whole circuit from the camera menu, under the modes', async () => {
+  await setup();
+  fireEvent.click(screen.getByRole('button', {name: '3D camera'}));
+  const whole = screen.getByRole('button', {name: /Whole circuit/});
+  expect(whole).toHaveTextContent('9'); expect(whole).not.toHaveAttribute('aria-pressed');
+  fireEvent.click(whole);
+  expect(scene.overview).toHaveBeenCalledOnce(); expect(scene.mode).toHaveBeenLastCalledWith('orbit');
+  expect(screen.queryByRole('group', {name: 'Camera modes'})).not.toBeInTheDocument();
+});
+
+it('hands a trackside drag over to orbit, and leaves a click in trackside', async () => {
+  const {map} = await setup();
+  fireEvent.keyDown(map, {key: '7'}); expect(scene.mode).toHaveBeenLastCalledWith('trackside');
+  const track = screen.getByLabelText(/^3D track/);
+  fireEvent.pointerDown(track, {clientX: 100, clientY: 100, buttons: 1});
+  fireEvent.pointerMove(track, {clientX: 102, clientY: 101, buttons: 1});
+  fireEvent.pointerUp(track, {clientX: 102, clientY: 101});
+  expect(scene.mode).toHaveBeenLastCalledWith('trackside'); // A click, not a drag.
+  fireEvent.pointerMove(track, {clientX: 140, clientY: 100, buttons: 0}); // Hovering moves no camera.
+  expect(scene.mode).toHaveBeenLastCalledWith('trackside');
+  fireEvent.pointerDown(track, {clientX: 100, clientY: 100, buttons: 1});
+  fireEvent.pointerMove(track, {clientX: 110, clientY: 100, buttons: 1});
+  expect(scene.mode).toHaveBeenLastCalledWith('orbit');
 });
 
 it('keeps friction, legend and trace controls working through expand and collapse', async () => {
@@ -402,3 +440,4 @@ it('repeats a picked corner from its entry, keeping the camera until the corner 
   expect(cursor.loopOf(trajectory.points)).toBeNull();
   expect(scene.showMarks).toHaveBeenLastCalledWith(null);
 });
+

@@ -90,12 +90,12 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   }, [trackGeometry, trajectory.bounds, svgPoints]);
 
   const cam = cameraActions(scene, mode, setMode, 'follow');
-  useGpsMapShortcuts({isExpanded, containerRef: map, points: trajectory.points, currentIndex, onSelectIndex,
+  useGpsMapShortcuts({active, isExpanded, containerRef: map, points: trajectory.points, currentIndex, onSelectIndex,
     onZoomIn: cam.onZoomIn, onZoomOut: cam.onZoomOut, onResetZoom: cam.onReset,
-    onPan: cam.onPan, onCenter: cam.onCenter, onToggleFollow: cam.onToggleFollow,
+    onCenter: cam.onCenter, onOverview: cam.onOverview, onToggleFollow: cam.onToggleFollow,
     onCycleGhostSync: baseline ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode, ghostSync.markerDistM !== null)) : undefined,
     onToggleMarker: () => toggleGhostMarker(ghostSync, primaryDists[activeIndex] ?? 0),
-    onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded(), onToggleView: onReturnTo2D});
+    heldKeys: cam, onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded(), onToggleView: onReturnTo2D});
   // What drives the car and wheels, for the curious: hover the toolbar rather than read it under every frame.
   const sources = state?.ready ? [state.cars, state.wheelMotion, baseline ? {distance: 'Same-station ghost', time: 'Same-time ghost', anchored: 'Ghost on time from marker A'}[ghostSync.mode] : ''].filter(Boolean).join(' · ') : undefined;
 

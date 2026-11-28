@@ -15,7 +15,7 @@ export interface MapViewSwitchButtonProps {
 export const MapViewSwitchButton: React.FC<MapViewSwitchButtonProps> = ({ view, onToggleView }) => {
   const targetView = view === '2d' ? '3d' : '2d';
   const label = targetView === '3d' ? 'Switch to 3D view' : 'Switch to 2D view';
-  const title = `${label} (E)`;
+  const title = `${label} (R)`;
   const text = targetView === '3d' ? '3D' : '2D', Icon = targetView === '3d' ? Box : MapIcon;
 
   return (
@@ -24,7 +24,7 @@ export const MapViewSwitchButton: React.FC<MapViewSwitchButtonProps> = ({ view, 
       onClick={onToggleView}
       aria-label={label}
       title={title}
-      aria-keyshortcuts="E"
+      aria-keyshortcuts="R"
       data-testid="map-view-switch-btn"
       className={`h-7 px-2 flex items-center justify-center gap-1 rounded-lg border border-lmu-accent/30 bg-lmu-accent/10 hover:bg-lmu-accent/20 hover:border-lmu-accent/50 text-lmu-accent-text text-[11px] font-bold font-mono transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
     >

@@ -19,6 +19,7 @@ import { assertHazed } from '../atmosphere/haze.js';
 import { linkConvolution } from '../reflectionCube.js';
 import { createAutoExposure, type DisplayTransform } from '../autoExposure.js';
 import { createPointerSurface, type DrawnCamera, type RaySpan } from './pointerSurface.js';
+import { createTracksideSight } from '../camera/tracksideSight.js';
 import { underCarBaker } from '../car/carContactShadow.js';
 import { readoutPainter } from '../car/readoutCanvas.js';
 import { linkUnderCarBake } from '../car/underCarBake.js';
@@ -245,7 +246,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; content?.refreshHeights(); invalidate(); }, 250);
   };
   // The scene and its cameras exist from the start, so the first view's chunks warm up as each arrives, while the others still load.
-  const scene = new Scene(), rig = createCameraRig(renderer.domElement, origin, () => invalidate());
+  const scene = new Scene(), rig = createCameraRig(renderer.domElement, origin, () => invalidate(), (point, referenceY, clearanceM) => ground.lift(point, origin, referenceY, clearanceM));
   /** The camera in the cloud field's frame: LMU local x and z, the height above the scene origin's. */
   const cloudEye = (): CloudEye => { const {x, y, z} = rig.camera.position; return [x + origin.x, y, origin.z - z]; };
   const sunMeter = (at: SceneSun, eye: CloudEye) => at.clouds.sheets
@@ -354,6 +355,8 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   const drawnCameras = {perspective: new PerspectiveCamera(), orthographic: new OrthographicCamera()};
   let drawnView: DrawnCamera = drawnCameras.perspective;
   const pointer = createPointerSurface(renderer);
+  /** Keeps the trackside camera's view of the car clear: one pixel drawn from each place it may stand (`tracksideSight.ts`). */
+  const sight = createTracksideSight((view, spans) => pointer.within(scene, view, 500, 500, 1001, 1001, spans));
   let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
   /** What waits for the next frame to be drawn (`afterFrame`). */
   const afterFrames: Array<{run: () => void; fail: (error: Error) => void}> = [];
@@ -365,13 +368,15 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     // First, while this frame has issued no draws: the fetch waits for every command before it.
     exposure.collect();
     if (frameTime !== undefined) frameHook?.(frameTime);
+    // Held camera keys move the camera by the frame's time and keep frames coming while held.
+    if (frameTime !== undefined && rig.step(frameTime)) invalidate();
     updateStream();
     // Zoomed trackside views keep every resident instance (their distance scale follows the zoom), as do the free views.
     batches.cull(followsCar(rig.mode) ? rig.camera.position : null, rig.lodMultiplier);
     if (texturesChanged()) report(); // Textures sharpen a band per frame, each frame asking for the next.
     const camera = rig.camera;
     desiredEye.copy(camera.position);
-    if (rig.checksGround) ground.resolve(desiredEye, rig.focus, origin, correctedEye);
+    if (rig.checksGround) ground.resolve(desiredEye, rig.focus, origin, correctedEye, rig.mode === 'orbit');
     else correctedEye.copy(desiredEye);
     const corrected = !correctedEye.equals(desiredEye);
     if (corrected) {
@@ -408,6 +413,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       exposure.render(scene, camera, !asked); asked = false;
       drawnView = camera instanceof PerspectiveCamera ? drawnCameras.perspective.copy(camera, false) : drawnCameras.orthographic.copy(camera, false);
       for (const waiting of afterFrames.splice(0)) waiting.run();
+      if (camera instanceof PerspectiveCamera) sight.update(rig.trackside, camera, rig.focus, frameStart);
       // The car's reflection probe renders up to three faces after the frame (car/carReflection.ts), around the body's centre.
       if (car?.visible && reflection.update(car.getWorldPosition(probeCentre), environment.shadowsRedrawn, frameStart + FRAME_BUDGET_MS)) invalidate();
     } finally {
@@ -479,6 +485,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
     isAttached: view => host === view,
     detach(view) {
       if (host !== view) return;
+      rig.releaseKeys();
       observer.disconnect(); renderer.domElement.remove();
       host = null; listener = null; frameHook = null;
       if (content) { world.remove(content.root); content = null; }

@@ -28,6 +28,9 @@ it('uses BVH terrain intersections to bring an obstructed camera above banking a
     await open.add('flat', flat);
     const clear = new Vector3(60, 1.5, -50);
     expect(open.resolve(clear, new Vector3(40, 0.5, -50), origin, new Vector3())).toEqual(clear);
+    const lowPivot = new Vector3(40, -2, -50);
+    expect(open.resolve(clear, lowPivot, origin, new Vector3(), true)).toEqual(clear);
+    expect(lowPivot.y).toBe(-2);
   } finally { collision.dispose(); open.dispose(); }
 });
 
@@ -39,6 +42,11 @@ it('keeps the eye above resident ground, preserves native handedness, and lets t
   try {
     await collision.add('road', root);
     expect(collision.resolve(eye, look, origin, new Vector3()).y).toBeCloseTo(4.2);
+    // An eye on the box's top must rise to its clearance; one well above it need not.
+    expect(collision.lift(new Vector3(0, 3, 0), origin)).toBeCloseTo(1.2);
+    expect(collision.lift(new Vector3(0, 30, 0), origin)).toBe(0);
+    // A large orbit drag can put the requested eye below the vertical probe's normal starting height.
+    expect(collision.lift(new Vector3(0, -500, 0), origin, 3)).toBeCloseTo(504.2);
     expect(road.geometry.getAttribute('position').array).toEqual(original);
     collision.dispose();
     expect(collision.resolve(eye, look, origin, new Vector3())).toEqual(eye);

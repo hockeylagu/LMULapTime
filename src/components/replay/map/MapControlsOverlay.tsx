@@ -103,7 +103,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         onClick={onReset}
         aria-label="Reset zoom and pan"
         className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
-        title="Reset View (R)"
+        title="Reset View (0)"
       >
         <RotateCcw className="w-3.5 h-3.5" />
       </button>

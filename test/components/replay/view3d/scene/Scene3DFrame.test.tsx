@@ -1,4 +1,4 @@
-import { createRef, useState, type RefObject } from 'react';
+import { createRef, useState, type ComponentProps, type RefObject } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Scene3DFrame } from '../../../../../src/components/replay/view3d/scene/Scene3DFrame.js';
@@ -6,7 +6,7 @@ import type { CameraMode } from '../../../../../src/components/replay/view3d/cam
 
 afterEach(cleanup);
 
-interface Camera { zoom: (direction: number) => void; reset: () => void; center: () => void }
+type Camera = NonNullable<ComponentProps<typeof Scene3DFrame>['scene']['current']>;
 interface FrameProps { ready?: boolean; error?: string; active?: boolean; onToggleView?: () => void; onRetry?: () => void; scene?: RefObject<Camera | null> }
 
 function Frame({ ready = true, error, active = true, onToggleView = vi.fn(), onRetry = vi.fn(), scene = createRef<Camera>() }: FrameProps) {
@@ -25,12 +25,12 @@ it('places each view panel in its slot on the shared surface', () => {
   expect(surface).toHaveAttribute('data-replay-surface', 'map');
   expect(surface).toHaveAttribute('data-replay-view', '3d');
   for (const text of ['top slot', 'content slot', 'overlay slot', 'bottom slot']) expect(screen.getByText(text)).toBeInTheDocument();
-  expect(screen.getByLabelText(/^3D track\. Drag to orbit/)).toBeInTheDocument();
+  expect(screen.getByLabelText(/^3D track\. In Orbit/)).toBeInTheDocument();
   expect(screen.getByTestId('map-controls-overlay')).toBeInTheDocument();
 });
 
 it('drives the scene camera from its buttons and switches the view', () => {
-  const scene = { current: { zoom: vi.fn(), reset: vi.fn(), center: vi.fn() } }, onToggleView = vi.fn();
+  const scene = { current: { zoom: vi.fn(), reset: vi.fn(), center: vi.fn(), holdKey: vi.fn(), releaseKeys: vi.fn() } }, onToggleView = vi.fn();
   render(<Frame scene={scene} onToggleView={onToggleView} />);
   fireEvent.click(screen.getByTestId('map-controls-overlay').querySelectorAll('button')[0]);
   expect(scene.current.zoom).toHaveBeenCalled();

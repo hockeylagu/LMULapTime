@@ -1,4 +1,5 @@
 import { Box3, Euler, Group, Matrix4, Quaternion, Vector3, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import type { HeldKey } from '../camera/heldKeys.js';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { RaceReplayCar, ReplayDaylightClock, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
@@ -32,9 +33,13 @@ export interface RaceSceneHandle {
   follow(slot: number | null, body: LoadedBody | null, signal?: AbortSignal): Promise<boolean>;
   mode(mode: CameraMode): void;
   reset(): void;
+  /** The followed car's lap from the air at an angle, in orbit view (`CameraRig.overview`); nothing without a followed car. */
+  overview(): void;
   center(): void;
   zoom(direction: number): void;
-  pan(horizontal: number, vertical: number): void;
+  /** A held camera key went down or up: the camera moves each frame while held (`heldKeys.ts`). */
+  holdKey(key: HeldKey, down: boolean): void;
+  releaseKeys(): void;
   /**
    * The car the frame shows under a point of the canvas (CSS pixels from its top left corner); null for none (`carPick.ts`). A car
    * too small on screen is not picked, nor one hidden there by anything the frame draws in front of it (scenery, another car).
@@ -401,9 +406,14 @@ export async function createRaceScene(
       if (shell.setMode(next)) shell.invalidate();
     },
     reset: () => rig.reset(),
+    overview() {
+      if (!rig.hasLap) return;
+      shell.setMode('orbit'); rig.overview(); shell.invalidate();
+    },
     center: () => rig.center(),
     zoom: direction => rig.zoom(direction),
-    pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
+    holdKey: (key, down) => rig.holdKey(key, down),
+    releaseKeys: () => rig.releaseKeys(),
     // Right after a frame: the cars where that frame drew them, as the pointer sees them.
     pick: (x, y) => shell.afterFrame(() => {
       // Each car's box: its body, or the fixed box for a stand-in, on the road under it (a pose is the body's centre, above the road).

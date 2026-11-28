@@ -49,10 +49,12 @@ export function useCameraModeShortcuts(map: React.RefObject<HTMLElement | null>,
 interface CameraModeControlProps {
   mode: CameraMode;
   onChange: (mode: CameraMode) => void;
+  /** The whole circuit from the air (key 9): an orbit view placed once, so it stands under the modes, never pressed. */
+  onOverview: () => void;
 }
 
 /** Camera picker in the map controls column: a disclosure like the Layers control, one pressed button per mode. */
-export const CameraModeControl: React.FC<CameraModeControlProps> = ({ mode, onChange }) => {
+export const CameraModeControl: React.FC<CameraModeControlProps> = ({ mode, onChange, onOverview }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -69,6 +71,7 @@ export const CameraModeControl: React.FC<CameraModeControlProps> = ({ mode, onCh
   }, [open]);
 
   const activeOption = CAMERA_MODES.find(opt => opt.value === mode) ?? CAMERA_MODES[0];
+  const pick = (act: () => void) => { act(); setOpen(false); trigger.current?.focus(); };
 
   return (
     <div
@@ -113,32 +116,31 @@ export const CameraModeControl: React.FC<CameraModeControlProps> = ({ mode, onCh
         >
           <div aria-hidden="true" className="text-xs font-semibold text-lmu-text mb-1.5 px-1">Camera mode</div>
           <div className="flex flex-col gap-0.5">
-            {CAMERA_MODES.map(opt => {
-              const selected = opt.value === mode;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => {
-                    onChange(opt.value);
-                    setOpen(false);
-                    trigger.current?.focus();
-                  }}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors cursor-pointer ${
-                    selected ? 'bg-lmu-raised text-white font-semibold' : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
-                  } ${FOCUS_RING}`}
-                >
-                  <span>{opt.label}</span>
-                  <kbd className="text-[10px] font-mono text-lmu-muted bg-lmu-deep/60 px-1 py-0.5 rounded border border-lmu-border">
-                    {opt.shortcut}
-                  </kbd>
-                </button>
-              );
-            })}
+            {CAMERA_MODES.map(opt => (
+              <CameraOption key={opt.value} label={opt.label} shortcut={opt.shortcut} pressed={opt.value === mode} onPick={() => pick(() => onChange(opt.value))} />
+            ))}
+            <div aria-hidden="true" className="my-1 border-t border-lmu-border" />
+            <CameraOption label="Whole circuit" shortcut="9" onPick={() => pick(onOverview)} />
           </div>
         </div>
       )}
     </div>
   );
 };
+
+/** One row of the camera menu: its label and key; `pressed` only on the modes. */
+function CameraOption({label, shortcut, pressed, onPick}: {label: string; shortcut: string; pressed?: boolean; onPick: () => void}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onPick}
+      className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors cursor-pointer ${
+        pressed ? 'bg-lmu-raised text-white font-semibold' : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
+      } ${FOCUS_RING}`}
+    >
+      <span>{label}</span>
+      <kbd className="text-[10px] font-mono text-lmu-muted bg-lmu-deep/60 px-1 py-0.5 rounded border border-lmu-border">{shortcut}</kbd>
+    </button>
+  );
+}

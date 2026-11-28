@@ -4,7 +4,6 @@ import { X } from 'lucide-react';
 import { isPageTarget, useReplayKeys } from '../../utils/replayShortcuts.js';
 import { useModalFocus } from '../common/useModalFocus.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
-import { CAMERA_MODES } from './view3d/camera/cameraModes.js';
 
 const shortcuts = [
   ['Shift + wheel', 'Zoom around the mouse'], ['Shift + drag', 'Zoom into a range'],
@@ -13,37 +12,39 @@ const shortcuts = [
   ['Shift + ← / →', 'Move cursor by 0.5 seconds'], ['Space', 'Play / pause'],
   [', / .', 'Slower / faster playback (0.25× to 2×)'],
   ['Home / End', 'Lap start / end'], ['+ / −', 'Zoom around the cursor'],
-  ['0 / R / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],
+  ['0 / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],
   ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['V', 'Ghost sync: distance / time (/ from A with a marker)'], ['Minimap drag', 'Pan camera to circuit sector'],
-  ['M', 'Toggle fullscreen map'], ['E', 'Switch to the 3D view'], ['T', 'Hide / show fullscreen trace'], ['K', 'Hide / show the corner card (fullscreen map)'], ['L', 'Session replay at the cursor\'s moment'],
+  ['M', 'Toggle fullscreen map'], ['R', 'Switch to the 3D view'], ['T', 'Hide / show fullscreen trace'], ['K', 'Hide / show the corner card (fullscreen map)'], ['L', 'Session replay at the cursor\'s moment'],
   ['W / A / S / D', 'Pan map up / left / down / right'],
   ['Esc', 'Exit fullscreen / cancel gesture / close help'], ['?', 'Show shortcuts'],
 ];
 const shortcuts3d = [
-  ...CAMERA_MODES.map(option => [option.shortcut, `${option.label} camera`]),
-  ['Drag / right drag', 'Orbit / pan camera'], ['Wheel / + / −', 'Zoom camera'],
+  ['1 – 9', 'Camera modes and the whole circuit: see the camera menu'],
+  ['Left drag / right drag', 'Orbit / pan. Overhead can also pan.'], ['Wheel / + / −', 'Zoom camera'],
   ['← / →', 'Previous / next recorded sample'], ['Shift + ← / →', 'Move cursor by 0.5 seconds'],
   ['Home / End', 'Lap start / end'], ['Space', 'Play / pause'], [', / .', 'Slower / faster playback (0.25× to 2×)'],
-  ['W / A / S / D', 'Pan camera up / left / down / right'], ['C', 'Center on car, keep zoom'],
+  ['W / S', 'Move forward / back at the same height'], ['A / D', 'Move left / right'],
+  ['E / Q', 'Fly up / down'], ['Shift', 'Fly faster'], ['C', 'Center on car, keep zoom'],
   ['F', 'Toggle follow car'], ['V', 'Ghost sync: distance / time (/ from A with a marker)'],
-  ['X', 'Marker A at the car: ghost runs from A (again: clear)'], ['Backspace', 'Back to marker A and play'], ['0 / R', 'Reset camera'], ['M', 'Toggle fullscreen map'], ['E', 'Back to the 2D map'], ['K', 'Hide / show the corner card'],
+  ['X', 'Marker A at the car: ghost runs from A (again: clear)'], ['Backspace', 'Back to marker A and play'], ['0', 'Reset camera'], ['M', 'Toggle fullscreen map'], ['R', 'Back to the 2D map'], ['K', 'Hide / show the corner card'],
   ['L', 'Session replay at the cursor\'s moment'], ['Esc', 'Exit fullscreen / close help'], ['?', 'Show shortcuts'],
 ];
 
 const shortcutsRace = [
   ['Space', 'Play / pause'], ['← / →', 'Back / forward 5 seconds'], ['Shift + ← / →', 'Back / forward 30 seconds'], ['Ctrl + ← / →', 'Back / forward 1 second'],
   [', / .', 'Slower / faster playback (1× to 16×)'], ['Home / End', 'Session start / end'],
-  ['+ / −', 'Zoom map'], ['0 / R / dbl-click', 'Show the whole circuit'], ['C', 'Center map on the followed car, keep zoom'],
+  ['+ / −', 'Zoom map'], ['0 / dbl-click', 'Show the whole circuit'], ['C', 'Center map on the followed car, keep zoom'],
   ['F', 'Toggle follow car'], ['W / A / S / D', 'Pan map up / left / down / right'],
-  ['E', 'Switch to the 3D view'], ['K', 'Hide / show the corner card'], ['L', 'The followed car\'s lap in the lap view, at this moment'], ['Click a car or row', 'Follow that car'], ['?', 'Show shortcuts'],
+  ['R', 'Switch to the 3D view'], ['K', 'Hide / show the corner card'], ['L', 'The followed car\'s lap in the lap view, at this moment'], ['Click a car or row', 'Follow that car'], ['?', 'Show shortcuts'],
 ];
 const shortcutsRace3d = [
-  ...CAMERA_MODES.map(option => [option.shortcut, `${option.label} camera`]),
-  ['Drag / right drag', 'Orbit / pan camera'], ['Wheel / + / −', 'Zoom camera'],
+  ['1 – 9', 'Camera modes and the whole circuit: see the camera menu'],
+  ['Left drag / right drag', 'Orbit / pan. Overhead can also pan.'], ['Wheel / + / −', 'Zoom camera'],
   ['Space', 'Play / pause'], ['← / →', 'Back / forward 5 seconds'], ['Shift + ← / →', 'Back / forward 30 seconds'], ['Ctrl + ← / →', 'Back / forward 1 second'],
   [', / .', 'Slower / faster playback (1× to 16×)'], ['Home / End', 'Session start / end'],
-  ['W / A / S / D', 'Pan camera up / left / down / right'], ['C', 'Center on the followed car, keep zoom'],
-  ['F', 'Toggle follow car'], ['0 / R', 'Reset camera'], ['E', 'Back to the 2D map'], ['K', 'Hide / show the corner card'],
+  ['W / S', 'Move forward / back at the same height'], ['A / D', 'Move left / right'],
+  ['E / Q', 'Fly up / down'], ['Shift', 'Fly faster'], ['C', 'Center on the followed car, keep zoom'],
+  ['F', 'Toggle follow car'], ['0', 'Reset camera'], ['R', 'Back to the 2D map'], ['K', 'Hide / show the corner card'],
   ['L', 'The followed car\'s lap in the lap view, at this moment'], ['Click a row', 'Follow that car'], ['?', 'Show shortcuts'],
 ];
 type ShortcutView = 'telemetry' | '3d' | 'race' | 'race3d';
@@ -51,9 +52,9 @@ const SHORTCUTS: Record<ShortcutView, string[][]> = { telemetry: shortcuts, '3d'
 const TITLES: Record<ShortcutView, string> = { telemetry: 'Telemetry shortcuts', '3d': '3D replay shortcuts', race: 'Race replay shortcuts', race3d: 'Race 3D shortcuts' };
 const NOTES = {
   telemetry: 'The keys work anywhere on the replay; the arrows, Home/End, + / − and X move the chart, or the map when it is focused or fullscreen. Dragging the map pauses following.',
-  '3d': 'Follow is the default. Drag, pan or zoom without leaving Follow. Choose a mode with 1–8; camera controls and typing keep their own keys.',
+  '3d': 'Movement keys switch from Follow, Trackside or a car-mounted view to Orbit.',
   race: 'The keys work anywhere on the race replay. Dragging the map pauses following.',
-  race3d: 'The keys work anywhere on the race replay; choose a camera with 1–8 on the 3D view. Chase is the default.',
+  race3d: 'The keys work anywhere on the race replay; choose a camera with 1 – 9 on the 3D view. Chase is the default.',
 };
 
 /** The help button and dialog of a view; `enabled` false (a view kept loaded, hidden) leaves ? to the view shown. */

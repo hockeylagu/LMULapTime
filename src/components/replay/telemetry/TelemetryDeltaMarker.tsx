@@ -83,7 +83,7 @@ export interface MarkerAButtonProps {
   className?: string;
 }
 
-/** The visible way to X: set A at the cursor, move it there, or clear it when the cursor is on A. */
+/** The visible way to B: set A at the cursor, move it there, or clear it when the cursor is on A. */
 export function MarkerAButton({ markerDistM, cursorDistM, onToggle, className = '' }: MarkerAButtonProps) {
   const atCursor = markerDistM !== null && cursorDistM !== undefined && Math.abs(markerDistM - cursorDistM) < 0.5;
   const label = markerDistM === null ? 'Set A' : atCursor ? 'Clear A' : 'Move A';

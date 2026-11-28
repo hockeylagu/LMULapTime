@@ -477,10 +477,14 @@ it('hands its shell to the next view: one renderer, the canvas moving to its ele
   const before = await openScene(first, layout, lap, null, vi.fn(), assets, shell);
   const canvas = shell.renderer.domElement;
   expect(canvas.parentElement).toBe(first);
+  before.mode('orbit');
+  before.holdKey('w', true);
+  expect(shell.rig.step(0)).toBe(true);
   before.dispose();
   expect(canvas.parentElement).toBeNull();
   const steps: SceneLoadProgress[] = [];
   const after = await openScene(second, layout, lap, null, vi.fn(), assets, shell, progress => steps.push(progress));
+  expect(shell.rig.step(16)).toBe(false);
   expect(shell.renderer.domElement).toBe(canvas);
   expect(canvas.parentElement).toBe(second);
   expect(shell.scene.getObjectsByProperty('name', 'body-envelope').length).toBeGreaterThan(0);

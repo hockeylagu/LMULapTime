@@ -64,7 +64,12 @@ export interface SceneryGround {
    */
   add(id: string, root: Object3D, coarse?: boolean): Promise<void>;
   /** Moves a camera eye (display frame) above the ground and in front of anything between it and `look`. */
-  resolve(eye: Vector3, look: Vector3, origin: Vector3, result: Vector3): Vector3;
+  resolve(eye: Vector3, look: Vector3, origin: Vector3, result: Vector3, clearRayStart?: boolean): Vector3;
+  /**
+   * Metres a camera point (display frame) must rise to stand `clearanceM` above the ground under it (an eye's clearance by default;
+   * 0 for the point it looks at); 0 when it does. `referenceY`: a height above it to look down from.
+   */
+  lift(point: Vector3, origin: Vector3, referenceY?: number, clearanceM?: number): number;
   dispose(): void;
 }
 
@@ -93,10 +98,15 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
     }
     return found ? nearest : null;
   };
-  const aboveGround = (position: Vector3) => {
+  const aboveGround = (position: Vector3, referenceY = position.y, clearanceM = GROUND_CLEARANCE_M) => {
     cameraRay.origin.set(position.x, position.y + 60, position.z); cameraRay.direction.set(0, -1, 0);
-    const distance = nearestHit(cameraRay, CAMERA, 0, 400);
-    if (distance !== null) position.y = Math.max(position.y, cameraRay.origin.y - distance + GROUND_CLEARANCE_M);
+    let distance = nearestHit(cameraRay, CAMERA, 0, 400);
+    if (distance === null && referenceY > position.y + 60) {
+      // A wide orbit can move the eye below the terrain in one pointer event.
+      cameraRay.origin.y = referenceY + 60;
+      distance = nearestHit(cameraRay, CAMERA, 0, Math.max(400, cameraRay.origin.y - position.y));
+    }
+    if (distance !== null) position.y = Math.max(position.y, cameraRay.origin.y - distance + clearanceM);
   };
   heightRay.direction.set(0, -1, 0);
   return {
@@ -139,9 +149,11 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
       catch (error) { if (chunks.get(id) === chunk) chunks.delete(id); geometry.dispose(); throw error; }
       finally { chunk.cancel = () => {}; }
     },
-    resolve(eye, look, origin, result) {
+    resolve(eye, look, origin, result, clearRayStart = false) {
       nativeEye.set(eye.x + origin.x, eye.y + origin.y, origin.z - eye.z);
       nativeLook.set(look.x + origin.x, look.y + origin.y + 0.1, origin.z - look.z);
+      // A free orbit pivot can be below the road after descending. Lift only the ray start.
+      if (clearRayStart) aboveGround(nativeLook);
       aboveGround(nativeEye);
       direction.subVectors(nativeEye, nativeLook);
       const length = direction.length();
@@ -154,6 +166,12 @@ export function createSceneryGround(roadHeightAt: RoadHeightLookup): SceneryGrou
         }
       }
       return result.set(nativeEye.x - origin.x, nativeEye.y - origin.y, origin.z - nativeEye.z);
+    },
+    lift(point, origin, referenceY = point.y, clearanceM = GROUND_CLEARANCE_M) {
+      nativeEye.set(point.x + origin.x, point.y + origin.y, origin.z - point.z);
+      const before = nativeEye.y;
+      aboveGround(nativeEye, referenceY + origin.y, clearanceM);
+      return nativeEye.y - before;
     },
     dispose() {
       disposed = true;

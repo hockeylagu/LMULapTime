@@ -21,7 +21,7 @@ describe('replay shortcut help', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     rerender(<ReplayShortcutHelp view="race3d" />);
     fireEvent.keyDown(window, { key: '?' });
-    expect(screen.getByRole('dialog', { name: 'Race 3D shortcuts' })).toHaveTextContent('Chase camera');
+    expect(screen.getByRole('dialog', { name: 'Race 3D shortcuts' })).toHaveTextContent('Camera modes and the whole circuit');
     expect(screen.getByRole('dialog')).toHaveTextContent('Back to the 2D map');
   });
 });
