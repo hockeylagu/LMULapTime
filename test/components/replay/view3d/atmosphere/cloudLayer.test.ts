@@ -71,6 +71,23 @@ describe('cloud layer', () => {
     expect([...((uniforms.cloudEndMap.value as DataTexture).image.data as Uint8Array)]).toEqual([32, 128, 255, 255]);
   });
 
+  it('takes another moment\'s sun and sheets in place: the sheets\' meshes change, the material, its program and its maps stay', () => {
+    const clouds = testClouds(), layer = createCloudLayer(clouds, cloudSheets(clouds, moment('0fff0'), 0), light, AT_ORIGIN);
+    const [first] = layer.group.children as Mesh[], material = materialOf(first), maps = composedTextures(material);
+    const disposed: string[] = [];
+    first.geometry.addEventListener('dispose', () => disposed.push('geometry'));
+    material.addEventListener('dispose', () => disposed.push('material'));
+    layer.light({sunDirection: new Vector3(0, 1, 0), sunGreen: 20, cloudCover: 1});
+    layer.place(cloudSheets(clouds, moment('0ffff'), 0));
+    const meshes = layer.group.children as Mesh[], uniforms = uniformsOf(meshes[0]);
+    // Overcast: the sun weight is 1, times the green 20, over pi; straight up stays straight up in the field's axes.
+    expect([uniforms.cloudSunLight.value, (uniforms.cloudSunDirection.value as Vector3).toArray()]).toEqual([20 / Math.PI, [0, 1, -0]]);
+    expect([meshes.length, meshes.includes(first), meshes[0].material === material, composedTextures(materialOf(meshes[0])), disposed]).toEqual([1, false, true, maps, ['geometry']]);
+    // The new sheet is laid out and ordered as the first ones were.
+    expect([meshes[0].matrixAutoUpdate, meshes[0].renderOrder]).toEqual([false, -1]);
+    layer.dispose();
+  });
+
   it('composes the program: the lit template with the cloud\'s own light and alpha, drawn at the far limit, under half the haze distance', () => {
     const clouds = testClouds(), layer = createCloudLayer(clouds, cloudSheets(clouds, moment('0fff0'), 0), light, AT_ORIGIN);
     const material = materialOf(layer.group.children[0] as Mesh), parts = composedParts(material) ?? [], [cloud] = parts;

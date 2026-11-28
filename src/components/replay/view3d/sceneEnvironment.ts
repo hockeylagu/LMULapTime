@@ -242,14 +242,21 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     setScene('lit_dayLight', Math.max(dayShare(venue.shading.ambient, night && night.sunShare === 0 ? 0 : radiance.g), night?.dayShare ?? 0));
     setScene('surface_crownSun', toLight.toArray()); // Foliage cards tilt their lighting normal up less as they come to face the sun.
     if (lit && turned) cascades.pass.setLight(toLight.clone().negate());
-    // The clouds are lit by the sun before they dim it, as it stood when they were made: made again when it moves (the daylight
-    // switched back to night kept day-lit clouds). The first environment and the venue capture are taken without them.
-    if (!lit || turned || clouds.sheets !== shownSheets) {
-      if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }
-      shownSheets = clouds.sheets;
-      cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toLight.clone(), sunGreen: clearSun.g, cloudCover: weather.cloudCover}, fieldOrigin) : null;
-      if (cloudLayer) scene.add(cloudLayer.group);
+    // The clouds are lit by the sun before they dim it, by the sun and coverage of each moment (the daylight switched back to night
+    // must not keep day-lit clouds). A moment's sheets replace the last ones' meshes only: a layer made again at each sun step linked
+    // its program and uploaded its maps again in a frame (45-110 ms at Spa). The first environment and the venue capture are taken
+    // without them.
+    const cloudLight = {sunDirection: toLight.clone(), sunGreen: clearSun.g, cloudCover: weather.cloudCover};
+    if (!clouds.sheets) {
+      if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); cloudLayer = null; }
+    } else if (!cloudLayer) {
+      cloudLayer = createCloudLayer(venue.sky.clouds, clouds.sheets, cloudLight, fieldOrigin);
+      scene.add(cloudLayer.group);
+    } else {
+      cloudLayer.light(cloudLight);
+      if (clouds.sheets !== shownSheets) cloudLayer.place(clouds.sheets);
     }
+    shownSheets = clouds.sheets;
     if (!venueProbe && environments) {
       firstEnvironment?.dispose();
       firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: ENVIRONMENT_FACE_PX});

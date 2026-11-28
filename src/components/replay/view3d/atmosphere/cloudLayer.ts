@@ -27,6 +27,13 @@ export interface CloudLayer {
   group: Group;
   /** Orders the sheets far to near from the camera (scene space): before the other transparent objects, each over the ones behind it. */
   order(camera: Vector3): void;
+  /**
+   * Draws another moment's sheets: only their geometry is made again. The materials (their program) and maps stay, so a sun step
+   * links and uploads no map again.
+   */
+  place(sheets: CloudSheet[]): void;
+  /** Lights the sheets for another moment's sun and coverage: only uniforms change. */
+  light(light: CloudLayerLight): void;
   dispose(): void;
 }
 
@@ -123,10 +130,18 @@ function mapTexture(map: CloudMapLevels & { channels?: 1 | 3 }): DataTexture {
   return texture;
 }
 
+/** The sun's light on a cloud material (its `cloudSunLight`): the material's sun weight for the coverage, times the sun's light, over pi. */
+function cloudSunLight(material: SceneryCloudMaterial, light: CloudLayerLight): number {
+  const {diffuse} = material.light;
+  return (diffuse.clear + (diffuse.overcast - diffuse.clear) * light.cloudCover) * light.sunGreen / Math.PI;
+}
+
+/** Toward the sun in the cloud field's axes (LMU local: the scene's z turned), as `cloudSunDirection` reads it. */
+const cloudSunDirection = (light: CloudLayerLight, into: Vector3) => into.set(light.sunDirection.x, light.sunDirection.y, -light.sunDirection.z);
+
 /** A cloud material's uniforms (its light block, maps and the field's alpha rule) for the lighting of a moment. */
 function cloudUniforms(clouds: SceneryClouds, material: SceneryCloudMaterial, light: CloudLayerLight, texture: (key: string, alpha?: boolean) => Texture) {
-  const { opacity, light: L } = material, { alpha, averagedInputs: A } = clouds, { x, y, z } = light.sunDirection;
-  const weight = L.diffuse.clear + (L.diffuse.overcast - L.diffuse.clear) * light.cloudCover;
+  const { opacity, light: L } = material, { alpha, averagedInputs: A } = clouds;
   return {
     cloudAlphaMap: { value: texture(material.cloudMap, true) }, cloudDensityMap: { value: texture(material.cloudMap) },
     cloudSideMap: { value: texture(material.sideMap) }, cloudEndMap: { value: texture(material.endMap) },
@@ -137,7 +152,7 @@ function cloudUniforms(clouds: SceneryClouds, material: SceneryCloudMaterial, li
     cloudAlbedoRandom: { value: new Vector2(L.albedo.randomMax, L.albedo.randomMin) }, cloudAmbient: { value: new Vector2(L.ambient.scalar, L.ambient.occlusion) },
     cloudBacklight: { value: [L.backlight.narrowScalar, L.backlight.narrowPower, L.backlight.wideScalar, L.backlight.widePower] },
     cloudBase: { value: L.backlight.base }, cloudDepthScale: { value: L.diffuse.depthScale },
-    cloudSunLight: { value: weight * light.sunGreen / Math.PI }, cloudSunDirection: { value: new Vector3(x, y, -z) },
+    cloudSunLight: { value: cloudSunLight(material, light) }, cloudSunDirection: { value: cloudSunDirection(light, new Vector3()) },
   };
 }
 
@@ -187,11 +202,13 @@ function sheetGeometry(sheet: CloudSheet): BufferGeometry {
 }
 
 /**
- * The cloud layer of a moment: the placed sheets as meshes, each at its centre, in a group at `fieldOrigin` (where the cloud
- * field's origin is in the scene: the LMU local origin at the height the sheets were placed for). Nothing in it moves.
+ * The cloud layer: the placed sheets as meshes, each at its centre, in a group at `fieldOrigin` (where the cloud field's origin is
+ * in the scene: the LMU local origin at the height the sheets were placed for). Nothing in it moves between `place` calls.
  */
 export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], light: CloudLayerLight, fieldOrigin: Vector3): CloudLayer {
   const group = new Group(), textures = new Map<string, DataTexture>(), materials = new Map<string, ShaderMaterial>();
+  /** Each material's cloud and its uniforms, which `light` sets again. */
+  const lit: {cloud: SceneryCloudMaterial; uniforms: ReturnType<typeof cloudUniforms>}[] = [];
   group.name = 'clouds'; group.position.copy(fieldOrigin);
   const texture = (key: string, alpha = false) => {
     const id = `${alpha ? 'alpha' : 'light'}:${key}`;
@@ -199,33 +216,51 @@ export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], li
     if (!made) { made = mapTexture(alpha ? clouds.maps[key] : clouds.lightMaps[key]); textures.set(id, made); }
     return made;
   };
+  let current = light;
   const materialOf = (cloud: SceneryCloudMaterial) => {
     let made = materials.get(cloud.name);
     if (made) return made;
-    made = cloudMaterial(cloudUniforms(clouds, cloud, light, texture));
-    materials.set(cloud.name, made);
+    const uniforms = cloudUniforms(clouds, cloud, current, texture);
+    made = cloudMaterial(uniforms);
+    materials.set(cloud.name, made); lit.push({cloud, uniforms});
     return made;
   };
-  // Each sheet's mesh at its centre, in the scene.
-  const placed = sheets.map(sheet => {
-    const mesh = new Mesh(sheetGeometry(sheet), materialOf(sheet.materials[0]));
-    mesh.frustumCulled = false; mesh.position.set(sheet.centre[0], sheet.centre[1], -sheet.centre[2]);
-    group.add(mesh);
-    return {mesh, at: mesh.position.clone().add(fieldOrigin), distance: 0};
-  });
-  group.traverse(object => { object.updateMatrix(); object.matrixAutoUpdate = false; });
-  group.updateMatrixWorld(true);
+  let placed: {mesh: Mesh; at: Vector3; distance: number}[] = [];
+  const camera = new Vector3(); // From the scene origin until a camera orders them.
   // Three's own sort would draw them near to far under the reversed depth buffer: the clip depth falls with distance there.
-  const order = (camera: Vector3) => {
-    for (const sheet of placed) sheet.distance = sheet.at.distanceToSquared(camera);
+  const order = (eye: Vector3) => {
+    camera.copy(eye);
+    for (const sheet of placed) sheet.distance = sheet.at.distanceToSquared(eye);
     [...placed].sort((a, b) => b.distance - a.distance).forEach((sheet, i) => { sheet.mesh.renderOrder = i - placed.length; });
   };
-  order(new Vector3()); // From the scene origin until a camera orders them.
+  // Each sheet's mesh at its centre, in the scene; the sheets it had go with their geometry, the materials and maps stay.
+  const place = (next: CloudSheet[]) => {
+    for (const {mesh} of placed) { group.remove(mesh); mesh.geometry.dispose(); }
+    placed = next.map(sheet => {
+      const mesh = new Mesh(sheetGeometry(sheet), materialOf(sheet.materials[0]));
+      mesh.frustumCulled = false; mesh.position.set(sheet.centre[0], sheet.centre[1], -sheet.centre[2]);
+      mesh.updateMatrix(); mesh.matrixAutoUpdate = false;
+      group.add(mesh);
+      return {mesh, at: mesh.position.clone().add(fieldOrigin), distance: 0};
+    });
+    group.updateMatrix(); group.matrixAutoUpdate = false;
+    group.updateMatrixWorld(true);
+    order(camera);
+  };
+  place(sheets);
   return {
     group,
     order,
+    place,
+    light(next) {
+      current = next;
+      for (const {cloud, uniforms} of lit) {
+        uniforms.cloudSunLight.value = cloudSunLight(cloud, next);
+        cloudSunDirection(next, uniforms.cloudSunDirection.value);
+      }
+    },
     dispose() {
-      group.children.forEach(child => { (child as Mesh).geometry.dispose(); });
+      for (const {mesh} of placed) mesh.geometry.dispose();
       materials.forEach(material => { material.dispose(); }); textures.forEach(made => { made.dispose(); });
     },
   };
