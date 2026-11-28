@@ -1,4 +1,4 @@
-import { Matrix4, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Matrix4, OrthographicCamera, Vector3, type PerspectiveCamera } from 'three';
 import type { HeldKey } from '../camera/heldKeys.js';
 import type { SpotCar } from '../night/carSpots.js';
 import { isBraking } from '../car/lampStates.js';
@@ -22,8 +22,8 @@ import type { SceneLoadProgress } from '../scene/loadProgress.js';
 import { stationAt } from '../scenery/streamView.js';
 import type { SceneContent, SceneShell } from '../scene/sceneShell.js';
 
-/** How near the pointer a sample's foot picks it overhead, in CSS pixels (`metresPerPixel` measures drawn ones). */
-const OVERHEAD_PICK_REACH_PX = 12;
+/** How near the pointer a sample's foot picks it, in CSS pixels (`metresPerPixel` measures drawn ones). */
+const FOOT_PICK_REACH_PX = 16;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
@@ -120,7 +120,7 @@ export async function createReplayScene(
   /** Where each car stands between its samples, for the curtains' cursor lines. */
   const primaryAt: CursorAt = {index: 0, fraction: 0}, ghostAt: CursorAt = {index: 0, fraction: 0};
   /** Read only while a free camera shows a trace (`curtainStep`): it walks the lap's points when the camera moved. */
-  const lapInView = () => shell.rig.lapInViewM;
+  const lapReach = () => shell.rig.lapReachM;
   /** The shell's content for a lap layer: the cars and lines, with the ghost's parts following the camera's distance. */
   const contentOf = (lap: LapLayer): SceneContent => {
     const fadeGhost = ghostFader(lap.ghost);
@@ -130,7 +130,7 @@ export async function createReplayScene(
       root: lap.root, reflected: lap.primary,
       beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
         lap.syncParts();
-        lap.syncTrace(shell.rig.mode, camera, lapInView, lap.primary.visible ? primaryAt : null, lap.ghost.visible ? ghostAt : null);
+        lap.syncTrace(shell.rig.mode, camera, lapReach, lap.primary.visible ? primaryAt : null, lap.ghost.visible ? ghostAt : null);
         // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
         // parts follow the camera's distance.
         if (lap.ghost.visible) {
@@ -254,10 +254,13 @@ export async function createReplayScene(
     pickTrace: (x, y) => shell.afterFrame(() => {
       const ray = shell.pointerRay(x, y);
       let best: (StripHit & {lap: TracePick['lap']}) | null = null;
-      // Overhead, a curtain stands edge-on: the sample whose foot is nearest the pointer, within a few pixels.
-      const overhead = shell.rig.mode === 'top';
+      // A pointer a few pixels off the line still picks its nearest foot, past the near fade: overhead a curtain stands edge-on, from a
+      // high orbit it is a thin sheet, and where the value is 0 only its line on the road is left.
+      const camera = shell.rig.camera, px = FOOT_PICK_REACH_PX * shell.renderer.getPixelRatio();
+      const reach = camera instanceof OrthographicCamera ? {fixedM: px * metresPerPixel(camera, ray.origin), perMetreM: 0}
+        : {fixedM: 0, perMetreM: px * metresPerPixel(camera, ray.at(1, new Vector3()))};
       for (const {lap, mesh, count, lift} of layer.pickable()) {
-        const hit = overhead ? pickStripFoot(mesh, count, ray, OVERHEAD_PICK_REACH_PX * shell.renderer.getPixelRatio() * metresPerPixel(shell.rig.camera, ray.origin)) : pickStrip(mesh, count, ray, lift);
+        const hit = (shell.rig.mode === 'top' ? null : pickStrip(mesh, count, ray, lift)) ?? pickStripFoot(mesh, count, ray, {...reach, fromM: lift?.shownFromM});
         if (hit && (!best || hit.distance < best.distance)) best = {...hit, lap};
       }
       if (!best) return null;

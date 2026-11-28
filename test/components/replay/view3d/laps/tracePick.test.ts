@@ -19,9 +19,13 @@ it('picks the sample whose foot is nearest a ray from straight above, where the 
   const down = (x: number, z: number) => new Ray(new Vector3(x, 500, z), new Vector3(0, -1, 0));
   // Native z 5 sits at scene z -5; straight down at x 123, a metre off the line: never on the sheet, but by its foot.
   expect(pickStrip(curtain, curtainFillIndexCount(curtain), down(123, -4))).toBeNull();
-  const hit = pickStripFoot(curtain, curtainFillIndexCount(curtain), down(123, -4), 5)!;
+  const hit = pickStripFoot(curtain, curtainFillIndexCount(curtain), down(123, -4), {fixedM: 5, perMetreM: 0})!;
   expect(hit.index).toBe(12); expect(hit.point.y).toBeCloseTo(0, 1); expect(hit.distance).toBeCloseTo(500, 0);
-  expect(pickStripFoot(curtain, curtainFillIndexCount(curtain), down(123, 10), 5)).toBeNull(); // 15 m off: out of reach.
+  expect(pickStripFoot(curtain, curtainFillIndexCount(curtain), down(123, 10), {fixedM: 5, perMetreM: 0})).toBeNull(); // 15 m off: out of reach.
+  // A perspective reach widens with the distance: 15 m off from 500 m up is within 0.04 m a metre (20 m there).
+  expect(pickStripFoot(curtain, curtainFillIndexCount(curtain), down(123, 10), {fixedM: 0, perMetreM: 0.04})?.index).toBe(12);
+  // Faded out near a driver camera: a foot nearer the eye than that does not pick.
+  expect(pickStripFoot(curtain, curtainFillIndexCount(curtain), down(123, -4), {fixedM: 5, perMetreM: 0, fromM: 600})).toBeNull();
 });
 
 it('picks the curtain sample under the ray through the mirrored world, the nearest hit first', () => {

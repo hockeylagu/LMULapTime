@@ -88,9 +88,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       /** Shows a channel's trace curtains in place of the racing lines (`curtainLayer.ts`); null shows the lines again. */
       showTrace(values: LapCurtains | null) { curtains.show(values); applyLineOpacity(); },
       /** Each frame: the curtains' camera-distance fade and height, and their cursor lines at the lap's and the ghost's samples. */
-      syncTrace(mode: CameraMode, camera: PerspectiveCamera | OrthographicCamera, lapInView: () => number, primaryAt: CursorAt | null, baselineAt: CursorAt | null) {
+      syncTrace(mode: CameraMode, camera: PerspectiveCamera | OrthographicCamera, lapReach: () => number, primaryAt: CursorAt | null, baselineAt: CursorAt | null) {
         if (!curtains.shown) return;
-        curtains.camera(mode, camera, lapInView); curtains.cursor(primaryAt, baselineAt);
+        curtains.camera(mode, camera, lapReach); curtains.cursor(primaryAt, baselineAt);
       },
       /** The hover line on a curtain where the pointer is (null: none). */
       hoverTrace(at: CurtainHover | null) { curtains.hover(at); },

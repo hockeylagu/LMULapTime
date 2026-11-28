@@ -82,9 +82,10 @@ it('stands the cursor line where the car is between samples, as tall as the curt
   expect(hover.visible).toBe(false);
   layer.hover({lap: 'primary', index: 2});
   expect(hover.visible).toBe(true); expect(hover.position.x).toBe(2); expect(hover.scale.y).toBeCloseTo(CURTAIN_HEIGHT_M);
-  expect(hover.material.opacity).toBe(0.5);
-  // Its bar lies across the lap (along x here): its local x turned onto z, so overhead it shows.
-  expect(new Vector3(1, 0, 0).applyEuler(hover.rotation).x).toBeCloseTo(0);
+  expect(hover.material.opacity).toBe(0.5); expect(hover.material.depthTest).toBe(false);
+  // A ring lies on the road round its foot, 7 px out, so overhead it shows; the car's cursor line has none.
+  const reach = (mesh: Mesh) => { const box = mesh.geometry.boundingBox ?? (mesh.geometry.computeBoundingBox(), mesh.geometry.boundingBox!); return [box.max.x, box.max.z, box.max.y]; };
+  expect(reach(hover)).toEqual([7, 7, 1]); expect(reach(cursor as Mesh)).toEqual([1, 1, 1]);
   layer.hover(null); expect(hover.visible).toBe(false);
   layer.fade(1, 0);
   expect(layer.pickable().baseline?.visible).toBe(false);
@@ -99,7 +100,7 @@ it('steps its height from a far free camera, with slack going down, and keeps it
   // Beside the car: its own height, without walking the lap for the distance.
   const unread = () => { throw Error('read the lap distance'); };
   for (const mode of ['chase', 'cockpit', 'trackside'] as const) expect(curtainStep(mode, camera, unread, 3)).toBe(0);
-  // Orbit: the step nearest 8 % of the height seen where it looks at the lap; 500 m off wants ~37 m: 30 m (100 from 55 m).
+  // Orbit: the step nearest 8 % of the height seen at the lap's nearest point; 500 m off wants ~37 m: 30 m (100 from 55 m).
   expect(CURTAIN_STEPS_M[curtainStep('orbit', camera, () => 500, 0)]).toBe(30);
   expect(wantedAt(500)).toBeCloseTo(37.3, 1);
   // Coming back to ~15 m wanted stays at 30 (slack); only under 13 m does it step down.
@@ -127,3 +128,13 @@ it('measures the metres a pixel covers at the depth seen: the width of the curta
   expect(metresPerPixel(top, new Vector3(0, -800, 0))).toBeCloseTo(0.5); // 500 m on 1000 px, anywhere.
 });
 
+it('marks the hovered point where the value is 0, while the cursor line of the car goes with the curtain there', () => {
+  const root = new Group(), lap = lapOf(3);
+  const layer = createCurtainLayer(root, new Vector3(), () => 0, () => display, lap, null);
+  layer.show({primary: values([[0, 0, 0]]), baseline: null});
+  layer.cursor({index: 1, fraction: 0}, null); layer.hover({lap: 'primary', index: 1});
+  const group = root.getObjectByName('trace-curtains')!;
+  expect(group.children.find(child => child.name === 'curtain-cursor')?.visible).toBe(false);
+  expect(group.getObjectByName('curtain-hover')?.visible).toBe(true);
+  layer.dispose();
+});

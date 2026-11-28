@@ -27,7 +27,7 @@ const FOOT_LIFT_M = 0.02;
  * height was either unreadable from the air or towering close by); a step changes rarely and the legend names it.
  */
 export const CURTAIN_STEPS_M = [CURTAIN_HEIGHT_M, 10, 30, 100] as const;
-/** The height a free camera wants: this share of the height it sees where it looks at the lap; it stands at the nearest step. */
+/** The height a free camera wants: this share of the height it sees at the lap's nearest point; it stands at the nearest step. */
 const VIEW_SHARE = 0.08; // 5.5 % stepped up too late (driver, 2026-11-28).
 /**
  * Slack: a step is reached at the (geometric) midpoint to the one before it, and left downward only under this share of that
@@ -42,14 +42,14 @@ export const CURTAIN_RISE_ATTRIBUTE = 'curtainRise';
 const CURTAIN_WIDEN_ATTRIBUTE = 'curtainWiden';
 
 /**
- * The curtain's step (an index into `CURTAIN_STEPS_M`) for a camera `lapInView()` metres from the lap where it looks (read only for a
- * free perspective camera), from the step it stands
+ * The curtain's step (an index into `CURTAIN_STEPS_M`) for a camera `lapReach()` metres from the lap's nearest point (read only for a
+ * free perspective camera, so turning it keeps the step), from the step it stands
  * at: the first beside the car (the car cameras and trackside, which frame it); from the free cameras (orbit and overhead), the step
  * nearest `VIEW_SHARE` of the height seen there (an orthographic camera sees its frame's height everywhere), with slack going down.
  */
-export function curtainStep(mode: CameraMode, camera: PerspectiveCamera | OrthographicCamera, lapInView: () => number, current: number): number {
+export function curtainStep(mode: CameraMode, camera: PerspectiveCamera | OrthographicCamera, lapReach: () => number, current: number): number {
   if (mode !== 'orbit' && mode !== 'top') return 0;
-  const seen = 'isPerspectiveCamera' in camera ? 2 * Math.tan(MathUtils.degToRad(camera.fov) / 2) * lapInView() : camera.top - camera.bottom;
+  const seen = 'isPerspectiveCamera' in camera ? 2 * Math.tan(MathUtils.degToRad(camera.fov) / 2) * lapReach() : camera.top - camera.bottom;
   const wanted = seen / camera.zoom * VIEW_SHARE;
   let step = Math.min(current, CURTAIN_STEPS_M.length - 1);
   while (step + 1 < CURTAIN_STEPS_M.length && wanted >= stepFrom(step + 1)) step++;

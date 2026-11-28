@@ -59,10 +59,10 @@ export interface CameraRig {
   /** The point the camera looks at (scene coordinates). */
   readonly focus: Vector3;
   /**
-   * How far the camera is from the lap where it looks (the lap point nearest the middle of the view; the point it looks at without
-   * one): the trace curtains' height step reads it (`curtainStep`).
+   * How far the camera is from the lap's nearest point (the point it looks at without one): the trace curtains' height step reads it
+   * (`curtainStep`), so turning the camera keeps the step.
    */
-  readonly lapInViewM: number;
+  readonly lapReachM: number;
   /** Whether the first pose has placed the camera. */
   readonly placed: boolean;
   /** The replay time of the pose the camera last followed, in seconds. */
@@ -142,27 +142,19 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
   const lapPoints = () => (lapScene ??= (layer?.trajectory.points ?? []).map(point => new Vector3(...nativeToScene(point, origin))));
   /**
    * How far the camera is from the lap's nearest point (from the point it looks at without one): the fly keys' speed, so they slow as
-   * the camera nears the circuit rather than following a look point out over the hills (driver, 2026-11-28).
+   * the camera nears the circuit rather than following a look point out over the hills, and the curtains' height step, which so holds
+   * while the camera only turns (driver, 2026-11-28: tilting changed the step, the lap where it looked nearing or receding). Every
+   * frame reads it, so it is kept until the camera moves.
    */
+  const reachedFrom = new Vector3(NaN, NaN, NaN);
+  let reach = 0;
   const reachToLap = () => {
+    if (lapScene?.length && camera.position.equals(reachedFrom)) return reach;
+    reachedFrom.copy(camera.position);
     let nearest = Infinity;
     for (const point of lapPoints()) nearest = Math.min(nearest, point.distanceToSquared(camera.position));
-    return Number.isFinite(nearest) ? Math.sqrt(nearest) : camera.position.distanceTo(controls.target);
-  };
-  /** `CameraRig.lapInViewM`. Every frame reads it (the curtains' height step), so it is kept until the camera moves or turns. */
-  const viewedFrom = new Vector3(NaN, NaN, NaN), viewedAlong = new Vector3(), toPoint = new Vector3();
-  let viewed = 0;
-  const lapInView = () => {
-    const along = camera.getWorldDirection(toPoint);
-    if (lapScene?.length && camera.position.equals(viewedFrom) && along.equals(viewedAlong)) return viewed;
-    viewedFrom.copy(camera.position); viewedAlong.copy(along);
-    let best = -Infinity;
-    viewed = camera.position.distanceTo(controls.target);
-    for (const point of lapPoints()) {
-      const distance = toPoint.subVectors(point, camera.position).length(), facing = toPoint.dot(viewedAlong) / distance;
-      if (distance > 0 && facing > best) { best = facing; viewed = distance; }
-    }
-    return viewed;
+    reach = Number.isFinite(nearest) ? Math.sqrt(nearest) : camera.position.distanceTo(controls.target);
+    return reach;
   };
   /** How far the point the camera looks at is under the ground (0 on or above it). */
   const sunk = () => groundLift?.(controls.target, camera.position.y, 0) ?? 0;
@@ -231,7 +223,7 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
     get camera() { return camera; },
     get mode() { return mode; },
     focus: controls.target,
-    get lapInViewM() { return lapInView(); },
+    get lapReachM() { return reachToLap(); },
     get placed() { return placed; },
     get timeSec() { return currentTime; },
     unplace() { placed = false; },
@@ -312,7 +304,7 @@ export function createCameraRig(element: HTMLElement, origin: Vector3, changed: 
       return mode === 'follow' || mode === 'chase' ? layer.chaseLodMultiplier : 1;
     },
     setLayer(next) {
-      layer = next; lapScene = null; viewedFrom.set(NaN, NaN, NaN);
+      layer = next; lapScene = null; reachedFrom.set(NaN, NaN, NaN);
       spots = createTracksideCameras(next.trajectory.points, next.primaryDistances, origin); spot = -1; places = [];
       syncDriverCamera();
     },

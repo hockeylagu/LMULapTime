@@ -96,21 +96,35 @@ export function pickStrip(mesh: Mesh, stripIndexCount: number, ray: Ray, lift?: 
 }
 
 /**
- * The lap sample whose foot on the road is nearest `ray` (scene space) within `reachM`, on `mesh`'s strip: from straight above (the
- * overhead view) a curtain stands edge-on and the ray never meets its sheet (driver, 2026-11-28). The hit is the ray's point nearest
- * that foot.
+ * How far from the ray a sample's foot still picks (m): `fixedM` everywhere (an orthographic view's pixels) plus `perMetreM` for each
+ * metre along the ray (a perspective view's pixels, wider further away).
  */
-export function pickStripFoot(mesh: Mesh, stripIndexCount: number, ray: Ray, reachM: number): StripHit | null {
+export interface FootReach { fixedM: number; perMetreM: number; /** Feet nearer the eye are faded out (`CurtainLift.shownFromM`). */ fromM?: number }
+
+/**
+ * The lap sample whose foot on the road is nearest `ray` (scene space) within its reach, on `mesh`'s strip: from above a curtain
+ * stands edge-on and the ray never meets its sheet, a thin line is hard to land on, and where the value is 0 there is no sheet, only
+ * its line on the road (driver, 2026-11-28). The hit is the ray's point
+ * nearest that foot.
+ */
+export function pickStripFoot(mesh: Mesh, stripIndexCount: number, ray: Ray, reach: FootReach): StripHit | null {
   mesh.updateWorldMatrix(true, false);
   localRay.copy(ray).applyMatrix4(toLocal.copy(mesh.matrixWorld).invert());
-  const position = mesh.geometry.getAttribute('position'), reach = reachM * reachM;
+  const position = mesh.geometry.getAttribute('position');
+  const reachAt = (alongM: number) => reach.fixedM + reach.perMetreM * Math.max(0, alongM);
   let best: {index: number; gap: number} | null = null;
   for (const cell of gridOf(mesh.geometry, stripIndexCount)) {
-    if (!localRay.intersectsBox(box.copy(cell.box).expandByScalar(reachM))) continue;
+    const far = localRay.origin.distanceTo(cell.box.getCenter(hit)) + cell.box.getSize(hit).length() / 2;
+    if (!localRay.intersectsBox(box.copy(cell.box).expandByScalar(reachAt(far)))) continue;
     for (const vertex of cell.triangles) {
       if (vertex % 2) continue; // A sample's foot: the fill's lower vertex.
-      const gap = localRay.distanceSqToPoint(hit.fromBufferAttribute(position, vertex));
-      if (gap <= reach && (!best || gap < best.gap)) best = {index: vertex / 2, gap};
+      hit.fromBufferAttribute(position, vertex);
+      const along = localRay.origin.distanceTo(hit);
+      if (along < (reach.fromM ?? 0)) continue;
+      const gap = localRay.distanceSqToPoint(hit), limit = reachAt(along);
+      // Nearest by the share of its reach, so a near foot and a far one compare in pixels.
+      const share = gap / (limit * limit);
+      if (share <= 1 && (!best || share < best.gap)) best = {index: vertex / 2, gap: share};
     }
   }
   if (!best) return null;

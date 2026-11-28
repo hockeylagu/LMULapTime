@@ -34,22 +34,26 @@ export interface CurtainHover { lap: 'primary' | 'baseline'; index: number }
 /** The hover line: light grey and half see-through, so it never reads as a car's line (driver, 2026-11-28). */
 const HOVER_COLOUR = LMU_COLORS.text, HOVER_OPACITY = 0.5;
 /**
- * The hover line's bar lying across the lap at its foot (pixels): its standing bands are edge-on from straight above, so the overhead
- * view shows the bar (driver, 2026-11-28). Half its length and half its width.
+ * The hover line's ring lying on the road round its foot (pixels, inner and outer radius), as the 2D map rings the hovered point: its
+ * standing bands are edge-on from straight above. A bar across the lap there read as a stray mark (driver, 2026-11-28).
  */
-const ACROSS_HALF_PX = 12, ACROSS_HALF_WIDTH_PX = 2;
+const RING_INNER_PX = 5, RING_OUTER_PX = 7, RING_SEGMENTS = 24;
 
 /** The colour each cursor line was last painted (it changes as the car crosses samples). */
 const cursorColours = new WeakMap<Mesh, string>();
 
 /**
- * A unit-tall cursor line in one colour, its width in pixels (scaled to the metres a pixel covers where it stands), as a data mesh (exposure divided out, colours baked like the lines); `across` adds a bar lying
- * along its local x at its foot (turned across the lap where it stands).
+ * A unit-tall cursor line in one colour, its width in pixels (scaled to the metres a pixel covers where it stands), as a data mesh (exposure divided out, colours baked like the lines); `ring` adds a ring lying
+ * round its foot.
  */
-function cursorLine(colour: string, display: () => DisplayTransform, across = false): Mesh<BufferGeometry, ShaderMaterial> {
-  const h = CURSOR_HALF_PX, l = ACROSS_HALF_PX, w = ACROSS_HALF_WIDTH_PX, geometry = new BufferGeometry();
+function cursorLine(colour: string, display: () => DisplayTransform, ring = false): Mesh<BufferGeometry, ShaderMaterial> {
+  const h = CURSOR_HALF_PX, geometry = new BufferGeometry();
   const positions = [-h, 0, 0, h, 0, 0, -h, 1, 0, h, 1, 0, 0, 0, -h, 0, 0, h, 0, 1, -h, 0, 1, h], indices = [0, 1, 2, 1, 3, 2, 4, 5, 6, 5, 7, 6];
-  if (across) { positions.push(-l, 0, -w, -l, 0, w, l, 0, -w, l, 0, w); indices.push(8, 9, 10, 9, 11, 10); }
+  for (let i = 0; ring && i <= RING_SEGMENTS; i++) {
+    const angle = (i / RING_SEGMENTS) * Math.PI * 2, x = Math.cos(angle), z = Math.sin(angle), at = positions.length / 3;
+    positions.push(x * RING_INNER_PX, 0, z * RING_INNER_PX, x * RING_OUTER_PX, 0, z * RING_OUTER_PX);
+    if (i > 0) indices.push(at - 2, at - 1, at, at - 1, at + 1, at);
+  }
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new Float32BufferAttribute(new Float32Array(positions.length), 3));
   geometry.setIndex(indices);
@@ -98,16 +102,14 @@ export function createCurtainLayer(
     const a = at ? points[at.index] : undefined, b = at ? points[at.index + 1] ?? a : undefined;
     const t = b === a ? 0 : at?.fraction ?? 0, next = (at?.index ?? 0) + (b === a ? 0 : 1);
     const height = a && at ? MathUtils.lerp(curtainTopM(curtain, at.index), curtainTopM(curtain, next), t) : 0;
-    cursor.visible = curtain.visible && height > 0.05;
+    // The car's line goes with the curtain where it has no height; the hover's ring still marks the point on its line.
+    cursor.visible = curtain.visible && Boolean(at) && (height > 0.05 || !paint);
     if (!cursor.visible || !a || !b || !at) return;
     along.set(MathUtils.lerp(a.x, b.x, t), MathUtils.lerp(a.y, b.y, t), MathUtils.lerp(a.z, b.z, t));
     const foot = surfaceHeight(along) ?? along.y;
     cursor.position.set(along.x - origin.x, foot - origin.y, along.z - origin.z);
     const width = viewer && cursor.parent ? metresPerPixel(viewer, cursor.parent.localToWorld(along.copy(cursor.position))) : 0;
-    cursor.scale.set(width, height, width);
-    // Its local x across the lap (the hover line's lying bar).
-    const from = b === a ? points[at.index - 1] ?? a : a, to = b === a ? a : b;
-    cursor.rotation.y = Math.atan2(to.x - from.x, to.z - from.z);
+    cursor.scale.set(width, Math.max(height, 1e-3), width);
     if (!paint) return;
     // The trace's colour where the car is: the pressed pedal's, the balance's sign, the channel's (`curtainColourAt`).
     const colour = curtainColourAt(curtain, t < 0.5 ? at.index : next);
@@ -134,18 +136,21 @@ export function createCurtainLayer(
         group.add(compared, comparedCursor);
       }
       hoverLine = cursorLine(HOVER_COLOUR, display, true); hoverLine.name = 'curtain-hover';
+      // Drawn over the road: a ring lying at the foot's height sank into camber and kerbs (half a ring). It shows only where the pick
+      // found the point in view (`surfaceWithin`), so nothing in front can hide it.
+      hoverLine.material.depthTest = false;
       group.add(hoverLine);
       applyOpacity(); placeHover();
     },
     /** The Line menu's fades apply to the curtains standing in for the lines (0 hides one). */
     fade(primaryOpacity: number, baselineOpacity: number) { opacities = [primaryOpacity, baselineOpacity]; applyOpacity(); },
     /**
-     * Each frame: the camera-distance fade for the camera mode, the curtains' height step for the camera's distance to the lap
-     * where it looks (`lapInView`, `curtainStep`, named in the legend), and the camera drawing.
+     * Each frame: the camera-distance fade for the camera mode, the curtains' height step for the camera's distance to the lap's
+     * nearest point (`lapReach`, `curtainStep`, named in the legend), and the camera drawing.
      */
-    camera(mode: CameraMode, drawing: PerspectiveCamera | OrthographicCamera, lapInView: () => number) {
+    camera(mode: CameraMode, drawing: PerspectiveCamera | OrthographicCamera, lapReach: () => number) {
       viewer = drawing;
-      step = curtainStep(mode, drawing, lapInView, step);
+      step = curtainStep(mode, drawing, lapReach, step);
       setCurtainHeight(CURTAIN_STEPS_M[step]);
       const scale = CURTAIN_STEPS_M[step] / CURTAIN_HEIGHT_M;
       for (const mesh of [primary, compared]) if (mesh) { fadeTraceCurtain(mesh, mode); viewTraceCurtain(mesh, scale); }

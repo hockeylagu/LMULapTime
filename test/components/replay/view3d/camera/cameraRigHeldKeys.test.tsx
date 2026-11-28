@@ -55,14 +55,16 @@ it('flies level, faster the farther it looks, up with E, and faster with Shift, 
   rig.dispose();
 });
 
-it('flies as fast as the camera is far from the lap, however far it looks, and measures the lap where it looks for the curtains', () => {
+it('flies as fast as the camera is far from the lap, however far it looks, and gives the curtains the same distance', () => {
   const rig = createCameraRig(document.createElement('div'), new Vector3(), vi.fn());
   rig.resize(1.5); rig.setMode('orbit');
   // A lap along x through the origin, a point every 10 m.
   const points = Array.from({length: 201}, (_, i) => ({x: i * 10, y: 0, z: 0}));
   rig.setLayer({primary: new Object3D(), cameras: [], chaseLodMultiplier: 1, trajectory: {points}, primaryDistances: points.map(point => point.x)});
+  const reaches: number[] = [];
   const flown = (eye: Vector3, look: Vector3) => {
     rig.frame(eye, look);
+    reaches.push(rig.lapReachM);
     const before = rig.camera.position.clone();
     let time = 0;
     rig.holdKey('d', true); rig.step(time); rig.step(time += 100); rig.holdKey('d', false);
@@ -74,6 +76,8 @@ it('flies as fast as the camera is far from the lap, however far it looks, and m
   expect(flown(new Vector3(1000, 200, 0), new Vector3(1000, 0, -3000))).toBeCloseTo(10);
   // 2 km off the lap: ten times as fast.
   expect(flown(new Vector3(1000, 2000, 0), new Vector3(1000, 0, -1))).toBeCloseTo(100);
+  // Tilting toward the horizon keeps the curtains' distance (driver, 2026-11-28: it changed their step); rising grows it.
+  expect(reaches.map(reach => Math.round(reach))).toEqual([200, 200, 2000]);
   rig.dispose();
 });
 
