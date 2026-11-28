@@ -5,7 +5,7 @@ import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createBodyStore } from '../../../../api/vehicles/bodyStore.js';
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import { ReplayPlaybackCursorContext } from '../../inspector/replayPlaybackCursor.js';
-import { createReplayScene, lapFirstStation, type ReplaySceneHandle } from './replayScene.js';
+import { createReplayScene, lapFirstStation, type ReplaySceneHandle, type TraceValues } from './replayScene.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
 import type { CameraMode } from '../camera/cameraModes.js';
 import type { GhostSyncMode } from '../../map/ghostSync.js';
@@ -24,6 +24,8 @@ interface Options {
   /** False hides the racing lines (the cars stay). */
   showLines?: boolean;
   retry: number;
+  /** The trace curtains' values for the picked channel (null: the racing lines). */
+  trace?: TraceValues | null;
   syncMode?: GhostSyncMode;
   anchorDistM?: number | null;
 }
@@ -46,7 +48,7 @@ function lineOpacities(fadedLine: Options['fadedLine'], showLines: boolean): [nu
 }
 
 /** Track resources live for a layout/revision; lap objects live for the selected laps. */
-export function useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine, showLines = true, retry, syncMode = 'distance', anchorDistM = null}: Options) {
+export function useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine, showLines = true, retry, trace = null, syncMode = 'distance', anchorDistM = null}: Options) {
   const cursor = useContext(ReplayPlaybackCursorContext);
   const shells = useSceneShells();
   const key = `${trajectory.layoutKey ?? ''}:${trajectory.geometryRevision ?? ''}:${trajectory.dataPluginRevision ?? ''}:${retry}`;
@@ -84,7 +86,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
   const {scene, ready, state, setState} = useSceneHost<ReplaySceneHandle, Extra>({host, key, errorMessage: 'Unable to load 3D scene', create,
     // Coming from the race on this circuit, its scene shows at once while the lap's cars build.
     showEarly: (container, listener) => shells.attachShown(trajectory.layoutKey, container, listener),
-    onCreated: handle => { handle.mode(mode); handle.beforeFrame(frameTime => liveCursor.current?.tick(frameTime)); }});
+    onCreated: handle => { handle.mode(mode); handle.showTrace(trace); handle.beforeFrame(frameTime => liveCursor.current?.tick(frameTime)); }});
   const drawCursor = useEffectEvent(() => {
     const position = cursor?.getSnapshot();
     scene.current?.cursor(position?.points === trajectory.points ? position.index : currentIndex, position?.points === trajectory.points ? position.fraction : 0);
@@ -128,6 +130,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
   useEffect(() => { scene.current?.mode(mode); drawCursor(); }, [mode, scene]);
   useEffect(() => { scene.current?.colorLines(colorBy); }, [colorBy, scene]);
   useEffect(() => { scene.current?.syncGhost(syncMode, anchorDistM); drawCursor(); }, [syncMode, anchorDistM, scene]);
+  useEffect(() => { scene.current?.showTrace(trace); }, [trace, scene]);
   useEffect(() => { scene.current?.fadeLines(...lineOpacities(fadedLine, showLines)); }, [fadedLine, showLines, scene]);
   return {scene, state};
 }

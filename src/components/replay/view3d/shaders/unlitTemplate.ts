@@ -21,6 +21,7 @@ void main() {
   #include <color_vertex>
   #include <batching_vertex>
   #include <begin_vertex>
+${slot('vertexPosition')}
   #include <project_vertex>
 ${slot('vertexView')}
 ${slot('vertexOutputs')}

@@ -103,12 +103,12 @@ export const SCENE_BLOCK = blockLayout('LmuScene', [
   {name: 'HAZE_SUN_DIRECTION', type: 'vec3'}, {name: 'HAZE_SUNWARD', type: 'float'},
   {name: 'HAZE_SUN_RADIANCE', type: 'vec3'}, {name: 'HAZE_ORIGIN_Y', type: 'float'},
   {name: 'HAZE_HEIGHT_AMOUNT', type: 'float'}, {name: 'HAZE_HEIGHT_RATE', type: 'float'}, {name: 'HAZE_HEIGHT_EXPONENT', type: 'float'},
-  // The reflected car's paint box (car/carPaint.ts).
+  // The reflected car's paint box (car/carPaint.ts), and a pixel in clip space (`setViewPixel`).
   {name: 'paint_boxLow', type: 'vec4'},
   {name: 'paint_boxHigh', type: 'vec3'}, {name: 'surface_time', type: 'float'},
-  {name: 'paint_boxCentre', type: 'vec3'}, {name: 'surface_lampPixel', type: 'float'},
-  // The scenery: the cards' turn and shadow eye (billboardCard.ts) and crown sun (sceneEnvironment.ts), the clock (surfaceAnimation.ts), the lamp pixel
-  // (lampSize.ts), the track's median rubber (realRoad.ts) and the reflection's scalars (sceneryReflection.ts).
+  {name: 'paint_boxCentre', type: 'vec3'}, {name: 'view_pixel', type: 'float'},
+  // The scenery: the cards' turn and shadow eye (billboardCard.ts) and crown sun (sceneEnvironment.ts), the clock (surfaceAnimation.ts), the
+  // track's median rubber (realRoad.ts) and the reflection's scalars (sceneryReflection.ts).
   {name: 'surface_cardFacing', type: 'vec4'},
   {name: 'surface_crownSun', type: 'vec3'}, {name: 'surface_realRoadMedian', type: 'float'},
   {name: 'surface_shadowEye', type: 'vec3'}, {name: 'surface_reflectionLodScale', type: 'float'},
@@ -125,6 +125,12 @@ export function setScene(member: SceneMember, value: number | ArrayLike<number>)
   if (typeof value === 'number') sceneBlock[SCENE_BLOCK.offsets[member]] = value;
   else sceneBlock.set(value, SCENE_BLOCK.offsets[member]);
 }
+
+/**
+ * Sets two over the drawing height in pixels, a pixel in clip space (`view_pixel`): the shell, each frame. A vertex program's metres
+ * per pixel at a view-space point is `(perspective ? -z : 1) * view_pixel / projectionMatrix[1][1]` (lamps, the trace curtains' edges).
+ */
+export function setViewPixel(heightPx: number): void { setScene('view_pixel', heightPx > 0 ? 2 / heightPx : 0); }
 
 /** A float member of the scene block, as written. */
 export const sceneValue = (member: SceneMember): number => sceneBlock[SCENE_BLOCK.offsets[member]];

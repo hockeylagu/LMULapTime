@@ -43,6 +43,8 @@ export interface LapOptions {
   race?: boolean;
   /** Race mode only: the session second the race replay opens at (its `t`), else the session's start. */
   raceTime?: number;
+  /** The lap view's trace curtain channel: the dock's channel (`dockChannel.ts`) with its 3D button on; none shows the racing lines. */
+  trace?: string;
 }
 
 /** Playwright (or playwright-core) from `PLAYWRIGHT_NODE_MODULES`: the app does not depend on it. */
@@ -118,6 +120,9 @@ export async function measureLap(options: LapOptions) {
     page.on('pageerror', error => errors.push(error.message));
     // tsx keeps function names through an `__name` helper; the page has no such helper, so give it a no-op one.
     await page.addInitScript({content: `var __name = f => f; (${installProbe.toString()})(${String(skipOffscreenDraws)}, ${String(stepMs)}, ${String(options.uniformNames === true)});`});
+    if (options.trace) {
+      await page.addInitScript({content: `localStorage.setItem('lmu-map-trace-channel-v1', ${JSON.stringify(options.trace)}); localStorage.setItem('lmu-3d-trace-shown-v1', 'true');`});
+    }
 
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Performance.enable');

@@ -37,11 +37,7 @@ export function racingLineColors(lap: ReplayTrajectoryData, baseline: ReplayTraj
 function racingLineGeometry(lap: ReplayTrajectoryData, origin: Vector3, heights: Array<number | null>, widthM: number, liftM: number): BufferGeometry {
   const points = lap.points, half = widthM / 2;
   const positions = new Float32Array(points.length * 6), indices: number[] = [];
-  const joined = (i: number) => {
-    const a = points[i - 1], b = points[i], dt = (b.timeSec ?? 0) - (a.timeSec ?? 0);
-    return !b.isTeleport && dt > 0 && dt <= 1 && [a.x, a.y, a.z, b.x, b.y, b.z].every(Number.isFinite)
-      && Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) <= 20 && heights[i - 1] !== null && heights[i] !== null;
-  };
+  const joined = (i: number) => joinedToPrevious(points, heights, i);
   for (let i = 0; i < points.length; i++) {
     const before = points[Math.max(0, i - 1)], after = points[Math.min(points.length - 1, i + 1)];
     let dx = after.x - before.x, dz = after.z - before.z;
@@ -57,12 +53,19 @@ function racingLineGeometry(lap: ReplayTrajectoryData, origin: Vector3, heights:
   return geometry;
 }
 
+/** Whether sample `i` joins sample `i - 1` on the road: no teleport or time jump, a real step, both draped. */
+export function joinedToPrevious(points: ReplayTrajectoryData['points'], heights: Array<number | null>, i: number): boolean {
+  const a = points[i - 1], b = points[i], dt = (b.timeSec ?? 0) - (a.timeSec ?? 0);
+  return !b.isTeleport && dt > 0 && dt <= 1 && [a.x, a.y, a.z, b.x, b.y, b.z].every(Number.isFinite)
+    && Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) <= 20 && heights[i - 1] !== null && heights[i] !== null;
+}
+
 /** Road heights under each lap point. The road does not move: a height once found is kept when its chunk unloads, and only points
  * still without one are looked up again, so a re-drape after streaming costs a few lookups instead of the whole lap. */
 const lineHeights = new WeakMap<Mesh, Array<number | null>>();
 /** Each line's colours, the display transform they are inverted through, and the transform they were last baked for. */
 const lineColours = new WeakMap<Mesh, {display: () => DisplayTransform; colors: string[]; baked: DisplayTransform | null}>();
-function fillHeights(heights: Array<number | null>, lap: ReplayTrajectoryData, surfaceHeight: SurfaceHeight): boolean {
+export function fillHeights(heights: Array<number | null>, lap: ReplayTrajectoryData, surfaceHeight: SurfaceHeight): boolean {
   let found = false;
   lap.points.forEach((point, i) => { if (heights[i] === null) { heights[i] = surfaceHeight(point); found ||= heights[i] !== null; } });
   return found;
@@ -92,13 +95,19 @@ export const exposureDivide: ShaderPart = {
 };
 
 /**
- * A mesh drawn in the 2D map's colours on the road (the racing lines, the driving marks): `geometry` has a `color` attribute with
- * two vertices per entry of `colors`. `colorRacingLine` and `syncRacingLine` keep its colours.
+ * A mesh drawn in the 2D map's colours (the racing lines and the driving marks on the road, the trace curtains' standing cursor lines):
+ * `geometry` has a `color` attribute with two vertices per entry of `colors`. `colorRacingLine` and `syncRacingLine` keep its colours.
  */
-export function makeDataMesh(geometry: BufferGeometry, colors: string[], display: () => DisplayTransform, renderOrder: number): Mesh<BufferGeometry, ShaderMaterial> {
-  // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
-  const material = composedMaterial(unlitTemplate, [exposureDivide, hazePart],
-    {vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2});
+export function makeDataMesh(
+  geometry: BufferGeometry, colors: string[], display: () => DisplayTransform, renderOrder: number, lies: 'on-road' | 'standing' = 'on-road',
+): Mesh<BufferGeometry, ShaderMaterial> {
+  // Unlit, so pedal/speed colours read exactly as on the 2D map. On the road: hazed as the road, the offset keeping it above the road
+  // it lies on. Standing (a curtain's cursor lines): drawn as the curtains, no haze and no depth written, so the hover pick's surface
+  // check sees through it.
+  const material = lies === 'on-road'
+    ? composedMaterial(unlitTemplate, [exposureDivide, hazePart],
+      {vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2})
+    : composedMaterial(unlitTemplate, [exposureDivide], {vertexColors: true, side: DoubleSide, transparent: true, depthWrite: false});
   const mesh = new Mesh(geometry, material);
   mesh.renderOrder = renderOrder;
   lineColours.set(mesh, {display, colors, baked: null});
@@ -106,14 +115,25 @@ export function makeDataMesh(geometry: BufferGeometry, colors: string[], display
   return mesh;
 }
 
+/**
+ * A colour's exposed value under a display transform: the colour inverted through the output encode and the tone curve, so a data
+ * mesh with the exposure divided out shows `hex` as it is. Returns a reader that writes it into `out`.
+ */
+export function colourBaker(display: DisplayTransform): (hex: string, out: Color) => Color {
+  const {toneCurve: curve, outputGamma} = display;
+  const exposed = (encoded: number) => inverseToneCurve(curve, encoded ** outputGamma);
+  return (hex, out) => {
+    out.setStyle(hex, LinearSRGBColorSpace); // the hex digits as they are: the displayed (encoded) value
+    return out.setRGB(exposed(out.r), exposed(out.g), exposed(out.b), LinearSRGBColorSpace);
+  };
+}
+
 /** Inverts each colour through the output encode and the tone curve: the exposed value the display shows as that colour. */
 function bakeColours(line: Mesh<BufferGeometry, ShaderMaterial>, state: {display: () => DisplayTransform; colors: string[]; baked: DisplayTransform | null}): void {
-  const display = state.display(), {toneCurve: curve, outputGamma} = display;
+  const display = state.display(), bake = colourBaker(display);
   const attribute = line.geometry.getAttribute('color') as Float32BufferAttribute, color = new Color();
-  const exposed = (encoded: number) => inverseToneCurve(curve, encoded ** outputGamma);
   for (let i = 0; i < attribute.count / 2; i++) {
-    color.setStyle(colors(state, i), LinearSRGBColorSpace); // the hex digits as they are: the displayed (encoded) value
-    const r = exposed(color.r), g = exposed(color.g), b = exposed(color.b);
+    const {r, g, b} = bake(colors(state, i), color);
     attribute.setXYZ(i * 2, r, g, b); attribute.setXYZ(i * 2 + 1, r, g, b);
   }
   attribute.needsUpdate = true;

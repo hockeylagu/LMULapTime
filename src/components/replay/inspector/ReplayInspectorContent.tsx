@@ -12,6 +12,7 @@ import { ReplayInspectorModalBody } from './ReplayInspectorModalBody.js';
 import { RaceModeContext } from '../race/raceModeContext.js';
 import { useConsistencyLapSelection } from './useConsistencyLapSelection.js';
 import { useReadoutLapExtras } from './readoutLapLoader.js';
+import { Scene3DFullscreenCover } from '../view3d/scene/Scene3DFullscreenCover.js';
 
 export interface ReplayInspectorContentProps {
   isOpen: boolean;
@@ -226,6 +227,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
 
   return (
     <ReplayPlaybackCursorContext.Provider value={playbackCursor}><RaceModeContext.Provider value={openRaceAtCursor}>
+    {isExpanded && activeView === '3d' && !error && <Scene3DFullscreenCover />}
     <ReplayInspectorModalBody
       onClose={onClose}
       sessionId={activeSessionId} metadata={metadata}

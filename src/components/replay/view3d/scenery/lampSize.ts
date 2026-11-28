@@ -1,6 +1,5 @@
 import { BufferAttribute, Mesh, type Material, type Object3D } from 'three';
 import type { ShaderPart } from '../shaders/composer.js';
-import { setScene } from '../shaders/sceneBlock.js';
 import { glslNumber } from './materials/shaderContext.js';
 import type { SurfaceConfig } from './materials/surfaceConfig.js';
 
@@ -14,8 +13,6 @@ import type { SurfaceConfig } from './materials/surfaceConfig.js';
  */
 export const LAMP_MIN_PX = 1.5;
 export const LAMP_ATTRIBUTE = '_lmu_lamp';
-/** Sets two over the drawing height in pixels, a pixel in clip space (the scene block's `surface_lampPixel`): the shell, each frame. */
-export function trackLampPixel(heightPx: number): void { setScene('surface_lampPixel', heightPx > 0 ? 2 / heightPx : 0); }
 
 /** The glowing kinds, whose emission is the whole of what they draw. */
 export const isLampKind = (kind: SurfaceConfig['kind']): boolean => kind === 'lowLumEmissive' || kind === 'highLumTrackside' || kind === 'highLumSun';
@@ -91,7 +88,7 @@ const LAMP_VERTEX_MAIN = `
         lampCentre = batchingMatrix * lampCentre;
       #endif
       lampCentre = modelViewMatrix * lampCentre;
-      float metresPerPixel = (isPerspectiveMatrix(projectionMatrix) ? -lampCentre.z : 1.0) * surface_lampPixel / projectionMatrix[1][1];
+      float metresPerPixel = (isPerspectiveMatrix(projectionMatrix) ? -lampCentre.z : 1.0) * view_pixel / projectionMatrix[1][1];
       float radius = -${LAMP_ATTRIBUTE}.w;
       float growth = radius > 0.0 ? max(1.0, ${glslNumber(LAMP_MIN_PX)} * metresPerPixel / radius) : 1.0;
       growth = mix(growth, 1.0, clamp(lit_dayLight, 0.0, 1.0));

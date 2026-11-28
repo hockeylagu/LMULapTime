@@ -1,5 +1,5 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useId, useMemo, type ReactNode } from 'react';
+import { Box, ChevronDown, ChevronUp } from 'lucide-react';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import { computeBaselineChartSamples, type PointComparison } from '../../../../utils/replayComparison.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
@@ -7,6 +7,7 @@ import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 import { computeTelemetryChartPaths } from '../../telemetry/telemetryChartPaths.js';
 import { TelemetryChannelRenderer } from '../../telemetry/TelemetryChannelRenderer.js';
 import { TelemetryScrubCursor } from '../../telemetry/TelemetryScrubCursor.js';
+import { TelemetryHoverLine } from '../../telemetry/TelemetryHoverLine.js';
 import { MarkerAButton, TelemetryDeltaMarker, measureMarkerSpan } from '../../telemetry/TelemetryDeltaMarker.js';
 import { useTelemetryStripInteraction } from '../../telemetry/useTelemetryStripInteraction.js';
 import { AVAILABLE_TELEMETRY_CHANNELS, type TelemetryChannelId } from '../../telemetry/presets/telemetryPresets.js';
@@ -16,18 +17,9 @@ import { ChartZoomControls } from '../../telemetry/ChartZoomControls.js';
 import { GpsMapTraceCursorChips } from './GpsMapTraceCursorChips.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { Select } from '../../../common/dropdown/Select.js';
+import { setDockChannel, shownDockChannel, useDockChannel } from './dockChannel.js';
 
-const CHANNEL_KEY = 'lmu-map-trace-channel-v1';
-type Channel = TelemetryChannelId | 'pedals';
 const NO_COMPARISONS: PointComparison[] = [];
-
-function loadChannel(): Channel {
-  try {
-    const saved = localStorage.getItem(CHANNEL_KEY);
-    if (saved === 'pedals' || AVAILABLE_TELEMETRY_CHANNELS.some(channel => channel.id === saved)) return saved as Channel;
-  } catch { /* Storage may be disabled. */ }
-  return 'speed';
-}
 
 interface Props {
   points: ReplayTrajectoryPoint[];
@@ -45,16 +37,17 @@ interface Props {
   traceHidden: boolean;
   onToggleTrace: () => void;
   hud?: ReactNode;
+  /** The 3D view's curtain: the button stands this trace over the racing line (absent in 2D). */
+  curtain?: {shown: boolean; onToggle: () => void};
 }
 
 /** One short trace, independent of the inspector's full telemetry presets. */
 export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: sceneComparisons, currentIndex, onSelectIndex, trackLengthM, source, sectors,
-  isPlaying, onTogglePlay, traceHidden: collapsed, onToggleTrace, hud }: Props) {
-  const [channel, setChannel] = useState(loadChannel);
+  isPlaying, onTogglePlay, traceHidden: collapsed, onToggleTrace, hud, curtain }: Props) {
+  const channel = useDockChannel();
   const contentId = useId();
   const hasBaseline = Boolean(baselinePoints?.length);
-  // Keep the saved comparison choice, but show speed while there is no reference lap.
-  const activeChannel = channel === 'delta' && !hasBaseline ? 'speed' : channel;
+  const activeChannel = shownDockChannel(channel, hasBaseline);
   const {
     viewStart, viewEnd, cumDists, safeIndex, pctForIndex, containerRef, dragSelection, interactionMode, isZoomed,
     setInteractionMode, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleResetZoom,
@@ -80,10 +73,6 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
   const paths = useMemo(() => computeTelemetryChartPaths(points, comparisons, viewStart, viewEnd, cumDists, baselineSamples),
     [points, comparisons, viewStart, viewEnd, cumDists, baselineSamples]);
   const compactChannel = activeChannel === 'speed' || activeChannel === 'pedals' || activeChannel === 'delta';
-  const selectChannel = (next: Channel) => {
-    setChannel(next);
-    try { localStorage.setItem(CHANNEL_KEY, next); } catch { /* Storage may be disabled. */ }
-  };
   const buttonClass = `inline-flex h-7 items-center gap-1.5 rounded px-2 text-xs text-lmu-muted hover:text-lmu-text hover:bg-lmu-raised transition-colors ${FOCUS_RING}`;
 
   return <section aria-label="Fullscreen telemetry" data-map-control
@@ -100,15 +89,20 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         ] as const).map(item => <button key={item.value} type="button"
           aria-pressed={activeChannel === item.value} disabled={item.value === 'delta' && !hasBaseline}
           title={item.value === 'delta' && !hasBaseline ? 'Select a comparison lap to show delta' : `Show ${item.label.toLowerCase()} trace`}
-          onClick={() => selectChannel(item.value)}
+          onClick={() => setDockChannel(item.value)}
           className={`${buttonClass} font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${activeChannel === item.value ? 'bg-lmu-raised text-lmu-text' : ''}`}>
           {item.label}
         </button>)}
         <Select<TelemetryChannelId> value={compactChannel ? null : activeChannel} aria-label="More telemetry channels"
           placeholder="More" title="More telemetry channels" className={compactChannel ? 'w-24' : 'w-48'} align="start"
-          onChange={selectChannel}
+          onChange={setDockChannel}
           options={AVAILABLE_TELEMETRY_CHANNELS.filter(item => item.id !== 'speed' && item.id !== 'delta')
             .map(item => ({ value: item.id, label: item.name }))} />
+        {curtain && <button type="button" aria-pressed={curtain.shown} onClick={curtain.onToggle}
+          title={curtain.shown ? 'Show the racing line in place of this trace' : 'Stand this trace over the racing line in 3D'}
+          className={`${buttonClass} font-semibold ${curtain.shown ? 'bg-lmu-raised text-lmu-text' : ''}`}>
+          <Box size={14} aria-hidden="true" />3D trace
+        </button>}
       </div>
       <span aria-hidden="true" className="h-5 w-px bg-lmu-border" />
       {!collapsed && <>
@@ -150,6 +144,7 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         className={`absolute inset-y-0 z-10 w-px pointer-events-none ${sector.line}`}>
         <span className={`absolute top-1 left-1 rounded px-1 py-0.5 font-mono text-[11px] font-bold ${sector.tag}`}>{sector.label}</span>
       </div>)}
+      <TelemetryHoverLine cumDists={cumDists} viewStart={viewStart} viewEnd={viewEnd} pctForIndex={pctForIndex} />
       {isCursorInView && <TelemetryScrubCursor cursorPct={cursorPct} />}
       {isCursorInView && (activeChannel === 'speed' || activeChannel === 'pedals' || activeChannel === 'delta')
         && <GpsMapTraceCursorChips channel={activeChannel} point={points[index]} comparison={comparisons[index]} cursorPct={cursorPct} />}

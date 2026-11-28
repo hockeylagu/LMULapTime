@@ -47,6 +47,9 @@ session's race replay, every car on its clock) with `--race-time` its opening se
 ratio 1), `REPLAY3D_BROWSER` channel (default `msedge`). The page runs at the app's own pixel-ratio cap; a 2560 monitor at
 fullscreen is `--width 2560 --height 1440`.
 
+`--trace <channel id>` opens the lap with that trace curtain shown (the fullscreen dock's channel with its 3D trace button on, e.g. `steer`, `tire-temps`, `pedals`), to
+measure the curtains against a run without.
+
 `--skip-offscreen-draws` is an experiment, not a baseline: it drops every draw outside the main pass (shadow maps, the
 reflection probe, bloom) at the GL call, so comparing a run with and without it gives those passes' GPU cost; their script
 still runs.

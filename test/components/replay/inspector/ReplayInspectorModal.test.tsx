@@ -63,6 +63,16 @@ describe('ReplayInspectorContent', () => {
     ],
   };
 
+  it('covers the page with the 3D loading card when it opens on the fullscreen 3D view, not in 2D or windowed', () => {
+    const view = render(<ReplayInspectorContent isOpen onClose={vi.fn()} sessionId="session-1" view="3d" isExpanded />);
+    expect(screen.getByTestId('scene-3d-fullscreen-cover')).toHaveTextContent('Loading 3D replay');
+    view.rerender(<ReplayInspectorContent isOpen onClose={vi.fn()} sessionId="session-1" view="2d" isExpanded />);
+    expect(screen.queryByTestId('scene-3d-fullscreen-cover')).toBeNull();
+    view.rerender(<ReplayInspectorContent isOpen onClose={vi.fn()} sessionId="session-1" view="3d" />);
+    expect(screen.queryByTestId('scene-3d-fullscreen-cover')).toBeNull();
+    view.unmount();
+  });
+
   it('renders nothing when isOpen is false', () => {
     const { container } = render(
       <ReplayInspectorContent isOpen={false} onClose={vi.fn()} sessionId="session-1" />

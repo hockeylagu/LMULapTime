@@ -11,9 +11,15 @@ import { plainSurfaceMaterial } from '../shaders/plainSurface.js';
  * lamps fade with it. It keeps the scene's environment at the scene's intensity, as its built-in materials did (three lit them by the
  * scene's environment whatever their `envMapIntensity` while they had no map of their own).
  */
+/**
+ * The see-through ghost's first part's draw order (`renderOrder`), one more per part: after the racing lines, the driving marks and the
+ * trace curtains (`CURTAIN_ORDER`, traceCurtain.ts), so the ghost reads over the data on the road.
+ */
+export const GHOST_FIRST_ORDER = 20;
+
 export function makeCar(color: string, ghost: boolean, model: Group): Group {
   const car = new Group(), envelope = model;
-  let order = 1;
+  let order = GHOST_FIRST_ORDER;
   envelope.traverse(object => {
     if (!(object instanceof Mesh)) return;
     if (ghost) object.renderOrder = order++;

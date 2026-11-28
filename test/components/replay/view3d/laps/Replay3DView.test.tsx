@@ -441,3 +441,33 @@ it('repeats a picked corner from its entry, keeping the camera until the corner 
   expect(scene.showMarks).toHaveBeenLastCalledWith(null);
 });
 
+it('stands the bottom trace as curtains in place of the lines with its 3D button, remembered; off brings the lines back', async () => {
+  localStorage.removeItem('lmu-3d-trace-shown-v1'); localStorage.setItem('lmu-map-trace-channel-v1', 'speed');
+  const {map} = await setup();
+  fireEvent.keyDown(map, {key: 'm'});
+  const button = screen.getByRole('button', {name: '3D trace'});
+  expect(button).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(screen.getByRole('button', {name: 'Throttle + Brake'}));
+  fireEvent.click(button);
+  expect(button).toHaveAttribute('aria-pressed', 'true');
+  expect(localStorage.getItem('lmu-3d-trace-shown-v1')).toBe('true');
+  // Both pedals on one curtain: throttle and brake edges on the 0–100 % scale.
+  const values = scene.showTrace.mock.calls.at(-1)?.[0] as (lap: ReplayTrajectoryData, baseline: null) => {primary: {edges: number[][]}} | null;
+  expect(values(trajectory, null)?.primary.edges).toEqual([trajectory.points.map(() => 0.8), trajectory.points.map(() => 0)]);
+  expect(screen.getByTestId('trace-legend')).toHaveTextContent('Throttle + Brake100 % at 3 m · 0 at the road');
+  // The curtain follows the bottom trace's channel; a lap without it keeps its line, and says why.
+  fireEvent.click(screen.getByRole('combobox', {name: 'More telemetry channels'}));
+  fireEvent.click(screen.getByRole('option', {name: 'Steering Force'}));
+  expect(screen.getByTestId('trace-legend')).toHaveTextContent('data on this lap: the racing line shows instead');
+  // The Line menu says the trace stands in place of the line; picking a line there turns the trace off.
+  const line = screen.getByRole('combobox', {name: 'Racing line'});
+  expect(line).toHaveTextContent('3D trace');
+  fireEvent.click(line); fireEvent.click(screen.getByRole('option', {name: 'Plain'}));
+  expect(button).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.getByRole('combobox', {name: 'Racing line'})).toHaveTextContent('Plain');
+  expect(scene.showTrace).toHaveBeenLastCalledWith(null);
+  expect(screen.queryByTestId('trace-legend')).not.toBeInTheDocument();
+  fireEvent.click(button); fireEvent.click(button);
+  expect(screen.queryByRole('combobox', {name: 'Trace'})).toBeNull();
+  localStorage.removeItem('lmu-3d-trace-shown-v1'); localStorage.removeItem('lmu-map-trace-channel-v1');
+});

@@ -1,4 +1,4 @@
-import { Group, type Vector3 } from 'three';
+import { Group, type Mesh, type OrthographicCamera, type PerspectiveCamera, type Vector3 } from 'three';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
@@ -11,6 +11,9 @@ import { makeDrivingMarks, type DrivingMark } from './drivingMarks.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { DisplayTransform } from '../autoExposure.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
+import type { CameraMode } from '../camera/cameraModes.js';
+import { createCurtainLayer, type CurtainHover, type CursorAt, type LapCurtains } from './curtainLayer.js';
+import { curtainFillIndexCount, curtainLift, type CurtainLift } from './traceCurtain.js';
 
 export interface LapCars {
   primary: LoadedBody;
@@ -52,6 +55,16 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       marks = {...makeDrivingMarks(list, markedLaps, origin, surfaceHeight, display), list};
       root.add(marks.mesh);
     };
+    const curtains = createCurtainLayer(root, origin, surfaceHeight, display, trajectory, baseline);
+    let opacities: [number, number] = [1, 1];
+    /** A trace curtain stands in for its lap's racing line: the ribbons show only without one. */
+    const applyLineOpacity = () => {
+      const [primaryOpacity, baselineOpacity] = opacities, ribbons = !curtains.shown;
+      // Opacity 0 hides a line: nothing to draw, and nothing for its transparent pass to sort.
+      primaryLine.material.opacity = primaryOpacity; primaryLine.visible = ribbons && primaryOpacity > 0;
+      if (baselineLine) { baselineLine.material.opacity = baselineOpacity; baselineLine.visible = ribbons && baselineOpacity > 0; }
+      curtains.fade(primaryOpacity, baseline ? baselineOpacity : 0);
+    };
     return {
       root, trajectory, baseline, primary, ghost, primaryMotion, ghostMotion,
       /** The primary car's game cameras (cockpit, hood and roof views). */
@@ -68,13 +81,33 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         colorRacingLine(primaryLine, colors.primary); if (baselineLine) colorRacingLine(baselineLine, colors.baseline);
       },
       /** The camera type changed: re-bake the line colours for its display transform. */
-      syncLines() { syncRacingLine(primaryLine); if (baselineLine) syncRacingLine(baselineLine); if (marks) syncRacingLine(marks.mesh); },
+      syncLines() { syncRacingLine(primaryLine); if (baselineLine) syncRacingLine(baselineLine); if (marks) syncRacingLine(marks.mesh); curtains.sync(); },
       /** Draws a corner's driving marks on the road (`drivingMarks.ts`), replacing any shown; null clears them. */
       showMarks,
-      fadeLines(primaryOpacity: number, baselineOpacity: number) {
-        // Opacity 0 hides a line: nothing to draw, and nothing for its transparent pass to sort.
-        primaryLine.material.opacity = primaryOpacity; primaryLine.visible = primaryOpacity > 0;
-        if (baselineLine) { baselineLine.material.opacity = baselineOpacity; baselineLine.visible = baselineOpacity > 0; }
+      fadeLines(primaryOpacity: number, baselineOpacity: number) { opacities = [primaryOpacity, baselineOpacity]; applyLineOpacity(); },
+      /** Shows a channel's trace curtains in place of the racing lines (`curtainLayer.ts`); null shows the lines again. */
+      showTrace(values: LapCurtains | null) { curtains.show(values); applyLineOpacity(); },
+      /** Each frame: the curtains' camera-distance fade and height, and their cursor lines at the lap's and the ghost's samples. */
+      syncTrace(mode: CameraMode, camera: PerspectiveCamera | OrthographicCamera, lapInView: () => number, primaryAt: CursorAt | null, baselineAt: CursorAt | null) {
+        if (!curtains.shown) return;
+        curtains.camera(mode, camera, lapInView); curtains.cursor(primaryAt, baselineAt);
+      },
+      /** The hover line on a curtain where the pointer is (null: none). */
+      hoverTrace(at: CurtainHover | null) { curtains.hover(at); },
+      /** What the hover pick tests (`tracePick.ts`): the shown curtains, else the shown ribbons, each with its strip's index count. */
+      pickable() {
+        const shown = curtains.pickable(), entries: Array<{lap: 'primary' | 'baseline'; mesh: Mesh; count: number; lift?: CurtainLift}> = [];
+        const add = (lap: 'primary' | 'baseline', mesh: Mesh | null, count: number) => {
+          if (mesh?.visible) entries.push({lap, mesh, count, lift: curtains.shown ? curtainLift(mesh) : undefined});
+        };
+        if (curtains.shown) {
+          add('primary', shown.primary, shown.primary ? curtainFillIndexCount(shown.primary) : 0);
+          add('baseline', shown.baseline, shown.baseline ? curtainFillIndexCount(shown.baseline) : 0);
+        } else {
+          add('primary', primaryLine, primaryLine.geometry.index?.count ?? 0);
+          add('baseline', baselineLine, baselineLine?.geometry.index?.count ?? 0);
+        }
+        return entries;
       },
       /** Places both cars' parts at their pose, wheels, steering and shown levels: call before each frame is drawn. */
       syncParts() { cars.primary.parts.sync(); cars.driven.cabin.parts.sync(); drawnGhost?.parts.sync(); },
@@ -86,6 +119,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         refreshRacingLine(primaryLine, trajectory, origin, colors.primary, surfaceHeight);
         if (baselineLine && baseline) refreshRacingLine(baselineLine, baseline, origin, colors.baseline, surfaceHeight, BASELINE_LINE.widthM, BASELINE_LINE.liftM);
         if (marks?.missing) showMarks(marks.list);
+        curtains.refresh();
       },
       // The car stays with the shell for the next view or lap driving it.
       dispose() { kept.keep(cars.driven); root.removeFromParent(); disposeObjects(root); },

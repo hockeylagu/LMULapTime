@@ -3,7 +3,8 @@ import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
 import { createRealRoadSurface } from '../scenery/realRoad.js';
-import { prepareLampSizes, trackLampPixel } from '../scenery/lampSize.js';
+import { prepareLampSizes } from '../scenery/lampSize.js';
+import { setViewPixel } from '../shaders/sceneBlock.js';
 import type { RenderPose } from './replayPose.js';
 import type { CarTextures } from '../cars/carModels.js';
 import { createCarTemplates, type CarTemplates } from '../cars/carTemplates.js';
@@ -397,7 +398,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       placeCockpitLight(content?.reflected ?? null);
       updateShownMatrices(scene);
       placePaintBox(); // The reflected car's box as its frame now stands.
-      trackCardFacing(camera); trackLampPixel(renderer.getDrawingBufferSize(drawingSize).y);
+      trackCardFacing(camera); setViewPixel(renderer.getDrawingBufferSize(drawingSize).y);
       // A measure of the sun through the clouds still running, or cached shadow cascades still due, ask for the next frame.
       const seen = meter?.step(cloudEye()) ?? null;
       if (seen !== null) seeSun(seen);

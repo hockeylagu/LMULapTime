@@ -9,6 +9,10 @@ import { ghostDistanceAt, type GhostSyncMode } from '../../map/ghostSync.js';
 import { nativeToScene, sampleRenderPose, sampleStationPose } from '../scene/replayPose.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './lapLayer.js';
 import type { DrivingMark } from './drivingMarks.js';
+import type { CursorAt, LapCurtains } from './curtainLayer.js';
+import { clearSpan, pickStrip, pickStripFoot, type StripHit } from './tracePick.js';
+import { metresPerPixel } from './traceCurtain.js';
+import { findIndexAtDistance } from '../../../../utils/lapAlignment.js';
 import { createCarSets } from '../cars/drawnCar.js';
 import { setCameraDistance } from '../cars/carParts.js';
 import { ghostFader } from '../cars/ghostFade.js';
@@ -17,6 +21,9 @@ import { cornerFraming } from '../camera/cornerFraming.js';
 import type { SceneLoadProgress } from '../scene/loadProgress.js';
 import { stationAt } from '../scenery/streamView.js';
 import type { SceneContent, SceneShell } from '../scene/sceneShell.js';
+
+/** How near the pointer a sample's foot picks it overhead, in CSS pixels (`metresPerPixel` measures drawn ones). */
+const OVERHEAD_PICK_REACH_PX = 12;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
@@ -28,7 +35,7 @@ export interface ReplaySceneHandle {
   beforeFrame(hook: ((frameTime: number) => void) | null): void;
   mode(mode: CameraMode): void;
   reset(): void;
-  /** The whole lap from the air at an angle, in orbit view (`CameraRig.overview`). */
+  /** The whole lap from the air at an angle, in orbit view: every trace curtain at once (`CameraRig.overview`). */
   overview(): void;
   /** Frames a lap's samples `start` to `end` (`points`) from the free camera, outside the turn at `apex` (orbit mode only). */
   frameStretch(points: ReplayTrajectoryPoint[], start: number, end: number, apex: number): void;
@@ -43,9 +50,33 @@ export interface ReplaySceneHandle {
   colorLines(colorBy: MapColorMode): void;
   /** Fade either racing line (opacity 0–1, 0 hides it), as the 2D map fades a line on request. */
   fadeLines(primaryOpacity: number, baselineOpacity: number): void;
+  /**
+   * Shows a trace curtain over each lap's line in place of the racing lines (null: the lines). `values` builds a channel's curtains for
+   * the laps shown, and again for laps shown later.
+   */
+  showTrace(values: TraceValues | null): void;
+  /**
+   * The lap sample under the pointer (CSS pixels in the host) on a shown curtain or racing ribbon, the nearer lap's where both are;
+   * null where none shows there or scenery in front hides it. Answers a frame or two later (the GPU tells what the frame drew).
+   */
+  pickTrace(x: number, y: number): Promise<TracePick | null>;
+  /** Stands the hover line on the curtain at a picked sample (null: none); the car stays where it is. */
+  hoverTrace(pick: TracePick | null): void;
   /** Place the ghost at the same distance, the same lap time, or the same time since marker A (as the 2D map). */
   syncGhost(mode: GhostSyncMode, anchorDistM: number | null): void;
   dispose(): void;
+}
+
+/** A channel's curtain values for a lap and its comparison lap; null when the lap has none of the channel. */
+export type TraceValues = (lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => LapCurtains | null;
+
+/** A hover pick on a lap's curtain or ribbon: the lap hit, its own sample, and the lap's sample at the same lap distance. */
+export interface TracePick {
+  lap: 'primary' | 'baseline';
+  /** The hit lap's sample. */
+  index: number;
+  /** The primary lap's sample at that lap distance (the cursor's index). */
+  primaryIndex: number;
 }
 
 /** Where the lap view's scenery streams first: around the lap's first pose. */
@@ -84,8 +115,12 @@ export async function createReplayScene(
   });
   carsWarm.catch(() => {}); // A failure here surfaces from the load or the scene's warm-up below.
   const ghostCentre = new Vector3(), primaryCentre = new Vector3();
-  /** The lap sample the primary car was last placed at (its headlight bit). */
+  /** The lap sample the primary car was last placed at (its headlight bit), and the ghost's (null: not shown). */
   let primaryIndex = 0;
+  /** Where each car stands between its samples, for the curtains' cursor lines. */
+  const primaryAt: CursorAt = {index: 0, fraction: 0}, ghostAt: CursorAt = {index: 0, fraction: 0};
+  /** Read only while a free camera shows a trace (`curtainStep`): it walks the lap's points when the camera moved. */
+  const lapInView = () => shell.rig.lapInViewM;
   /** The shell's content for a lap layer: the cars and lines, with the ghost's parts following the camera's distance. */
   const contentOf = (lap: LapLayer): SceneContent => {
     const fadeGhost = ghostFader(lap.ghost);
@@ -95,6 +130,7 @@ export async function createReplayScene(
       root: lap.root, reflected: lap.primary,
       beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
         lap.syncParts();
+        lap.syncTrace(shell.rig.mode, camera, lapInView, lap.primary.visible ? primaryAt : null, lap.ghost.visible ? ghostAt : null);
         // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
         // parts follow the camera's distance.
         if (lap.ghost.visible) {
@@ -138,6 +174,8 @@ export async function createReplayScene(
   }
   let syncMode: GhostSyncMode = 'distance', anchorDistM: number | null = null, disposed = false;
   let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0, shownMarks: DrivingMark[] | null = null;
+  let shownTrace: TraceValues | null = null;
+  const traceOf = (lap: LapLayer) => shownTrace?.(lap.trajectory, lap.baseline) ?? null;
   const target = new Vector3();
   return {
     get wheelMotion() { return layer.primaryMotion.wheels?.description ?? ''; },
@@ -154,6 +192,7 @@ export async function createReplayScene(
         await shell.warm(replacement.root);
         if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
         replacement.ready(); replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity); replacement.showMarks(shownMarks);
+        replacement.showTrace(traceOf(replacement));
         layer.dispose(); layer = replacement; shell.show(contentOf(layer)); rig.setLayer(layer);
         shell.setDaylight(next.daylightClock);
         return true;
@@ -169,7 +208,7 @@ export async function createReplayScene(
       primary.visible = pose !== null;
       if (!pose) { shell.invalidate(); return; }
       shell.placeCar(primary, pose, primaryMotion);
-      primaryIndex = pose.index;
+      primaryIndex = primaryAt.index = pose.index; primaryAt.fraction = pose.fraction;
       const sample = trajectory.points[pose.index], nextSample = trajectory.points[pose.index + 1];
       const timeSec = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
 
@@ -179,6 +218,7 @@ export async function createReplayScene(
       const ghostStation = ghostClock ? ghostDistanceAt(ghostClock, syncMode, station, anchorDistM) : station;
       const other = baseline ? sampleStationPose(baseline.points, baselineDistances, ghostStation) : null;
       ghost.visible = other !== null;
+      if (other) { ghostAt.index = other.index; ghostAt.fraction = other.fraction; }
       if (other) shell.placeCar(ghost, other, ghostMotion);
       rig.follow({target: target.set(...nativeToScene(pose, origin)), yaw: pose.yaw ?? 0, timeSec, stationM: station, index, fraction});
       shell.invalidate();
@@ -209,6 +249,29 @@ export async function createReplayScene(
     },
     colorLines(next) {
       lineMode = next; layer.colorLines(next);
+      shell.invalidate();
+    },
+    pickTrace: (x, y) => shell.afterFrame(() => {
+      const ray = shell.pointerRay(x, y);
+      let best: (StripHit & {lap: TracePick['lap']}) | null = null;
+      // Overhead, a curtain stands edge-on: the sample whose foot is nearest the pointer, within a few pixels.
+      const overhead = shell.rig.mode === 'top';
+      for (const {lap, mesh, count, lift} of layer.pickable()) {
+        const hit = overhead ? pickStripFoot(mesh, count, ray, OVERHEAD_PICK_REACH_PX * shell.renderer.getPixelRatio() * metresPerPixel(shell.rig.camera, ray.origin)) : pickStrip(mesh, count, ray, lift);
+        if (hit && (!best || hit.distance < best.distance)) best = {...hit, lap};
+      }
+      if (!best) return null;
+      const {lap, index} = best, {primaryDistances, baselineDistances} = layer;
+      const primaryIndex = lap === 'primary' ? index : findIndexAtDistance(primaryDistances, baselineDistances[index] ?? 0);
+      // Shown only where the frame drew no opaque surface between the eye and the hit.
+      return shell.surfaceWithin(x, y, [clearSpan(ray, best.point)]).then(hidden => (hidden === -1 ? {lap, index, primaryIndex} : null));
+    }),
+    hoverTrace(pick) {
+      layer.hoverTrace(pick && {lap: pick.lap, index: pick.index});
+      shell.invalidate();
+    },
+    showTrace(values) {
+      shownTrace = values; layer.showTrace(traceOf(layer));
       shell.invalidate();
     },
     syncGhost(next, anchor) {

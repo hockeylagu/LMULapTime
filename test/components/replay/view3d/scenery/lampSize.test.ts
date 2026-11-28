@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
-import { LAMP_ATTRIBUTE, lampCentres, lampSizePart, prepareLampSizes, trackLampPixel } from '../../../../../src/components/replay/view3d/scenery/lampSize.js';
-import { sceneValue } from '../../../../../src/components/replay/view3d/shaders/sceneBlock.js';
+import { LAMP_ATTRIBUTE, lampCentres, lampSizePart, prepareLampSizes } from '../../../../../src/components/replay/view3d/scenery/lampSize.js';
+import { sceneValue, setViewPixel } from '../../../../../src/components/replay/view3d/shaders/sceneBlock.js';
 
 /** Two lamps: a square of two triangles split by normal (no shared vertex) about (0, 0, 0), and a triangle about (10, 0, 0). */
 const POSITIONS = [
@@ -36,8 +36,8 @@ describe('lamp sizes', () => {
   });
 
   it('keeps a pixel in clip space for the frame', () => {
-    trackLampPixel(1000); expect(sceneValue('surface_lampPixel')).toBeCloseTo(0.002);
-    trackLampPixel(0); expect(sceneValue('surface_lampPixel')).toBe(0);
+    setViewPixel(1000); expect(sceneValue('view_pixel')).toBeCloseTo(0.002);
+    setViewPixel(0); expect(sceneValue('view_pixel')).toBe(0);
   });
 });
 

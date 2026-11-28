@@ -324,6 +324,14 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   const layer = world.children.at(-1)!;
   expect(layer.children[0].position.x).toBeCloseTo(7); expect(layer.children[1].visible).toBe(true);
   expect((layer.children[2] as Mesh<BufferGeometry, ShaderMaterial>).material.opacity).toBe(0.12);
+  // A trace curtain stands in for each lap's line, under the line's fade, until the lines come back.
+  const half = (shown: typeof lap) => ({edges: [shown.points.map(() => 0.5)], edgeColours: ['#ff0000'], fillColours: [], edgeOpacity: 1});
+  handle.showTrace((shown, compared) => ({primary: half(shown), baseline: compared ? half(compared) : null})); draw();
+  const curtains = layer.getObjectByName('trace-curtains')!, [primaryCurtain] = curtains.children as Array<Mesh<BufferGeometry, ShaderMaterial>>;
+  expect([layer.children[2].visible, curtains.children.filter(child => child.name === 'trace-curtain')]).toEqual([false, [expect.anything(), expect.anything()]]);
+  expect(primaryCurtain.material.opacity).toBe(0.12);
+  handle.showTrace(null);
+  expect([layer.children[2].visible, layer.getObjectByName('trace-curtains')]).toEqual([true, undefined]);
   expect(await handle.updateLaps(next, null, assets)).toBe(true); handle.cursor(2, 0);
   expect(world.children.at(-1)!.children).toHaveLength(3);
   expect(world.children.at(-1)!.children[1].visible).toBe(false);

@@ -29,6 +29,10 @@ import { useCornerFocus } from './useCornerFocus.js';
 import { CornerFocusBar } from './CornerFocusBar.js';
 import { CornerCardButton, CORNER_CARD_UNDER_FULLSCREEN_MINIMAP, CORNER_CARD_UNDER_MINIMAP } from '../../cornerCard/CornerInsightCard.js';
 import { LapCornerCard } from '../../cornerCard/LapCornerCard.js';
+import { shownDockChannel, useDockChannel } from '../../map/telemetry/dockChannel.js';
+import { lapCurtains } from './traceValues.js';
+import { TraceLegend } from './TraceLegend.js';
+import { TraceHover } from './TraceHover.js';
 
 interface Props {
   trajectory: ReplayTrajectoryData;
@@ -64,7 +68,16 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
   const [showLines, toggleLines] = useStoredToggle('lmu-3d-racing-lines-v1', true);
   const ghostSync = useGhostSync(), syncControls = ghostSyncControls(ghostSync);
-  const {scene, state} = useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine, showLines, retry,
+  // The curtain stands the bottom trace's channel while its 3D button is on (driver, 2026-11-28).
+  const [traceShown, toggleTraceShown] = useStoredToggle('lmu-3d-trace-shown-v1', false);
+  const dockChannel = shownDockChannel(useDockChannel(), Boolean(baseline)), traceChannel = traceShown ? dockChannel : null;
+  const traceControls = {traceShown, onHideTrace: toggleTraceShown};
+  const shownTrace = useMemo(() => (traceChannel ? lapCurtains(traceChannel, trajectory, baseline) : null), [traceChannel, trajectory, baseline]);
+  // The scene takes the values worked out here for the laps shown, and works them out for laps it shows before the next render.
+  const trace = useMemo(() => (traceChannel ? (lap: ReplayTrajectoryData, compared: ReplayTrajectoryData | null) => (
+    lap === trajectory && compared === baseline ? shownTrace?.curtains ?? null : lapCurtains(traceChannel, lap, compared)?.curtains ?? null
+  ) : null), [traceChannel, trajectory, baseline, shownTrace]);
+  const {scene, state} = useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine, showLines, retry, trace,
     syncMode: ghostSync.mode, anchorDistM: ghostSync.markerDistM});
 
   const baselinePoints = useMemo(() => baseline?.points ?? [], [baseline]);
@@ -110,11 +123,12 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy} hasBaseline={Boolean(baseline)}
             isCompareMode={Boolean(baseline)} fadedLine={fadedLine} onToggleFadedLine={onToggleFadedLine}
             showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={onToggleFrictionCircle}
-            showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />
+            showRacingLines={showLines} onToggleRacingLines={toggleLines} {...traceControls} {...syncControls} />
         </div>
       )}
       overlays={<>
-        <HeatmapLegendBar colorBy={colorBy} />
+        {traceChannel && showLines ? <TraceLegend trace={traceChannel} scale={shownTrace?.scale ?? null} compared={Boolean(baseline)} />
+          : <HeatmapLegendBar colorBy={showLines ? colorBy : 'default'} />}
         {cornerFocus.focused && focusCorner && onLeaveCorner && <CornerFocusBar corner={focusCorner} compared={Boolean(baseline)}
           looping={cornerFocus.looping} onToggleLoop={cornerFocus.toggleLoop} onFrame={cornerFocus.frame} onClose={onLeaveCorner} />}
         {isExpanded && <GpsMapExpandedOverlays points={trajectory.points} currentIndex={activeIndex}
@@ -124,12 +138,13 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           colorBy={colorBy} onChangeColorBy={onChangeColorBy} isCompareMode={Boolean(baseline)} hasBaseline={Boolean(baseline)}
           fadedLine={fadedLine} onToggleFadedLine={onToggleFadedLine}
           showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={onToggleFrictionCircle}
-          showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />}
+          showRacingLines={showLines} onToggleRacingLines={toggleLines} {...traceControls} {...syncControls} />}
       </>}
       bottom={isExpanded && onSelectIndex ? (
         <GpsMapTelemetryDock points={trajectory.points} baselinePoints={baseline?.points} comparisons={comparisons} currentIndex={currentIndex}
           onSelectIndex={onSelectIndex} trackLengthM={trajectory.trackLengthM} source={trajectory.source} sectors={trajectory.sectors}
           isPlaying={isPlaying} onTogglePlay={onTogglePlay} traceHidden={isTraceHidden} onToggleTrace={toggleTrace}
+          curtain={{shown: traceShown, onToggle: toggleTraceShown}}
           hud={<GpsMapTelemetryHud primaryPoint={activePrimaryPoint} baselinePoint={baselineGhostPos?.point} deltaTimeSec={currentDeltaTimeSec} />} />
       ) : (
         <div className="shrink-0 bg-lmu-deep">
@@ -140,6 +155,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
         </div>
       )}>
       <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_24px_rgba(6,9,16,0.35)]" />
+      {showLines && <TraceHover host={host} scene={scene} trajectory={trajectory} baseline={baseline} comparisons={comparisons} distances={primaryDists}
+        trace={traceChannel && shownTrace ? {id: traceChannel, scale: shownTrace.scale} : null} onSelectIndex={onSelectIndex} active={active && Boolean(state?.ready)} />}
       <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
         className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
       {/* A scene under 640 px (the page's embedded view) has no room beside the card: it hides there (driver, 2026-11-18). */}
