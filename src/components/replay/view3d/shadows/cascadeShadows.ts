@@ -3,7 +3,7 @@ import {
   type Object3D, type PerspectiveCamera, type Scene, type WebGLRenderer,
 } from 'three';
 import type { SceneryShadows } from '../../../../../shared/types/scenes/scenery.js';
-import { SHADOW_ONLY_LAYER } from '../cars/carBatching.js';
+import { SHADOW_ONLY_LAYER, UNSEEN_LAYER } from '../cars/carBatching.js';
 import { createShadowCasterPass } from './shadowCasterPass.js';
 import { cascadeCentres, sunSquareAxes, type ShadowCascadeLayout, type SunSquareAxes } from './shadowCascades.js';
 
@@ -132,9 +132,14 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   // The static depth of the held and cached cascades, in the atlas' own tiles, of the atlas' depth type: the shadow pass copies it as stored.
   const staticDepth = cascades.some(row => row.held || !row.live) ? new DepthTexture(sizePx, heightPx, UnsignedIntType) : null;
   const staticTarget = staticDepth && atlasTarget(sizePx, heightPx, staticDepth);
-  /** What a first draw (`drawFirst`) draws into: a texel of the atlas' kind, from a camera that sees what the cascades' cameras see. */
+  /**
+   * What a first draw (`drawFirst`) draws into: a texel of the atlas' kind, from a camera that sees what the cascades' cameras see
+   * and the layer a warming car waits in (`UNSEEN_LAYER`, until it shows): its casters' first draw is the warm-up's, not its first frame's.
+   */
   let firstTarget: WebGLRenderTarget | null = null;
-  const firstLayer = [{viewport: new Vector4(0, 0, 1, 1), light: lightCamera(), depthBias: {slope: 0, units: 0}}];
+  const firstLight = lightCamera();
+  firstLight.layers.enable(UNSEEN_LAYER);
+  const firstLayer = [{viewport: new Vector4(0, 0, 1, 1), light: firstLight, depthBias: {slope: 0, units: 0}}];
   if (staticTarget) renderer.initRenderTarget(staticTarget);
   const state: CascadeShadowState = {
     atlas: depth,

@@ -1,7 +1,8 @@
 import {
-  AlwaysDepth, BoxGeometry, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Scene, ShaderMaterial, Vector3, Vector4, type DepthTexture,
+  AlwaysDepth, BoxGeometry, Mesh, MeshBasicMaterial, OrthographicCamera, PerspectiveCamera, Scene, ShaderMaterial, Vector3, Vector4, type Camera, type DepthTexture,
   type WebGLRenderer, type WebGLRenderTarget,
 } from 'three';
+import { UNSEEN_LAYER } from '../../../../../src/components/replay/view3d/cars/carBatching.js';
 import { describe, expect, it } from 'vitest';
 import { cascadeDepthRangeM, createCascadeShadows, placeCascadeCamera } from '../../../../../src/components/replay/view3d/shadows/cascadeShadows.js';
 import { shadowCascadeLayout, sunSquareAxes } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
@@ -11,7 +12,7 @@ const {shadows} = testShading();
 const layout = shadowCascadeLayout(shadows, shadows.cameras.chase);
 const light = new Vector3(1, -1, 0.5).normalize();
 
-type Event = {kind: 'render'; viewport: Vector4; root: unknown; car: boolean} | {kind: 'copy'; viewport: Vector4; from: unknown; to: unknown; material: ShaderMaterial};
+type Event = {kind: 'render'; viewport: Vector4; root: unknown; car: boolean; layers: number} | {kind: 'copy'; viewport: Vector4; from: unknown; to: unknown; material: ShaderMaterial};
 
 /** The depth copy's material when `root` is the pass's depth copy quad (a scene of one quad reading `baseDepth`). */
 const depthCopyOf = (root: unknown) => {
@@ -29,10 +30,10 @@ function recordingRenderer(car: Mesh) {
     state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}},
     initRenderTarget() {}, clear() {},
     getRenderTarget: () => target, setRenderTarget(next: unknown) { target = next; },
-    render(root: unknown) {
+    render(root: unknown, camera: Camera) {
       const into = target as WebGLRenderTarget, viewport = into.viewport.clone(), copy = depthCopyOf(root);
       events.push(copy ? {kind: 'copy', viewport, from: copy.uniforms.baseDepth.value, to: into.depthTexture, material: copy}
-        : {kind: 'render', viewport, root, car: car.visible});
+        : {kind: 'render', viewport, root, car: car.visible, layers: camera.layers.mask});
     },
   };
   return {renderer: renderer as unknown as WebGLRenderer, events};
@@ -76,6 +77,11 @@ describe('cascade shadows', () => {
     // The test layout has no whole live cascade: no scene draw, the car drawn on its own over nothing (no depth copy).
     expect([draws.renders.map(draw => [draw.root === car, draw.viewport.toArray()]), sceneRenders(draws, scene), draws.copies]).toEqual([[[true, [0, 0, 1, 1]]], [], []]);
     expect(car.visible).toBe(true);
+    // It sees what the cascades see, and the layer a warming car waits in, which they do not.
+    const unseen = 1 << UNSEEN_LAYER, first = draws.renders[0].layers;
+    draws.clear();
+    cascades.update(view, [], []);
+    expect([first & unseen, first & ~unseen, draws.renders[0].layers]).toEqual([unseen, draws.renders[0].layers, first & ~unseen]);
     cascades.dispose();
   });
 

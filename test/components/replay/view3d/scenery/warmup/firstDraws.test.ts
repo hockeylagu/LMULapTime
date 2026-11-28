@@ -1,4 +1,4 @@
-import { BatchedMesh, BoxGeometry, DirectionalLight, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three';
+import { BatchedMesh, BoxGeometry, DepthTexture, DirectionalLight, FloatType, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, Scene, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three';
 import { expect, it, vi } from 'vitest';
 import { createFirstDraws } from '../../../../../../src/components/replay/view3d/scenery/warmup/firstDraws.js';
 
@@ -8,9 +8,9 @@ interface Drawn { meshes: Object3D[]; lights: number; width: number | undefined;
 function fixture() {
   const scene = new Scene(), sun = new DirectionalLight(), scenery = new Mesh(new BoxGeometry(), new MeshBasicMaterial());
   scene.add(sun, sun.target, scenery);
-  const frameTarget = new WebGLRenderTarget(64, 32, {samples: 4});
+  const frameTarget = new WebGLRenderTarget(64, 32, {samples: 4, depthTexture: new DepthTexture(64, 32, FloatType)});
   let target: WebGLRenderTarget | null = null;
-  const drawn: Drawn[] = [], batches: BatchedMesh[] = [];
+  const drawn: Drawn[] = [], batches: BatchedMesh[] = [], depths = new Set<DepthTexture | null>();
   const render = vi.fn((root: Object3D, camera: Camera) => {
     const meshes: Object3D[] = [];
     let lights = 0;
@@ -21,15 +21,16 @@ function fixture() {
     });
     drawn.push({meshes, lights, width: target?.width, culled: meshes.map(mesh => mesh.frustumCulled),
       instanceShown: batches.length ? batches[0].getVisibleAt(0) : undefined});
+    depths.add(target?.depthTexture ?? null);
   });
   const renderer = {getRenderTarget: () => target, setRenderTarget: (next: WebGLRenderTarget | null) => { target = next; }, render} as unknown as WebGLRenderer;
   const shadows = vi.fn<(root: Object3D) => void>();
   const draws = createFirstDraws(renderer, scene, shadows);
-  return {scene, scenery, frameTarget, drawn, batches, render, shadows, draws, prepare: () => { target = frameTarget; }, target: () => target};
+  return {scene, scenery, frameTarget, drawn, batches, depths, render, shadows, draws, prepare: () => { target = frameTarget; }, target: () => target};
 }
 
 it('draws each material once, a frame apart, alone in the scene with its lights, into a pixel of the frame target kind', async () => {
-  const {scene, scenery, frameTarget, drawn, batches, shadows, draws, prepare, target} = fixture();
+  const {scene, scenery, frameTarget, drawn, batches, depths, shadows, draws, prepare, target} = fixture();
   const material = new MeshBasicMaterial(), other = new MeshBasicMaterial();
   const car = new Group(), body = new Mesh(new BoxGeometry(), material), wheel = new Mesh(new BoxGeometry(), material), glass = new Mesh(new BoxGeometry(), other);
   const standIn = new Mesh(new BoxGeometry(), new MeshBasicMaterial());
@@ -51,6 +52,10 @@ it('draws each material once, a frame apart, alone in the scene with its lights,
     expect([batch.getVisibleAt(0), batch.perObjectFrustumCulled, body.frustumCulled, scenery.visible, wheel.visible, car.parent, target()]).toEqual([false, true, true, true, true, null, null]);
     expect(scene.children).not.toContain(car);
     expect(frameTarget.samples).toBe(4);
+    // The pixel has a depth texture of its own, of the frame's type: the frame's keeps its image and size.
+    const [depth] = depths, frameDepth = frameTarget.depthTexture!;
+    expect([depths.size, depth !== frameDepth, depth?.image !== frameDepth.image, depth?.type, depth?.image.width]).toEqual([1, true, true, FloatType, 1]);
+    expect([frameDepth.image.width, frameDepth.image.height]).toEqual([64, 32]);
   } finally { draws.dispose(); }
 });
 
@@ -68,12 +73,14 @@ it('leaves a root already in the scene, stops when aborted, and draws the calls 
     await draws.draw([placed], camera, prepare, () => Promise.resolve(), new AbortController().signal);
     await draws.draw([first], camera, prepare, () => Promise.resolve(), aborted.signal);
     expect(drawn).toHaveLength(0);
+    const joins = new Mesh(new BoxGeometry(), new MeshBasicMaterial());
     const one = draws.draw([first], camera, prepare, () => { order.push('first waits'); return held; }, new AbortController().signal);
-    const two = draws.draw([second], camera, prepare, () => { order.push('second waits'); return Promise.resolve(); }, new AbortController().signal);
+    const two = draws.draw([second, joins], camera, prepare, () => { order.push('second waits'); return Promise.resolve(); }, new AbortController().signal);
     await Promise.resolve();
     expect(order).toEqual(['first waits']);
+    scene.add(joins); // Joins the scene while queued: it draws there, and stays.
     release();
     await Promise.all([one, two]);
-    expect([order, drawn.map(draw => draw.meshes[0])]).toEqual([['first waits', 'second waits'], [first, second]]);
+    expect([order, drawn.map(draw => draw.meshes[0]), joins.parent]).toEqual([['first waits', 'second waits', 'second waits'], [first, second], scene]);
   } finally { draws.dispose(); }
 });
