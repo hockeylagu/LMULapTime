@@ -138,4 +138,16 @@ describe('TelemetryPresetChannelRow', () => {
 
     expect(screen.getByText('ENERGY / FUEL')).toBeInTheDocument();
   });
+
+  it('shows a cut-off description whole on hover and with More, without toggling the channel', () => {
+    const onToggle = vi.fn();
+    const width = vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(1000);
+    render(<TelemetryPresetChannelRow channel={baseChannel} isActive={false} isFirst={false} isLast={false} onToggle={onToggle} onMove={vi.fn()} />);
+    width.mockRestore();
+    expect(screen.getByTitle('Vehicle ground velocity (km/h)')).toHaveClass('truncate');
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    expect(screen.getByTitle('Vehicle ground velocity (km/h)')).not.toHaveClass('truncate');
+    expect(screen.getByRole('button', { name: 'Less' })).toHaveAttribute('aria-expanded', 'true');
+    expect(onToggle).not.toHaveBeenCalled();
+  });
 });

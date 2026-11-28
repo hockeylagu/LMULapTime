@@ -121,7 +121,11 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     unit: '% FFB',
     category: 'inputs',
     isComputed: true,
-    description: 'Driver steering force from the force feedback, with light-hands and counter-steer moments (DuckDB laps)',
+    description: "The driver's steering force from the force feedback, positive pushing left. Two laps compare only at the "
+      + 'same in-game FFB strength, which the recording does not hold. Amber bands: light hands, the force changes while the wheel '
+      + "stays still. Red bands: passive counter-steer, the hands push against the wheel's angle. Measured on laps with DuckDB "
+      + 'telemetry; replay laps of a car fitted on your own laps show an estimate (≈) from lateral g and balance, without '
+      + 'light-hands bands',
     badgeColor: 'text-lmu-azure bg-lmu-azure-strong/20',
     lineColor: TELEMETRY_COLORS.steerForce,
   },

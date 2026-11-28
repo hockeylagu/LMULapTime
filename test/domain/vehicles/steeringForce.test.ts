@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeSteeringForce } from '../../../shared/domain/vehicles/steeringForce.js';
+import { computeSteeringForce, estimateFfbPct } from '../../../shared/domain/vehicles/steeringForce.js';
 
 const RANGE_DEG = 540;
 /** A 100 Hz trace from per-sample wheel angles (steering-wheel degrees, ISO) and FFB (% , ISO). */
@@ -57,5 +57,19 @@ describe('computeSteeringForce', () => {
     const force = trace(1, () => 30, () => undefined);
     expect(force.driverForcePct.every(value => value === undefined)).toBe(true);
     expect(count(force.holdingStill) + count(force.passiveCounterSteer)).toBe(0);
+  });
+});
+
+describe('estimateFfbPct', () => {
+  const fit = { c1: 20, c2: 10 };
+  it('opposes the lateral g with the full trail while the front tyres grip, and only c1 once they slide', () => {
+    expect(estimateFfbPct(1.5, 0, fit)).toBeCloseTo(-45);
+    // 0.05 rad (2.86°) of understeer: the trail term is gone; half of it, half the term.
+    expect(estimateFfbPct(1.5, (0.05 * 180) / Math.PI, fit)).toBeCloseTo(-30);
+    expect(estimateFfbPct(-1.5, (0.025 * 180) / Math.PI, fit)).toBeCloseTo(37.5);
+  });
+
+  it('keeps the full trail in oversteer: a rear slide does not lighten the front', () => {
+    expect(estimateFfbPct(1, -5, fit)).toBeCloseTo(-30);
   });
 });

@@ -543,6 +543,19 @@ export function initDbSchema(db: DatabaseType): void {
       rejected_at INTEGER NOT NULL,
       PRIMARY KEY (session_id, replay_filename)
     );
+
+    -- Each car's FFB from its replay channels (shared/domain/vehicles/steeringForce.ts estimateFfbPct), fitted by
+    -- tools/analysis/fitSteeringForce.ts --write on the driver's own laps with both a replay and DuckDB telemetry, at the
+    -- FFB strength driven then. held_out_r2 is the fit's score on sessions it was not fitted on.
+    CREATE TABLE IF NOT EXISTS steering_force_fit (
+      car_model TEXT PRIMARY KEY,
+      c1 REAL NOT NULL,
+      c2 REAL NOT NULL,
+      held_out_r2 REAL NOT NULL,
+      laps_count INTEGER NOT NULL,
+      newest_session TEXT NOT NULL,
+      fitted_at INTEGER NOT NULL
+    );
   `);
 
   initSessionSummarySchema(db);

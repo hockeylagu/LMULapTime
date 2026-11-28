@@ -170,3 +170,27 @@ describe('applyTelemetryPostProcessingToTrajectory', () => {
     expect(trajectory.points.map(p => p.gear)).toEqual([2, 0]);
   });
 });
+
+describe('the estimated steering force', () => {
+  // 2 s at 120 km/h, 1 g to the left, a sample every 20 ms; the wheel at `steer` (normalized, ISO).
+  const lap = (steer: number, extra: Partial<ReplayTrajectoryPoint> = {}): ReplayTrajectoryData => ({
+    replayName: 'test', pointsCount: 101, bounds: { minX: 0, maxX: 67, minZ: 0, maxZ: 0, spanX: 67, spanZ: 0 },
+    steeringForceFit: { c1: 20, c2: 10 },
+    points: Array.from({ length: 101 }, (_, i) => point({ x: i * 0.67, timeSec: i * 0.02, speedKmh: 120, accelLatG: 1, steerYaw: steer, ...extra })),
+  });
+
+  it('gives a lap without measured FFB the force of its car fit, flagged estimated, with counter-steer and never holding still', () => {
+    const points = applyTelemetryPostProcessingToTrajectory(lap(-0.1)).points;
+    // 1 g left: the FFB pushes the wheel right, the hands hold it left. The wheel turned right: counter-steer.
+    expect(points[50].driverForcePct).toBeGreaterThan(19);
+    expect(points[50].driverForceEstimated).toBe(true);
+    expect(points[50].passiveCounterSteer).toBe(true);
+    expect(points.some(p => p.steerHoldStill)).toBe(false);
+  });
+
+  it('leaves a lap with measured FFB as measured', () => {
+    const points = applyTelemetryPostProcessingToTrajectory(lap(0.1, { ffbPct: -30, driverForcePct: 30 })).points;
+    expect(points[50].driverForcePct).toBe(30);
+    expect(points.some(p => p.driverForceEstimated)).toBe(false);
+  });
+});

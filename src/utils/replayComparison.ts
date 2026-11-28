@@ -48,6 +48,7 @@ export interface InterpolatedPoint {
   driverForcePct?: number;
   steerHoldStill?: true;
   passiveCounterSteer?: true;
+  driverForceEstimated?: true;
 }
 
 export interface PointComparison {
@@ -192,7 +193,7 @@ function blendTelemetryPoints(
     ? Number((p0.driverForcePct + t * (p1.driverForcePct - p0.driverForcePct)).toFixed(1))
     : (p0.driverForcePct ?? p1.driverForcePct);
   // The steering markers are the nearer sample's, as the gear.
-  const { steerHoldStill, passiveCounterSteer } = t < 0.5 ? p0 : p1;
+  const { steerHoldStill, passiveCounterSteer, driverForceEstimated } = t < 0.5 ? p0 : p1;
 
   return {
     timeSec: relativeTime,
@@ -229,6 +230,7 @@ function blendTelemetryPoints(
     ...(driverForcePct === undefined ? {} : { driverForcePct }),
     ...(steerHoldStill ? { steerHoldStill } : {}),
     ...(passiveCounterSteer ? { passiveCounterSteer } : {}),
+    ...(driverForceEstimated ? { driverForceEstimated } : {}),
   };
 }
 

@@ -181,7 +181,7 @@ acceleration signs. Screen coordinates are display coordinates, not vehicle axes
 | `steerYaw` | Steering left | VCR wheel position and DuckDB `Steering Pos` negated at decode |
 | `steerTorqueNm` | Column torque turning the wheel left | DuckDB `Steering Shaft Torque` (Nm) negated at decode |
 | `ffbPct` | Force feedback turning the wheel left | DuckDB `FFB Output` (% of the wheel base's peak, ±100) negated at decode |
-| `driverForcePct` | The driver's hands pushing the wheel left | `-ffbPct` after a centred 0.15 s mean, on the full-rate lap (`shared/domain/vehicles/steeringForce.ts`); `steerHoldStill` and `passiveCounterSteer` mark its two moments, set only where true |
+| `driverForcePct` | The driver's hands pushing the wheel left | `-ffbPct` after a centred 0.15 s mean, on the full-rate lap (`shared/domain/vehicles/steeringForce.ts`); `steerHoldStill` and `passiveCounterSteer` mark its two moments, set only where true. Laps without DuckDB telemetry, of a car in `steering_force_fit`: estimated in the client from `accelLatG` and `understeerDeg` (`estimateFfbPct`), flagged `driverForceEstimated`, with no `steerHoldStill` |
 | `lateralOffsetM` | Left of the centerline | Track projection onto the left-hand normal |
 | `understeerDeg` | Understeer (oversteer negative) | Not an axis; independent of turn direction |
 

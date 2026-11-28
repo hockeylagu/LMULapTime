@@ -1,3 +1,5 @@
+import type { SteeringForceFit } from '../../types/replay.js';
+
 /**
  * The driver's steering force, from the FFB the game sends to the wheel base, and two moments worth a look: the
  * hands holding the wheel still while the force changes ("light hands", trail braking) and the driver pushing against
@@ -27,6 +29,27 @@
  * 0.9 (Barcelona race, 18), 0.8 (Le Mans race, 16); passive counter-steer 3, 2, 12 and 42 moments. To confirm with
  * the driver (plan step 6c): the moments land where the driver remembers light hands and counter-steer.
  */
+
+/**
+ * A replay carries no FFB, but it carries what makes it. The column torque is the front tyres' lateral force times their
+ * trail, and the trail shrinks as the front tyres pass their grip peak, so per car:
+ * `ffbPct ≈ −a_y × (c1 + c2 × max(0, 1 − u⁺ / u0))`, with `a_y` the lateral g, `u⁺` the understeer angle (the balance
+ * channel, radians; only understeer shrinks the front trail, a rear slide does not) and `u0` 0.05 rad.
+ * c1 and c2 are fitted offline per car on the driver's own laps with both a replay and DuckDB telemetry
+ * (`tools/analysis/fitSteeringForce.ts`), so they hold that driver's in-game FFB strength. Checked 2026-11-28 on 310
+ * laps (10 cars, GT3 / GTE / LMP3 / Hypercar, 9 tracks), fitted on half the sessions and scored on the others from
+ * replay inputs alone: R² 0.91–0.97 a car (0.93 all), 6–11 % RMS. Of the two moments, passive counter-steer reads
+ * from the estimate (45–88 % of the measured samples found, 40–94 % of the found ones measured); holding still does
+ * not (0–57 % found, 9–87 % right): it is the FFB's own short changes, which the estimate smooths, so an estimated
+ * lap carries no holding-still moment.
+ */
+export const STEERING_FORCE_TRAIL_U0_RAD = 0.05;
+
+/** The FFB in % (ISO sign) a car's fit gives for a lateral g and a balance angle (`understeerDeg`, + understeer). */
+export function estimateFfbPct(accelLatG: number, understeerDeg: number, fit: SteeringForceFit): number {
+  const trail = Math.max(0, 1 - Math.max(0, (understeerDeg * Math.PI) / 180) / STEERING_FORCE_TRAIL_U0_RAD);
+  return -accelLatG * (fit.c1 + fit.c2 * trail);
+}
 
 /** Centred mean of the FFB, seconds. */
 export const STEERING_FORCE_MEAN_SEC = 0.15;

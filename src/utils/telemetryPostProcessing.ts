@@ -1,7 +1,8 @@
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint, SteeringForceFit } from '../../shared/types/index.js';
 import { computeVehicleDynamics } from './computedTelemetry.js';
 import { getSteerAngleDeg } from '../../shared/domain/vehicles/steering.js';
 import { resolveVehicleHandling } from '../../shared/domain/vehicles/handling.js';
+import { computeSteeringForce, estimateFfbPct } from '../../shared/domain/vehicles/steeringForce.js';
 import type { VehicleHandlingCalibration } from '../../shared/types/dataPlugin.js';
 
 const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
@@ -161,5 +162,32 @@ export function applyTelemetryPostProcessing(points: ReplayTrajectoryPoint[], ca
 export function applyTelemetryPostProcessingToTrajectory<T extends ReplayTrajectoryData | null | undefined>(trajectory: T): T {
   if (!trajectory) return trajectory;
   const handlingCalibration = resolveVehicleHandling(trajectory.vehicleData, trajectory.setupSteering);
-  return { ...trajectory, handlingCalibration, points: applyTelemetryPostProcessing(trajectory.points, handlingCalibration) };
+  const points = applyTelemetryPostProcessing(trajectory.points, handlingCalibration);
+  const fit = trajectory.steeringForceFit;
+  return { ...trajectory, handlingCalibration,
+    points: fit ? withEstimatedSteeringForce(trajectory.points, points, fit, handlingCalibration.steeringWheelRangeDeg) : points };
+}
+
+/**
+ * A lap without measured FFB, of a car with a fit: the driver's steering force and passive counter-steer from the
+ * estimated FFB (`estimateFfbPct`), on the processed lateral g and balance. The served lap is already spaced, so the
+ * mean and the moment run on its points; the estimate is smooth, which the spacing keeps. No holding still: the
+ * estimate cannot show it.
+ */
+function withEstimatedSteeringForce(
+  raw: ReplayTrajectoryPoint[], points: ReplayTrajectoryPoint[], fit: SteeringForceFit, steeringWheelRangeDeg: number,
+): ReplayTrajectoryPoint[] {
+  if (raw.some(point => point.ffbPct !== undefined)) return points;
+  const force = computeSteeringForce({
+    timeSec: sampleTimes(points),
+    steer: raw.map(point => point.steerYaw ?? 0),
+    ffbPct: points.map(point => (point.accelLatG === undefined ? undefined : estimateFfbPct(point.accelLatG, point.understeerDeg ?? 0, fit))),
+    speedKmh: points.map(point => point.speedKmh ?? 0),
+    steeringWheelRangeDeg,
+  });
+  return points.map((point, i) => {
+    const driverForcePct = force.driverForcePct[i];
+    if (driverForcePct === undefined) return point;
+    return { ...point, driverForcePct, driverForceEstimated: true, ...(force.passiveCounterSteer[i] ? { passiveCounterSteer: true } : {}) };
+  });
 }

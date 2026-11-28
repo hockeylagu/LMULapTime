@@ -19,6 +19,8 @@ import { getDriverEvents, getReplayLaps, getReplayRunningOrder } from '../core/r
 import { parseBoundedInteger, queryString } from './queryParams.js';
 import { readReplaySessionContext } from '../core/sessionRows/replayContext.js';
 import { hasVerifiedLiveCapture } from '../core/live/dbLiveCaptureStore.js';
+import { readSteeringForceFit } from '../core/dbSteeringForceFitStore.js';
+import { carModel } from '../corners/cornerAnalysisService.js';
 import { replayDaylightClock } from '../../shared/domain/scenery/replayDaylightClock.js';
 import type { ReplayDaylightClock, ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
 import type { ReplaySessionContext } from '../replay/replayServiceTypes.js';
@@ -150,6 +152,10 @@ export function createReplayRouter(context: ServerContext): Router {
         pointSpacingM,
         allowDuckDb: queryString(req.query.source)?.toLowerCase() !== 'vcr',
       });
+      // A lap without measured FFB gets its car's fit, from which the client estimates the steering force.
+      const steeringForceFit = trajectory.source === 'duckdb' ? undefined
+        : readSteeringForceFit(context.sessionDb.getDb(), carModel(trajectory.vehicleIdentity?.carType ?? null));
+      if (steeringForceFit) trajectory.steeringForceFit = steeringForceFit;
       const daylightClock = lapDaylightClock(trajectorySession, driverOrdinal, lapOrdinal, trajectory);
       res.json({ ...trajectory, ...(daylightClock ? { daylightClock } : {}),
         ...(hasVerifiedLiveCapture(context.sessionDb.getDb(), sessionId, driverOrdinal) ? { hasLiveCapture: true } : {}) });

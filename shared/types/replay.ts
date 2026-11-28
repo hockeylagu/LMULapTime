@@ -146,6 +146,8 @@ export interface ReplayTrajectoryPoint {
   steerHoldStill?: true;
   /** The hands push against the wheel's angle (passive counter-steer); absent when not. */
   passiveCounterSteer?: true;
+  /** `driverForcePct` is estimated from the replay (`steeringForceFit`), not measured; absent on measured laps. */
+  driverForceEstimated?: true;
   distM?: number;
   stationM?: number;
   /** Metres left of the reference centerline (positive left, OpenDRIVE t). */
@@ -297,6 +299,15 @@ export interface ReplayDaylightClock {
   scene?: string;
 }
 
+/**
+ * One car's FFB from its replay channels, fitted on the driver's own laps that also have DuckDB telemetry
+ * (`tools/analysis/fitSteeringForce.ts`): `ffbPct ≈ −a_y × (c1 + c2 × trail)`, see `estimateFfbPct`.
+ */
+export interface SteeringForceFit {
+  c1: number;
+  c2: number;
+}
+
 export interface ReplayTrajectoryData {
   /** Attachment hint only; the live-evidence API validates current ownership before use. */
   hasLiveCapture?: boolean;
@@ -310,6 +321,8 @@ export interface ReplayTrajectoryData {
   handlingCalibration?: VehicleHandlingCalibration;
   /** DuckDB laps: the run's steering lock from the recording's car setup (`VM_STEER_LOCK`). */
   setupSteering?: SetupSteeringCalibration;
+  /** Laps without DuckDB telemetry: the car's FFB fit, from which the client estimates the steering force. */
+  steeringForceFit?: SteeringForceFit;
   dataPluginRevision?: string;
   replayName: string;
   driverSlot?: number;

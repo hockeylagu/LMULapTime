@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { ArrowUp, ArrowDown, Sparkles } from 'lucide-react';
 import { TelemetryChannelInfo, TelemetryChannelId } from './telemetryPresets.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
@@ -20,6 +20,15 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
   onToggle,
   onMove,
 }) => {
+  const description = `${channel.description} (${channel.unit})`;
+  const descriptionRef = useRef<HTMLSpanElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [cut, setCut] = useState(false);
+  // A cut-off description offers More; measured while it is one line.
+  useLayoutEffect(() => {
+    const element = descriptionRef.current;
+    if (element && !expanded) setCut(element.scrollWidth > element.clientWidth);
+  }, [description, expanded]);
   return (
     <div
       className={`px-2 py-2 border-b border-lmu-border/50 flex items-center justify-between gap-2 transition-colors ${
@@ -59,11 +68,17 @@ export const TelemetryPresetChannelRow: React.FC<TelemetryPresetChannelRowProps>
           <span className="text-[12px] font-medium text-white truncate">
             {channel.name}
           </span>
-          <span className="text-[10px] text-lmu-muted truncate">
-            {channel.description} ({channel.unit})
+          <span ref={descriptionRef} title={description} className={`text-[10px] text-lmu-muted ${expanded ? '' : 'truncate'}`}>
+            {description}
           </span>
         </div>
       </label>
+      {(cut || expanded) && (
+        <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}
+          className={`self-end shrink-0 px-1 text-[10px] font-semibold text-lmu-text-soft hover:text-lmu-text cursor-pointer rounded ${FOCUS_RING}`}>
+          {expanded ? 'Less' : 'More'}
+        </button>
+      )}
 
       {isActive && (
         <div className="flex items-center gap-1 shrink-0">

@@ -181,11 +181,6 @@ events (driver-confirmed: the mapped wheel preset switches as intended). Nothing
 
 ## 3D replay
 
-- [3D telemetry traces](proposed/TELEMETRY_3D_TRACES.md): any chart channel as a curtain over each lap's line in the
-  lap view's 3D scene, in the chart's colours and scale, and the driver's steering force from the DuckDB
-  `Steering Shaft Torque` and `FFB Output` channels. Part 1 built 2026-11-28, waiting on acceptance. Part 2, behind its
-  own gate: steering force on replay-only laps.
-
 [3D replay](proposed/REPLAY_3D.md): lap and race views share one scene on the accepted personal-v18 package and
 freeze-v18 look; the performance goal is met. Next round: the analysis/UX features (awaiting the user's pick), parked fidelity
 items and the open code-review findings.
