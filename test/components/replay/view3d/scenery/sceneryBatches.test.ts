@@ -1,4 +1,4 @@
-import { BatchedMesh, BoxGeometry, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, Vector3, type BufferAttribute, type BufferGeometry, type Material } from 'three';
+import { BatchedMesh, BoxGeometry, Float32BufferAttribute, Group, Mesh, MeshDepthMaterial, MeshStandardMaterial, Vector3, type BufferAttribute, type BufferGeometry, type Material } from 'three';
 import { expect, it } from 'vitest';
 import type { SceneryMaterialTotals } from '../../../../../shared/packageContract/index.js';
 import { surfaceTextureUnits } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
@@ -69,18 +69,35 @@ it('splits a material by shadow flags, each part reserving the material totals',
   expect(created.map(batch => [batch.castShadow, batch.maxInstanceCount])).toEqual([[false, 2], [true, 2]]);
 });
 
-it('keeps its own draw for a glTF material, a camera-facing or hooked mesh', () => {
+it('keeps its own draw for a glTF material or a hooked mesh', () => {
   const batches = createSceneryBatches(new Group(), [totals('a', 1, 1), totals('g', 1, 1)], 16);
-  const card = new Mesh(new BoxGeometry(), material('c')); card.customDepthMaterial = new MeshDepthMaterial(); card.userData.lmuMaterial = 'c';
   const flag = new Mesh(new BoxGeometry(), material('f')); flag.onBeforeRender = () => {}; flag.userData.lmuMaterial = 'f';
   const root = chunk([new BoxGeometry(), material('a')], [new BoxGeometry(), material('g', {transparent: true})]);
   // A mesh without a surface description keeps its chunk's own glTF material: it cannot share a batch with other chunks.
   const gltf = new MeshStandardMaterial(); gltf.userData.lmuMaterial = 'a';
-  root.add(card, flag, Object.assign(new Mesh(new BoxGeometry(), gltf), {userData: {lmuMaterial: 'a'}}));
+  root.add(flag, Object.assign(new Mesh(new BoxGeometry(), gltf), {userData: {lmuMaterial: 'a'}}));
   const [batch, glass] = batches.add(root);
   // The see-through surface batches too, its instances sorted back to front; the opaque batch is not sorted.
-  expect((root.children as Mesh[]).map(mesh => mesh.visible)).toEqual([false, false, true, true, true]);
+  expect((root.children as Mesh[]).map(mesh => mesh.visible)).toEqual([false, false, true, true]);
   expect([batch.sortObjects, glass.sortObjects]).toEqual([false, true]);
+});
+
+it('batches camera-facing cards with their shadow material, the culling bounds grown by how far a card reaches as it turns', () => {
+  const batches = createSceneryBatches(new Group(), [totals('c', 1, 2)], 16), leaves = material('c'), shadow = new MeshDepthMaterial();
+  // A card's corners: 3 m either side of its pivot.
+  const geometry = new BoxGeometry();
+  geometry.setAttribute('_lmu_corner', new Float32BufferAttribute(Array.from({length: geometry.getAttribute('position').count}, (_, i) => [i % 2 ? 3 : -3, 0]).flat(), 2));
+  const root = chunk([geometry, leaves], [geometry, leaves]);
+  for (const card of root.children as Mesh[]) card.customDepthMaterial = shadow;
+  (root.children[1] as Mesh).scale.setScalar(2); // A card scaled twice reaches twice as far.
+  const [batch] = batches.add(root);
+  expect([batch.instanceCount, batch.customDepthMaterial, root.children.some(card => card.visible)]).toEqual([2, shadow, false]);
+  // The box's own bounds (half a metre, up to 1 m scaled), grown by the widest reach: 6 m.
+  expect(batch.boundingBox!.max.x).toBeCloseTo(1 + 6);
+  // A card with another shadow material cannot join the batch.
+  const other = chunk([geometry, leaves]);
+  (other.children[0] as Mesh).customDepthMaterial = new MeshDepthMaterial();
+  expect(() => batches.add(other)).toThrow('draws with two materials');
 });
 
 it('keeps its own draw for a node the night switch shows and hides', () => {

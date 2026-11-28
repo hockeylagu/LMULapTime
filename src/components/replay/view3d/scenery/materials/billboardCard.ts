@@ -35,8 +35,17 @@ export function trackCardFacing(camera: Camera): void {
   setScene('surface_cardFacing', [axisZ.x, 0, axisZ.z, 1]);
 }
 
-/** The card's attributes and its turn toward an eye (level), or the overhead camera's own way (`surface_cardFacing`). */
+/**
+ * The card's attributes and its turn toward an eye (level), or the overhead camera's own way (`surface_cardFacing`). `CARD_MODEL` is
+ * the card's model matrix: in a batch (sceneryBatches.ts) its instance's matrix too, which three's `batching_vertex` reads before the
+ * card's slots.
+ */
 const CARD_PARS = `
+    #ifdef USE_BATCHING
+      #define CARD_MODEL (modelMatrix * batchingMatrix)
+    #else
+      #define CARD_MODEL modelMatrix
+    #endif
     attribute vec3 _lmu_pivot;
     attribute vec2 _lmu_corner;
     vec3 cardToEye(vec3 eye, vec3 pivotWorld) {
@@ -49,11 +58,11 @@ const CARD_PARS = `
  * local direction whose world direction is d.
  */
 const cardPosition = (eye: string) => `
-    vec3 pivotWorld = (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz;
+    vec3 pivotWorld = (CARD_MODEL * vec4(_lmu_pivot, 1.0)).xyz;
     vec3 directionToCamera = cardToEye(${eye}, pivotWorld);
     bool facingCamera = length(directionToCamera) > 0.0001;
     vec3 rightWorld = facingCamera ? normalize(cross(vec3(0.0,1.0,0.0), directionToCamera)) : vec3(1.0,0.0,0.0);
-    vec3 rightLocal = normalize(rightWorld * mat3(modelMatrix));
+    vec3 rightLocal = normalize(rightWorld * mat3(CARD_MODEL));
     transformed = _lmu_pivot + rightLocal * _lmu_corner.x + vec3(0.0,_lmu_corner.y,0.0);`;
 
 /**
@@ -61,10 +70,10 @@ const cardPosition = (eye: string) => `
  * left whole crowds facing away from the sun).
  */
 const cardNormal = (eye: string) => `
-    { vec3 toEye = cardToEye(${eye}, (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz);
-      if (length(toEye) > 0.0001) objectNormal = normalize(normalize(toEye) * mat3(modelMatrix));
+    { vec3 toEye = cardToEye(${eye}, (CARD_MODEL * vec4(_lmu_pivot, 1.0)).xyz);
+      if (length(toEye) > 0.0001) objectNormal = normalize(normalize(toEye) * mat3(CARD_MODEL));
       #ifdef USE_TANGENT
-        objectTangent = normalize(normalize(cross(vec3(0.0,1.0,0.0), toEye)) * mat3(modelMatrix));
+        objectTangent = normalize(normalize(cross(vec3(0.0,1.0,0.0), toEye)) * mat3(CARD_MODEL));
       #endif
     }`;
 
@@ -75,13 +84,13 @@ const cardNormal = (eye: string) => `
  * rather than reading as an underside. Backlit cards get a normal the translucency can use. A local normal (transpose(M) * world).
  */
 const crownNormal = (eye: string) => `
-    { vec3 toEye = cardToEye(${eye}, (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz);
+    { vec3 toEye = cardToEye(${eye}, (CARD_MODEL * vec4(_lmu_pivot, 1.0)).xyz);
       if (length(toEye) > 0.0001) {
         vec3 facing = normalize(toEye), across = normalize(cross(vec3(0.0,1.0,0.0), toEye));
         float side = clamp(2.0 * clamp(_lmu_corner.x, 0.0, 1.0) - 1.0, -1.0, 1.0);
         float up = clamp(2.0 * clamp(_lmu_corner.y, 0.0, 1.0) - 1.0, 0.0, 1.0) * clamp(1.0 - dot(facing, surface_crownSun), 0.0, 1.0);
         vec3 crownNormal = facing + across * side + vec3(0.0, up, 0.0);
-        objectNormal = normalize(normalize(crownNormal) * mat3(modelMatrix));
+        objectNormal = normalize(normalize(crownNormal) * mat3(CARD_MODEL));
       } }`;
 
 /**

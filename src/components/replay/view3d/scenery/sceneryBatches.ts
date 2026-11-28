@@ -52,8 +52,8 @@ function rangeOf(mesh: Mesh): {inSq: number; outSq: number} {
 
 /**
  * Whether a mesh can draw from a batch. Only configured surfaces share one material across chunks (a mesh without a surface
- * description keeps its chunk's own glTF material). A camera-facing card has its own shadow material, and a mesh with a per-draw
- * hook must keep its own draw. A see-through surface (fences, glass, decals) batches too, its batch sorting its instances back to
+ * description keeps its chunk's own glTF material). A camera-facing card batches with its shadow material (`customDepthMaterial`,
+ * which its batch takes), and a mesh with a per-draw hook must keep its own draw. A see-through surface (fences, glass, decals) batches too, its batch sorting its instances back to
  * front in each pass. A program whose samplers plus the batch's vertex textures pass `maxTextures` (three's limit on texture units
  * across both stages) keeps its mesh's own draw, and so does a node the night switch shows and hides (night/nightSwitch.ts).
  */
@@ -61,7 +61,18 @@ function batchable(mesh: Mesh<BufferGeometry, Material | Material[]>, maxTexture
   if (!mesh.visible || sceneVisibility(mesh) || Array.isArray(mesh.material) || mesh.material.userData.surfaceConfigured !== true) return false;
   const units: unknown = mesh.material.userData.surfaceTextureUnits;
   if (typeof units !== 'number') throw Error(`Configured scenery material without its texture unit count (${mesh.name})`);
-  return units + BATCH_VERTEX_TEXTURES <= maxTextures && !mesh.customDepthMaterial && mesh.onBeforeRender === Object3D.prototype.onBeforeRender;
+  return units + BATCH_VERTEX_TEXTURES <= maxTextures && mesh.onBeforeRender === Object3D.prototype.onBeforeRender;
+}
+
+/**
+ * How far a camera-facing card's corners reach from its rest plane as it turns (its widest `_lmu_corner`), metres; 0 for a mesh that
+ * is no card. Its batch's culling bounds grow by it, as the card's own bounds did (configureSurfaceMaterial.ts).
+ */
+function cardReach(geometry: BufferGeometry): number {
+  const corners = geometry.getAttribute('_lmu_corner');
+  let reach = 0;
+  if (corners) for (let i = 0; i < corners.count; i++) reach = Math.max(reach, Math.abs(corners.getX(i)));
+  return reach;
 }
 
 /**
@@ -79,10 +90,12 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
   const batches = new Map<string, Batch>(), byKey = new Map<string, Batch[]>(), used = new Map<string, Used>();
   const chunks = new Map<Object3D, {placed: Placed[]; shown: boolean}>();
   const hiddenInReflection: BatchedMesh[] = [];
+  /** A card batch's widest card reach (`cardReach`), world metres. */
+  const reaches = new Map<BatchedMesh, number>();
   const batchFor = (key: string, mesh: Mesh<BufferGeometry, Material>, layout: string, fresh: BatchedMesh[]): Batch => {
     const reflected = reflects(mesh), id = `${key}|${mesh.castShadow}|${mesh.receiveShadow}|${reflected}`, existing = batches.get(id);
     if (existing) {
-      if (existing.mesh.material !== mesh.material) throw Error(`Scenery material ${key} draws with two materials (${mesh.name})`);
+      if (existing.mesh.material !== mesh.material || existing.mesh.customDepthMaterial !== mesh.customDepthMaterial) throw Error(`Scenery material ${key} draws with two materials (${mesh.name})`);
       if (existing.layout !== layout) throw Error(`Scenery material ${key} has primitives with different attributes (${mesh.name})`);
       return existing;
     }
@@ -90,6 +103,7 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
     if (!total) throw Error(`Scenery material ${key} is not in the layout (${mesh.name})`);
     const made = createBatch({...total, material: mesh.material, name: `batch ${id}`, castShadow: mesh.castShadow, receiveShadow: mesh.receiveShadow});
     made.sortObjects = mesh.material.transparent;
+    made.customDepthMaterial = mesh.customDepthMaterial;
     // Outside the scene until a chunk that draws from it is shown, like a chunk's root: three sets a drawn object's program even
     // with no instance to draw, so a batch in the scene before its chunk's warm-up would link its program on the main thread.
     const batch = {mesh: made, layout};
@@ -151,6 +165,7 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
         const key: unknown = mesh.userData.lmuMaterial;
         if (typeof key !== 'string') throw Error(`Scenery material without its package key (${mesh.name})`);
         const batch = batchFor(key, mesh, layoutOf(mesh.geometry), fresh), total = totals.get(key)!;
+        if (mesh.customDepthMaterial) reaches.set(batch.mesh, Math.max(reaches.get(batch.mesh) ?? 0, cardReach(mesh.geometry) * mesh.matrixWorld.getMaxScaleOnAxis()));
         const count = used.get(key) ?? {primitives: 0, draws: 0};
         used.set(key, count); keys.add(key);
         let placed = byBatch.get(batch.mesh);
@@ -174,8 +189,13 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
       // The originals stay in the chunk (their materials are released with it) but draw nothing, hold no geometry and are in no
       // camera layer, so no program is linked for them (sceneWarmup.ts).
       for (const mesh of moved) { mesh.geometry.dispose(); mesh.geometry = MOVED; mesh.visible = false; mesh.layers.disableAll(); }
-      // A batch's bounds (its frustum culling) cover the instances it had when first computed: they grow with each chunk.
-      for (const batch of byBatch.keys()) computeBatchBounds(batch);
+      // A batch's bounds (its frustum culling) cover the instances it had when first computed: they grow with each chunk, a card
+      // batch's by its cards' reach as they turn.
+      for (const batch of byBatch.keys()) {
+        computeBatchBounds(batch);
+        const reach = reaches.get(batch) ?? 0;
+        batch.boundingBox!.expandByScalar(reach); batch.boundingSphere!.radius += reach;
+      }
       // The last primitive of a material fills its batches: they keep no CPU copy past their next upload. A material only switched parts
       // draw has none.
       for (const key of keys) if (used.get(key)!.primitives === totals.get(key)!.primitives) for (const {mesh} of byKey.get(key) ?? []) releaseBatchOnUpload(mesh);
@@ -206,7 +226,7 @@ export function createSceneryBatches(parent: Object3D, materials: readonly Scene
     notReflected: () => hiddenInReflection,
     dispose() {
       for (const {mesh} of batches.values()) { mesh.removeFromParent(); mesh.dispose(); }
-      batches.clear(); hiddenInReflection.length = 0; byKey.clear(); counts.clear(); chunks.clear(); used.clear();
+      batches.clear(); reaches.clear(); hiddenInReflection.length = 0; byKey.clear(); counts.clear(); chunks.clear(); used.clear();
     },
   };
 }

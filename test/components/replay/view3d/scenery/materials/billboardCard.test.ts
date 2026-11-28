@@ -14,7 +14,9 @@ describe('camera-facing cards', () => {
   it("turns a card and its normal toward the eye in the vertex stage, a leaf card's normal shaped as its crown", () => {
     const card = billboardPart(false), leaf = billboardPart(true);
     expect(card.slots.vertexPosition?.glsl).toContain('vec3 directionToCamera = cardToEye(cameraPosition, pivotWorld);');
-    expect(card.slots.vertexNormal?.glsl).toContain('objectNormal = normalize(normalize(toEye) * mat3(modelMatrix));');
+    expect(card.slots.vertexNormal?.glsl).toContain('objectNormal = normalize(normalize(toEye) * mat3(CARD_MODEL));');
+    // In a batch the card turns in its instance's frame (three's batching matrix), else in its mesh's.
+    expect(card.slots.vertexPars?.glsl).toMatch(/#ifdef USE_BATCHING\s+#define CARD_MODEL \(modelMatrix \* batchingMatrix\)\s+#else\s+#define CARD_MODEL modelMatrix/);
     expect(card.slots.vertexNormal?.glsl).not.toContain('crownNormal');
     expect(leaf.slots.vertexNormal?.glsl).toContain('float up = clamp(2.0 * clamp(_lmu_corner.y, 0.0, 1.0) - 1.0, 0.0, 1.0) * clamp(1.0 - dot(facing, surface_crownSun), 0.0, 1.0);');
     expect(card.slots.fragmentPars?.glsl).toBe('#define SURFACE_CARD');
