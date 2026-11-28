@@ -9,7 +9,7 @@ export function pixelAlignedCursor(pct: number, left: number, width: number, rat
   };
 }
 
-export function TelemetryScrubCursor({ cursorPct, className = '' }: { cursorPct: number; className?: string }) {
+export function TelemetryScrubCursor({ cursorPct, className = '', testId = 'telemetry-scrub-cursor' }: { cursorPct: number; className?: string; testId?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState<{ left: number; width: number; ratio: number } | null>(null);
   useLayoutEffect(() => {
@@ -27,6 +27,6 @@ export function TelemetryScrubCursor({ cursorPct, className = '' }: { cursorPct:
   }, []);
   const style = bounds ? pixelAlignedCursor(cursorPct, bounds.left, bounds.width, bounds.ratio)
     : { left: `${cursorPct}%`, width: 1 };
-  return <div ref={ref} data-testid="telemetry-scrub-cursor" aria-hidden="true"
+  return <div ref={ref} data-testid={testId} aria-hidden="true"
     style={style} className={`absolute inset-y-0 bg-white pointer-events-none z-30 ${className}`} />;
 }

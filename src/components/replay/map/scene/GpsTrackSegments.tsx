@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildTrackLineRuns,
   getHeatmapColor,
@@ -14,6 +14,7 @@ import {
 import { GpsTrackHoverTooltip } from '../display/GpsTrackHoverTooltip.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { EMPTY_ARRAY } from '../../../../utils/emptyDefaults.js';
+import { setTrackHover } from '../telemetry/trackHover.js';
 
 export interface GpsTrackSegmentsProps {
   svgPoints: ProjectedPoint[];
@@ -124,6 +125,10 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
     setHoveredPoint(pts[nearestRunVertex(pts, run.from, run.to, at.sx, at.sy)]);
   }, []);
   const handlePointerLeave = useCallback(() => setHoveredPoint(null), []);
+  // The strip charts draw a hover line where the pointer is on the line (`trackHover.ts`); the car stays.
+  const hoveredDistM = hoveredPoint && primaryDists ? primaryDists[hoveredPoint.idx] ?? null : null;
+  useEffect(() => { setTrackHover(hoveredDistM); }, [hoveredDistM]);
+  useEffect(() => () => setTrackHover(null), []);
 
   return (
     <>

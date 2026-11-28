@@ -3,6 +3,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { GpsTrackSegments } from '../../../../../src/components/replay/map/scene/GpsTrackSegments.js';
 import type { ProjectedPoint } from '../../../../../src/components/replay/map/replayMapUtils.js';
 import { TELEMETRY_COLORS } from '../../../../../src/utils/themeColors.js';
+import { TelemetryHoverLine } from '../../../../../src/components/replay/telemetry/TelemetryHoverLine.js';
 
 /** The test DOM has no layout: give the path an identity screen transform so clicks map 1:1 to SVG space. */
 function withIdentityCtm(el: Element): Element {
@@ -162,8 +163,10 @@ describe('GpsTrackSegments', () => {
     expect(paths[1].getAttribute('stroke')).not.toBe('#334155');
   });
 
-  it('displays telemetry hover tooltip when pointer moves over the track line', () => {
+  it('displays telemetry hover tooltip when pointer moves over the track line, and the charts a hover line there', () => {
     const { container } = render(
+      <div>
+      <div className="relative"><TelemetryHoverLine cumDists={[100, 200, 300]} viewStart={0} viewEnd={2} pctForIndex={i => i * 50} /></div>
       <svg>
         <GpsTrackSegments
           svgPoints={mockPrimaryPoints}
@@ -173,11 +176,13 @@ describe('GpsTrackSegments', () => {
           onSelectIndex={vi.fn()}
         />
       </svg>
+      </div>
     );
 
     const hitPath = container.querySelector('path[data-track-line="hit-target"]');
     expect(hitPath).toBeInTheDocument();
     expect(container.querySelector('[data-testid="gps-track-hover-tooltip"]')).toBeNull();
+    expect(container.querySelector('[data-testid="telemetry-hover-line"]')).toBeNull();
 
     if (hitPath) {
       fireEvent.pointerMove(withIdentityCtm(hitPath), { clientX: 110, clientY: 110 });
@@ -186,11 +191,13 @@ describe('GpsTrackSegments', () => {
     expect(tooltip).toBeInTheDocument();
     expect(tooltip?.textContent).toContain('120 km/h');
     expect(tooltip?.textContent).toContain('-0.15s');
+    expect(container.querySelector('[data-testid="telemetry-hover-line"]')).toBeInTheDocument();
 
     if (hitPath) {
       fireEvent.pointerLeave(hitPath);
     }
     expect(container.querySelector('[data-testid="gps-track-hover-tooltip"]')).toBeNull();
+    expect(container.querySelector('[data-testid="telemetry-hover-line"]')).toBeNull();
   });
 
   it('displays telemetry hover tooltip with delta even when colorBy is pedal mode', () => {

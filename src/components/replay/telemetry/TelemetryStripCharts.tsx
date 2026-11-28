@@ -12,6 +12,7 @@ import { TelemetryResolution } from './telemetryResolution.js';
 import { LoadingState } from '../../common/LoadingState.js';
 import { usePlaybackPosition } from '../inspector/replayPlaybackCursor.js';
 import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
+import { TelemetryHoverLine } from './TelemetryHoverLine.js';
 import { SURFACE_FOCUS_RING } from '../../common/buttonStyles.js';
 import { MarkerAButton, TelemetryDeltaMarker, measureMarkerSpan } from './TelemetryDeltaMarker.js';
 import type { SteeringWheelRanges } from './channels/inputs/steerDegrees.js';
@@ -235,7 +236,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         currentTimeSec={currentTimeSec}
         totalFrames={points.length}
         headerContent={headerContent}
-        markerOverlay={markerOverlay}
+        markerOverlay={<>{markerOverlay}<TelemetryHoverLine cumDists={cumDists} viewStart={viewStart} viewEnd={viewEnd} pctForIndex={pctForIndex} /></>}
         markerButton={<MarkerAButton markerDistM={markerDistM} cursorDistM={cumDists[safeIndex]} onToggle={toggleMarkerAtCursor} className="h-6 rounded-lg text-[11px]" />}
         dragSelection={dragSelection}
         markerPcts={metrics} activeChannels={activePreset?.channels}
